@@ -1,0 +1,25 @@
+///|
+/// Remove build artifacts from the workspace.
+///
+/// Usage: `mise run clean`, or `moonx scripts/clean.mbtx`.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+}
+
+///|
+async fn main {
+  println("🧹 Cleaning build artifacts...")
+  let _ = @process.run(
+    "moon", ["clean"],
+    stdout=@stdio.stdout, stderr=@stdio.stderr,
+  )
+  for dir in ["_build", "scripts/_build"] {
+    if @fs.exists(dir) {
+      @fs.rmdir(dir, recursive=true)
+    }
+  }
+  println("✅ Clean complete")
+}

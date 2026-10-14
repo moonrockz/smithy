@@ -1,0 +1,108 @@
+///|
+/// Check that the package structure of the workspace is valid.
+///
+/// - `moon.work` exists and lists at least one member.
+/// - Each active member has `moon.mod`, and `moon.pkg` in its root or in a sub-directory.
+/// - Each directory under `pkgs/` and `apps/` that has `moon.mod` is an active member.
+///
+/// A member is active when its line starts, after whitespace, with a quoted path (`"pkgs/x"` or
+/// `"./pkgs/x"`). A commented-out entry starts with `#`, so it does not count.
+///
+/// Usage: `mise run validate:packages`, or `moonx scripts/validate-packages.mbtx`.
+/// It exits with 0 when the structure is valid, else with 1.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+/// Directories whose children are workspace members.
+let member_roots : Array[String] = ["pkgs", "apps"]
+
+///|
+/// Parse the active members out of `moon.work`, without a leading `./`.
+fn members(work : String) -> Array[String] {
+  let found = []
+  for line in work.split("\n") {
+    let entry = line.trim_start(chars=" \t\r").to_owned()
+    guard entry.has_prefix("\"") else { continue }
+    let rest = entry[1:]
+    guard rest.find("\"") is Some(end) else { continue }
+    let path = rest[:end].to_owned()
+    let path = if path.has_prefix("./") { path[2:].to_owned() } else { path }
+    if path == "." || path.is_empty() {
+      continue
+    }
+    found.push(path)
+  }
+  found
+}
+
+///|
+/// Whether any directory at or below `dir` contains `moon.pkg`.
+async fn has_package(dir : String) -> Bool {
+  if @fs.exists("\{dir}/moon.pkg") {
+    return true
+  }
+  for entry in @fs.readdir(dir) {
+    let child = "\{dir}/\{entry}"
+    guard entry != "_build" && entry != ".mooncakes" else { continue }
+    guard @fs.kind(child) is Directory else { continue }
+    if has_package(child) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+async fn main {
+  println("🔍 Verifying package structure...")
+  let mut errors = 0
+  let error = fn(message : String) {
+    println("❌ ERROR: \{message}")
+    errors += 1
+  }
+  let work = if @fs.exists("moon.work") {
+    @fs.read_file("moon.work").text()
+  } else {
+    error("moon.work workspace manifest missing")
+    ""
+  }
+  let active = members(work)
+  if work != "" && active.is_empty() {
+    error("moon.work lists no members")
+  }
+  for path in active {
+    if !@fs.exists(path) {
+      error("\{path} is a moon.work member but the directory is missing")
+      continue
+    }
+    if !@fs.exists("\{path}/moon.mod") {
+      error("moon.mod missing for \{path}")
+      continue
+    }
+    if !has_package(path) {
+      error("\{path} has no moon.pkg in its tree")
+      continue
+    }
+    println("✓ \{path}")
+  }
+  for root in member_roots {
+    guard @fs.exists(root) else { continue }
+    for entry in @fs.readdir(root) {
+      let dir = "\{root}/\{entry}"
+      guard @fs.exists("\{dir}/moon.mod") else { continue }
+      if !active.contains(dir) {
+        error("\{dir} has moon.mod but is not an active member in moon.work")
+      }
+    }
+  }
+  if errors == 0 {
+    println("✅ All package configurations valid")
+  } else {
+    println("❌ Found \{errors} configuration error(s)")
+    @sys.exit(1)
+  }
+}

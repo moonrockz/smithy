@@ -1,0 +1,39 @@
+///|
+/// Build every workspace member for one or more targets.
+///
+/// Usage: `mise run build [-- <target>... [--release]]`, or `moonx scripts/build.mbtx <target>...`.
+/// With no target, it builds wasm, wasm-gc, js and native. The native target is always a release build.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]
+
+///|
+async fn main {
+  let args = @env.args()[1:]
+  let release = args.contains("--release")
+  let targets = args.filter(fn(arg) { !arg.has_prefix("--") })
+  let targets = if targets.is_empty() { all_targets } else { targets }
+  for target in targets {
+    println("🔨 Building for \{target}...")
+    let moon_args = ["build", "--target", target]
+    if release || target == "native" {
+      moon_args.push("--release")
+    }
+    let code = @process.run(
+      "moon", moon_args,
+      stdout=@stdio.stdout, stderr=@stdio.stderr,
+    )
+    if code != 0 {
+      println("❌ Build failed for \{target}")
+      @sys.exit(if code > 0 { code } else { 1 })
+    }
+  }
+  println("✅ All builds complete")
+}

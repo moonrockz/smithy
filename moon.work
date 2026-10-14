@@ -1,0 +1,5 @@
+members = [
+  ".",
+  "./pkgs/smithy",
+  "./apps/smithy",
+]

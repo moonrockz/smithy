@@ -1,0 +1,106 @@
+# Mise configuration for the moonrockz/smithy monorepo.
+#
+# Tools are pinned here. Tasks are MoonBit scripts in scripts/*.mbtx, run with moonx, so one script
+# works on every platform (see AGENTS.md, "Task scripts").
+#
+# Local overrides go in .config/mise/config.local.toml (gitignored); see config.local.toml.example.
+
+[tools]
+# Node.js runs the js target in `moon test --target js` and `moon run --target js`.
+node = "24.14.1"
+
+# YAML linting
+yamllint = "latest"
+
+# MoonBit toolchain, pinned. mise cannot resolve "latest" for an http: tool, and a pinned version
+# keeps CI and every machine on the same compiler. To move to a newer release, change the version
+# here and in each URL (with "+" written as "%2B"), taken from
+# https://cli.moonbitlang.com/binaries/<version>/.
+#
+# The binary archive omits the core library. CI (and a fresh machine) completes it with
+# `curl -fsSL https://cli.moonbitlang.com/install/unix.sh | MOON_HOME=$(mise where http:moonbit) bash -s -- <version>`.
+
+[tools."http:moonbit"]
+version = "0.10.15+943464bfa"
+bin_path = "bin"
+
+[tools."http:moonbit".platforms]
+linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.15%2B943464bfa/moonbit-linux-x86_64.tar.gz" }
+macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.15%2B943464bfa/moonbit-darwin-aarch64.tar.gz" }
+windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.15%2B943464bfa/moonbit-windows-x86_64.zip", format = "zip" }
+
+[env]
+_.path = ["./node_modules/.bin"]
+
+# Every task is a MoonBit script: `moonx scripts/<name>.mbtx`. Pass arguments after `--`.
+
+[tasks.build]
+description = "Build all workspace members (args: targets, --release; default: wasm wasm-gc js native)"
+run = "moonx scripts/build.mbtx"
+
+[tasks."build:wasm"]
+description = "Build all workspace members for the wasm target"
+run = "moonx scripts/build.mbtx wasm"
+
+[tasks."build:wasm-gc"]
+description = "Build all workspace members for the wasm-gc target"
+run = "moonx scripts/build.mbtx wasm-gc"
+
+[tasks."build:js"]
+description = "Build all workspace members for the js target"
+run = "moonx scripts/build.mbtx js"
+
+[tasks."build:native"]
+description = "Build all workspace members as native release executables"
+run = "moonx scripts/build.mbtx native --release"
+
+[tasks.test]
+description = "Run tests for all workspace members (args: targets; default: wasm wasm-gc js native)"
+run = "moonx scripts/test.mbtx"
+
+[tasks.format]
+description = "Format MoonBit code"
+run = "moonx scripts/format.mbtx"
+
+[tasks.lint]
+description = "Run all lint tasks (YAML, MoonBit format and check)"
+run = "moonx scripts/lint.mbtx"
+
+[tasks."lint:moonbit"]
+description = "Check MoonBit formatting and run moon check"
+run = "moonx scripts/lint-moonbit.mbtx"
+
+[tasks."lint:yaml"]
+description = "Lint YAML files with yamllint"
+run = "moonx scripts/lint-yaml.mbtx"
+
+[tasks.validate]
+description = "Run all validation checks"
+depends = ["validate:packages"]
+
+[tasks."validate:packages"]
+description = "Verify the workspace package structure against moon.work"
+run = "moonx scripts/validate-packages.mbtx"
+
+[tasks.check]
+description = "Run lint, validate, test and build"
+run = "moonx scripts/check.mbtx"
+
+[tasks.clean]
+description = "Remove build artifacts"
+run = "moonx scripts/clean.mbtx"
+
+[tasks."setup:hooks"]
+description = "Install the pre-push git hook (idempotent)"
+run = "moonx scripts/setup-hooks.mbtx"
+
+[tasks.list-tasks]
+description = "List all mise tasks"
+run = "mise tasks"
+
+[hooks]
+# Install git hooks when entering the directory.
+enter = "mise run setup:hooks"
+
+[settings]
+experimental = true

@@ -1,0 +1,62 @@
+///|
+/// Install the pre-push git hook that runs lint and validation before a push. Idempotent.
+///
+/// Usage: `mise run setup:hooks`, or `moonx scripts/setup-hooks.mbtx`. It runs on `mise` directory
+/// entry too (see `[hooks]` in `.config/mise/config.toml`). Skipped in CI and outside a git checkout.
+/// Bypass the hook with `git push --no-verify` (not recommended).
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+}
+
+///|
+let pre_push : String =
+  #|#!/usr/bin/env bash
+  #|# Pre-push hook: runs lint and validation before allowing a push.
+  #|# Installed by `mise run setup:hooks` (scripts/setup-hooks.mbtx). Do not edit by hand.
+  #|set -e
+  #|
+  #|if ! command -v mise >/dev/null 2>&1; then
+  #|  echo "❌ mise is not installed or not in PATH: https://mise.jdx.dev/"
+  #|  exit 1
+  #|fi
+  #|
+  #|echo "🔍 Running pre-push checks..."
+  #|mise run lint || { echo "❌ Lint failed. Run: mise run lint"; exit 1; }
+  #|mise run validate || { echo "❌ Validation failed. Run: mise run validate"; exit 1; }
+  #|echo "✅ Pre-push checks passed."
+  #|
+
+///|
+fn truthy(name : String) -> Bool {
+  match @env.get_env_var(name) {
+    Some("true") | Some("1") => true
+    _ => false
+  }
+}
+
+///|
+async fn main {
+  if truthy("CI") || truthy("GITHUB_ACTIONS") {
+    return
+  }
+  let (code, out, _) = @process.collect_output("git", [
+    "rev-parse", "--git-path", "hooks",
+  ])
+  if code != 0 {
+    // Not a git checkout: nothing to do.
+    return
+  }
+  let hooks_dir = out.text().trim().to_owned()
+  let hook = "\{hooks_dir}/pre-push"
+  if @fs.exists(hook) && @fs.read_file(hook).text() == pre_push {
+    return
+  }
+  println("🔧 Installing git pre-push hook at \{hook}...")
+  @fs.mkdir(hooks_dir, recursive=true, allow_exist=true)
+  @fs.write_file(hook, pre_push)
+  @fs.chmod(hook, 0o755)
+  println("✅ Git hook installed. It runs 'mise run lint' and 'mise run validate' before each push.")
+}

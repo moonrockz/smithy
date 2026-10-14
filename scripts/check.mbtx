@@ -1,0 +1,29 @@
+///|
+/// Run the full local gate: lint, validate, test, build.
+///
+/// Usage: `mise run check`, or `moonx scripts/check.mbtx`.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+async fn main {
+  println("🔍 Running all checks...")
+  for task in ["lint", "validate", "test", "build"] {
+    println("")
+    println("=== \{task} ===")
+    let code = @process.run(
+      "mise", ["run", task],
+      stdout=@stdio.stdout, stderr=@stdio.stderr,
+    )
+    if code != 0 {
+      println("❌ \{task} failed")
+      @sys.exit(if code > 0 { code } else { 1 })
+    }
+  }
+  println("")
+  println("✅ All checks passed!")
+}

@@ -1,0 +1,7 @@
+# Copy this file to .config/mise/config.local.toml for local overrides (gitignored).
+#
+# [tools]
+# node = "24.15.0"
+#
+# [env]
+# DEBUG = "true"

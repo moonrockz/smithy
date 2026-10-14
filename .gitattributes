@@ -1,0 +1,5 @@
+*.yml text eol=lf
+*.yaml text eol=lf
+*.mbt text eol=lf
+*.mbtx text eol=lf
+*.toml text eol=lf

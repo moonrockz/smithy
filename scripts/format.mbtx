@@ -1,0 +1,23 @@
+///|
+/// Format all MoonBit code in the workspace.
+///
+/// Usage: `mise run format`, or `moonx scripts/format.mbtx`.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+async fn main {
+  println("🎨 Formatting MoonBit code...")
+  let code = @process.run(
+    "moon", ["fmt"],
+    stdout=@stdio.stdout, stderr=@stdio.stderr,
+  )
+  if code != 0 {
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+  println("✅ Formatting complete")
+}

@@ -1,0 +1,6 @@
+pkgtype(kind: "executable")
+
+import {
+  "moonrockz/smithy",
+  "moonbitlang/core/env",
+}
