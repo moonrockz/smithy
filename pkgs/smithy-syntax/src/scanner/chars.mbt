@@ -32,6 +32,26 @@ fn is_ident_char(c : Char) -> Bool {
 }
 
 ///|
+fn is_hex(c : Char) -> Bool {
+  is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
+///|
+/// Whether the text at `at` starts with `s`.
+fn looking_at(text : String, at : @span.Offset, s : String) -> Bool {
+  let n = s.length()
+  if at.0 + n > text.length() {
+    return false
+  }
+  for k in 0..<n {
+    if text.code_unit_at(at.0 + k) != s.code_unit_at(k) {
+      return false
+    }
+  }
+  true
+}
+
+///|
 /// The offset of the first unit at or after `from` that fails `pred` (or
 /// the end of the text).
 fn skip_while(

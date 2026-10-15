@@ -146,13 +146,3 @@ pub fn scan_at(text : String, at : @span.Offset) -> Step? {
     },
   )
 }
-
-///|
-fn scan_string_or_text_block(text : String, at : @span.Offset) -> Step {
-  scan_unexpected(text, at)
-}
-
-///|
-fn scan_number(text : String, at : @span.Offset) -> Step {
-  scan_unexpected(text, at)
-}
