@@ -17,6 +17,7 @@
 - Functional style: public functions are pure (a value in, a value out, no hidden state). Mutation is allowed only for local accumulators and the parser's private cursor inside one `parse` call. Diagnostics are returned as values, never pushed into shared state across functions. Linear multi-stage flows are written as `|>` pipelines.
 - Text output goes through core's `Logger` trait (`&Logger`), the sink that `StringBuilder`, `@buffer.Buffer` and `Show::output` share; a renderer never holds a concrete `StringBuilder` in its API. The async `@io.Writer` of `moonbitlang/async` is byte-oriented and belongs to the CLI boundary (sub-project 5), which writes rendered strings to it.
 - Every value type with an invariant (`Offset`, `Length`, `Line`, `Column`, `Span`, `Depth`) has quickcheck laws beside its unit tests, in a `*_law_test.mbt` file.
+- Three test layers: unit and law tests inside `pkgs/smithy-syntax` (every target), the corpus parity tests in `harness/corpus`, and acceptance features in Gherkin (`tests/features/*.feature`) run by `moonrockz/moonspec@0.11.0` from `harness/bdd`. The harness module depends on `moonbitlang/async`, which supports js and native, so `mise run test` runs the harness on those two targets only; the library runs on all four.
 - LF and CRLF are line breaks; a lone CR is not.
 - Every AST node has `span`; every list field is `ArrayView[T]`; every public type derives `Eq, Debug`. `derive(Show)` is deprecated on this toolchain: write `impl Show` by hand where a type needs it.
 - Diagnostic codes are `SM-SCAN-001`..`SM-SCAN-007` and `SM-PARSE-001`..`SM-PARSE-011`, exactly as listed in Task 3; a test checks the table against what is emitted.
@@ -26,6 +27,7 @@
 - Build and test from the workspace root: `moon check`, `moon test`, `moon test --target js|wasm|wasm-gc|native`. On this ARM64 Windows machine, `.config/mise/config.local.toml` (gitignored) disables the pinned `http:moonbit` and uses `~/.moon/bin`; if `mise run` fails with "No URL for platform windows-arm64", recreate that file (see Task 1 step 1).
 - Every public function and type has a `///|` doc comment; package READMEs are `README.mbt.md` with ` ```mbt check ` blocks that `moon test` runs.
 - Messages are in Elm's voice: first person, what I was parsing, what I saw, what I expected. Never "syntax error" alone.
+- Test inputs and expected outputs that span lines are written as MoonBit multiline literals (`#|` lines, parenthesized; `$|` lines when the text interpolates), never as `"...\n..."` strings. The exceptions are texts whose point is an invisible character (CRLF, a lone CR, a tab, a unicode escape), which stay escaped so the character is visible in the source.
 
 ## Review Focus
 
@@ -1389,7 +1391,13 @@ test "a shape id scans as adjacent pieces" {
 
 ///|
 test "whitespace, commas and comments are trivia" {
-  let s = stream("a, b // c\n/// doc\nd")
+  let s = stream(
+    (
+      #|a, b // c
+      #|/// doc
+      #|d
+    ),
+  )
   inspect(s.tokens.length(), content="3")
   @expect.expect(s.tokens[0].trivia_after.map(t => t.text())).to_equal([",", " "])
   @expect.expect(s.tokens[1].trivia_after.map(t => t.text())).to_equal([" ", "// c", "\n"])
@@ -1402,7 +1410,13 @@ test "whitespace, commas and comments are trivia" {
 
 ///|
 test "trivia after a token stops at the first line break" {
-  let s = stream("a\n\n  b")
+  let s = stream(
+    (
+      #|a
+      #|
+      #|  b
+    ),
+  )
   @expect.expect(s.tokens[0].trivia_after.map(t => t.text())).to_equal(["\n"])
   @expect.expect(s.tokens[1].trivia_before.map(t => t.text())).to_equal(["\n", "  "])
 }
@@ -1418,10 +1432,18 @@ test "CRLF is one newline trivia and the scan is lossless" {
 
 ///|
 test "a text with only trivia keeps it on the stream" {
-  let s = stream("  // hi\n")
+  let s = stream(
+    (
+      #|  // hi
+      #|
+    ),
+  )
   inspect(s.tokens.length(), content="0")
   inspect(s.trivia.length(), content="3")
-  inspect(s.to_source(), content="  // hi\n")
+  inspect(s.to_source(), content=(
+    #|  // hi
+    #|
+  ))
 }
 
 ///|
@@ -1976,7 +1998,12 @@ fn scodes(text : String) -> Array[String] {
 
 ///|
 test "quoted strings" {
-  @expect.expect(skinds("\"\" \"hi\" \"a\\\"b\" \"multi\nline\"")).to_equal([
+  @expect.expect(skinds(
+    (
+      #|"" "hi" "a\"b" "multi
+      #|line"
+    ),
+  )).to_equal([
     String, String, String, String,
   ])
   inspect(@scanner.tokenize_text("\"a\\\"b\"").tokens[0].lexeme, content="\"a\\\"b\"")
@@ -1984,10 +2011,28 @@ test "quoted strings" {
 
 ///|
 test "an unterminated string runs to the end and is SM-SCAN-002" {
-  let s = @scanner.tokenize_text("\"abc\nstring Foo")
-  @expect.expect(skinds("\"abc\nstring Foo")).to_equal([Error])
-  @expect.expect(scodes("\"abc\nstring Foo")).to_equal(["SM-SCAN-002"])
-  inspect(s.to_source(), content="\"abc\nstring Foo")
+  let s = @scanner.tokenize_text(
+    (
+      #|"abc
+      #|string Foo
+    ),
+  )
+  @expect.expect(skinds(
+    (
+      #|"abc
+      #|string Foo
+    ),
+  )).to_equal([Error])
+  @expect.expect(scodes(
+    (
+      #|"abc
+      #|string Foo
+    ),
+  )).to_equal(["SM-SCAN-002"])
+  inspect(s.to_source(), content=(
+    #|"abc
+    #|string Foo
+  ))
 }
 
 ///|
@@ -2002,7 +2047,11 @@ test "bad escapes keep the String token and report each one" {
 
 ///|
 test "text blocks" {
-  let text = "\"\"\"\n    hello\n    \"\"\""
+  let text = (
+    #|"""
+    #|    hello
+    #|    """
+  )
   @expect.expect(skinds(text)).to_equal([TextBlock])
   @expect.expect(scodes(text)).to_equal([])
   inspect(@scanner.tokenize_text(text).tokens[0].lexeme == text, content="true")
@@ -2010,7 +2059,11 @@ test "text blocks" {
 
 ///|
 test "a text block may hold one or two quotes in a row" {
-  let text = "\"\"\"\n  say \"hi\" or \"\"hey\"\"\n  \"\"\""
+  let text = (
+    #|"""
+    #|  say "hi" or ""hey""
+    #|  """
+  )
   @expect.expect(skinds(text)).to_equal([TextBlock])
 }
 
@@ -2018,13 +2071,29 @@ test "a text block may hold one or two quotes in a row" {
 test "a text block must start with a line break" {
   @expect.expect(scodes("\"\"\"hello\"\"\"")).to_equal(["SM-SCAN-004"])
   @expect.expect(skinds("\"\"\"hello\"\"\"")).to_equal([TextBlock])
-  @expect.expect(scodes("\"\"\"   \n x\n\"\"\"")).to_equal([])
+  @expect.expect(scodes(
+    (
+      #|"""   
+      #| x
+      #|"""
+    ),
+  )).to_equal([])
 }
 
 ///|
 test "an unterminated text block is SM-SCAN-003" {
-  @expect.expect(scodes("\"\"\"\n abc")).to_equal(["SM-SCAN-003"])
-  @expect.expect(skinds("\"\"\"\n abc")).to_equal([Error])
+  @expect.expect(scodes(
+    (
+      #|"""
+      #| abc
+    ),
+  )).to_equal(["SM-SCAN-003"])
+  @expect.expect(skinds(
+    (
+      #|"""
+      #| abc
+    ),
+  )).to_equal([Error])
 }
 ```
 
@@ -2203,7 +2272,12 @@ Expected: string tests pass.
 test "unescape decodes the known escapes and keeps unknown ones" {
   @expect.expect_all(e => {
     e.expect(@scanner.unescape("\"\"")).to_equal("")
-    e.expect(@scanner.unescape("\"a\\nb\"")).to_equal("a\nb")
+    e.expect(@scanner.unescape("\"a\\nb\"")).to_equal(
+      (
+        #|a
+        #|b
+      ),
+    )
     e.expect(@scanner.unescape("\"\\t\\r\\b\\f\\/\\\\\\\"\"")).to_equal("\t\r\u{8}\u{c}/\\\"")
     e.expect(@scanner.unescape("\"\\u00e9\"")).to_equal("é")
     e.expect(@scanner.unescape("\"\\uD83D\\uDE00\"")).to_equal("\u{1F600}")
@@ -2214,20 +2288,43 @@ test "unescape decodes the known escapes and keeps unknown ones" {
 
 ///|
 test "text_block_value removes incidental whitespace" {
-  let block = "\"\"\"\n    hello\n      world\n    \"\"\""
-  inspect(@scanner.text_block_value(block), content="hello\n  world\n")
+  let block = (
+    #|"""
+    #|    hello
+    #|      world
+    #|    """
+  )
+  inspect(@scanner.text_block_value(block), content=(
+    #|hello
+    #|  world
+    #|
+  ))
 }
 
 ///|
 test "the closing quotes on the content's last line keep that line" {
-  let block = "\"\"\"\n  a\n  b\"\"\""
-  inspect(@scanner.text_block_value(block), content="a\nb")
+  let block = (
+    #|"""
+    #|  a
+    #|  b"""
+  )
+  inspect(@scanner.text_block_value(block), content=(
+    #|a
+    #|b
+  ))
 }
 
 ///|
 test "a last line of only spaces does not count toward the common prefix" {
-  let block = "\"\"\"\n      deep\n  \"\"\""
-  inspect(@scanner.text_block_value(block), content="deep\n")
+  let block = (
+    #|"""
+    #|      deep
+    #|  """
+  )
+  inspect(@scanner.text_block_value(block), content=(
+    #|deep
+    #|
+  ))
 }
 
 ///|
@@ -2238,20 +2335,39 @@ test "trailing spaces are removed and escapes run after stripping" {
 
 ///|
 test "an escaped line break joins lines" {
-  let block = "\"\"\"\n  a\\\n  b\n  \"\"\""
-  inspect(@scanner.text_block_value(block), content="ab\n")
+  let block = (
+    #|"""
+    #|  a\
+    #|  b
+    #|  """
+  )
+  inspect(@scanner.text_block_value(block), content=(
+    #|ab
+    #|
+  ))
 }
 
 ///|
 test "CRLF inside a text block is a line break" {
   let block = "\"\"\"\r\n  a\r\n  b\r\n  \"\"\""
-  inspect(@scanner.text_block_value(block), content="a\nb\n")
+  inspect(@scanner.text_block_value(block), content=(
+    #|a
+    #|b
+    #|
+  ))
 }
 
 ///|
 test "quotes inside a text block" {
-  let block = "\"\"\"\n  say \"hi\" or \"\"hey\"\"\n  \"\"\""
-  inspect(@scanner.text_block_value(block), content="say \"hi\" or \"\"hey\"\"\n")
+  let block = (
+    #|"""
+    #|  say "hi" or ""hey""
+    #|  """
+  )
+  inspect(@scanner.text_block_value(block), content=(
+    #|say "hi" or ""hey""
+    #|
+  ))
 }
 ```
 
@@ -2362,7 +2478,12 @@ fn is_blank(line : String) -> Bool {
 ///|
 /// The lines of a text block body, line breaks removed (`\r\n` and `\n`).
 fn block_lines(body : String) -> Array[String] {
-  body.split("\n").map(raw => raw.to_string().trim_end(chars="\r").to_string()).collect()
+  body.split(
+    (
+      #|
+      #|
+    ),
+  ).map(raw => raw.to_string().trim_end(chars="\r").to_string()).collect()
 }
 
 ///|
@@ -2414,7 +2535,12 @@ pub fn text_block_value(lexeme : String) -> String {
       line.unsafe_substring(start=cut, end=line.length()).trim_end(chars=" ").to_string()
     }
   })
-  .join("\n")
+  .join(
+    (
+      #|
+      #|
+    ),
+  )
   |> decode_escapes
 }
 ```
@@ -2677,7 +2803,12 @@ test "the generator produces text and shrinks toward fewer pieces" {
 test "the small model is non-empty and ends with a line break" {
   let m = @lawkit.small_model()
   inspect(m.length() > 100, content="true")
-  inspect(m.has_suffix("\n"), content="true")
+  inspect(m.has_suffix(
+    (
+      #|
+      #|
+    ),
+  ), content="true")
 }
 ```
 
@@ -3539,15 +3670,31 @@ fn o(n : Int) -> @span.Offset raise {
 
 ///|
 test "statements tile the stream and print the source back" {
-  let text = "namespace a.b\n\nstring Foo // c\n"
+  let text = (
+    #|namespace a.b
+    #|
+    #|string Foo // c
+    #|
+  )
   let s = @scanner.tokenize_text(text)
   let ns = @cst.StatementCst::new(kind=Namespace, name=Some("a.b"), tokens=s.tokens[0:4])
   let foo = @cst.StatementCst::new(kind=Shape(Simple(String)), name=Some("Foo"), tokens=s.tokens[4:6])
   let cst = @cst.IdlCst::new(s, [ns, foo])
   @expect.expect_all(e => {
     e.expect(cst.to_source()).to_equal(text)
-    e.expect(ns.to_source()).to_equal("namespace a.b\n\n")
-    e.expect(foo.to_source()).to_equal("string Foo // c\n")
+    e.expect(ns.to_source()).to_equal(
+      (
+        #|namespace a.b
+        #|
+        #|
+      ),
+    )
+    e.expect(foo.to_source()).to_equal(
+      (
+        #|string Foo // c
+        #|
+      ),
+    )
     e.expect(ns.span).to_equal(o(0).to(o(13)))
     e.expect(foo.span).to_equal(o(15).to(o(25)))
     e.expect(cst.skipped().length()).to_equal(0)
@@ -3564,8 +3711,16 @@ test "an empty statement has an empty span" {
 
 ///|
 test "a text with only trivia prints back" {
-  let s = @scanner.tokenize_text("// only\n")
-  inspect(@cst.IdlCst::new(s, []).to_source(), content="// only\n")
+  let s = @scanner.tokenize_text(
+    (
+      #|// only
+      #|
+    ),
+  )
+  inspect(@cst.IdlCst::new(s, []).to_source(), content=(
+    #|// only
+    #|
+  ))
 }
 ```
 
@@ -4597,7 +4752,15 @@ fn codes(text : String) -> Array[String] {
 
 ///|
 test "control, metadata, namespace and use parse in order" {
-  let r = @parser.parse_text("$version: \"2\"\nmetadata a = \"x\"\nnamespace com.foo\nuse smithy.api#String\n")
+  let r = @parser.parse_text(
+    (
+      #|$version: "2"
+      #|metadata a = "x"
+      #|namespace com.foo
+      #|use smithy.api#String
+      #|
+    ),
+  )
   guard r.ast is Some(f) else { fail("no ast") }
   @expect.expect_all(e => {
     e.expect(r.has_errors()).to_be_false()
@@ -4607,52 +4770,135 @@ test "control, metadata, namespace and use parse in order" {
     e.expect(f.namespace.map(n => n.namespace.value)).to_equal(Some("com.foo"))
     e.expect(f.uses[0].id.value.to_string()).to_equal("smithy.api#String")
     e.expect(r.cst.statements.length()).to_equal(4)
-    e.expect(r.cst.to_source()).to_equal("$version: \"2\"\nmetadata a = \"x\"\nnamespace com.foo\nuse smithy.api#String\n")
+    e.expect(r.cst.to_source()).to_equal(
+      (
+        #|$version: "2"
+        #|metadata a = "x"
+        #|namespace com.foo
+        #|use smithy.api#String
+        #|
+      ),
+    )
   })
 }
 
 ///|
 test "an unsupported version is SM-PARSE-006" {
-  @expect.expect(codes("$version: \"3\"\n")).to_equal(["SM-PARSE-006"])
-  @expect.expect(codes("$version: \"1.0\"\n")).to_equal([])
-  inspect(@parser.parse_text("$version: \"1\"\n").version, content="Some(V1)")
-  inspect(@parser.parse_text("namespace a\n").version, content="None")
+  @expect.expect(codes(
+    (
+      #|$version: "3"
+      #|
+    ),
+  )).to_equal(["SM-PARSE-006"])
+  @expect.expect(codes(
+    (
+      #|$version: "1.0"
+      #|
+    ),
+  )).to_equal([])
+  inspect(@parser.parse_text(
+    (
+      #|$version: "1"
+      #|
+    ),
+  ).version, content="Some(V1)")
+  inspect(@parser.parse_text(
+    (
+      #|namespace a
+      #|
+    ),
+  ).version, content="None")
 }
 
 ///|
 test "two statements on one line is MISSING LINE BREAK, also with CRLF files" {
-  @expect.expect(codes("namespace a use b#C\n")).to_equal(["SM-PARSE-003"])
+  @expect.expect(codes(
+    (
+      #|namespace a use b#C
+      #|
+    ),
+  )).to_equal(["SM-PARSE-003"])
   @expect.expect(codes("namespace a\r\nuse b#C\r\n")).to_equal([])
-  @expect.expect(codes("namespace a // ok\nuse b#C\n")).to_equal([])
-  let r = @parser.parse_text("namespace a use b#C\n")
+  @expect.expect(codes(
+    (
+      #|namespace a // ok
+      #|use b#C
+      #|
+    ),
+  )).to_equal([])
+  let r = @parser.parse_text(
+    (
+      #|namespace a use b#C
+      #|
+    ),
+  )
   inspect(r.diagnostics[0].title, content="MISSING LINE BREAK")
   inspect(r.diagnostics[0].message, content="I was expecting a line break here but found `use`")
 }
 
 ///|
 test "statements out of order are EXPECTED A STATEMENT with a note" {
-  let r = @parser.parse_text("namespace a\nmetadata x = \"y\"\n")
-  @expect.expect(codes("namespace a\nmetadata x = \"y\"\n")).to_equal(["SM-PARSE-004"])
+  let r = @parser.parse_text(
+    (
+      #|namespace a
+      #|metadata x = "y"
+      #|
+    ),
+  )
+  @expect.expect(codes(
+    (
+      #|namespace a
+      #|metadata x = "y"
+      #|
+    ),
+  )).to_equal(["SM-PARSE-004"])
   inspect(r.diagnostics[0].notes[0], content="Control statements (`$...`) come first, then `metadata`, then `namespace`.")
-  @expect.expect(codes("use a#B\n")).to_equal(["SM-PARSE-004"])
+  @expect.expect(codes(
+    (
+      #|use a#B
+      #|
+    ),
+  )).to_equal(["SM-PARSE-004"])
 }
 
 ///|
 test "a use statement needs an absolute id" {
-  @expect.expect(codes("namespace a\nuse Foo\n")).to_equal(["SM-PARSE-005"])
-  @expect.expect(codes("namespace a\nuse a.b#Foo$bar\n")).to_equal(["SM-PARSE-005"])
+  @expect.expect(codes(
+    (
+      #|namespace a
+      #|use Foo
+      #|
+    ),
+  )).to_equal(["SM-PARSE-005"])
+  @expect.expect(codes(
+    (
+      #|namespace a
+      #|use a.b#Foo$bar
+      #|
+    ),
+  )).to_equal(["SM-PARSE-005"])
 }
 
 ///|
 test "recovery skips to the next statement and keeps the CST lossless" {
-  let text = "namespace a\nuse Foo\nuse smithy.api#String\n"
+  let text = (
+    #|namespace a
+    #|use Foo
+    #|use smithy.api#String
+    #|
+  )
   let r = @parser.parse_text(text)
   guard r.ast is Some(f) else { fail("no ast") }
   @expect.expect_all(e => {
     e.expect(r.errors().length()).to_equal(1)
     e.expect(f.uses.length()).to_equal(1)
     e.expect(r.cst.skipped().length()).to_equal(1)
-    e.expect(r.cst.skipped()[0].to_source()).to_equal("use Foo\n")
+    e.expect(r.cst.skipped()[0].to_source()).to_equal(
+      (
+        #|use Foo
+        #|
+      ),
+    )
     e.expect(r.cst.to_source()).to_equal(text)
   })
 }
@@ -4662,21 +4908,52 @@ test "an empty file has no ast and no errors" {
   let r = @parser.parse_text("")
   inspect(r.ast is None, content="true")
   inspect(r.has_errors(), content="false")
-  inspect(@parser.parse_text("// just a comment\n").ast is None, content="true")
+  inspect(@parser.parse_text(
+    (
+      #|// just a comment
+      #|
+    ),
+  ).ast is None, content="true")
 }
 
 ///|
 test "doc comments before a namespace are detached warnings" {
-  let r = @parser.parse_text("/// hi\nnamespace a\n")
-  @expect.expect(codes("/// hi\nnamespace a\n")).to_equal(["SM-PARSE-009"])
+  let r = @parser.parse_text(
+    (
+      #|/// hi
+      #|namespace a
+      #|
+    ),
+  )
+  @expect.expect(codes(
+    (
+      #|/// hi
+      #|namespace a
+      #|
+    ),
+  )).to_equal(["SM-PARSE-009"])
   inspect(r.has_errors(), content="false")
   inspect(r.diagnostics[0].title, content="DETACHED DOC COMMENT")
 }
 
 ///|
 test "a scanner error is a hole the parser steps over" {
-  let r = @parser.parse_text("namespace a\n^\nuse a#B\n")
-  @expect.expect(codes("namespace a\n^\nuse a#B\n")).to_equal(["SM-SCAN-001"])
+  let r = @parser.parse_text(
+    (
+      #|namespace a
+      #|^
+      #|use a#B
+      #|
+    ),
+  )
+  @expect.expect(codes(
+    (
+      #|namespace a
+      #|^
+      #|use a#B
+      #|
+    ),
+  )).to_equal(["SM-SCAN-001"])
   guard r.ast is Some(f) else { fail("no ast") }
   inspect(f.uses.length(), content="1")
 }
@@ -4743,7 +5020,12 @@ git commit -m "feat(syntax): parse the control, metadata, namespace and use sect
 ///|
 /// Parse `metadata v = <text>` and return the value.
 fn value(text : String) -> @ast.NodeValue raise {
-  let r = @parser.parse_text("metadata v = \{text}\n")
+  let r = @parser.parse_text(
+    (
+      $|metadata v = \{text}
+      $|
+    ),
+  )
   guard r.ast is Some(f) && f.metadata.length() == 1 else {
     fail("no value: \{r.diagnostics}")
   }
@@ -4752,7 +5034,12 @@ fn value(text : String) -> @ast.NodeValue raise {
 
 ///|
 fn vcodes(text : String) -> Array[String] {
-  @parser.parse_text("metadata v = \{text}\n").diagnostics.iter().map(d => d.code).collect()
+  @parser.parse_text(
+    (
+      $|metadata v = \{text}
+      $|
+    ),
+  ).diagnostics.iter().map(d => d.code).collect()
 }
 
 ///|
@@ -4782,7 +5069,12 @@ test "numbers are exact" {
 
 ///|
 test "arrays and objects with optional commas and nested values" {
-  let v = value("[1, 2 3,\n {a: \"x\", \"b c\": [true]}]")
+  let v = value(
+    (
+      #|[1, 2 3,
+      #| {a: "x", "b c": [true]}]
+    ),
+  )
   guard v is Array(items, _) else { fail("not an array") }
   inspect(items.length(), content="4")
   inspect(items[3].get("a").bind(x => x.as_string()), content="Some(\"x\")")
@@ -4794,12 +5086,24 @@ test "arrays and objects with optional commas and nested values" {
 
 ///|
 test "a text block value is decoded" {
-  inspect(value("\"\"\"\n    hello\n    \"\"\"").as_string(), content="Some(\"hello\\n\")")
+  inspect(value(
+    (
+      #|"""
+      #|    hello
+      #|    """
+    ),
+  ).as_string(), content="Some(\"hello\\n\")")
 }
 
 ///|
 test "an unclosed array is reported once with the array as context" {
-  let r = @parser.parse_text("metadata v = [1, 2\nnamespace a\n")
+  let r = @parser.parse_text(
+    (
+      #|metadata v = [1, 2
+      #|namespace a
+      #|
+    ),
+  )
   inspect(r.errors().length(), content="1")
   let d = r.errors()[0]
   inspect(d.labels[0].text, content="an array started here")
@@ -4808,7 +5112,12 @@ test "an unclosed array is reported once with the array as context" {
 
 ///|
 test "a missing colon in an object names the key" {
-  let r = @parser.parse_text("metadata v = {a \"x\"}\n")
+  let r = @parser.parse_text(
+    (
+      #|metadata v = {a "x"}
+      #|
+    ),
+  )
   inspect(r.errors()[0].message, content="I was expecting `:` after the key `a` but found a string")
 }
 
@@ -5040,7 +5349,14 @@ git commit -m "feat(syntax): parse node values with exact numbers and a nesting 
 ```moonbit
 ///|
 fn model(body : String) -> @parser.ParseResult {
-  @parser.parse_text("$version: \"2\"\nnamespace com.foo\n\n\{body}")
+  @parser.parse_text(
+    (
+      $|$version: "2"
+      $|namespace com.foo
+      $|
+      $|\{body}
+    ),
+  )
 }
 
 ///|
@@ -5057,7 +5373,13 @@ fn scodes(body : String) -> Array[String] {
 
 ///|
 test "simple shapes" {
-  let ss = shapes("string Foo\nblob Bar with [Mix]\n")
+  let ss = shapes(
+    (
+      #|string Foo
+      #|blob Bar with [Mix]
+      #|
+    ),
+  )
   @expect.expect_all(e => {
     e.expect(ss.length()).to_equal(2)
     e.expect(ss[0].shape.name().value).to_equal("Foo")
@@ -5071,14 +5393,15 @@ test "simple shapes" {
 ///|
 test "structures with explicit and elided members and defaults" {
   let ss = shapes(
-    #|structure Foo for Res with [A, B] {
-    #|    @required
-    #|    bar: String = "x"
-    #|    $baz
-    #|    $qux = 1
-    #|}
-    #|
-    ,
+    (
+      #|structure Foo for Res with [A, B] {
+      #|    @required
+      #|    bar: String = "x"
+      #|    $baz
+      #|    $qux = 1
+      #|}
+      #|
+    ),
   )
   guard ss[0].shape is Aggregate(kind=Structure, for_resource=Some(res), mixins=Some(m), members~, ..) else {
     fail("not a structure")
@@ -5098,7 +5421,15 @@ test "structures with explicit and elided members and defaults" {
 
 ///|
 test "list, map, union and set" {
-  let ss = shapes("list L { member: String }\nmap M { key: String, value: Integer }\nunion U { a: String }\nset S { member: String }\n")
+  let ss = shapes(
+    (
+      #|list L { member: String }
+      #|map M { key: String, value: Integer }
+      #|union U { a: String }
+      #|set S { member: String }
+      #|
+    ),
+  )
   @expect.expect(ss.map(s => s.shape.kind())).to_equal([
     Aggregate(List), Aggregate(Map), Aggregate(Union), Aggregate(Set),
   ])
@@ -5108,7 +5439,18 @@ test "list, map, union and set" {
 
 ///|
 test "enum and intEnum members with values and traits" {
-  let ss = shapes("enum Color {\n  /// red\n  @deprecated\n  RED = \"red\"\n  BLUE\n}\nintEnum N { ONE = 1 }\n")
+  let ss = shapes(
+    (
+      #|enum Color {
+      #|  /// red
+      #|  @deprecated
+      #|  RED = "red"
+      #|  BLUE
+      #|}
+      #|intEnum N { ONE = 1 }
+      #|
+    ),
+  )
   guard ss[0].shape is Enum(kind=Enum, members~, ..) else { fail("not an enum") }
   @expect.expect_all(e => {
     e.expect(members.length()).to_equal(2)
@@ -5122,7 +5464,16 @@ test "enum and intEnum members with values and traits" {
 
 ///|
 test "service and resource bodies are node objects" {
-  let ss = shapes("service S {\n  version: \"1\"\n  operations: [Op]\n}\nresource R { identifiers: { id: String } }\n")
+  let ss = shapes(
+    (
+      #|service S {
+      #|  version: "1"
+      #|  operations: [Op]
+      #|}
+      #|resource R { identifiers: { id: String } }
+      #|
+    ),
+  )
   guard ss[0].shape is Entity(kind=Service, body~, ..) else { fail("not a service") }
   inspect(body.get("version").bind(v => v.as_string()), content="Some(\"1\")")
   guard ss[1].shape is Entity(kind=Resource, ..) else { fail("not a resource") }
@@ -5131,15 +5482,16 @@ test "service and resource bodies are node objects" {
 ///|
 test "operations with references, inline shapes and errors" {
   let ss = shapes(
-    #|operation Op {
-    #|    input := @sensitive for Res with [M] {
-    #|        id: String
-    #|    }
-    #|    output: Out
-    #|    errors: [E1, E2]
-    #|}
-    #|
-    ,
+    (
+      #|operation Op {
+      #|    input := @sensitive for Res with [M] {
+      #|        id: String
+      #|    }
+      #|    output: Out
+      #|    errors: [E1, E2]
+      #|}
+      #|
+    ),
   )
   guard ss[0].shape is Operation(properties~, ..) else { fail("not an operation") }
   inspect(properties.length(), content="3")
@@ -5158,38 +5510,91 @@ test "operations with references, inline shapes and errors" {
 
 ///|
 test "an unknown operation property is SM-PARSE-011" {
-  @expect.expect(scodes("operation Op { inputs: Foo }\n")).to_equal(["SM-PARSE-011"])
+  @expect.expect(scodes(
+    (
+      #|operation Op { inputs: Foo }
+      #|
+    ),
+  )).to_equal(["SM-PARSE-011"])
 }
 
 ///|
 test "a shape name must be an identifier (the reference's parse errors)" {
-  let r = model("string com.foo#Bam\n")
-  @expect.expect(scodes("string com.foo#Bam\n")).to_equal(["SM-PARSE-005"])
+  let r = model(
+    (
+      #|string com.foo#Bam
+      #|
+    ),
+  )
+  @expect.expect(scodes(
+    (
+      #|string com.foo#Bam
+      #|
+    ),
+  )).to_equal(["SM-PARSE-005"])
   inspect(r.errors()[0].message, content="a shape name is a plain identifier, but `com.foo#Bam` has a namespace")
-  @expect.expect(scodes("string Foo$bar\n")).to_equal(["SM-PARSE-005"])
+  @expect.expect(scodes(
+    (
+      #|string Foo$bar
+      #|
+    ),
+  )).to_equal(["SM-PARSE-005"])
 }
 
 ///|
 test "spaces inside a shape id are not a shape id" {
-  @expect.expect(scodes("structure S { a: smithy.api # String }\n")).to_equal(["SM-PARSE-001"])
+  @expect.expect(scodes(
+    (
+      #|structure S { a: smithy.api # String }
+      #|
+    ),
+  )).to_equal(["SM-PARSE-001"])
 }
 
 ///|
 test "a shape keyword needs a name on the same line" {
-  @expect.expect(scodes("string\nFoo\n")).to_equal(["SM-PARSE-001"])
-  let r = model("string\n")
+  @expect.expect(scodes(
+    (
+      #|string
+      #|Foo
+      #|
+    ),
+  )).to_equal(["SM-PARSE-001"])
+  let r = model(
+    (
+      #|string
+      #|
+    ),
+  )
   inspect(r.errors()[0].message, content="I was expecting a shape name after `string` but found the end of the file")
 }
 
 ///|
 test "members need a line break between them" {
-  @expect.expect(scodes("structure S { a: String b: String }\n")).to_equal(["SM-PARSE-003"])
-  @expect.expect(scodes("structure S { a: String, b: String }\n")).to_equal([])
+  @expect.expect(scodes(
+    (
+      #|structure S { a: String b: String }
+      #|
+    ),
+  )).to_equal(["SM-PARSE-003"])
+  @expect.expect(scodes(
+    (
+      #|structure S { a: String, b: String }
+      #|
+    ),
+  )).to_equal([])
 }
 
 ///|
 test "an unclosed structure is reported once, with the structure as context" {
-  let r = model("structure S {\n  a: String\nstring Foo\n")
+  let r = model(
+    (
+      #|structure S {
+      #|  a: String
+      #|string Foo
+      #|
+    ),
+  )
   let errs = r.errors()
   inspect(errs.length(), content="1")
   inspect(errs[0].labels[0].text, content="the structure `S` started here")
@@ -5203,7 +5608,14 @@ test "an unclosed structure is reported once, with the structure as context" {
 ```moonbit
 ///|
 fn tmodel(body : String) -> @parser.ParseResult {
-  @parser.parse_text("$version: \"2\"\nnamespace com.foo\n\n\{body}")
+  @parser.parse_text(
+    (
+      $|$version: "2"
+      $|namespace com.foo
+      $|
+      $|\{body}
+    ),
+  )
 }
 
 ///|
@@ -5215,7 +5627,17 @@ fn traits_of(body : String) -> Array[@ast.Trait] raise {
 
 ///|
 test "trait forms" {
-  let ts = traits_of("@a\n@b()\n@c(\"x\")\n@d(k: 1, \"j\": [true])\n@smithy.api#e(Foo)\nstring S\n")
+  let ts = traits_of(
+    (
+      #|@a
+      #|@b()
+      #|@c("x")
+      #|@d(k: 1, "j": [true])
+      #|@smithy.api#e(Foo)
+      #|string S
+      #|
+    ),
+  )
   @expect.expect_all(e => {
     e.expect(ts.length()).to_equal(5)
     e.expect(ts[0].body).to_equal(None)
@@ -5229,14 +5651,29 @@ test "trait forms" {
 
 ///|
 test "an unclosed trait body is reported with the trait as context" {
-  let r = tmodel("@a(k: 1\nstring S\n")
+  let r = tmodel(
+    (
+      #|@a(k: 1
+      #|string S
+      #|
+    ),
+  )
   inspect(r.errors().length(), content="1")
   inspect(r.errors()[0].labels[0].text, content="the trait `@a` started here")
 }
 
 ///|
 test "apply statements" {
-  let r = tmodel("apply Foo @since(\"1\")\napply Bar$baz {\n  @a\n  @b\n}\n")
+  let r = tmodel(
+    (
+      #|apply Foo @since("1")
+      #|apply Bar$baz {
+      #|  @a
+      #|  @b
+      #|}
+      #|
+    ),
+  )
   guard r.ast is Some(f) else { fail("no ast") }
   inspect(r.has_errors(), content="false")
   guard f.statements[0] is Apply(a) && f.statements[1] is Apply(b) else { fail("not applies") }
@@ -5252,7 +5689,12 @@ test "apply statements" {
 
 ///|
 test "traits with nothing after them are an error, not a crash" {
-  let r = tmodel("@a\n")
+  let r = tmodel(
+    (
+      #|@a
+      #|
+    ),
+  )
   inspect(r.errors().length(), content="1")
   inspect(r.errors()[0].message, content="I was expecting a shape after the traits but found the end of the file")
 }
@@ -5263,7 +5705,14 @@ test "traits with nothing after them are an error, not a crash" {
 ```moonbit
 ///|
 fn dmodel(body : String) -> @parser.ParseResult {
-  @parser.parse_text("$version: \"2\"\nnamespace com.foo\n\n\{body}")
+  @parser.parse_text(
+    (
+      $|$version: "2"
+      $|namespace com.foo
+      $|
+      $|\{body}
+    ),
+  )
 }
 
 ///|
@@ -5274,20 +5723,22 @@ fn dcodes(body : String) -> Array[String] {
 ///|
 test "doc comments attach to shapes, members, enum members and inline shapes" {
   let r = dmodel(
-    #|/// Shape docs.
-    #|/// Second line.
-    #|@a
-    #|structure S {
-    #|    /// Member docs.
-    #|    @b
-    #|    m: String
-    #|}
-    #|
-    #|operation Op {
-    #|    /// Inline docs.
-    #|    input := {}
-    #|}
-    #|
+    (
+      #|/// Shape docs.
+      #|/// Second line.
+      #|@a
+      #|structure S {
+      #|    /// Member docs.
+      #|    @b
+      #|    m: String
+      #|}
+      #|
+      #|operation Op {
+      #|    /// Inline docs.
+      #|    input := {}
+      #|}
+      #|
+    ),
   )
   guard r.ast is Some(f) else { fail("no ast") }
   let ss = f.shapes()
@@ -5305,7 +5756,14 @@ test "doc comments attach to shapes, members, enum members and inline shapes" {
 
 ///|
 test "docs between the traits and the keyword still attach" {
-  let r = dmodel("@a\n/// late\nstring S\n")
+  let r = dmodel(
+    (
+      #|@a
+      #|/// late
+      #|string S
+      #|
+    ),
+  )
   guard r.ast is Some(f) else { fail("no ast") }
   inspect(f.shapes()[0].docs.length(), content="1")
   inspect(r.has_errors(), content="false")
@@ -5313,35 +5771,104 @@ test "docs between the traits and the keyword still attach" {
 
 ///|
 test "a doc comment with no shape after it is a warning" {
-  @expect.expect(dcodes("string S\n/// trailing\n")).to_equal(["SM-PARSE-009"])
-  @expect.expect(dcodes("structure S {\n  a: String\n  /// nothing\n}\n")).to_equal(["SM-PARSE-009"])
-  inspect(dmodel("string S\n/// trailing\n").has_errors(), content="false")
+  @expect.expect(dcodes(
+    (
+      #|string S
+      #|/// trailing
+      #|
+    ),
+  )).to_equal(["SM-PARSE-009"])
+  @expect.expect(dcodes(
+    (
+      #|structure S {
+      #|  a: String
+      #|  /// nothing
+      #|}
+      #|
+    ),
+  )).to_equal(["SM-PARSE-009"])
+  inspect(dmodel(
+    (
+      #|string S
+      #|/// trailing
+      #|
+    ),
+  ).has_errors(), content="false")
 }
 
 ///|
 test "docs before apply are an error" {
-  @expect.expect(dcodes("/// no\napply Foo @a\n")).to_equal(["SM-PARSE-008"])
+  @expect.expect(dcodes(
+    (
+      #|/// no
+      #|apply Foo @a
+      #|
+    ),
+  )).to_equal(["SM-PARSE-008"])
 }
 
 ///|
 test "version 1 files reject 2.0 syntax with the reference's facts" {
   fn v1(body : String) -> Array[String] {
-    @parser.parse_text("$version: \"1.0\"\nnamespace com.foo\n\{body}").diagnostics.iter().map(d => d.code).collect()
+    @parser.parse_text(
+      (
+        $|$version: "1.0"
+        $|namespace com.foo
+        $|\{body}
+      ),
+    ).diagnostics.iter().map(d => d.code).collect()
   }
 
   @expect.expect_all(e => {
-    e.expect(v1("string S with [M]\n")).to_equal(["SM-PARSE-007"])
-    e.expect(v1("structure S { $a }\n")).to_equal(["SM-PARSE-007"])
-    e.expect(v1("structure S for R {}\n")).to_equal(["SM-PARSE-007"])
-    e.expect(v1("operation O { input := {} }\n")).to_equal(["SM-PARSE-007"])
-    e.expect(v1("structure S { a: String }\n")).to_equal([])
+    e.expect(v1(
+      (
+        #|string S with [M]
+        #|
+      ),
+    )).to_equal(["SM-PARSE-007"])
+    e.expect(v1(
+      (
+        #|structure S { $a }
+        #|
+      ),
+    )).to_equal(["SM-PARSE-007"])
+    e.expect(v1(
+      (
+        #|structure S for R {}
+        #|
+      ),
+    )).to_equal(["SM-PARSE-007"])
+    e.expect(v1(
+      (
+        #|operation O { input := {} }
+        #|
+      ),
+    )).to_equal(["SM-PARSE-007"])
+    e.expect(v1(
+      (
+        #|structure S { a: String }
+        #|
+      ),
+    )).to_equal([])
   })
   // A missing $version means 1.0.
   @expect.expect(
-    @parser.parse_text("namespace com.foo\nstring S with [M]\n").diagnostics.iter().map(d => d.code).collect(),
+    @parser.parse_text(
+      (
+        #|namespace com.foo
+        #|string S with [M]
+        #|
+      ),
+    ).diagnostics.iter().map(d => d.code).collect(),
   ).to_equal(["SM-PARSE-007"])
   inspect(
-    @parser.parse_text("namespace a\nstring S with [M]\n").errors()[0].message,
+    @parser.parse_text(
+      (
+        #|namespace a
+        #|string S with [M]
+        #|
+      ),
+    ).errors()[0].message,
     content="Mixins can only be used with Smithy version 2 or later",
   )
 }
@@ -5971,12 +6498,28 @@ git commit -m "feat(syntax): parse shapes, traits, apply statements and doc comm
 ```moonbit
 ///|
 fn rmodel(body : String) -> @parser.ParseResult {
-  @parser.parse_text("$version: \"2\"\nnamespace com.foo\n\n\{body}")
+  @parser.parse_text(
+    (
+      $|$version: "2"
+      $|namespace com.foo
+      $|
+      $|\{body}
+    ),
+  )
 }
 
 ///|
 test "a broken structure yields one error and the next shape survives" {
-  let r = rmodel("structure Bad {\n  a String\n}\n\nstring Foo\n")
+  let r = rmodel(
+    (
+      #|structure Bad {
+      #|  a String
+      #|}
+      #|
+      #|string Foo
+      #|
+    ),
+  )
   guard r.ast is Some(f) else { fail("no ast") }
   let names = f.shapes().map(s => s.shape.name().value)
   @expect.expect_all(e => {
@@ -5988,7 +6531,18 @@ test "a broken structure yields one error and the next shape survives" {
 
 ///|
 test "an unclosed brace still lets the next statement parse" {
-  let r = rmodel("structure Bad {\n  a: String\n\nstring Foo\n\n@deprecated\nstring Bar\n")
+  let r = rmodel(
+    (
+      #|structure Bad {
+      #|  a: String
+      #|
+      #|string Foo
+      #|
+      #|@deprecated
+      #|string Bar
+      #|
+    ),
+  )
   guard r.ast is Some(f) else { fail("no ast") }
   let names = f.shapes().map(s => s.shape.name().value)
   // `string Foo` is read as a bad member of Bad; recovery resumes at `@deprecated`.
@@ -6015,12 +6569,37 @@ test "every statement form appears in the CST with its name" {
 
 ///|
 test "the reference's error-recovery cases: resume at a doc comment, a dollar, an identifier and a trait" {
-  for body in [
-      "structure Bad {\n  a: \n\n/// docs\nstring Foo\n",
-      "metadata x = [1,\n\n$version: \"2\"\nstring Foo\n",
-      "structure Bad {\n  a: \n\nstring Foo\n",
-      "structure Bad {\n  a: \n\n@deprecated\nstring Foo\n",
-    ] {
+  let to_docs = (
+    #|structure Bad {
+    #|  a:
+    #|
+    #|/// docs
+    #|string Foo
+    #|
+  )
+  let to_dollar = (
+    #|metadata x = [1,
+    #|
+    #|$version: "2"
+    #|string Foo
+    #|
+  )
+  let to_identifier = (
+    #|structure Bad {
+    #|  a:
+    #|
+    #|string Foo
+    #|
+  )
+  let to_trait = (
+    #|structure Bad {
+    #|  a:
+    #|
+    #|@deprecated
+    #|string Foo
+    #|
+  )
+  for body in [to_docs, to_dollar, to_identifier, to_trait] {
     let r = rmodel(body)
     guard r.ast is Some(f) else { fail("no ast for \{body}") }
     @expect.expect(r.errors().length()).because(body).to_equal(1)
@@ -6260,7 +6839,12 @@ fn first_error(text : String) -> (@diagnostic.Diagnostic, @span.SourceText) rais
 
 ///|
 test "render_short is one line" {
-  let (d, source) = first_error("namespace a use b#C\n")
+  let (d, source) = first_error(
+    (
+      #|namespace a use b#C
+      #|
+    ),
+  )
   inspect(
     @report.render_short(d, source),
     content="model.smithy:1:13: error[SM-PARSE-003]: I was expecting a line break here but found `use`",
@@ -6269,7 +6853,17 @@ test "render_short is one line" {
 
 ///|
 test "render_plain shows the excerpt, labels, notes and hint" {
-  let (d, source) = first_error("$version: \"2\"\nnamespace com.foo\n\nstructure S {\n    a String\n}\n")
+  let (d, source) = first_error(
+    (
+      #|$version: "2"
+      #|namespace com.foo
+      #|
+      #|structure S {
+      #|    a String
+      #|}
+      #|
+    ),
+  )
   inspect(
     @report.render_plain(d, source),
     content=(
@@ -6291,15 +6885,31 @@ test "render_plain shows the excerpt, labels, notes and hint" {
 
 ///|
 test "a warning renders with the warning header" {
-  let (d, source) = first_error("namespace a\n/// lost\n")
+  let (d, source) = first_error(
+    (
+      #|namespace a
+      #|/// lost
+      #|
+    ),
+  )
   let out = @report.render_plain(d, source)
-  inspect(out.has_prefix("warning[SM-PARSE-009]: DETACHED DOC COMMENT\n"), content="true")
+  inspect(out.has_prefix(
+    (
+      #|warning[SM-PARSE-009]: DETACHED DOC COMMENT
+      #|
+    ),
+  ), content="true")
   inspect(out.contains("= hint: Move it right before"), content="true")
 }
 
 ///|
 test "render_terminal adds colors and render_plain does not" {
-  let (d, source) = first_error("namespace a use b#C\n")
+  let (d, source) = first_error(
+    (
+      #|namespace a use b#C
+      #|
+    ),
+  )
   inspect(@report.render_terminal(d, source).contains("\u{1b}["), content="true")
   inspect(@report.render_terminal(d, source, color=false) == @report.render_plain(d, source), content="true")
   inspect(@report.render_plain(d, source).contains("\u{1b}["), content="false")
@@ -6307,14 +6917,30 @@ test "render_terminal adds colors and render_plain does not" {
 
 ///|
 test "a span at the end of the file renders a caret after the last character" {
-  let (d, source) = first_error("namespace a\nstring\n")
+  let (d, source) = first_error(
+    (
+      #|namespace a
+      #|string
+      #|
+    ),
+  )
   let out = @report.render_plain(d, source)
-  inspect(out.contains(" 2 | string\n   |       ^ "), content="true")
+  inspect(out.contains(
+    (
+      #| 2 | string
+      #|   |       ^ 
+    ),
+  ), content="true")
 }
 
 ///|
 test "render_terminal_to writes into any Logger" {
-  let (d, source) = first_error("namespace a use b#C\n")
+  let (d, source) = first_error(
+    (
+      #|namespace a use b#C
+      #|
+    ),
+  )
   let sb = StringBuilder()
   @report.render_terminal_to(d, source, sb, color=false)
   let buf = @buffer.Buffer()
@@ -6325,18 +6951,43 @@ test "render_terminal_to writes into any Logger" {
 
 ///|
 test "render_all ends with a summary" {
-  let source = @span.SourceText::new("namespace a\nuse Foo\n/// x\n", name="m.smithy")
+  let source = @span.SourceText::new(
+    (
+      #|namespace a
+      #|use Foo
+      #|/// x
+      #|
+    ),
+    name="m.smithy",
+  )
   let r = @parser.parse(source)
   let out = @report.render_all(r.diagnostics, source, color=false)
-  inspect(out.has_suffix("1 error, 1 warning\n"), content="true")
+  inspect(out.has_suffix(
+    (
+      #|1 error, 1 warning
+      #|
+    ),
+  ), content="true")
 }
 
 ///|
 test "long notes reflow at 80 columns" {
-  let source = @span.SourceText::new("namespace a\nmetadata x = \"y\"\n", name="m.smithy")
+  let source = @span.SourceText::new(
+    (
+      #|namespace a
+      #|metadata x = "y"
+      #|
+    ),
+    name="m.smithy",
+  )
   let r = @parser.parse(source)
   let out = @report.render_plain(r.diagnostics[0], source)
-  for line in out.split("\n") {
+  for line in out.split(
+    (
+      #|
+      #|
+    ),
+  ) {
     @expect.expect(line.length() <= 80).because(line.to_string()).to_be_true()
   }
 }
@@ -6464,7 +7115,12 @@ pub fn render_terminal_to(
   out.write("\{sev}[\{d.code}]")
   out.reset()
   out.bold()
-  out.write(": \{d.title}\n")
+  out.write(
+    (
+      $|: \{d.title}
+      $|
+    ),
+  )
   out.reset()
   let labels = [label_for(source, d.span, d.message, true)]
   for l in d.labels {
@@ -6480,14 +7136,24 @@ pub fn render_terminal_to(
   out.reset()
   out.write("\{source.name().unwrap_or("<input>")}:\{p.line.0}:\{p.column.0}\n")
   out.border()
-  out.write("\{pad}  |\n")
+  out.write(
+    (
+      $|\{pad}  |
+      $|
+    ),
+  )
   out.reset()
   let mut last_line : @span.Line? = None
   for l in labels {
     if last_line != Some(l.line) {
       if last_line is Some(prev) && l.line.0 > prev.0 + 1 {
         out.border()
-        out.write("\{pad} ...\n")
+        out.write(
+          (
+            $|\{pad} ...
+            $|
+          ),
+        )
         out.reset()
       }
       let number = l.line.0.to_string()
@@ -6496,7 +7162,12 @@ pub fn render_terminal_to(
       out.write("\{num_pad}\{number} | ")
       out.reset()
       out.write(source.line_text(l.line).unwrap_or(""))
-      out.write("\n")
+      out.write(
+        (
+          #|
+          #|
+        ),
+      )
       last_line = Some(l.line)
     }
     out.border()
@@ -6511,10 +7182,20 @@ pub fn render_terminal_to(
     out.write((if l.primary { "^" } else { "-" }).repeat(l.end_col.0 - l.start_col.0))
     out.write(" \{l.text}")
     out.reset()
-    out.write("\n")
+    out.write(
+      (
+        #|
+        #|
+      ),
+    )
   }
   out.border()
-  out.write("\{pad}  |\n")
+  out.write(
+    (
+      $|\{pad}  |
+      $|
+    ),
+  )
   out.reset()
   let body_width = width - gutter - 6
   for note in d.notes {
@@ -6522,7 +7203,12 @@ pub fn render_terminal_to(
       out.border()
       out.write(if i == 0 { "\{pad}  = " } else { "\{pad}    " })
       out.reset()
-      out.write("\{line}\n")
+      out.write(
+        (
+          $|\{line}
+          $|
+        ),
+      )
     }
   }
   match d.hint {
@@ -6538,7 +7224,12 @@ pub fn render_terminal_to(
         } else {
           out.write("      ")
         }
-        out.write("\{line}\n")
+        out.write(
+          (
+            $|\{line}
+            $|
+          ),
+        )
       }
     None => ()
   }
@@ -6548,10 +7239,25 @@ pub fn render_terminal_to(
       out.write("\{pad}  = ")
       out.reset()
       out.bold()
-      out.write("example:\n")
+      out.write(
+        (
+          #|example:
+          #|
+        ),
+      )
       out.reset()
-      for line in ex.split("\n") {
-        out.write("\{pad}      \{line}\n")
+      for line in ex.split(
+        (
+          #|
+          #|
+        ),
+      ) {
+        out.write(
+          (
+            $|\{pad}      \{line}
+            $|
+          ),
+        )
       }
     }
     None => ()
@@ -6589,7 +7295,12 @@ pub fn render_all_to(
   let mut warnings = 0
   for d in ds {
     render_terminal_to(d, source, logger, color~)
-    logger.write_string("\n")
+    logger.write_string(
+      (
+        #|
+        #|
+      ),
+    )
     if d.is_error() {
       errors += 1
     } else {
@@ -6628,7 +7339,12 @@ test "law: every caret line fits its source line and the render never panics" {
       for d in r.diagnostics {
         let out = @report.render_plain(d, source)
         ok = ok && out.length() > 0 && !out.contains("\u{1b}[")
-        let lines : Array[String] = out.split("\n").map(x => x.to_string()).collect()
+        let lines : Array[String] = out.split(
+          (
+            #|
+            #|
+          ),
+        ).map(x => x.to_string()).collect()
         for i, line in lines {
           // A caret line follows a numbered source line.
           guard line.contains("| ") && (line.contains("^") || line.contains("-")) && i > 0 else { continue }
@@ -6814,7 +7530,16 @@ pub fn parse(source : SourceText) -> ParseResult {
 ///
 /// ```mbt check
 /// test {
-///   let r = @syntax.parse_idl("$version: \"2\"\nnamespace com.foo\n\nstring Name\n", name="a.smithy")
+///   let r = @syntax.parse_idl(
+  (
+    #|$version: "2"
+    #|namespace com.foo
+    #|
+    #|string Name
+    #|
+  ),
+  name="a.smithy",
+)
 ///   inspect(r.has_errors(), content="false")
 /// }
 /// ```
@@ -6907,17 +7632,19 @@ diagnostics. Nothing is resolved: shape IDs are as written.
 ```mbt check
 test "read the shapes of a model" {
   let r = @syntax.parse_idl(
-    #|$version: "2"
-    #|namespace com.example
-    #|
-    #|/// A person.
-    #|structure Person {
-    #|    @required
-    #|    name: String
-    #|    age: Integer = 0
-    #|}
-    #|
-    , name="person.smithy",
+    (
+      #|$version: "2"
+      #|namespace com.example
+      #|
+      #|/// A person.
+      #|structure Person {
+      #|    @required
+      #|    name: String
+      #|    age: Integer = 0
+      #|}
+      #|
+    ),
+    name="person.smithy",
   )
   inspect(r.has_errors(), content="false")
   inspect(r.version, content="Some(V2)")
@@ -6993,12 +7720,13 @@ git commit -m "docs(syntax): add the root facade, the cookbook and the package R
 **Files:**
 - Create: `scripts/vendor-corpus.mbtx`
 - Modify: `.config/mise/config.toml` (task `corpus:vendor`)
-- Create: `harness/corpus/moon.mod`, `harness/corpus/moon.pkg`, `harness/corpus/README.md`, `harness/corpus/NOTICE`
+- Create: `harness/moon.mod`, `harness/README.md`, `harness/NOTICE` (the harness module; Task 16 adds its `bdd` package)
+- Create: `harness/corpus/moon.pkg`, `harness/corpus/types.mbt`
 - Create: `harness/corpus/cases/...` (vendored `.smithy` files)
 - Create: `harness/corpus/cases.mbt` (generated)
 - Create: `harness/corpus/corpus_test.mbt`
-- Modify: `moon.work` (add `./harness/corpus`)
-- Modify: `scripts/validate-packages.mbtx` (`member_roots` gains `harness`)
+- Modify: `moon.work` (add `./harness`)
+- Modify: `scripts/test.mbtx` (the harness runs on js and native only; see Step 2)
 
 Beads: this is task `smithy-2qe.1.3`; claim it, and record skipped cases in its notes.
 
@@ -7072,11 +7800,26 @@ async fn list_smithy(ref_ : String, dir : String) -> Array[String] {
 /// MoonBit string literal syntax for `s` (multi-line `#|` form).
 fn literal(s : String) -> String {
   let sb = StringBuilder()
-  sb.write_string("(\n")
-  for line in s.split("\n") {
+  sb.write_string(
+    (
+      #|(
+      #|
+    ),
+  )
+  for line in s.split(
+    (
+      #|
+      #|
+    ),
+  ) {
     sb.write_string("      #|")
     sb.write_string(line.to_string().trim_end(chars="\r").to_string())
-    sb.write_string("\n")
+    sb.write_string(
+      (
+        #|
+        #|
+      ),
+    )
   }
   sb.write_string("    )")
   sb.to_string()
@@ -7093,8 +7836,21 @@ async fn main {
   }
   println("📥 Vendoring the loader corpus at \{sha}")
   let gen = StringBuilder()
-  gen.write_string("// Generated by scripts/vendor-corpus.mbtx from smithy-lang/smithy at \{sha}. Do not edit.\n\n")
-  gen.write_string("///|\npub fn cases() -> Array[Case] {\n  [\n")
+  gen.write_string(
+    (
+      $|// Generated by scripts/vendor-corpus.mbtx from smithy-lang/smithy at \{sha}. Do not edit.
+      $|
+      $|
+    ),
+  )
+  gen.write_string(
+    (
+      #|///|
+      #|pub fn cases() -> Array[Case] {
+      #|  [
+      #|
+    ),
+  )
   let mut count = 0
   for g in groups {
     let (dir, kind) = g
@@ -7110,7 +7866,12 @@ async fn main {
         "recovery" => "Recovery"
         _ => {
           // `// Syntax error at line L, column C: message` or `// Parse error at line L, column C near ...: message`.
-          let first = text.split("\n").next().map(l => l.to_string()).unwrap_or("")
+          let first = text.split(
+            (
+              #|
+              #|
+            ),
+          ).next().map(l => l.to_string()).unwrap_or("")
           match parse_header(first) {
             Some((line, column, message)) =>
               "Invalid(line=\{line}, column=\{column}, message=\{@json.stringify(String(message))})"
@@ -7118,11 +7879,22 @@ async fn main {
           }
         }
       }
-      gen.write_string("    { path: \"\{rel}\", kind: \{kind_expr}, text: \{literal(text)} },\n")
+      gen.write_string(
+        (
+          $|    { path: "\{rel}", kind: \{kind_expr}, text: \{literal(text)} },
+          $|
+        ),
+      )
       count += 1
     }
   }
-  gen.write_string("  ]\n}\n")
+  gen.write_string(
+    (
+      #|  ]
+      #|}
+      #|
+    ),
+  )
   @fs.write_file("harness/corpus/cases.mbt", gen.to_string())
   @fs.write_file("harness/corpus/CORPUS_SHA", sha + "\n")
   println("✅ Vendored \{count} cases")
@@ -7161,14 +7933,14 @@ run = "moonx scripts/vendor-corpus.mbtx"
 
 - [ ] **Step 2: Create the harness module and run the vendoring**
 
-`harness/corpus/moon.mod`:
+`harness/moon.mod`:
 
 ```toml
-name = "moonrockz/smithy_corpus"
+name = "moonrockz/smithy_harness"
 
 version = "0.1.0"
 
-description = "Parity harness for moonrockz/smithy-syntax over the reference loader corpus; not published"
+description = "Test harness for moonrockz/smithy-syntax: reference corpus parity and moonspec acceptance features; not published"
 
 repository = "https://github.com/moonrockz/smithy"
 
@@ -7176,9 +7948,14 @@ license = "Apache-2.0"
 
 source = "."
 
+warnings = "-implicit_impl_as_method"
+
 import {
   "moonrockz/smithy-syntax@0.1.0",
   "moonrockz/expect@0.6.1",
+  "moonrockz/moonspec@0.11.0",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/x@0.5.5",
 }
 ```
 
@@ -7189,11 +7966,13 @@ import {
 }
 
 import {
-  "moonrockz/smithy_corpus" @corpus,
+  "moonrockz/smithy_harness/corpus" @corpus,
   "moonrockz/smithy-syntax" @syntax,
   "moonrockz/expect",
 } for "test"
 ```
+
+In `scripts/test.mbtx`, run the harness only where `moonbitlang/async` builds. Replace the single `moon test --target <t>` call per target with: for every target, `moon test pkgs/smithy pkgs/smithy-syntax apps/smithy docs/cookbook --target <t>` (one call per path if `moon test` takes a single path on this toolchain), and for `js` and `native` also `moon test harness --target <t>`. Keep the exit-code handling. Update the script's doc comment and the README task table line for `test` to say the harness runs on js and native.
 
 `harness/corpus/types.mbt`:
 
@@ -7213,9 +7992,11 @@ pub(all) struct Case {
 } derive(Debug)
 ```
 
-`harness/corpus/NOTICE`: copy the `NOTICE` file from the smithy-lang/smithy repository root verbatim, with a first line "The files under cases/ are copied from https://github.com/smithy-lang/smithy (Apache-2.0)."
+`harness/NOTICE`: copy the `NOTICE` file from the smithy-lang/smithy repository root verbatim, with a first line "The files under corpus/cases/ are copied from https://github.com/smithy-lang/smithy (Apache-2.0)."
 
-Add `"./harness/corpus"` to `moon.work`. In `scripts/validate-packages.mbtx` change `member_roots` to `["pkgs", "apps", "harness"]`.
+`harness/README.md`: three lines naming the two packages (`corpus`: parity over the vendored reference corpus; `bdd`: moonspec acceptance features from `tests/features`) and that the module is not published.
+
+Add `"./harness"` to `moon.work`.
 
 Run: `mise run corpus:vendor`
 Expected: `✅ Vendored N cases` with N around 150, `harness/corpus/cases.mbt` and `harness/corpus/CORPUS_SHA` written. Then `moon check` must be clean; if a vendored text contains a sequence the `#|` literal cannot hold, the generator must switch that case to a regular escaped literal (`@json.stringify(String(text))`).
@@ -7302,25 +8083,471 @@ Many `invalid/` cases are semantic (duplicate shapes, bad trait values) and the 
 
 - [ ] **Step 4: Run, fix, record**
 
-Run: `moon test -p moonrockz/smithy_corpus` then `mise run test`
+Run: `moon test harness --target js` then `mise run test`
 Expected: green. Each failure is either a parser bug (fix it in `pkgs/smithy-syntax`, with a unit test that pins it) or a case outside sub-project 1's scope (add to `skipped` with the reason). Then:
 
 ```bash
 bd update smithy-2qe.1.3 --append-notes "Vendored <N> cases at <sha>. Skipped: <list with reasons>."
 mise run format
-git add scripts/vendor-corpus.mbtx .config/mise/config.toml moon.work scripts/validate-packages.mbtx harness
+git add scripts/vendor-corpus.mbtx scripts/test.mbtx .config/mise/config.toml moon.work README.md harness
 git commit -m "test(syntax): vendor the reference loader corpus and check parity"
 bd close smithy-2qe.1.3 --reason "Corpus vendored and parity tests green"
 ```
 
 ---
 
-### Task 16: Wrap up the sub-project
+### Task 16: Acceptance features with moonspec
+
+**Files:**
+- Create: `tests/features/parsing.feature`
+- Create: `tests/features/diagnostics.feature`
+- Create: `tests/features/recovery.feature`
+- Create: `harness/bdd/moon.pkg`
+- Create: `harness/bdd/syntax_world_wbtest.mbt`
+- Modify: `.config/mise/config.toml` (task `test:bdd`)
+- Modify: `README.md` (task table)
+
+**Interfaces:**
+- Consumes: `@syntax.parse_idl`, `@syntax.render_plain`, `@syntax.render_short`, the AST accessors of Task 7, `@moonspec.World`, `@moonspec.run_or_fail`, `@moonspec.RunOptions::new`, `@moonspec.FeatureSource::File`, `@moonspec.DocString`.
+- Produces: one `SyntaxWorld` with the steps below, reused by all three features. Scenarios are the acceptance contract for sub-project 1; a behavior change must change a scenario.
+
+- [ ] **Step 1: Write the features**
+
+`tests/features/parsing.feature`:
+
+```gherkin
+Feature: Parsing Smithy IDL
+  The parser reads Smithy IDL 2.0 text into a typed AST with spans and a
+  lossless CST. These scenarios are the acceptance contract for the shapes,
+  members, traits and node values the grammar defines.
+
+  Scenario: Every statement form parses clean
+    Given the Smithy model:
+      """smithy
+      $version: "2"
+      metadata foo = ["bar"]
+      namespace smithy.example
+      use smithy.api#String
+
+      /// Docs.
+      @deprecated(message: "old")
+      structure Foo with [Mix] {
+          @required
+          bar: String = "x"
+          $baz
+      }
+
+      @mixin
+      structure Mix {
+          baz: Integer
+      }
+
+      enum Color {
+          RED = "red"
+          BLUE
+      }
+
+      operation GetFoo {
+          input := {
+              id: String
+          }
+          output: Foo
+          errors: [NotFound]
+      }
+
+      @error("client")
+      structure NotFound {}
+
+      apply Foo @since("1.0")
+      """
+    When I parse the model
+    Then there are no diagnostics
+    And the version is "2"
+    And the namespace is "smithy.example"
+    And the shapes are "Foo, Mix, Color, GetFoo, NotFound"
+    And the shape "Foo" has docs " Docs."
+    And the shape "Foo" has the traits "deprecated"
+    And the member "Foo$bar" targets "String" with default "x"
+    And the member "Foo$baz" is elided
+    And the CST prints the model back unchanged
+
+  Scenario: Shape IDs are read as written, not resolved
+    Given the Smithy model:
+      """smithy
+      $version: "2"
+      namespace a.b
+
+      structure S {
+          x: c.d#E$f
+          y: Local
+      }
+      """
+    When I parse the model
+    Then there are no diagnostics
+    And the member "S$x" targets "c.d#E$f"
+    And the member "S$y" targets "Local"
+
+  Scenario: Text blocks decode per the specification
+    Given the Smithy model:
+      """smithy
+      $version: "2"
+      namespace a
+
+      @documentation("""
+          Hello,
+            world.
+          """)
+      string S
+      """
+    When I parse the model
+    Then there are no diagnostics
+    And the trait "documentation" on "S" has the string value:
+      """
+      Hello,
+        world.
+
+      """
+
+  Scenario: A 1.0 model may not use mixins
+    Given the Smithy model:
+      """smithy
+      $version: "1.0"
+      namespace a
+
+      string S with [M]
+      """
+    When I parse the model
+    Then the diagnostics are "SM-PARSE-007"
+    And the first message is "Mixins can only be used with Smithy version 2 or later"
+```
+
+`tests/features/diagnostics.feature`:
+
+```gherkin
+Feature: Diagnostics
+  Every problem is reported with a code, a title, a message under the span,
+  context labels, notes in the first person and a hint, and rendered in the
+  Rust and codespan layout.
+
+  Scenario: A missing colon in a member names the member and the construct
+    Given the Smithy model "model.smithy":
+      """smithy
+      $version: "2"
+      namespace com.foo
+
+      structure S {
+          a String
+      }
+      """
+    When I parse the model
+    Then the diagnostics are "SM-PARSE-001"
+    And the first diagnostic renders as:
+      """
+      error[SM-PARSE-001]: UNEXPECTED TOKEN
+        --> model.smithy:5:7
+         |
+       4 | structure S {
+         | --------- the structure `S` started here
+       5 |     a String
+         |       ^^^^^^ I was expecting `:` after the member name `a` but found `String`
+         |
+         = I was parsing the structure `S` when I got stuck.
+         = example:
+             a: String
+
+      """
+    And the short form is "model.smithy:5:7: error[SM-PARSE-001]: I was expecting `:` after the member name `a` but found `String`"
+
+  Scenario: Two statements on one line
+    Given the Smithy model "m.smithy":
+      """smithy
+      namespace a use b#C
+      """
+    When I parse the model
+    Then the diagnostics are "SM-PARSE-003"
+    And the first title is "MISSING LINE BREAK"
+    And the first hint is "Put `use` on its own line."
+
+  Scenario: A detached doc comment is a warning, not an error
+    Given the Smithy model "m.smithy":
+      """smithy
+      namespace a
+
+      string S
+      /// nothing follows
+      """
+    When I parse the model
+    Then the diagnostics are "SM-PARSE-009"
+    And there are no errors
+```
+
+`tests/features/recovery.feature`:
+
+```gherkin
+Feature: Recovery per statement
+  An error inside a statement is reported once; the parser resumes at the
+  next statement and the CST keeps every token.
+
+  Scenario: A broken shape does not take the next one with it
+    Given the Smithy model:
+      """smithy
+      $version: "2"
+      namespace com.foo
+
+      structure Bad {
+          a String
+      }
+
+      string Foo
+      """
+    When I parse the model
+    Then the diagnostics are "SM-PARSE-001"
+    And the shapes are "Bad, Foo"
+    And the CST prints the model back unchanged
+
+  Scenario: An unclosed brace resumes at the next statement start
+    Given the Smithy model:
+      """smithy
+      $version: "2"
+      namespace com.foo
+
+      structure Bad {
+          a: String
+
+      @deprecated
+      string Bar
+      """
+    When I parse the model
+    Then there is 1 error
+    And the shapes include "Bar"
+    And the CST has 1 skipped statement
+    And the CST prints the model back unchanged
+```
+
+- [ ] **Step 2: Write the world**
+
+`harness/bdd/moon.pkg`:
+
+```
+import {
+  "moonrockz/smithy-syntax" @syntax,
+  "moonrockz/moonspec",
+  "moonrockz/expect",
+  "moonbitlang/async",
+} for "wbtest"
+```
+
+`harness/bdd/syntax_world_wbtest.mbt`:
+
+```moonbit
+///|
+/// Scenario state shared by the three features.
+struct SyntaxWorld {
+  mut source : @syntax.SourceText
+  mut result : @syntax.ParseResult?
+}
+
+///|
+fn SyntaxWorld::new() -> SyntaxWorld {
+  { source: @syntax.SourceText::new(""), result: None }
+}
+
+///|
+fn SyntaxWorld::parsed(self : SyntaxWorld) -> @syntax.ParseResult raise {
+  guard self.result is Some(r) else { fail("the model was not parsed yet") }
+  r
+}
+
+///|
+fn SyntaxWorld::file(self : SyntaxWorld) -> @syntax.IdlFile raise {
+  guard self.parsed().ast is Some(f) else { fail("no AST") }
+  f
+}
+
+///|
+fn SyntaxWorld::shape(self : SyntaxWorld, name : String) -> @syntax.ShapeStatement raise {
+  for s in self.file().shapes() {
+    if s.shape.name().value == name {
+      return s
+    }
+  }
+  fail("no shape named \{name}")
+}
+
+///|
+/// `Shape$member`.
+fn SyntaxWorld::member(self : SyntaxWorld, id : String) -> @syntax.Member raise {
+  guard id.find("$") is Some(i) else { fail("member id needs a $: \{id}") }
+  let shape = self.shape(id.unsafe_substring(start=0, end=i))
+  let member_name = id.unsafe_substring(start=i + 1, end=id.length())
+  guard shape.shape is Aggregate(members~, ..) else { fail("\{id}: not an aggregate shape") }
+  for m in members {
+    if m.name.value == member_name {
+      return m
+    }
+  }
+  fail("no member \{id}")
+}
+
+///|
+fn SyntaxWorld::first(self : SyntaxWorld) -> @syntax.Diagnostic raise {
+  guard self.parsed().diagnostics.length() > 0 else { fail("no diagnostics") }
+  self.parsed().diagnostics[0]
+}
+
+///|
+fn trait_name(t : @syntax.Trait) -> String {
+  t.id.value.name
+}
+
+///|
+impl @moonspec.World for SyntaxWorld with fn configure(self, setup) {
+  setup.given1("the Smithy model:", fn(doc : @moonspec.DocString) {
+    self.source = @syntax.SourceText::new(doc.content)
+  })
+  setup.given2("the Smithy model {string}:", fn(name : String, doc : @moonspec.DocString) {
+    self.source = @syntax.SourceText::new(doc.content, name~)
+  })
+  setup.when0("I parse the model", fn() { self.result = Some(@syntax.parse(self.source)) })
+  setup.then0("there are no diagnostics", fn() raise {
+    @expect.expect(self.parsed().diagnostics.map(d => d.code)).to_equal([])
+  })
+  setup.then0("there are no errors", fn() raise {
+    @expect.expect(self.parsed().has_errors()).to_be_false()
+  })
+  setup.then1("there is {int} error", fn(n : Int) raise {
+    @expect.expect(self.parsed().errors().length()).to_equal(n)
+  })
+  setup.then1("the diagnostics are {string}", fn(codes : String) raise {
+    let expected = codes.split(", ").map(s => s.to_string()).collect()
+    @expect.expect(self.parsed().diagnostics.map(d => d.code)).to_equal(expected)
+  })
+  setup.then1("the version is {string}", fn(v : String) raise {
+    let expected = if v == "2" { Some(@syntax.Version::V2) } else { Some(@syntax.Version::V1) }
+    @expect.expect(self.parsed().version).to_equal(expected)
+  })
+  setup.then1("the namespace is {string}", fn(ns : String) raise {
+    @expect.expect(self.file().namespace.map(n => n.namespace.value)).to_equal(Some(ns))
+  })
+  setup.then1("the shapes are {string}", fn(names : String) raise {
+    let expected = names.split(", ").map(s => s.to_string()).collect()
+    @expect.expect(self.file().shapes().map(s => s.shape.name().value)).to_equal(expected)
+  })
+  setup.then1("the shapes include {string}", fn(name : String) raise {
+    @expect.expect(self.file().shapes().map(s => s.shape.name().value).contains(name)).to_be_true()
+  })
+  setup.then2("the shape {string} has docs {string}", fn(name : String, docs : String) raise {
+    @expect.expect(self.shape(name).docs.map(d => d.text).join("\n")).to_equal(docs)
+  })
+  setup.then2("the shape {string} has the traits {string}", fn(name : String, traits : String) raise {
+    let expected = traits.split(", ").map(s => s.to_string()).collect()
+    @expect.expect(self.shape(name).traits.map(trait_name)).to_equal(expected)
+  })
+  setup.then2("the member {string} targets {string}", fn(id : String, target : String) raise {
+    guard self.member(id).target is Explicit(t) else { fail("\{id} is elided") }
+    @expect.expect(t.value.to_string()).to_equal(target)
+  })
+  setup.then3("the member {string} targets {string} with default {string}", fn(id : String, target : String, default : String) raise {
+    let m = self.member(id)
+    guard m.target is Explicit(t) else { fail("\{id} is elided") }
+    @expect.expect(t.value.to_string()).to_equal(target)
+    @expect.expect(m.default.bind(v => v.as_string())).to_equal(Some(default))
+  })
+  setup.then1("the member {string} is elided", fn(id : String) raise {
+    @expect.expect(self.member(id).target is Elided).to_be_true()
+  })
+  setup.then3("the trait {string} on {string} has the string value:", fn(trait_ : String, shape : String, doc : @moonspec.DocString) raise {
+    for t in self.shape(shape).traits {
+      if trait_name(t) == trait_ {
+        guard t.body is Some(Node(v)) else { fail("trait \{trait_} has no node value") }
+        @expect.expect(v.as_string()).to_equal(Some(doc.content))
+        return
+      }
+    }
+    fail("no trait \{trait_} on \{shape}")
+  })
+  setup.then0("the CST prints the model back unchanged", fn() raise {
+    @expect.expect(self.parsed().cst.to_source()).to_equal(self.source.text())
+  })
+  setup.then1("the CST has {int} skipped statement", fn(n : Int) raise {
+    @expect.expect(self.parsed().cst.skipped().length()).to_equal(n)
+  })
+  setup.then1("the first message is {string}", fn(m : String) raise {
+    @expect.expect(self.first().message).to_equal(m)
+  })
+  setup.then1("the first title is {string}", fn(m : String) raise {
+    @expect.expect(self.first().title).to_equal(m)
+  })
+  setup.then1("the first hint is {string}", fn(m : String) raise {
+    @expect.expect(self.first().hint).to_equal(Some(m))
+  })
+  setup.then1("the first diagnostic renders as:", fn(doc : @moonspec.DocString) raise {
+    @expect.expect(@syntax.render_plain(self.first(), self.source)).to_equal(doc.content)
+  })
+  setup.then1("the short form is {string}", fn(line : String) raise {
+    @expect.expect(@syntax.render_short(self.first(), self.source)).to_equal(line)
+  })
+}
+
+///|
+async test "parsing feature" {
+  @moonspec.run_or_fail(
+    SyntaxWorld::new,
+    @moonspec.RunOptions::new([@moonspec.FeatureSource::File("../tests/features/parsing.feature")]),
+  )
+  |> ignore
+}
+
+///|
+async test "diagnostics feature" {
+  @moonspec.run_or_fail(
+    SyntaxWorld::new,
+    @moonspec.RunOptions::new([@moonspec.FeatureSource::File("../tests/features/diagnostics.feature")]),
+  )
+  |> ignore
+}
+
+///|
+async test "recovery feature" {
+  @moonspec.run_or_fail(
+    SyntaxWorld::new,
+    @moonspec.RunOptions::new([@moonspec.FeatureSource::File("../tests/features/recovery.feature")]),
+  )
+  |> ignore
+}
+```
+
+If moonspec's `DocString` exposes the content under another field name on 0.11.0, or `then3` with a `DocString` last argument needs the `_ctx` form, adjust to the API in `moon info`'s `pkg.generated.mbti` of `moonrockz/moonspec`; the scenarios stay as written.
+
+- [ ] **Step 3: Wire the task and run**
+
+In `.config/mise/config.toml`:
+
+```toml
+[tasks."test:bdd"]
+description = "Run the moonspec acceptance features (harness/bdd, js target)"
+run = "moon test harness/bdd --target js"
+```
+
+Add the row to the README task table. Run: `mise run test:bdd` then `mise run test`.
+Expected: every scenario passes. A scenario that fails on wording is a real difference between the plan's messages and the implementation: fix whichever is wrong against the Global Constraints, and keep the feature as the record.
+
+- [ ] **Step 4: Format and commit**
+
+```bash
+mise run format
+git add tests/features harness/bdd .config/mise/config.toml README.md
+git commit -m "test(syntax): add moonspec acceptance features for parsing, diagnostics and recovery"
+```
+
+---
+
+### Task 17: Wrap up the sub-project
 
 **Files:**
 - Modify: `AGENTS.md` (an "Architecture" note for `pkgs/smithy-syntax` and the diagnostics table pointer)
 - Modify: `README.md` (status)
-- Modify: `.github/workflows/ci.yml` only if a new mise task must run in CI (none expected: `mise run test` already covers the harness and the cookbook as workspace members)
+- Modify: `.github/workflows/ci.yml` only if a new mise task must run in CI (none expected: `mise run test` runs the library on every target, and the harness and cookbook on js and native)
 
 - [ ] **Step 1: Document the module for agents**
 
@@ -7340,6 +8567,9 @@ the API changes. Rules that tests enforce:
   `*_law_test.mbt` check this with quickcheck.
 - `harness/corpus` holds the vendored reference corpus; refresh it with
   `mise run corpus:vendor`, and record skipped cases on the beads task.
+- `tests/features/*.feature` are the acceptance contract, run by moonspec from
+  `harness/bdd` (`mise run test:bdd`). Change the scenario when you change the
+  behavior.
 ```
 
 - [ ] **Step 2: Full check, beads, push**
@@ -7350,7 +8580,7 @@ Expected: lint, validate, test and build all green.
 ```bash
 git add AGENTS.md README.md
 git commit -m "docs: describe the syntax module for agents"
-bd update smithy-2qe.1.2 --append-notes "Plan executed through Task 16."
+bd update smithy-2qe.1.2 --append-notes "Plan executed through Task 17."
 bd close smithy-2qe.1.2 --reason "Implementation plan written and executed"
 bd sync -y
 ```
@@ -7362,7 +8592,7 @@ Open a pull request from this branch to `main` with the beads epic ID in the des
 
 ## Self-review notes
 
-- Spec coverage: module and packages (Tasks 1, 14), positions (2), scanner (4, 5, 6), AST (7), CST (8), parser and recovery (9, 10, 11, 12), diagnostics (3, 11), report (13), testing and corpus (6, 12, 15), documentation (14, 16), out of scope untouched.
+- Spec coverage: module and packages (Tasks 1, 14), positions (2), scanner (4, 5, 6), AST (7), CST (8), parser and recovery (9, 10, 11, 12), diagnostics (3, 11), report (13), testing and corpus (6, 12, 15), acceptance features (16), documentation (14, 17), out of scope untouched.
 - Functional style: the scanner is `scan_at` (pure) unfolded by `scan_pieces` and grouped by `attach_trivia`, composed with `|>` in `tokenize`; diagnostics travel inside `Step` values. The parser's only mutable state is the private `Parser` cursor inside one `parse` call; `order_diagnostics` and the CST grouping are pure functions of their inputs; `parse` and `parse_text` are pipelines.
 - Typed units: `Offset`, `Length`, `Line`, `Column` (Task 2) and `Depth` (Task 9) replace raw ints for positions, counts and nesting; `Span` is start plus length so its end never precedes its start. Raw `Int` remains only for array indexes (`pos`, `doc_head`, loop counters) and display widths. Each unit type has quickcheck laws (`span_law_test.mbt`, `depth_law_test.mbt`).
 - Output sink: `report` renders into core's `&Logger` (`render_terminal_to`, `render_all_to`); the string-returning functions wrap a `StringBuilder`. The async `@io.Writer` is left to the CLI.
