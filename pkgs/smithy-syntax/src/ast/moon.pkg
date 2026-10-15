@@ -1,0 +1,10 @@
+import {
+  "moonrockz/smithy-syntax/span",
+  "moonbitlang/x/decimal",
+}
+
+import {
+  "moonrockz/smithy-syntax/ast",
+  "moonrockz/smithy-syntax/span",
+  "moonrockz/expect",
+} for "test"

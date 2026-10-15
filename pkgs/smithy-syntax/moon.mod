@@ -14,7 +14,7 @@ readme = "README.mbt.md"
 
 source = "src"
 
-warnings = "-implicit_impl_as_method"
+warnings = "-implicit_impl_as_method-reserved_keyword"
 
 import {
   "moonbitlang/x@0.5.5",
