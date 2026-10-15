@@ -389,6 +389,16 @@ fn Parser::parse_shape_id(
     namespace = Some(parts.join("."))
     name = n.value
     end = n.span.end()
+  } else if saw_dot && self.at_kind(Pound) {
+    // The `#` is there, just not adjacent: a space inside the ID, not a
+    // missing one.
+    self.fail(
+      "SM-PARSE-001",
+      "UNEXPECTED TOKEN",
+      "a shape ID cannot contain spaces; I was expecting `#` right after `\{parts.join(".")}` but found \{self.found()}",
+      self.here(),
+      hint="Remove the space before `#`.",
+    )
   } else if saw_dot {
     self.fail(
       "SM-PARSE-005",

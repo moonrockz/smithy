@@ -197,20 +197,6 @@ fn Parser::parse_use(self : Parser) -> @ast.UseStatement raise ParseError {
 }
 
 ///|
-/// A shape or apply statement. Task 11 implements this; until then every
-/// statement start is reported.
-fn Parser::parse_shape_or_apply(
-  self : Parser,
-) -> @ast.Statement raise ParseError {
-  self.fail(
-    "SM-PARSE-004",
-    "EXPECTED A STATEMENT",
-    "shape statements are not supported yet",
-    self.here(),
-  )
-}
-
-///|
 /// Which section a statement start belongs to, to enforce the order
 /// control, metadata, namespace, use, shapes.
 priv enum Section {
