@@ -42,11 +42,6 @@ async fn main {
     // Not a git checkout: nothing to do.
     return
   }
-  let hook = "\{out.text().trim()}/pre-push"
-  if @fs.exists(hook) && @fs.read_file(hook).text().contains(legacy_marker) {
-    println("🧹 Removing the pre-push hook from the retired setup:hooks task...")
-    @fs.remove(hook)
-  }
   let (rc, hooks_path, _) = @process.collect_output("git", [
     "config", "--local", "--get", "core.hooksPath",
   ])
@@ -57,6 +52,12 @@ async fn main {
     println("   lefthook would not be used. To move this checkout to lefthook on purpose, run:")
     println("   git config --local --unset core.hooksPath && mise run hooks:install")
     @sys.exit(1)
+  }
+  // Only now, with git on its default hooks directory, retire the old hook.
+  let hook = "\{out.text().trim()}/pre-push"
+  if @fs.exists(hook) && @fs.read_file(hook).text().contains(legacy_marker) {
+    println("🧹 Removing the pre-push hook from the retired setup:hooks task...")
+    @fs.remove(hook)
   }
   let code = @process.run(
     "lefthook", ["install"],
