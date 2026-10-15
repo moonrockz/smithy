@@ -61,6 +61,7 @@ pub fn Trivia::text(self : Trivia) -> String {
 }
 
 ///|
+/// The span the trivia covers.
 pub fn Trivia::span(self : Trivia) -> @span.Span {
   match self {
     Whitespace(_, s) | Newline(_, s) | Comma(s) => s
@@ -69,11 +70,13 @@ pub fn Trivia::span(self : Trivia) -> @span.Span {
 }
 
 ///|
+/// Whether this trivia is a line break.
 pub fn Trivia::is_newline(self : Trivia) -> Bool {
   self is Newline(_, _)
 }
 
 ///|
+/// Whether this trivia is a comment.
 pub fn Trivia::is_comment(self : Trivia) -> Bool {
   self is Comment(_)
 }
@@ -127,6 +130,7 @@ pub fn TokenStream::to_source(self : TokenStream) -> String {
 }
 
 ///|
+/// Whether any diagnostic has severity `Error`.
 pub fn TokenStream::has_errors(self : TokenStream) -> Bool {
   self.diagnostics.iter().any(d => d.is_error())
 }

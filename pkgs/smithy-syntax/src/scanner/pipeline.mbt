@@ -70,6 +70,7 @@ pub fn tokenize(source : @span.SourceText) -> TokenStream {
 }
 
 ///|
+/// `tokenize` of a `SourceText` built from `text`.
 pub fn tokenize_text(text : String) -> TokenStream {
   @span.SourceText::new(text) |> tokenize
 }
