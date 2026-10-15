@@ -1,3 +1,5 @@
+warnings = "-reserved_keyword"
+
 import {
   "moonrockz/smithy-syntax/span",
   "moonbitlang/x/decimal",
