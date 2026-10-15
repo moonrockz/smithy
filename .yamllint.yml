@@ -6,6 +6,7 @@ ignore:
   - .mooncakes/
   - node_modules/
   - .git/
+  - .beads/  # bd rewrites config.yaml with its own indentation
 
 rules:
   line-length:
