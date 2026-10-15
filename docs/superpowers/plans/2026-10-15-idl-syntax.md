@@ -15,6 +15,8 @@
 - Module path `pkgs/smithy-syntax`, module name `moonrockz/smithy-syntax`, version `0.1.0`, `source = "src"`, license Apache-2.0, `warnings = "-implicit_impl_as_method"` in `moon.mod` (the derive promotion warning of this toolchain).
 - No primitive obsession for positions: text positions are `@span.Offset` (a UTF-16 unit index, never negative), counts are `@span.Length` (never negative), lines and columns are `@span.Line` and `@span.Column` (1-based, never zero), nesting is `@parser.Depth`. A raw `Int` is used only for array indexes and loop counters that never leave a function. Newtypes are `pub struct X(Int)` (read-only outside their package) with validating constructors.
 - Functional style: public functions are pure (a value in, a value out, no hidden state). Mutation is allowed only for local accumulators and the parser's private cursor inside one `parse` call. Diagnostics are returned as values, never pushed into shared state across functions. Linear multi-stage flows are written as `|>` pipelines.
+- Text output goes through core's `Logger` trait (`&Logger`), the sink that `StringBuilder`, `@buffer.Buffer` and `Show::output` share; a renderer never holds a concrete `StringBuilder` in its API. The async `@io.Writer` of `moonbitlang/async` is byte-oriented and belongs to the CLI boundary (sub-project 5), which writes rendered strings to it.
+- Every value type with an invariant (`Offset`, `Length`, `Line`, `Column`, `Span`, `Depth`) has quickcheck laws beside its unit tests, in a `*_law_test.mbt` file.
 - LF and CRLF are line breaks; a lone CR is not.
 - Every AST node has `span`; every list field is `ArrayView[T]`; every public type derives `Eq, Debug`. `derive(Show)` is deprecated on this toolchain: write `impl Show` by hand where a type needs it.
 - Diagnostic codes are `SM-SCAN-001`..`SM-SCAN-007` and `SM-PARSE-001`..`SM-PARSE-011`, exactly as listed in Task 3; a test checks the table against what is emitted.
@@ -204,6 +206,7 @@ git commit -m "feat(syntax): scaffold the moonrockz/smithy-syntax module"
 - Create: `pkgs/smithy-syntax/src/span/units_test.mbt`
 - Create: `pkgs/smithy-syntax/src/span/span_test.mbt`
 - Create: `pkgs/smithy-syntax/src/span/source_text_test.mbt`
+- Create: `pkgs/smithy-syntax/src/span/span_law_test.mbt`
 - Create: `pkgs/smithy-syntax/src/span/README.mbt.md`
 
 **Interfaces:**
@@ -221,6 +224,8 @@ import {
   "moonrockz/smithy-syntax/span",
   "moonrockz/expect",
   "moonbitlang/core/debug",
+  "moonbitlang/core/quickcheck",
+  "moonbitlang/core/quickcheck/splitmix",
 } for "test"
 ```
 
@@ -672,7 +677,163 @@ pub fn SourceText::slice(self : SourceText, span : Span) -> String {
 }
 ```
 
-- [ ] **Step 7: Run the tests, write the README, commit**
+- [ ] **Step 7: Write the laws for the unit types and the source text**
+
+`span/span_law_test.mbt`. The generators live in this test file so the package has no test dependency on `lawkit` (Task 6), which depends on `span`.
+
+```moonbit
+///|
+fn pick(rs : @splitmix.RandomState, n : Int) -> Int {
+  rs.next_uint(limit=n.reinterpret_as_uint()).reinterpret_as_int()
+}
+
+///|
+/// A random non-negative offset, at most 1000.
+pub(all) struct AnyOffset(@span.Offset) derive(Debug)
+
+///|
+pub impl @quickcheck.Arbitrary for AnyOffset with fn arbitrary(_size, rs) {
+  AnyOffset(@span.Offset::new(pick(rs, 1001)).unwrap())
+}
+
+///|
+pub(all) struct AnyLength(@span.Length) derive(Debug)
+
+///|
+pub impl @quickcheck.Arbitrary for AnyLength with fn arbitrary(_size, rs) {
+  AnyLength(@span.Length::new(pick(rs, 1001)).unwrap())
+}
+
+///|
+/// A random text of ASCII letters, spaces, LF, CRLF and lone CR, with an
+/// offset inside it (or at its end).
+pub(all) struct TextAndOffset(String, @span.Offset) derive(Debug)
+
+///|
+pub impl @quickcheck.Arbitrary for TextAndOffset with fn arbitrary(size, rs) {
+  let pieces = ["a", "b", " ", "\n", "\r\n", "\r", "é", "\u{1F600}"]
+  let sb = StringBuilder()
+  for _ in 0..<pick(rs, size + 1) {
+    sb.write_string(pieces[pick(rs, pieces.length())])
+  }
+  let text = sb.to_string()
+  TextAndOffset(text, @span.Offset::new(pick(rs, text.length() + 1)).unwrap())
+}
+
+///|
+test "law: Offset::new accepts exactly the non-negative ints" {
+  @quickcheck.check((n : Int) => (@span.Offset::new(n) is Some(_)) == (n >= 0), count=300, seed=1001)
+  @quickcheck.check((n : Int) => (@span.Length::new(n) is Some(_)) == (n >= 0), count=300, seed=1002)
+  @quickcheck.check((n : Int) => (@span.Line::new(n) is Some(_)) == (n >= 1), count=300, seed=1003)
+  @quickcheck.check((n : Int) => (@span.Column::new(n) is Some(_)) == (n >= 1), count=300, seed=1004)
+}
+
+///|
+test "law: advance and distance round-trip, and advance never moves backwards" {
+  @quickcheck.check(
+    (p : (AnyOffset, AnyLength)) => {
+      let (AnyOffset(o), AnyLength(l)) = p
+      let moved = o.advance(l)
+      o.distance(moved) == l && moved >= o && o.next() == o.advance(@span.Length::one())
+    },
+    count=300,
+    seed=1005,
+  )
+}
+
+///|
+test "law: distance and to are symmetric, and to's end is the larger offset" {
+  @quickcheck.check(
+    (p : (AnyOffset, AnyOffset)) => {
+      let (AnyOffset(a), AnyOffset(b)) = p
+      let s = a.to(b)
+      a.distance(b) == b.distance(a) &&
+      s == b.to(a) &&
+      s.end() == (if a > b { a } else { b }) &&
+      s.start == (if a < b { a } else { b }) &&
+      s.length == a.distance(b)
+    },
+    count=300,
+    seed=1006,
+  )
+}
+
+///|
+test "law: Length addition is a commutative monoid with zero" {
+  @quickcheck.check(
+    (p : (AnyLength, AnyLength, AnyLength)) => {
+      let (AnyLength(a), AnyLength(b), AnyLength(c)) = p
+      a + b == b + a && (a + b) + c == a + (b + c) && a + @span.Length::zero() == a
+    },
+    count=300,
+    seed=1007,
+  )
+}
+
+///|
+test "law: a span contains its start when non-empty and never its end; join covers and is idempotent" {
+  @quickcheck.check(
+    (p : (AnyOffset, AnyOffset, AnyOffset, AnyOffset)) => {
+      let (AnyOffset(a), AnyOffset(b), AnyOffset(c), AnyOffset(d)) = p
+      let s = a.to(b)
+      let u = c.to(d)
+      let j = s.join(u)
+      (s.contains(s.start) == !s.is_empty()) &&
+      !s.contains(s.end()) &&
+      j == u.join(s) &&
+      j.join(s) == j &&
+      j.start <= s.start && j.start <= u.start && j.end() >= s.end() && j.end() >= u.end()
+    },
+    count=300,
+    seed=1008,
+  )
+}
+
+///|
+test "law: position and line_span agree, and position is monotone in the offset" {
+  @quickcheck.check(
+    (t : TextAndOffset) => {
+      let TextAndOffset(text, o) = t
+      let st = @span.SourceText::new(text)
+      let p = st.position(o)
+      guard st.line_span(p.line) is Some(ls) else { return false }
+      // The column counts units from the line start, also on the line break.
+      let agrees = o.0 - ls.start.0 + 1 == p.column.0 && o >= ls.start
+      let in_range = p.line.0 >= 1 && p.line.0 <= st.line_count()
+      let monotone = o.0 == 0 || {
+        let q = st.position(@span.Offset::new(o.0 - 1).unwrap())
+        q.line < p.line || (q.line == p.line && q.column < p.column)
+      }
+      agrees && in_range && monotone
+    },
+    count=400,
+    max_size=24,
+    seed=1009,
+  )
+}
+
+///|
+test "law: slice of a line span is the line text and never panics on any span" {
+  @quickcheck.check(
+    (t : TextAndOffset) => {
+      let TextAndOffset(text, o) = t
+      let st = @span.SourceText::new(text)
+      let p = st.position(o)
+      let by_line = st.line_span(p.line).map(s => st.slice(s)) == st.line_text(p.line)
+      let any_span = st.slice(o.to(st.end())).length() == st.end().0 - o.0
+      by_line && any_span
+    },
+    count=300,
+    max_size=24,
+    seed=1010,
+  )
+}
+```
+
+Run: `moon test -p moonrockz/smithy-syntax/span`
+Expected: all laws pass. A counterexample means the type's invariant is wrong, not the law, unless the law mis-states the spec.
+
+- [ ] **Step 8: Run the tests, write the README, commit**
 
 Run: `moon test -p moonrockz/smithy-syntax/span`
 Expected: all pass. If a `debug_inspect` of a newtype prints differently (for example `Offset(2)` versus `2`), confirm the value and update the `content`.
@@ -4526,7 +4687,36 @@ test "a scanner error is a hole the parser steps over" {
 Run: `moon test -p moonrockz/smithy-syntax/parser`
 Expected: all pass. The last test depends on `skip_holes` running after `recover` and in `advance`; if the `^` leaves the `use` unparsed, check that `Parser::new` skipped the hole before the first `peek`.
 
-- [ ] **Step 6: Format and commit**
+- [ ] **Step 6: Add the Depth laws**
+
+`parser/depth_law_test.mbt`:
+
+```moonbit
+///|
+test "law: deeper then shallower is the identity, and shallower never goes below zero" {
+  @quickcheck.check(
+    (n : Int) => {
+      let d = {
+        let mut d = @parser.Depth::zero()
+        for _ in 0..<(if n < 0 { 0 } else { n % 200 }) {
+          d = d.deeper()
+        }
+        d
+      }
+      d.deeper().shallower() == d &&
+      @parser.Depth::zero().shallower() == @parser.Depth::zero() &&
+      d.deeper() > d &&
+      (d > @parser.max_nesting) == (d.0 > 100)
+    },
+    count=300,
+    seed=1011,
+  )
+}
+```
+
+Run: `moon test -p moonrockz/smithy-syntax/parser`
+
+- [ ] **Step 7: Format and commit**
 
 ```bash
 mise run format
@@ -6033,7 +6223,7 @@ git commit -m "test(syntax): add recovery tests and the parser laws"
 
 **Interfaces:**
 - Consumes: `@diagnostic.Diagnostic`, `@span.SourceText`.
-- Produces: `render_short(d, source) -> String`; `render_plain(d, source) -> String`; `render_terminal(d, source, color? : Bool) -> String` (default `true`); `render_all(ds : ArrayView[Diagnostic], source, color? : Bool) -> String` (every diagnostic, blank line between, then a summary line `N errors, M warnings`).
+- Produces: `render_terminal_to(d, source, logger : &Logger, color? : Bool) -> Unit` (the one renderer: writes into any core `Logger`, so a `StringBuilder`, a `@buffer.Buffer` or a caller's own sink); `render_terminal(d, source, color? : Bool) -> String` (default `true`) and `render_plain(d, source) -> String`, both thin wrappers over a `StringBuilder`; `render_short(d, source) -> String`; `render_all_to(ds, source, logger, color?)` and `render_all(ds : ArrayView[Diagnostic], source, color? : Bool) -> String` (every diagnostic, blank line between, then a summary line `N errors, M warnings`). The async `@io.Writer` is not used here; the CLI writes the returned strings to it.
 
 - [ ] **Step 1: Write the failing snapshot tests**
 
@@ -6053,6 +6243,7 @@ import {
   "moonrockz/smithy-syntax/lawkit",
   "moonrockz/expect",
   "moonbitlang/core/quickcheck",
+  "moonbitlang/core/buffer",
 } for "test"
 ```
 
@@ -6122,6 +6313,17 @@ test "a span at the end of the file renders a caret after the last character" {
 }
 
 ///|
+test "render_terminal_to writes into any Logger" {
+  let (d, source) = first_error("namespace a use b#C\n")
+  let sb = StringBuilder()
+  @report.render_terminal_to(d, source, sb, color=false)
+  let buf = @buffer.Buffer()
+  @report.render_terminal_to(d, source, buf, color=false)
+  inspect(sb.to_string() == @report.render_plain(d, source), content="true")
+  inspect(buf.to_string() == @report.render_plain(d, source), content="true")
+}
+
+///|
 test "render_all ends with a summary" {
   let source = @span.SourceText::new("namespace a\nuse Foo\n/// x\n", name="m.smithy")
   let r = @parser.parse(source)
@@ -6144,21 +6346,23 @@ test "long notes reflow at 80 columns" {
 
 ```moonbit
 ///|
+/// The sink of a render: any core `Logger` (a `StringBuilder`, a
+/// `@buffer.Buffer`, or the caller's own), plus the color switch.
 priv struct Out {
-  sb : StringBuilder
+  logger : &Logger
   color : Bool
   severity : @diagnostic.Severity
 }
 
 ///|
 fn Out::write(self : Out, s : String) -> Unit {
-  self.sb.write_string(s)
+  self.logger.write_string(s)
 }
 
 ///|
 fn Out::code(self : Out, code : String) -> Unit {
   if self.color {
-    self.sb.write_string("\u{1b}[\{code}m")
+    self.logger.write_string("\u{1b}[\{code}m")
   }
 }
 
@@ -6247,13 +6451,14 @@ pub fn render_short(d : @diagnostic.Diagnostic, source : @span.SourceText) -> St
 
 ///|
 /// The Rust and codespan layout: header, location, excerpt with labels,
-/// notes, hint and example.
-pub fn render_terminal(
+/// notes, hint and example, written into `logger`.
+pub fn render_terminal_to(
   d : @diagnostic.Diagnostic,
   source : @span.SourceText,
+  logger : &Logger,
   color? : Bool = true,
-) -> String {
-  let out = { sb: StringBuilder(), color, severity: d.severity }
+) -> Unit {
+  let out = { logger, color, severity: d.severity }
   let sev = if d.severity is Error { "error" } else { "warning" }
   out.header()
   out.write("\{sev}[\{d.code}]")
@@ -6351,7 +6556,18 @@ pub fn render_terminal(
     }
     None => ()
   }
-  out.sb.to_string()
+}
+
+///|
+/// `render_terminal_to` into a fresh string.
+pub fn render_terminal(
+  d : @diagnostic.Diagnostic,
+  source : @span.SourceText,
+  color? : Bool = true,
+) -> String {
+  let sb = StringBuilder()
+  render_terminal_to(d, source, sb, color~)
+  sb.to_string()
 }
 
 ///|
@@ -6361,18 +6577,19 @@ pub fn render_plain(d : @diagnostic.Diagnostic, source : @span.SourceText) -> St
 }
 
 ///|
-/// Every diagnostic, a blank line between them, then a summary line.
-pub fn render_all(
+/// Every diagnostic, a blank line between them, then a summary line,
+/// written into `logger`.
+pub fn render_all_to(
   ds : ArrayView[@diagnostic.Diagnostic],
   source : @span.SourceText,
+  logger : &Logger,
   color? : Bool = true,
-) -> String {
-  let sb = StringBuilder()
+) -> Unit {
   let mut errors = 0
   let mut warnings = 0
   for d in ds {
-    sb.write_string(render_terminal(d, source, color~))
-    sb.write_string("\n")
+    render_terminal_to(d, source, logger, color~)
+    logger.write_string("\n")
     if d.is_error() {
       errors += 1
     } else {
@@ -6380,7 +6597,18 @@ pub fn render_all(
     }
   }
   let plural = (n : Int, word : String) => if n == 1 { "1 \{word}" } else { "\{n} \{word}s" }
-  sb.write_string("\{plural(errors, "error")}, \{plural(warnings, "warning")}\n")
+  logger.write_string("\{plural(errors, "error")}, \{plural(warnings, "warning")}\n")
+}
+
+///|
+/// `render_all_to` into a fresh string.
+pub fn render_all(
+  ds : ArrayView[@diagnostic.Diagnostic],
+  source : @span.SourceText,
+  color? : Bool = true,
+) -> String {
+  let sb = StringBuilder()
+  render_all_to(ds, source, sb, color~)
   sb.to_string()
 }
 ```
@@ -6607,6 +6835,12 @@ pub fn render_plain(d : Diagnostic, source : SourceText) -> String {
 ///|
 pub fn render_terminal(d : Diagnostic, source : SourceText, color? : Bool = true) -> String {
   @report.render_terminal(d, source, color~)
+}
+
+///|
+/// Render into any core `Logger`, for callers with their own sink.
+pub fn render_terminal_to(d : Diagnostic, source : SourceText, logger : &Logger, color? : Bool = true) -> Unit {
+  @report.render_terminal_to(d, source, logger, color~)
 }
 
 ///|
@@ -7130,6 +7364,7 @@ Open a pull request from this branch to `main` with the beads epic ID in the des
 
 - Spec coverage: module and packages (Tasks 1, 14), positions (2), scanner (4, 5, 6), AST (7), CST (8), parser and recovery (9, 10, 11, 12), diagnostics (3, 11), report (13), testing and corpus (6, 12, 15), documentation (14, 16), out of scope untouched.
 - Functional style: the scanner is `scan_at` (pure) unfolded by `scan_pieces` and grouped by `attach_trivia`, composed with `|>` in `tokenize`; diagnostics travel inside `Step` values. The parser's only mutable state is the private `Parser` cursor inside one `parse` call; `order_diagnostics` and the CST grouping are pure functions of their inputs; `parse` and `parse_text` are pipelines.
-- Typed units: `Offset`, `Length`, `Line`, `Column` (Task 2) and `Depth` (Task 9) replace raw ints for positions, counts and nesting; `Span` is start plus length so its end never precedes its start. Raw `Int` remains only for array indexes (`pos`, `doc_head`, loop counters) and display widths.
+- Typed units: `Offset`, `Length`, `Line`, `Column` (Task 2) and `Depth` (Task 9) replace raw ints for positions, counts and nesting; `Span` is start plus length so its end never precedes its start. Raw `Int` remains only for array indexes (`pos`, `doc_head`, loop counters) and display widths. Each unit type has quickcheck laws (`span_law_test.mbt`, `depth_law_test.mbt`).
+- Output sink: `report` renders into core's `&Logger` (`render_terminal_to`, `render_all_to`); the string-returning functions wrap a `StringBuilder`. The async `@io.Writer` is left to the CLI.
 - Review Focus coverage: CRLF (Task 4 test "CRLF is one newline trivia", Task 9 test "two statements on one line"), text blocks (Task 5 decode tests), adjacent shape IDs (Task 11 "spaces inside a shape id" and "a shape name must be an identifier"), deep nesting on wasm (Task 10 "150 nested arrays"), recovery keeps the next statement (Task 12 recovery tests).
 - Type names used across tasks: `Offset`, `Length`, `Line`, `Column`, `Span`, `Position`, `SourceText`, `Diagnostic`, `Label`, `TokenKind`, `Trivia`, `Token`, `TokenStream`, `Piece`, `Step`, `Node`, `ShapeId`, `DocComment`, `NodeValue`, `NodeKvp`, `NumberLiteral`, `NumberValue`, `Shape`, `ShapeKind`, `Member`, `MemberTarget`, `EnumMember`, `InlineShape`, `OperationTarget`, `OperationProperty`, `Trait`, `TraitBody`, `Mixins`, `IdlFile`, `Statement`, `ShapeStatement`, `ApplyStatement`, `StatementCst`, `StatementKind`, `IdlCst`, `ParseResult`, `ParseError`, `Version`, `Depth`. `Show` is hand-written for `ShapeKind` (Task 7), `StatementKind` (Task 8) and `ShapeId` (Task 7); `derive(Show)` is not used.
