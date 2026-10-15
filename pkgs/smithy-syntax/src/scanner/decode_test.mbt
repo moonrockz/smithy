@@ -53,7 +53,7 @@ test "the closing quotes on the content's last line keep that line" {
 }
 
 ///|
-test "a last line of only spaces does not count toward the common prefix" {
+test "the closing quotes' own line counts toward the common prefix" {
   let block =
     #|"""
     #|      deep
@@ -61,7 +61,22 @@ test "a last line of only spaces does not count toward the common prefix" {
   inspect(
     @scanner.text_block_value(block),
     content=(
-      #|deep
+      #|    deep
+      #|
+    ),
+  )
+}
+
+///|
+test "a closing delimiter at the margin keeps all indentation" {
+  let block =
+    #|"""
+    #|    kept
+    #|"""
+  inspect(
+    @scanner.text_block_value(block),
+    content=(
+      #|    kept
       #|
     ),
   )

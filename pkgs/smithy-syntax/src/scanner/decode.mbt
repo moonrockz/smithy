@@ -114,14 +114,13 @@ fn block_lines(body : String) -> Array[String] {
 }
 
 ///|
-/// The common leading-space count over the non-blank lines. A blank line
-/// (including the last, which may hold only the closing quotes' indent)
-/// does not count: its indentation carries no signal about the block's
-/// shared prefix.
+/// The common leading-space count: over the non-blank lines, and over the
+/// last line even when blank (it holds the closing quotes' indent).
 fn common_indent(lines : Array[String]) -> Int32 {
+  let last = lines.length() - 1
   let mut common = -1
-  for line in lines {
-    if is_blank(line) {
+  for idx, line in lines {
+    if idx != last && is_blank(line) {
       continue
     }
     let k = leading_spaces(line)
