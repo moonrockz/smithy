@@ -1,0 +1,10 @@
+import {
+  "moonrockz/smithy-syntax/span",
+  "moonrockz/smithy-syntax/diagnostic",
+}
+
+import {
+  "moonrockz/smithy-syntax/scanner",
+  "moonrockz/smithy-syntax/span",
+  "moonrockz/expect",
+} for "test"
