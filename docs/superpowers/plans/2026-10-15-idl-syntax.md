@@ -3695,15 +3695,17 @@ test "statements tile the stream and print the source back" {
   let cst = @cst.IdlCst::new(s, [ns, foo])
   @expect.expect_all(e => {
     e.expect(cst.to_source()).to_equal(text)
+    // Trivia after a token stops at its first line break; the blank line
+    // belongs to the next token, so it prints with `string`.
     e.expect(ns.to_source()).to_equal(
       (
         #|namespace a.b
-        #|
         #|
       ),
     )
     e.expect(foo.to_source()).to_equal(
       (
+        #|
         #|string Foo // c
         #|
       ),
