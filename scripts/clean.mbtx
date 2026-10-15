@@ -7,15 +7,20 @@ import {
   "moonbitlang/async@0.22.5/fs",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/x@0.5.5/sys",
 }
 
 ///|
 async fn main {
   println("🧹 Cleaning build artifacts...")
-  let _ = @process.run(
+  let code = @process.run(
     "moon", ["clean"],
     stdout=@stdio.stdout, stderr=@stdio.stderr,
   )
+  if code != 0 {
+    println("❌ moon clean failed")
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
   for dir in ["_build", "scripts/_build"] {
     if @fs.exists(dir) {
       @fs.rmdir(dir, recursive=true)

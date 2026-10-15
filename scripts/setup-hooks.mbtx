@@ -4,12 +4,20 @@
 /// Usage: `mise run setup:hooks`, or `moonx scripts/setup-hooks.mbtx`. It runs on `mise` directory
 /// entry too (see `[hooks]` in `.config/mise/config.toml`). Skipped in CI and outside a git checkout.
 /// Bypass the hook with `git push --no-verify` (not recommended).
+///
+/// The script only writes a hook that it installed before (it carries the `marker` line) or that
+/// does not exist. A pre-push hook from another tool is left in place, with a message that says how
+/// to chain the checks into it.
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/env",
 }
+
+///|
+/// Identifies a hook that this script wrote. Keep it in step with `pre_push`.
+let marker : String = "# Installed by `mise run setup:hooks` (scripts/setup-hooks.mbtx)."
 
 ///|
 let pre_push : String =
@@ -51,8 +59,17 @@ async fn main {
   }
   let hooks_dir = out.text().trim().to_owned()
   let hook = "\{hooks_dir}/pre-push"
-  if @fs.exists(hook) && @fs.read_file(hook).text() == pre_push {
-    return
+  if @fs.exists(hook) {
+    let existing = @fs.read_file(hook).text()
+    if existing == pre_push {
+      return
+    }
+    if !existing.contains(marker) {
+      println("⚠️  \{hook} exists and was not installed by this script, so it is left in place.")
+      println("   To run the repository checks from it, add this line to that hook:")
+      println("   mise run lint && mise run validate")
+      return
+    }
   }
   println("🔧 Installing git pre-push hook at \{hook}...")
   @fs.mkdir(hooks_dir, recursive=true, allow_exist=true)

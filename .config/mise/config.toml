@@ -9,8 +9,8 @@
 # Node.js runs the js target in `moon test --target js` and `moon run --target js`.
 node = "24.14.1"
 
-# YAML linting
-yamllint = "latest"
+# YAML linting, pinned so lint results do not change between machines
+yamllint = "1.38.0"
 
 # MoonBit toolchain, pinned. mise cannot resolve "latest" for an http: tool, and a pinned version
 # keeps CI and every machine on the same compiler. To move to a newer release, change the version
