@@ -38,3 +38,15 @@ and test. `mise run check` runs lint, validate, test and build, which is what CI
 - Commits use Conventional Commits, in plain English, with no AI attribution and no `Co-Authored-By` lines.
 - Run `mise run format` before you commit MoonBit code.
 - New packages go under `pkgs/` (libraries) or `apps/` (executables), and into `moon.work`.
+
+## Work tracking
+
+Issues live in [beads](https://github.com/steveyegge/beads) (`bd`), in a Dolt database that syncs through
+`refs/dolt/data` on the GitHub origin, separate from the source branches. The config in `.beads/` is
+committed; the database is not. On a fresh clone run `bd bootstrap`, or `bd init -p smithy --shared-server`
+when the clone has no Dolt data yet.
+
+- `bd prime` prints the workflow; `bd ready` lists unblocked work; `bd show <id>` gives the context.
+- `bd update <id> --claim` before starting, `bd close <id> --reason "..."` when done.
+- `bd sync` publishes issue changes. Run it at the end of a session; it needs no commit.
+- The top epic is `smithy-2qe`, one child epic per sub-project.
