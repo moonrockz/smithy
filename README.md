@@ -1,2 +1,76 @@
 # smithy
-A Smithy implementation for the Moonbit ecosystem.
+
+A [Smithy](https://smithy.io/) implementation for the MoonBit ecosystem, organized as a monorepo.
+
+## Packages
+
+| Path | Module | Purpose |
+|------|--------|---------|
+| `pkgs/smithy` | `moonrockz/smithy` | Smithy model library |
+| `apps/smithy` | `moonrockz/smithy-cli` | Command-line application |
+
+The workspace members are listed in `moon.work`.
+
+## Prerequisites
+
+- [mise](https://mise.jdx.dev/). It installs every other tool: the pinned MoonBit toolchain, Node.js and yamllint.
+
+## Setup
+
+```shell
+git clone https://github.com/moonrockz/smithy.git
+cd smithy
+mise trust
+mise install
+```
+
+The mise binary archive of MoonBit omits the core library and `moonx`. If `moon version --all` does not show `moonc`,
+complete the toolchain into the mise install directory:
+
+```shell
+curl -fsSL https://cli.moonbitlang.com/install/unix.sh | MOON_HOME="$(mise where http:moonbit)" bash -s -- "$(mise current http:moonbit)"
+```
+
+Git hooks are installed when you enter the directory (mise `enter` hook). The pre-push hook runs lint and validation.
+
+## Tasks
+
+Every task is a MoonBit script in `scripts/*.mbtx`, run with `moonx`, so one script works on every platform.
+Run `mise tasks` for the list.
+
+```shell
+mise run check                 # lint, validate, test, build
+mise run lint                  # yamllint, moon fmt --check, moon check
+mise run format                # moon fmt
+mise run validate              # package structure against moon.work
+mise run test                  # all targets
+mise run test -- js native     # some targets
+mise run build                 # all targets
+mise run build:native          # native release build
+mise run clean
+```
+
+Without mise: `moonx scripts/<name>.mbtx [args]`.
+
+## Layout
+
+```
+smithy/
+├── .config/mise/config.toml   # tools and tasks
+├── .github/workflows/ci.yml   # lint, build and test on every target
+├── apps/smithy/               # CLI (moonrockz/smithy-cli)
+├── pkgs/smithy/               # library (moonrockz/smithy)
+├── scripts/*.mbtx             # task scripts, run with moonx
+├── moon.mod                   # workspace root module
+└── moon.work                  # workspace members
+```
+
+## Adding a package
+
+1. Create `pkgs/<name>/moon.mod` (module `moonrockz/<name>`) and a `moon.pkg`.
+2. Add `"./pkgs/<name>"` to `moon.work`.
+3. Run `mise run validate`.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).

@@ -51,3 +51,15 @@ node_modules/
 *.exe
 # macOS debug symbol bundles.
 *.dSYM/
+
+# Mise
+
+# Local mise overrides (copy .config/mise/config.local.toml.example).
+.config/mise/config.local.toml
+mise.local.toml
+.mise.local.toml
+
+# Misc
+
+.DS_Store
+*.log

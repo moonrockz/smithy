@@ -1,0 +1,48 @@
+name: Setup toolchain
+description: Install mise, the tools pinned in .config/mise/config.toml, and the complete MoonBit toolchain.
+
+inputs:
+  github-token:
+    description: Token for mise to query GitHub releases without rate limits.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Install mise and pinned tools
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        MISE_GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -euo pipefail
+        curl -fsSL https://mise.run | sh
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        echo "$HOME/.local/share/mise/shims" >> "$GITHUB_PATH"
+        export PATH="$HOME/.local/bin:$PATH"
+        mise --version
+        mise trust
+        mise install
+
+    - name: Complete the MoonBit toolchain
+      shell: bash
+      # The binary archive that mise installs omits the core library and moonx. The official
+      # installer adds them into the same directory, for the same pinned version.
+      run: |
+        set -euo pipefail
+        export PATH="$HOME/.local/bin:$PATH"
+        moonbit_dir="$(mise where http:moonbit)"
+        moonbit_version="$(mise current http:moonbit)"
+        curl -fsSL https://cli.moonbitlang.com/install/unix.sh | \
+          MOON_HOME="$moonbit_dir" bash -s -- "$moonbit_version"
+        chmod +x "$moonbit_dir"/bin/* || true
+        echo "$moonbit_dir/bin" >> "$GITHUB_PATH"
+        echo "MOON_HOME=$moonbit_dir" >> "$GITHUB_ENV"
+
+    - name: Report versions and update the registry
+      shell: bash
+      run: |
+        set -euo pipefail
+        moon version --all
+        moon update

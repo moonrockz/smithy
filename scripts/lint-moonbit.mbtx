@@ -1,0 +1,32 @@
+///|
+/// Check MoonBit formatting and run the type checker across the workspace.
+///
+/// Usage: `mise run lint:moonbit`, or `moonx scripts/lint-moonbit.mbtx`.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+async fn moon(args : Array[String]) -> Int {
+  @process.run("moon", args, stdout=@stdio.stdout, stderr=@stdio.stderr)
+}
+
+///|
+async fn main {
+  println("🔍 Checking MoonBit formatting...")
+  let fmt = moon(["fmt", "--check"])
+  if fmt != 0 {
+    println("❌ Formatting issues found. Run 'mise run format' to fix.")
+    @sys.exit(if fmt > 0 { fmt } else { 1 })
+  }
+  println("🔍 Checking MoonBit code...")
+  let check = moon(["check", "--deny-warn"])
+  if check != 0 {
+    println("❌ moon check reported problems.")
+    @sys.exit(if check > 0 { check } else { 1 })
+  }
+  println("✅ MoonBit lint complete")
+}
