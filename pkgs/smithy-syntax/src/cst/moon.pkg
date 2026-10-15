@@ -9,5 +9,4 @@ import {
   "moonrockz/smithy-syntax/scanner",
   "moonrockz/smithy-syntax/span",
   "moonrockz/expect",
-  "moonbitlang/core/debug",
 } for "test"

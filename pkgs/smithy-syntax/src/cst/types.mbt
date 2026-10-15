@@ -38,6 +38,7 @@ pub(all) struct StatementCst {
 } derive(Eq, Debug)
 
 ///|
+/// Group `tokens` as one statement; the span runs from the first token's start to the last token's end.
 pub fn StatementCst::new(
   kind~ : StatementKind,
   name~ : String?,
@@ -72,6 +73,7 @@ pub(all) struct IdlCst {
 } derive(Eq, Debug)
 
 ///|
+/// The CST of a scanned stream with its statements.
 pub fn IdlCst::new(
   stream : @scanner.TokenStream,
   statements : Array[StatementCst],
