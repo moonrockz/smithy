@@ -33,6 +33,7 @@ pub(all) struct Diagnostic {
 } derive(Eq, Debug)
 
 ///|
+/// Build a diagnostic; the optional parts default to empty lists and `None`.
 pub fn Diagnostic::new(
   code~ : String,
   severity~ : Severity,
@@ -58,6 +59,7 @@ pub fn Diagnostic::new(
 }
 
 ///|
+/// Whether the severity is `Error`.
 pub fn Diagnostic::is_error(self : Diagnostic) -> Bool {
   self.severity == Error
 }
