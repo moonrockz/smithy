@@ -59,6 +59,24 @@ test "numbers are exact" {
 }
 
 ///|
+test "exponent-form numbers are exact" {
+  guard value("1e19") is Number(n, _) else { fail("not a number") }
+  guard n.value is Decimal(d) else { fail("not a decimal") }
+  inspect(
+    d.to_bigint() == BigInt::from_string("10000000000000000000"),
+    content="true",
+  )
+  guard value("2.5e+10") is Number(a, _) else { fail("not a number") }
+  inspect(a.as_double(), content="25000000000")
+  guard value("1E-3") is Number(b, _) else { fail("not a number") }
+  inspect(b.as_double(), content="0.001")
+  guard b.value is Decimal(bd) else { fail("not a decimal") }
+  inspect(bd.scale(), content="3")
+  guard value("-1.25e2") is Number(c, _) else { fail("not a number") }
+  inspect(c.as_double(), content="-125")
+}
+
+///|
 test "arrays and objects with optional commas and nested values" {
   let v = value(
     (

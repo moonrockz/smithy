@@ -7,7 +7,6 @@ import {
   "moonrockz/smithy-syntax/ast",
   "moonrockz/smithy-syntax/cst",
   "moonbitlang/x/decimal",
-  "moonbitlang/core/string",
 }
 
 import {

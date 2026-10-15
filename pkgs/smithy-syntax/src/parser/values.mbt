@@ -23,19 +23,91 @@ fn Parser::parse_object_key(
 }
 
 ///|
-/// `Decimal::from_double` rejects a precision that would push the scaled
-/// value past `Int64`, which a fixed high precision does for anything but
-/// tiny magnitudes (`1000` at precision 17 already overflows). Try the
-/// highest precision that fits, down to an integer.
-fn decimal_from_double(d : Double) -> @decimal.Decimal {
-  let mut precision = 17
-  while precision >= 0 {
-    if @decimal.Decimal::from_double(d, precision) is Some(v) {
-      return v
-    }
-    precision -= 1
+/// Whether `c` is an ASCII digit.
+fn is_number_digit(c : Char) -> Bool {
+  c >= '0' && c <= '9'
+}
+
+///|
+/// The digits of `chars` from `start`, and the index after them.
+fn number_digits(chars : Array[Char], start : Int32) -> (String, Int32) {
+  let n = chars.length()
+  let mut i = start
+  while i < n && is_number_digit(chars[i]) {
+    i += 1
   }
-  @decimal.Decimal::from_int(0)
+  (String::from_array(chars[start:i]), i)
+}
+
+///|
+/// Split a scanner-validated `Number` lexeme (`[-] int [. frac]
+/// [e|E [+|-] digits]`) into its sign, integer digits, fraction digits
+/// (empty when there is no `.`) and exponent (`0` when there is no
+/// `e`/`E`).
+fn split_number_lexeme(text : String) -> (String, String, String, Int32) {
+  let chars = text.to_array()
+  let n = chars.length()
+  let mut i = 0
+  let sign = if i < n && chars[i] == '-' {
+    i += 1
+    "-"
+  } else {
+    ""
+  }
+  let (int_digits, after_int) = number_digits(chars, i)
+  i = after_int
+  let frac_digits = if i < n && chars[i] == '.' {
+    let (digits, after_frac) = number_digits(chars, i + 1)
+    i = after_frac
+    digits
+  } else {
+    ""
+  }
+  let exponent = if i < n && (chars[i] == 'e' || chars[i] == 'E') {
+    i += 1
+    let exp_sign = if i < n && chars[i] == '-' {
+      i += 1
+      -1
+    } else {
+      if i < n && chars[i] == '+' {
+        i += 1
+      }
+      1
+    }
+    let (exp_digits, _) = number_digits(chars, i)
+    let mut exp_value = 0
+    for ch in exp_digits {
+      exp_value = exp_value * 10 + (ch.to_int() - '0'.to_int())
+    }
+    exp_sign * exp_value
+  } else {
+    0
+  }
+  (sign, int_digits, frac_digits, exponent)
+}
+
+///|
+/// The exact decimal value of a lexeme with a `.` or an exponent (or
+/// both), as `coefficient * 10^(-scale)`: no `Double` involved, so no
+/// lexeme the scanner accepts can lose precision.
+fn decimal_from_lexeme(text : String) -> @decimal.Decimal {
+  let (sign, int_digits, frac_digits, exponent) = split_number_lexeme(text)
+  let mut coefficient = BigInt::from_string(sign + int_digits + frac_digits)
+  let mut scale = frac_digits.length() - exponent
+  if scale < 0 {
+    coefficient *= BigInt::from_int(10).pow(BigInt::from_int(-scale))
+    scale = 0
+  }
+  match @decimal.Decimal::new(coefficient, scale) {
+    Some(d) => d
+    // `Decimal::new` only rejects a negative scale (never produced here)
+    // or one past `max_scale`: an exponent so extreme no Smithy file
+    // needs it.
+    None =>
+      abort(
+        "number literal \{text} needs \{scale} fractional digits, more than a Decimal can hold",
+      )
+  }
 }
 
 ///|
@@ -51,12 +123,9 @@ fn Parser::parse_number(
     match @decimal.Decimal::from_string(text) {
       Some(d) => Decimal(d)
       // The scanner validated the digits; a lexeme the decimal parser
-      // rejects (an exponent form it does not take) falls back to a
-      // double, which is still a decimal value.
-      None =>
-        Decimal(
-          decimal_from_double(@string.parse_double(text) catch { _ => 0.0 }),
-        )
+      // rejects (an exponent form it does not take) is parsed exactly
+      // from its digits instead.
+      None => Decimal(decimal_from_lexeme(text))
     }
   }
   { text, value, }

@@ -188,6 +188,31 @@ test "recovery skips to the next statement and keeps the CST lossless" {
 }
 
 ///|
+test "recovery is not fooled by a comma into stopping at column 1" {
+  // A leading `,` means `use` is not at column 1, so the skipped run
+  // swallows the whole second line too, instead of stopping right
+  // before it and parsing `use a#B` as a second statement.
+  let text =
+    #|namespace a
+    #|use Foo
+    #|,use a#B
+    #|
+  let r = @parser.parse_text(text)
+  @expect.expect_all(e => {
+    e.expect(r.cst.skipped().length()).to_equal(1)
+    e
+    .expect(r.cst.skipped()[0].to_source())
+    .to_equal(
+      (
+        #|use Foo
+        #|,use a#B
+        #|
+      ),
+    )
+  })
+}
+
+///|
 test "an empty file has no ast and no errors" {
   let r = @parser.parse_text("")
   inspect(r.ast is None, content="true")
