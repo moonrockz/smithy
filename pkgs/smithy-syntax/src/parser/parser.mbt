@@ -163,7 +163,13 @@ fn Parser::pop_context(self : Parser) -> Unit {
 
 ///|
 /// Build and raise a diagnostic. The innermost context gives a secondary
-/// label ("the structure started here") and the first note.
+/// label ("the structure started here") and the first note. A caller that
+/// raises `SM-PARSE-001` for a diagnostic whose `span` is the end-of-input
+/// span (what `here()` returns once the file is exhausted) gets
+/// `SM-PARSE-002` instead: that is really "unexpected end of file", not
+/// "unexpected token". A `SM-PARSE-001` whose `span` points at a real
+/// token is left alone even when that token happens to be the last one in
+/// the file.
 fn[T] Parser::fail(
   self : Parser,
   code : String,
@@ -175,7 +181,9 @@ fn[T] Parser::fail(
   example? : String,
   labels? : Array[@diagnostic.Label],
 ) -> T raise ParseError {
-  let code = if self.peek() is None && code == "SM-PARSE-001" {
+  let code = if self.peek() is None &&
+    code == "SM-PARSE-001" &&
+    span == self.here() {
     "SM-PARSE-002"
   } else {
     code

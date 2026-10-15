@@ -78,26 +78,15 @@ test "exponent-form numbers are exact" {
 
 ///|
 test "a number needing more than 28 decimal places is reported" {
-  // A trailing `namespace` keeps the number from being the file's last
-  // token: `Parser::fail` remaps a bare `SM-PARSE-001` raised at the end
-  // of the file to `SM-PARSE-002`, which would otherwise mask the code
-  // this diagnostic actually reports.
-  let codes = @parser.parse_text(
-      (
-        #|metadata v = 1e-40
-        #|namespace a
-        #|
-      ),
-    ).diagnostics
-    .iter()
-    .map(d => d.code)
-    .collect()
-  @expect.expect(codes).to_equal(["SM-PARSE-001"])
+  // The too-precise number is the file's last token here, but its
+  // diagnostic points at the number itself, not at end-of-input, so it
+  // keeps its own code (`Parser::fail` only remaps to `SM-PARSE-002` when
+  // the span it is given is the end-of-input span).
+  @expect.expect(vcodes("1e-40")).to_equal(["SM-PARSE-001"])
   let r = @parser.parse_text(
     (
-      #|metadata v = 1e-40
-      #|namespace a
-      #|
+      $|metadata v = 1e-40
+      $|
     ),
   )
   inspect(r.errors()[0].title, content="NUMBER TOO PRECISE")
@@ -105,6 +94,13 @@ test "a number needing more than 28 decimal places is reported" {
   guard value("1e-28") is Number(n, _) else { fail("not a number") }
   guard n.value is Decimal(d) else { fail("not a decimal") }
   inspect(d.scale(), content="28")
+}
+
+///|
+test "a value missing at the end of the file is still SM-PARSE-002" {
+  // Unlike the too-precise number above, this diagnostic's span really is
+  // the end-of-input span (nothing follows `=`), so the remap applies.
+  @expect.expect(vcodes("")).to_equal(["SM-PARSE-002"])
 }
 
 ///|
