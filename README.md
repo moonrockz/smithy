@@ -7,6 +7,7 @@ A [Smithy](https://smithy.io/) implementation for the MoonBit ecosystem, organiz
 | Path | Module | Purpose |
 |------|--------|---------|
 | `pkgs/smithy` | `moonrockz/smithy` | Smithy model library |
+| `pkgs/smithy-syntax` | `moonrockz/smithy-syntax` | Smithy IDL scanner, AST, CST, parser and diagnostics |
 | `apps/smithy` | `moonrockz/smithy-cli` | Command-line application |
 
 The workspace members are listed in `moon.work`.
@@ -68,6 +69,7 @@ smithy/
 ├── lefthook.yml               # git hooks
 ├── apps/smithy/               # CLI (moonrockz/smithy-cli)
 ├── pkgs/smithy/               # library (moonrockz/smithy)
+├── pkgs/smithy-syntax/        # IDL syntax (moonrockz/smithy-syntax)
 ├── scripts/*.mbtx             # task scripts, run with moonx
 ├── moon.mod                   # workspace root module
 └── moon.work                  # workspace members

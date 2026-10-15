@@ -1,0 +1,6 @@
+import {
+}
+
+import {
+  "moonrockz/smithy-syntax" @syntax,
+} for "test"

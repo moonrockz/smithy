@@ -1,5 +1,6 @@
 members = [
   ".",
   "./pkgs/smithy",
+  "./pkgs/smithy-syntax",
   "./apps/smithy",
 ]
