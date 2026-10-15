@@ -77,6 +77,37 @@ test "exponent-form numbers are exact" {
 }
 
 ///|
+test "a number needing more than 28 decimal places is reported" {
+  // A trailing `namespace` keeps the number from being the file's last
+  // token: `Parser::fail` remaps a bare `SM-PARSE-001` raised at the end
+  // of the file to `SM-PARSE-002`, which would otherwise mask the code
+  // this diagnostic actually reports.
+  let codes = @parser.parse_text(
+      (
+        #|metadata v = 1e-40
+        #|namespace a
+        #|
+      ),
+    ).diagnostics
+    .iter()
+    .map(d => d.code)
+    .collect()
+  @expect.expect(codes).to_equal(["SM-PARSE-001"])
+  let r = @parser.parse_text(
+    (
+      #|metadata v = 1e-40
+      #|namespace a
+      #|
+    ),
+  )
+  inspect(r.errors()[0].title, content="NUMBER TOO PRECISE")
+  // The limit itself (28 places) still parses.
+  guard value("1e-28") is Number(n, _) else { fail("not a number") }
+  guard n.value is Decimal(d) else { fail("not a decimal") }
+  inspect(d.scale(), content="28")
+}
+
+///|
 test "arrays and objects with optional commas and nested values" {
   let v = value(
     (

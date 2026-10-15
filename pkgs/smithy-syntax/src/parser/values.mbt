@@ -89,8 +89,13 @@ fn split_number_lexeme(text : String) -> (String, String, String, Int32) {
 ///|
 /// The exact decimal value of a lexeme with a `.` or an exponent (or
 /// both), as `coefficient * 10^(-scale)`: no `Double` involved, so no
-/// lexeme the scanner accepts can lose precision.
-fn decimal_from_lexeme(text : String) -> @decimal.Decimal {
+/// lexeme the scanner accepts can lose precision. `span` is the number
+/// token's span, for the diagnostic when the scale is unrepresentable.
+fn Parser::decimal_from_lexeme(
+  self : Parser,
+  text : String,
+  span : @span.Span,
+) -> @decimal.Decimal raise ParseError {
   let (sign, int_digits, frac_digits, exponent) = split_number_lexeme(text)
   let mut coefficient = BigInt::from_string(sign + int_digits + frac_digits)
   let mut scale = frac_digits.length() - exponent
@@ -100,12 +105,16 @@ fn decimal_from_lexeme(text : String) -> @decimal.Decimal {
   }
   match @decimal.Decimal::new(coefficient, scale) {
     Some(d) => d
-    // `Decimal::new` only rejects a negative scale (never produced here)
-    // or one past `max_scale`: an exponent so extreme no Smithy file
-    // needs it.
+    // `Decimal::new` rejects a negative scale (never produced here) or
+    // one past `max_scale` (28): more decimal places than Smithy numbers
+    // can hold.
     None =>
-      abort(
-        "number literal \{text} needs \{scale} fractional digits, more than a Decimal can hold",
+      self.fail(
+        "SM-PARSE-001",
+        "NUMBER TOO PRECISE",
+        "I cannot represent `\{text}` exactly: it needs more than 28 decimal places",
+        span,
+        hint="Round the number to at most 28 decimal places.",
       )
   }
 }
@@ -113,9 +122,9 @@ fn decimal_from_lexeme(text : String) -> @decimal.Decimal {
 ///|
 /// The exact value of a `Number` token.
 fn Parser::parse_number(
-  _self : Parser,
+  self : Parser,
   t : @scanner.Token,
-) -> @ast.NumberLiteral {
+) -> @ast.NumberLiteral raise ParseError {
   let text = t.lexeme
   let value : @ast.NumberValue = if @scanner.is_integer_lexeme(text) {
     Integer(BigInt::from_string(text))
@@ -125,7 +134,7 @@ fn Parser::parse_number(
       // The scanner validated the digits; a lexeme the decimal parser
       // rejects (an exponent form it does not take) is parsed exactly
       // from its digits instead.
-      None => Decimal(decimal_from_lexeme(text))
+      None => Decimal(self.decimal_from_lexeme(text, t.span))
     }
   }
   { text, value, }
