@@ -50,12 +50,15 @@ fn Parser::parse_trait(self : Parser) -> @ast.Trait raise ParseError {
 
 ///|
 /// An error for 2.0-only syntax in a 1.0 file. The messages are the
-/// reference's.
+/// reference's. Reports nothing when `version_unknown`: a broken `$`
+/// control statement might have been `$version: "2"`, so gating on 1.0
+/// would be reporting an error we can't actually back up.
 fn Parser::require_v2(
   self : Parser,
   feature : String,
   span : @span.Span,
 ) -> Unit raise ParseError {
+  guard !self.version_unknown else { return }
   guard self.version != Some(V2) else { return }
   let message = match feature {
     "mixins" => "Mixins can only be used with Smithy version 2 or later"

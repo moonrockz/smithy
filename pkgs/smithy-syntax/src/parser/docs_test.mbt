@@ -205,3 +205,37 @@ test "version 1 files reject 2.0 syntax with the reference's facts" {
     content="Mixins can only be used with Smithy version 2 or later",
   )
 }
+
+///|
+test "a broken control statement makes the version unknown, not 1.0, so v2 gating does not fire" {
+  let r = @parser.parse_text(
+    (
+      #|$ver""ion: "2"
+      #|namespace a
+      #|string S with [M]
+      #|
+    ),
+  )
+  @expect.expect(r.diagnostics.iter().map(d => d.code).collect()).to_equal([
+    "SM-PARSE-001",
+  ])
+}
+
+///|
+test "a statement that swallows the $version line also makes the version unknown" {
+  let r = @parser.parse_text(
+    (
+      #|"a
+      #|b"$version: "2"
+      #|namespace a
+      #|string S with [M]
+      #|
+    ),
+  )
+  @expect.expect_all(e => {
+    e
+    .expect(r.diagnostics.iter().any(d => d.code == "SM-PARSE-007"))
+    .to_be_false()
+    e.expect(r.errors().length()).to_equal(1)
+  })
+}

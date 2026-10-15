@@ -173,6 +173,45 @@ fn Parser::check_unfinished(
 }
 
 ///|
+/// Whether, starting at `i`, skipping over a run of trait applications
+/// (`@Name` or `@Name(...)`, balancing parens), the next token is a
+/// column-1 shape keyword. When it is, the traits at `i` are not a new
+/// member's leading traits: the block was left open, and what looks
+/// like a member start is really the start of the *next* shape.
+fn Parser::leads_to_block_break(self : Parser, i : Int32) -> Bool {
+  let mut j = i
+  while j < self.tokens.length() && self.tokens[j].kind == At {
+    j += 1
+    if j < self.tokens.length() && self.tokens[j].kind == Identifier {
+      j += 1
+      while j + 1 < self.tokens.length() &&
+            (
+              self.tokens[j].kind == Dot ||
+              self.tokens[j].kind == Pound ||
+              self.tokens[j].kind == Dollar
+            ) &&
+            self.tokens[j + 1].kind == Identifier {
+        j += 2
+      }
+    }
+    if j < self.tokens.length() && self.tokens[j].kind == LParen {
+      let mut depth = 1
+      j += 1
+      while j < self.tokens.length() && depth > 0 {
+        if self.tokens[j].kind == LParen {
+          depth += 1
+        }
+        if self.tokens[j].kind == RParen {
+          depth -= 1
+        }
+        j += 1
+      }
+    }
+  }
+  self.at_block_breaking_statement(j)
+}
+
+///|
 /// Skip to the next member start or the closing brace after an error in a
 /// member, so one bad member does not drop the shape. `start_pos` is
 /// `self.pos` from before the failed item was attempted: when the item
@@ -199,6 +238,9 @@ fn Parser::recover_member(self : Parser, start_pos : Int32) -> Bool {
       return false
     }
     if self.first_on_line(self.pos) && self.at_member_start() {
+      if self.tokens[self.pos].kind == At && self.leads_to_block_break(self.pos) {
+        return false
+      }
       return true
     }
     ignore(self.advance())
@@ -312,6 +354,18 @@ fn Parser::parse_member(self : Parser) -> @ast.Member raise ParseError {
   let traits = self.parse_traits()
   // Docs between traits and the name still attach.
   docs.append(self.take_docs_before(self.here().start))
+  // A column-1 shape keyword after a member's leading traits means those
+  // traits belong to the *next* shape, not to a member here: the block
+  // was left open, not a member with an odd name.
+  if self.at_block_breaking_statement(self.pos) {
+    self.fail(
+      "SM-PARSE-001",
+      "UNFINISHED SHAPE",
+      "I was reading a member and found \{self.found()} at the start of a line; did you forget `}`?",
+      self.here(),
+      hint="Close the block with `}` before the next statement.",
+    )
+  }
   let (name, target) : (@ast.Node[String], @ast.MemberTarget) = if self.at_kind(
       Dollar,
     ) {

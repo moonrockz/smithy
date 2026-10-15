@@ -217,8 +217,24 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
   let uses : Array[@ast.UseStatement] = []
   let statements : Array[@ast.Statement] = []
   let cst_statements : Array[@cst.StatementCst] = []
+  // `Parser::new` already skipped any leading holes (`Error` tokens); they
+  // belong to no statement, so record them here or the CST would not tile
+  // the token array.
+  if p.pos > 0 {
+    cst_statements.push(
+      @cst.StatementCst::new(
+        kind=Skipped,
+        name=None,
+        tokens=stream.tokens[0:p.pos],
+      ),
+    )
+  }
   let mut section = ControlSection
   let mut read_anything = false
+  // Guards the one-time `MISSING NAMESPACE` report below: a file missing
+  // its `namespace` statement gets exactly one diagnostic, not one per
+  // shape, `use` or `apply` statement that follows.
+  let mut reported_missing_namespace = false
   while !p.at_end() {
     let start_index = p.pos
     guard p.peek() is Some(t) else { break }
@@ -256,6 +272,42 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
         let u = p.parse_use()
         uses.push(u)
         Ok((@cst.StatementKind::Use, Some(u.id.value.to_string())))
+      } else if namespace is None &&
+        (
+          p.at_keyword("use") ||
+          p.at_keyword("apply") ||
+          t.kind == At ||
+          (t.kind == Identifier && @ast.ShapeKind::of(t.lexeme) is Some(_))
+        ) {
+        // A shape, `use` or `apply` statement with no `namespace` before
+        // it: report it once, then keep parsing the shape section as if
+        // the namespace were there, so one typo gives one diagnostic
+        // instead of one per statement that follows.
+        if !reported_missing_namespace {
+          reported_missing_namespace = true
+          p.report(
+            "SM-PARSE-004",
+            Error,
+            "MISSING NAMESPACE",
+            "I found `\{t.lexeme}` but no `namespace` statement before it",
+            t.span,
+            notes=[
+              "Every shape, `use` and `apply` statement belongs to a namespace, which the file declares with `namespace your.package` before them.",
+            ],
+            hint="Add `namespace your.package` before the first shape.",
+          )
+        }
+        section = ShapeSection
+        if p.at_keyword("use") {
+          p.detach_docs_before(start_offset)
+          let u = p.parse_use()
+          uses.push(u)
+          Ok((@cst.StatementKind::Use, Some(u.id.value.to_string())))
+        } else {
+          let s = p.parse_shape_or_apply()
+          statements.push(s)
+          Ok(statement_cst_kind(s))
+        }
       } else if p.at_keyword("metadata") ||
         p.at_keyword("namespace") ||
         p.at_keyword("use") ||
@@ -291,6 +343,13 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
         )
       }
       Err(e) => {
+        // Before the namespace statement, with no `$version` recorded
+        // yet, a recovery's skipped run might have swallowed the
+        // `$version` line whole (dispatched or not) along with whatever
+        // else failed: the version is unknown, not 1.0.
+        if namespace is None && p.version is None {
+          p.version_unknown = true
+        }
         p.diagnostics.push(e.diagnostic())
         p.recover(start_index, cst_statements)
       }

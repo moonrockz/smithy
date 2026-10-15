@@ -20,6 +20,12 @@ priv struct Parser {
   doc_comments : Array[@ast.DocComment]
   mut doc_head : Int32
   mut version : Version?
+  /// Set when a recovery before the namespace may have eaten the
+  /// `$version` statement: the file *might* have declared
+  /// `$version: "2"`, we just couldn't read it, so `require_v2` must not
+  /// report 1.0-only gating errors on the strength of a version we
+  /// don't actually know.
+  mut version_unknown : Bool
 }
 
 ///|
@@ -51,6 +57,7 @@ fn Parser::new(stream : @scanner.TokenStream) -> Parser {
     doc_comments,
     doc_head: 0,
     version: None,
+    version_unknown: false,
   }
   p.skip_holes()
   p

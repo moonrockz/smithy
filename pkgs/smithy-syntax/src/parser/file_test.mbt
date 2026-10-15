@@ -141,6 +141,23 @@ test "statements out of order are EXPECTED A STATEMENT with a note" {
 }
 
 ///|
+test "a missing namespace is reported once and the shapes after it still parse" {
+  let r = @parser.parse_text(
+    (
+      #|string Foo
+      #|string Bar
+      #|
+    ),
+  )
+  guard r.ast is Some(f) else { fail("no ast") }
+  @expect.expect_all(e => {
+    e.expect(r.diagnostics.map(d => d.code)).to_equal(["SM-PARSE-004"])
+    e.expect(r.diagnostics[0].title).to_equal("MISSING NAMESPACE")
+    e.expect(f.shapes().length()).to_equal(2)
+  })
+}
+
+///|
 test "a use statement needs an absolute id" {
   @expect.expect(
     codes(
