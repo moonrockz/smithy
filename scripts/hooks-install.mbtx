@@ -1,0 +1,61 @@
+///|
+/// Install the git hooks with lefthook. The hooks are defined in `lefthook.yml`.
+///
+/// Usage: `mise run hooks:install`, or `moonx scripts/hooks-install.mbtx`. Idempotent: lefthook
+/// rewrites its hook files on every run. Skipped in CI.
+///
+/// A `core.hooksPath` setting makes git look away from `.git/hooks`, where lefthook writes, so it
+/// is unset first. A pre-push hook that the old `setup:hooks` task wrote is removed, because
+/// lefthook would otherwise keep it beside its own hook as `pre-push.old`.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+/// The marker line of the hook that the retired `setup:hooks` task wrote.
+let legacy_marker : String = "# Installed by `mise run setup:hooks` (scripts/setup-hooks.mbtx)."
+
+///|
+fn truthy(name : String) -> Bool {
+  match @env.get_env_var(name) {
+    Some("true") | Some("1") => true
+    _ => false
+  }
+}
+
+///|
+async fn main {
+  if truthy("CI") || truthy("GITHUB_ACTIONS") {
+    return
+  }
+  let (code, out, _) = @process.collect_output("git", [
+    "rev-parse", "--git-path", "hooks",
+  ])
+  if code != 0 {
+    // Not a git checkout: nothing to do.
+    return
+  }
+  let hook = "\{out.text().trim()}/pre-push"
+  if @fs.exists(hook) && @fs.read_file(hook).text().contains(legacy_marker) {
+    println("🧹 Removing the pre-push hook from the retired setup:hooks task...")
+    @fs.remove(hook)
+  }
+  // Ignore the result: the setting is usually absent, and git then exits with 5.
+  let _ = @process.collect_output("git", [
+    "config", "--local", "--unset", "core.hooksPath",
+  ])
+  let code = @process.run(
+    "lefthook", ["install"],
+    stdout=@stdio.stdout, stderr=@stdio.stderr,
+  )
+  if code != 0 {
+    println("❌ lefthook install failed. Run 'mise install' to get lefthook.")
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+  println("✅ Git hooks installed. See lefthook.yml for what they run.")
+}

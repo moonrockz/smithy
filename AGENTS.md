@@ -28,8 +28,10 @@ then works on every platform, and it uses the toolchain that mise already instal
 
 ## Pre-push checks
 
-`mise run lint` and `mise run validate` must pass before a push. The pre-push git hook (`mise run setup:hooks`)
-runs them. `mise run check` runs lint, validate, test and build, which is what CI runs.
+`mise run lint` and `mise run validate` must pass before a push. The git hooks are managed by
+[lefthook](https://lefthook.dev/) and defined in `lefthook.yml`. Install them once with `mise run hooks:install`.
+The pre-commit hook runs `moon fmt --check` and `moon check --deny-warn`. The pre-push hook runs lint, validate
+and test. `mise run check` runs lint, validate, test and build, which is what CI runs.
 
 ## Working rules
 
