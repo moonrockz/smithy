@@ -1,0 +1,18 @@
+# Git hooks for moonrockz/smithy. Install them with `mise run hooks:install`.
+# Every check is a mise task, so the hooks run the same commands as CI.
+
+pre-commit:
+  commands:
+    format-check:
+      run: moon fmt --check
+    lint-check:
+      run: moon check --deny-warn
+
+pre-push:
+  commands:
+    lint:
+      run: mise run lint
+    validate:
+      run: mise run validate
+    test:
+      run: mise run test

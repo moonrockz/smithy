@@ -12,6 +12,9 @@ node = "24.14.1"
 # YAML linting, pinned so lint results do not change between machines
 yamllint = "1.38.0"
 
+# Git hooks manager; the hooks are in lefthook.yml
+lefthook = "2.1.1"
+
 # MoonBit toolchain, pinned. mise cannot resolve "latest" for an http: tool, and a pinned version
 # keeps CI and every machine on the same compiler. To move to a newer release, change the version
 # here and in each URL (with "+" written as "%2B"), taken from
@@ -90,17 +93,13 @@ run = "moonx scripts/check.mbtx"
 description = "Remove build artifacts"
 run = "moonx scripts/clean.mbtx"
 
-[tasks."setup:hooks"]
-description = "Install the pre-push git hook (idempotent)"
-run = "moonx scripts/setup-hooks.mbtx"
+[tasks."hooks:install"]
+description = "Install the git hooks with lefthook (see lefthook.yml)"
+run = "moonx scripts/hooks-install.mbtx"
 
 [tasks.list-tasks]
 description = "List all mise tasks"
 run = "mise tasks"
-
-[hooks]
-# Install git hooks when entering the directory.
-enter = "mise run setup:hooks"
 
 [settings]
 experimental = true

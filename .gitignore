@@ -59,6 +59,11 @@ node_modules/
 mise.local.toml
 .mise.local.toml
 
+# Lefthook
+
+# Local hook overrides.
+lefthook-local.yml
+
 # Misc
 
 .DS_Store

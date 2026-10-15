@@ -31,7 +31,13 @@ complete the toolchain into the mise install directory:
 curl -fsSL https://cli.moonbitlang.com/install/unix.sh | MOON_HOME="$(mise where http:moonbit)" bash -s -- "$(mise current http:moonbit)"
 ```
 
-Git hooks are installed when you enter the directory (mise `enter` hook). The pre-push hook runs lint and validation.
+Then install the git hooks, which [lefthook](https://lefthook.dev/) manages from `lefthook.yml`:
+
+```shell
+mise run hooks:install
+```
+
+The pre-commit hook checks formatting and runs `moon check`. The pre-push hook runs lint, validate and test.
 
 ## Tasks
 
@@ -48,6 +54,7 @@ mise run test -- js native     # some targets
 mise run build                 # all targets
 mise run build:native          # native release build
 mise run clean
+mise run hooks:install         # git hooks (lefthook)
 ```
 
 Without mise: `moonx scripts/<name>.mbtx [args]`.
@@ -58,6 +65,7 @@ Without mise: `moonx scripts/<name>.mbtx [args]`.
 smithy/
 ├── .config/mise/config.toml   # tools and tasks
 ├── .github/workflows/ci.yml   # lint, build and test on every target
+├── lefthook.yml               # git hooks
 ├── apps/smithy/               # CLI (moonrockz/smithy-cli)
 ├── pkgs/smithy/               # library (moonrockz/smithy)
 ├── scripts/*.mbtx             # task scripts, run with moonx
