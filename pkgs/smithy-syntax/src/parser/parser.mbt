@@ -395,7 +395,7 @@ fn Parser::parse_shape_id(
     self.fail(
       "SM-PARSE-001",
       "UNEXPECTED TOKEN",
-      "a shape ID cannot contain spaces; I was expecting `#` right after `\{parts.join(".")}` but found \{self.found()}",
+      "a shape ID cannot contain spaces; I was expecting `#` right after `\{parts.join(".")}` with no space before it",
       self.here(),
       hint="Remove the space before `#`.",
     )

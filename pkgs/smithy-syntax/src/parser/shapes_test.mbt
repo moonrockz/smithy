@@ -297,3 +297,125 @@ test "an unclosed structure is reported once, with the structure as context" {
   inspect(errs.length(), content="1")
   inspect(errs[0].labels[0].text, content="the structure `S` started here")
 }
+
+///|
+test "a bad member recovers to the closing brace and the shape still parses (R2 regression)" {
+  let r = model(
+    (
+      #|structure Bad {
+      #|  a String
+      #|}
+      #|
+      #|string Foo
+      #|
+    ),
+  )
+  guard r.ast is Some(f) else { fail("no ast") }
+  @expect.expect_all(e => {
+    e.expect(r.errors().length()).to_equal(1)
+    e.expect(f.shapes().map(s => s.shape.name().value)).to_equal(["Bad", "Foo"])
+    e.expect(r.cst.skipped().length()).to_equal(0)
+  })
+}
+
+///|
+test "an unclosed structure skips to the next shape, which still parses (R2 regression)" {
+  let r = model(
+    (
+      #|structure Bad {
+      #|  a: String
+      #|
+      #|string Foo
+      #|
+      #|@deprecated
+      #|string Bar
+      #|
+    ),
+  )
+  guard r.ast is Some(f) else { fail("no ast") }
+  @expect.expect_all(e => {
+    e.expect(r.errors().length()).to_equal(1)
+    e.expect(r.cst.skipped().length()).to_equal(1)
+    e
+    .expect(f.shapes().iter().any(s => s.shape.name().value == "Bar"))
+    .to_be_true()
+  })
+}
+
+///|
+test "an indented $ in an enum member fails without hanging (finding 1 regression)" {
+  let r = model(
+    (
+      #|enum E {
+      #|  $X
+      #|}
+      #|
+    ),
+  )
+  inspect(r.errors().length(), content="1")
+}
+
+///|
+test "member recovery restores contexts and depth across a failed member (finding 2 regression)" {
+  let r = model(
+    (
+      #|structure S {
+      #|  @a(1 2)
+      #|  b: String
+      #|  c String
+      #|}
+      #|string com.foo#Bam
+      #|
+    ),
+  )
+  let errs = r.errors()
+  let c_errs = errs
+    .iter()
+    .filter(e => e.message.contains("member name `c`"))
+    .collect()
+  guard c_errs.length() > 0 else {
+    fail("no error for member `c`: " + errs.map(e => e.message).join(" | "))
+  }
+  let name_errs = errs
+    .iter()
+    .filter(e => e.message.contains("com.foo#Bam"))
+    .collect()
+  guard name_errs.length() > 0 else {
+    fail("no error for `com.foo#Bam`: " + errs.map(e => e.message).join(" | "))
+  }
+  @expect.expect_all(e => {
+    e.expect(c_errs[0].labels.length() > 0).to_be_true()
+    e
+    .expect(c_errs[0].labels[0].text)
+    .to_equal("the structure `S` started here")
+    e.expect(name_errs[0].labels.length()).to_equal(0)
+  })
+}
+
+///|
+test "an unindented structure member and trait are not an unfinished block (finding 3 regression)" {
+  let r = model(
+    (
+      #|structure S {
+      #|@required
+      #|a: String
+      #|}
+      #|
+    ),
+  )
+  inspect(r.has_errors(), content="false")
+}
+
+///|
+test "operation properties accept a comma separator (finding 4 regression)" {
+  let ss = shapes(
+    (
+      #|operation O { input: A, output: B }
+      #|
+    ),
+  )
+  guard ss[0].shape is Operation(properties~, ..) else {
+    fail("not an operation")
+  }
+  inspect(properties.length(), content="2")
+}

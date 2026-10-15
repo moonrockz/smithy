@@ -99,3 +99,16 @@ test "traits with nothing after them are an error, not a crash" {
     content="I was expecting a shape after the traits but found the end of the file",
   )
 }
+
+///|
+test "an apply block with unindented traits is not unfinished (finding 3 regression)" {
+  let r = tmodel(
+    (
+      #|apply Foo {
+      #|@a
+      #|}
+      #|
+    ),
+  )
+  inspect(r.has_errors(), content="false")
+}

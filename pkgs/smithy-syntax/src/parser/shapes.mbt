@@ -133,21 +133,66 @@ fn Parser::at_member_start(self : Parser) -> Bool {
 }
 
 ///|
+/// Whether the token at `i` is a shape keyword, `apply`, `use`, `metadata`
+/// or `namespace` at column 1. These are the only tokens whose appearance
+/// inside an unclosed block means the block was left open: `@`, `$` and a
+/// doc comment are themselves legal member/trait starts at any column
+/// (including column 1), so they never end a block on their own.
+fn Parser::at_block_breaking_statement(self : Parser, i : Int32) -> Bool {
+  guard self.first_on_line(i) && self.at_column_one(i) else { return false }
+  self.tokens[i].kind == Identifier && statement_keyword(self.tokens[i].lexeme)
+}
+
+///|
+/// The "unfinished block" diagnostic shared by every block kind: a member
+/// block, an enum block, an operation body or an apply block. Checked at
+/// the top of each block's loop, before parsing the next item.
+fn Parser::check_unfinished(
+  self : Parser,
+  title : String,
+  owner : String,
+) -> Unit raise ParseError {
+  if self.at_block_breaking_statement(self.pos) {
+    self.fail(
+      "SM-PARSE-001",
+      title,
+      "I was reading \{owner} and found \{self.found()} at the start of a line; did you forget `}`?",
+      self.here(),
+      hint="Close the block with `}` before the next statement.",
+    )
+  }
+  if self.at_end() {
+    self.fail(
+      "SM-PARSE-002",
+      title,
+      "I reached the end of the file while reading \{owner}",
+      self.here(),
+      hint="Add the closing `}`.",
+    )
+  }
+}
+
+///|
 /// Skip to the next member start or the closing brace after an error in a
-/// member, so one bad member does not drop the shape. Returns `true` when
-/// it stopped at `}` or at an indented member start, so the caller may
-/// record the diagnostic and keep going; `false` when it instead reached a
-/// column-1 statement start or the end of the file, so the caller must
-/// re-raise the original error instead of reporting a second one.
+/// member, so one bad member does not drop the shape. Always advances at
+/// least one token first, so a member that failed without consuming
+/// anything can never make this loop spin forever on the same token.
+/// Returns `true` when it stops at `}` or at any first-on-line member
+/// start (`@`, `$`, or an identifier), so the caller may record the
+/// diagnostic and keep going; `false` when it instead reaches a
+/// block-breaking statement (`at_block_breaking_statement`) or the end of
+/// the file, so the caller must re-raise the original error instead of
+/// reporting a second one.
 fn Parser::recover_member(self : Parser) -> Bool {
+  if !self.at_end() && !self.at_kind(RBrace) {
+    ignore(self.advance())
+  }
   while !self.at_end() && !self.at_kind(RBrace) {
-    if self.first_on_line(self.pos) &&
-      !self.at_column_one(self.pos) &&
-      self.at_member_start() {
-      return true
-    }
-    if self.at_statement_start(self.pos) {
+    if self.at_block_breaking_statement(self.pos) {
       return false
+    }
+    if self.first_on_line(self.pos) && self.at_member_start() {
+      return true
     }
     ignore(self.advance())
   }
@@ -182,6 +227,47 @@ fn Parser::expect_member_br(self : Parser) -> Unit raise ParseError {
 }
 
 ///|
+/// The shared loop for `ShapeMembers` and `EnumShapeMembers`: read items
+/// with `parse_item` until `}`, recovering from one bad item (without
+/// losing the rest) and restoring `contexts` and `depth` to what they were
+/// before the bad item, since whatever it entered (a trait body, a node
+/// value) may never have run its own cleanup once it raised.
+fn[T] Parser::parse_block_items(
+  self : Parser,
+  title : String,
+  owner : String,
+  parse_item : () -> Result[T, ParseError],
+) -> Array[T] raise ParseError {
+  let items : Array[T] = []
+  while !self.at_kind(RBrace) {
+    self.check_unfinished(title, "the members of \{owner}")
+    let ctx_len = self.contexts.length()
+    let depth0 = self.depth
+    match parse_item() {
+      Ok(m) => {
+        items.push(m)
+        if !self.at_kind(RBrace) {
+          self.expect_member_br()
+        }
+      }
+      Err(e) => {
+        while self.contexts.length() > ctx_len {
+          ignore(self.contexts.pop())
+        }
+        self.depth = depth0
+        if self.recover_member() {
+          self.diagnostics.push(e.diagnostic())
+        } else {
+          raise e
+        }
+      }
+    }
+  }
+  self.detach_docs_before(self.here().start)
+  items
+}
+
+///|
 /// `ShapeMembers = "{" [WS] *(ShapeMember [WS]) "}"`, each
 /// `ShapeMember = TraitStatements (ExplicitShapeMember / ElidedShapeMember) [ValueAssignment]`.
 fn Parser::parse_members(
@@ -190,47 +276,13 @@ fn Parser::parse_members(
 ) -> Array[@ast.Member] raise ParseError {
   let open = self.expect_kind(LBrace, "`{` to start the members of \{owner}")
   self.enter()
-  let members : Array[@ast.Member] = []
-  while !self.at_kind(RBrace) {
-    if self.at_statement_start(self.pos) {
-      self.fail(
-        "SM-PARSE-001",
-        "UNFINISHED SHAPE",
-        "I was reading the members of \{owner} and found \{self.found()} at the start of a line; did you forget `}`?",
-        self.here(),
-        hint="Close the block with `}` before the next statement.",
-      )
-    }
-    if self.at_end() {
-      self.fail(
-        "SM-PARSE-002",
-        "UNFINISHED SHAPE",
-        "I reached the end of the file while reading the members of \{owner}",
-        self.here(),
-        hint="Add the closing `}`.",
-      )
-    }
-    let outcome = try Ok(self.parse_member()) catch {
+  let members = self.parse_block_items("UNFINISHED SHAPE", owner, () => {
+    try Ok(self.parse_member()) catch {
       e => Err(e)
     } noraise {
       v => v
     }
-    match outcome {
-      Ok(m) => {
-        members.push(m)
-        if !self.at_kind(RBrace) {
-          self.expect_member_br()
-        }
-      }
-      Err(e) =>
-        if self.recover_member() {
-          self.diagnostics.push(e.diagnostic())
-        } else {
-          raise e
-        }
-    }
-  }
-  self.detach_docs_before(self.here().start)
+  })
   ignore(self.expect_kind(RBrace, "`}`"))
   self.leave()
   ignore(open)
@@ -329,47 +381,13 @@ fn Parser::parse_enum_members(
 ) -> Array[@ast.EnumMember] raise ParseError {
   ignore(self.expect_kind(LBrace, "`{` to start the members of \{owner}"))
   self.enter()
-  let members : Array[@ast.EnumMember] = []
-  while !self.at_kind(RBrace) {
-    if self.at_statement_start(self.pos) {
-      self.fail(
-        "SM-PARSE-001",
-        "UNFINISHED ENUM",
-        "I was reading the members of \{owner} and found \{self.found()} at the start of a line; did you forget `}`?",
-        self.here(),
-        hint="Close the block with `}` before the next statement.",
-      )
-    }
-    if self.at_end() {
-      self.fail(
-        "SM-PARSE-002",
-        "UNFINISHED ENUM",
-        "I reached the end of the file while reading the members of \{owner}",
-        self.here(),
-        hint="Add the closing `}`.",
-      )
-    }
-    let outcome = try Ok(self.parse_enum_member()) catch {
+  let members = self.parse_block_items("UNFINISHED ENUM", owner, () => {
+    try Ok(self.parse_enum_member()) catch {
       e => Err(e)
     } noraise {
       v => v
     }
-    match outcome {
-      Ok(m) => {
-        members.push(m)
-        if !self.at_kind(RBrace) {
-          self.expect_member_br()
-        }
-      }
-      Err(e) =>
-        if self.recover_member() {
-          self.diagnostics.push(e.diagnostic())
-        } else {
-          raise e
-        }
-    }
-  }
-  self.detach_docs_before(self.here().start)
+  })
   ignore(self.expect_kind(RBrace, "`}`"))
   self.leave()
   members
@@ -389,6 +407,16 @@ fn Parser::parse_enum_member(self : Parser) -> @ast.EnumMember raise ParseError 
   let docs = self.take_docs_before(first.span.start)
   let traits = self.parse_traits()
   docs.append(self.take_docs_before(self.here().start))
+  if self.at_kind(Dollar) {
+    let d = self.expect_kind(Dollar, "`$`")
+    self.fail(
+      "SM-PARSE-001",
+      "UNEXPECTED TOKEN",
+      "an enum member is a name, not `$name`",
+      d.span,
+      hint="Write the member name without a leading `$`; `$name` elides a member from a mixin, which enums don't have.",
+    )
+  }
   guard self.at_kind(Identifier) else {
     self.fail(
       "SM-PARSE-001",
@@ -451,24 +479,7 @@ fn Parser::parse_operation_body(
   self.enter()
   let props : Array[@ast.OperationProperty] = []
   while !self.at_kind(RBrace) {
-    if self.at_statement_start(self.pos) {
-      self.fail(
-        "SM-PARSE-001",
-        "UNFINISHED OPERATION",
-        "I was reading \{owner} and found \{self.found()} at the start of a line; did you forget `}`?",
-        self.here(),
-        hint="Close the block with `}` before the next statement.",
-      )
-    }
-    if self.at_end() {
-      self.fail(
-        "SM-PARSE-002",
-        "UNFINISHED OPERATION",
-        "I reached the end of the file while reading \{owner}",
-        self.here(),
-        hint="Add the closing `}`.",
-      )
-    }
+    self.check_unfinished("UNFINISHED OPERATION", owner)
     // Docs before `input :=` belong to the inline shape; elsewhere they are detached.
     guard self.peek() is Some(key) && key.kind == Identifier else {
       self.fail(
@@ -541,7 +552,7 @@ fn Parser::parse_operation_body(
         )
     }
     if !self.at_kind(RBrace) {
-      self.expect_br()
+      self.expect_member_br()
     }
   }
   self.detach_docs_before(self.here().start)
@@ -637,24 +648,10 @@ fn Parser::parse_apply(
     self.enter()
     let ts : Array[@ast.Trait] = []
     while !self.at_kind(RBrace) {
-      if self.at_statement_start(self.pos) {
-        self.fail(
-          "SM-PARSE-001",
-          "UNFINISHED APPLY",
-          "I was reading the traits applied to `\{target.value}` and found \{self.found()} at the start of a line; did you forget `}`?",
-          self.here(),
-          hint="Close the block with `}` before the next statement.",
-        )
-      }
-      if self.at_end() {
-        self.fail(
-          "SM-PARSE-002",
-          "UNFINISHED APPLY",
-          "I reached the end of the file while reading the traits applied to `\{target.value}`",
-          self.here(),
-          hint="Add the closing `}`.",
-        )
-      }
+      self.check_unfinished(
+        "UNFINISHED APPLY",
+        "the traits applied to `\{target.value}`",
+      )
       ts.push(self.parse_trait())
     }
     self.detach_docs_before(self.here().start)
