@@ -5,7 +5,7 @@ for the layout and the task list.
 
 ## Toolchain
 
-- `mise` installs and pins every tool (`.config/mise/config.toml`). Run `mise install` once.
+- `mise` installs and pins every tool (`.config/mise/config.toml`). Run `mise trust` and then `mise install` once.
 - The MoonBit version is pinned there. Change it in the version field and in each URL together.
 - `moon.work` lists the workspace members. `moon build`, `moon test`, `moon check` and `moon fmt` at the root act
   on all of them.
