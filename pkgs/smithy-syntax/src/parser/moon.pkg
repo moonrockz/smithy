@@ -1,4 +1,4 @@
-warnings = "-reserved_keyword-unused_value"
+warnings = "-reserved_keyword"
 
 import {
   "moonrockz/smithy-syntax/span",
@@ -6,6 +6,8 @@ import {
   "moonrockz/smithy-syntax/scanner",
   "moonrockz/smithy-syntax/ast",
   "moonrockz/smithy-syntax/cst",
+  "moonbitlang/x/decimal",
+  "moonbitlang/core/string",
 }
 
 import {

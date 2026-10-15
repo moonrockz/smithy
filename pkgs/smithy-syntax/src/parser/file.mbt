@@ -22,9 +22,9 @@ fn Parser::first_on_line(self : Parser, i : Int32) -> Bool {
 
 ///|
 /// Whether the token at `i` is at column 1: first on its line and no
-/// whitespace precedes it on that line (no `Whitespace` after the last
-/// `Newline` in its `trivia_before`, or, for `i == 0`, no `Whitespace` at
-/// all).
+/// whitespace or comma precedes it on that line (no `Whitespace` or
+/// `Comma` after the last `Newline` in its `trivia_before`, or, for
+/// `i == 0`, no `Whitespace` or `Comma` at all).
 fn Parser::at_column_one(self : Parser, i : Int32) -> Bool {
   guard i >= 0 && i < self.tokens.length() else { return false }
   let before = self.tokens[i].trivia_before
@@ -36,7 +36,7 @@ fn Parser::at_column_one(self : Parser, i : Int32) -> Bool {
   }
   let mut j = last_newline + 1
   while j < before.length() {
-    if before[j] is Whitespace(_, _) {
+    if before[j] is (Whitespace(_, _) | Comma(_)) {
       return false
     }
     j += 1
