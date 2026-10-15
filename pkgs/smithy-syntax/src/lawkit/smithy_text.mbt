@@ -160,16 +160,19 @@ fn piece(rs : @splitmix.RandomState) -> String {
 pub(all) struct SmithyText(Array[String]) derive(Debug)
 
 ///|
+/// The pieces joined into one text.
 pub fn SmithyText::text(self : SmithyText) -> String {
   self.0.join("")
 }
 
 ///|
+/// Up to `size + 1` random pieces.
 pub impl @quickcheck.Arbitrary for SmithyText with fn arbitrary(size, rs) {
   SmithyText(Array::makei(pick(rs, size + 1), _ => piece(rs)))
 }
 
 ///|
+/// Drop one piece, or halve the longest piece over length 1.
 pub impl @quickcheck.Shrink for SmithyText with fn shrink(self) {
   let SmithyText(parts) = self
   let out = Array::makei(parts.length(), i => {
