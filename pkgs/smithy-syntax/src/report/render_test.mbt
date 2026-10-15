@@ -109,8 +109,8 @@ test "a span at the end of the file renders a caret after the last character" {
   inspect(
     out.contains(
       (
-        #|3 | 
-        #|   | ^ 
+        #|2 | string
+        #|   |       ^ 
       ),
     ),
     content="true",
@@ -196,6 +196,32 @@ test "long notes reflow at 80 columns" {
     // Caret/label lines carry an unwrapped message after the underline;
     // only notes and hints are reflowed at 80 columns.
     guard !(line.contains("^") || line.contains("---")) else { continue }
+    @expect.expect(line.length() <= 80).because(line.to_owned()).to_be_true()
+  }
+}
+
+///|
+test "reflow hard-breaks a word wider than 80 columns" {
+  let source = @span.SourceText::new("namespace a\n", name="m.smithy")
+  let long = "x".repeat(120)
+  let d = @diagnostic.Diagnostic::new(
+    code="SM-TEST-000",
+    severity=Error,
+    title="TEST",
+    message="test",
+    span=@span.Offset::zero().to(@span.Offset::zero()),
+    notes=[long],
+  )
+  let out = @report.render_plain(d, source)
+  for
+    line in out.split(
+      (
+        #|
+        #|
+      ),
+    ) {
+    // Only the note lines (no "|") carry the 120-char unbroken token.
+    guard !line.contains("|") && line.length() > 0 else { continue }
     @expect.expect(line.length() <= 80).because(line.to_owned()).to_be_true()
   }
 }

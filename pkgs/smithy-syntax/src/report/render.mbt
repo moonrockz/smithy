@@ -54,11 +54,21 @@ let width : Int32 = 80
 
 ///|
 /// Reflow `text` into lines of at most `max` columns, breaking at spaces.
+/// A single word wider than `max` is hard-broken into `max`-sized chunks;
+/// the chunk left over after that starts the next line's accumulation.
 fn reflow(text : String, max : Int32) -> Array[String] {
   let lines : Array[String] = []
   let mut current = ""
   for word in text.split(" ") {
-    let w = word.to_owned()
+    let mut w = word.to_owned()
+    while w.length() > max {
+      if current.length() > 0 {
+        lines.push(current)
+        current = ""
+      }
+      lines.push(w.unsafe_substring(start=0, end=max))
+      w = w.unsafe_substring(start=max, end=w.length())
+    }
     if current.length() == 0 {
       current = w
     } else if current.length() + 1 + w.length() <= max {
@@ -72,6 +82,29 @@ fn reflow(text : String, max : Int32) -> Array[String] {
     lines.push(current)
   }
   lines
+}
+
+///|
+/// `source.position(span.start)`, except an empty span sitting at the very
+/// end of a text that ends with a line break is anchored on the last line
+/// that has content, one column past its last character, rather than on
+/// the synthetic empty line after the final break.
+fn anchor(source : @span.SourceText, span : @span.Span) -> @span.Position {
+  let pos = source.position(span.start)
+  guard span.is_empty() &&
+    span.start == source.end() &&
+    source.line_text(pos.line).unwrap_or("").length() == 0 else {
+    return pos
+  }
+  let mut line = pos.line
+  while line.0 > 1 && source.line_text(line).unwrap_or("").length() == 0 {
+    line = @span.Line::new(line.0 - 1).unwrap_or(line)
+  }
+  let len = source.line_text(line).unwrap_or("").length()
+  @span.Position::new(
+    line,
+    @span.Column::new(len + 1).unwrap_or(@span.Column::first()),
+  )
 }
 
 ///|
@@ -91,7 +124,7 @@ fn label_for(
   text : String,
   primary : Bool,
 ) -> LineLabel {
-  let start = source.position(span.start)
+  let start = anchor(source, span)
   let line_span = source
     .line_span(start.line)
     .unwrap_or(@span.Offset::zero().to(@span.Offset::zero()))
@@ -117,7 +150,7 @@ pub fn render_short(
   d : @diagnostic.Diagnostic,
   source : @span.SourceText,
 ) -> String {
-  let p = source.position(d.span.start)
+  let p = anchor(source, d.span)
   let sev = if d.severity is Error { "error" } else { "warning" }
   "\{source.name().unwrap_or("<input>")}:\{p.line.0}:\{p.column.0}: \{sev}[\{d.code}]: \{d.message}"
 }
@@ -155,7 +188,7 @@ pub fn render_terminal_to(
     .fold(init=1, (a, b) => if a > b { a } else { b })
   let gutter = max_line.to_string().length()
   let pad = " ".repeat(gutter)
-  let p = source.position(d.span.start)
+  let p = anchor(source, d.span)
   out.border()
   out.write("\{pad} --> ")
   out.reset()
