@@ -2315,14 +2315,27 @@ test "the closing quotes on the content's last line keep that line" {
 }
 
 ///|
-test "a last line of only spaces does not count toward the common prefix" {
+test "the closing quotes' own line counts toward the common prefix" {
   let block = (
     #|"""
     #|      deep
     #|  """
   )
   inspect(@scanner.text_block_value(block), content=(
-    #|deep
+    #|    deep
+    #|
+  ))
+}
+
+///|
+test "a closing delimiter at the margin keeps all indentation" {
+  let block = (
+    #|"""
+    #|    kept
+    #|"""
+  )
+  inspect(@scanner.text_block_value(block), content=(
+    #|    kept
     #|
   ))
 }
@@ -3849,6 +3862,7 @@ test {
   let st = @cst.StatementCst::new(kind=Shape(Simple(String)), name=Some("Foo"), tokens=s.tokens)
   inspect(@cst.IdlCst::new(s, [st]).to_source(), content="string Foo\n")
 }
+```
 ````
 
 ```bash
@@ -8596,5 +8610,5 @@ Open a pull request from this branch to `main` with the beads epic ID in the des
 - Functional style: the scanner is `scan_at` (pure) unfolded by `scan_pieces` and grouped by `attach_trivia`, composed with `|>` in `tokenize`; diagnostics travel inside `Step` values. The parser's only mutable state is the private `Parser` cursor inside one `parse` call; `order_diagnostics` and the CST grouping are pure functions of their inputs; `parse` and `parse_text` are pipelines.
 - Typed units: `Offset`, `Length`, `Line`, `Column` (Task 2) and `Depth` (Task 9) replace raw ints for positions, counts and nesting; `Span` is start plus length so its end never precedes its start. Raw `Int` remains only for array indexes (`pos`, `doc_head`, loop counters) and display widths. Each unit type has quickcheck laws (`span_law_test.mbt`, `depth_law_test.mbt`).
 - Output sink: `report` renders into core's `&Logger` (`render_terminal_to`, `render_all_to`); the string-returning functions wrap a `StringBuilder`. The async `@io.Writer` is left to the CLI.
-- Review Focus coverage: CRLF (Task 4 test "CRLF is one newline trivia", Task 9 test "two statements on one line"), text blocks (Task 5 decode tests), adjacent shape IDs (Task 11 "spaces inside a shape id" and "a shape name must be an identifier"), deep nesting on wasm (Task 10 "150 nested arrays"), recovery keeps the next statement (Task 12 recovery tests).
+- Review Focus coverage: CRLF (Task 4 test "CRLF is one newline trivia", Task 9 test "two statements on one line"), text blocks (Task 5 decode tests, including the closing delimiter's own line counting toward the prefix as the spec says), adjacent shape IDs (Task 11 "spaces inside a shape id" and "a shape name must be an identifier"), deep nesting on wasm (Task 10 "150 nested arrays"), recovery keeps the next statement (Task 12 recovery tests).
 - Type names used across tasks: `Offset`, `Length`, `Line`, `Column`, `Span`, `Position`, `SourceText`, `Diagnostic`, `Label`, `TokenKind`, `Trivia`, `Token`, `TokenStream`, `Piece`, `Step`, `Node`, `ShapeId`, `DocComment`, `NodeValue`, `NodeKvp`, `NumberLiteral`, `NumberValue`, `Shape`, `ShapeKind`, `Member`, `MemberTarget`, `EnumMember`, `InlineShape`, `OperationTarget`, `OperationProperty`, `Trait`, `TraitBody`, `Mixins`, `IdlFile`, `Statement`, `ShapeStatement`, `ApplyStatement`, `StatementCst`, `StatementKind`, `IdlCst`, `ParseResult`, `ParseError`, `Version`, `Depth`. `Show` is hand-written for `ShapeKind` (Task 7), `StatementKind` (Task 8) and `ShapeId` (Task 7); `derive(Show)` is not used.
