@@ -1,0 +1,251 @@
+///|
+fn codes(text : String) -> Array[String] {
+  @parser.parse_text(text).diagnostics.iter().map(d => d.code).collect()
+}
+
+///|
+test "control, metadata, namespace and use parse in order" {
+  let r = @parser.parse_text(
+    (
+      #|$version: "2"
+      #|metadata a = "x"
+      #|namespace com.foo
+      #|use smithy.api#String
+      #|
+    ),
+  )
+  guard r.ast is Some(f) else { fail("no ast") }
+  @expect.expect_all(e => {
+    e.expect(r.has_errors()).to_be_false()
+    e.expect(r.version).to_equal(Some(V2))
+    e.expect(f.control.length()).to_equal(1)
+    e.expect(f.metadata[0].key.value).to_equal("a")
+    e.expect(f.namespace.map(n => n.namespace.value)).to_equal(Some("com.foo"))
+    e.expect(f.uses[0].id.value.to_string()).to_equal("smithy.api#String")
+    e.expect(r.cst.statements.length()).to_equal(4)
+    e
+    .expect(r.cst.to_source())
+    .to_equal(
+      (
+        #|$version: "2"
+        #|metadata a = "x"
+        #|namespace com.foo
+        #|use smithy.api#String
+        #|
+      ),
+    )
+  })
+}
+
+///|
+test "an unsupported version is SM-PARSE-006" {
+  @expect.expect(
+    codes(
+      (
+        #|$version: "3"
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-006"])
+  @expect.expect(
+    codes(
+      (
+        #|$version: "1.0"
+        #|
+      ),
+    ),
+  ).to_equal([])
+  debug_inspect(
+    @parser.parse_text(
+      (
+        #|$version: "1"
+        #|
+      ),
+    ).version,
+    content="Some(V1)",
+  )
+  debug_inspect(
+    @parser.parse_text(
+      (
+        #|namespace a
+        #|
+      ),
+    ).version,
+    content="None",
+  )
+}
+
+///|
+test "two statements on one line is MISSING LINE BREAK, also with CRLF files" {
+  @expect.expect(
+    codes(
+      (
+        #|namespace a use b#C
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-003"])
+  @expect.expect(codes("namespace a\r\nuse b#C\r\n")).to_equal([])
+  @expect.expect(
+    codes(
+      (
+        #|namespace a // ok
+        #|use b#C
+        #|
+      ),
+    ),
+  ).to_equal([])
+  let r = @parser.parse_text(
+    (
+      #|namespace a use b#C
+      #|
+    ),
+  )
+  inspect(r.diagnostics[0].title, content="MISSING LINE BREAK")
+  inspect(
+    r.diagnostics[0].message,
+    content="I was expecting a line break here but found `use`",
+  )
+}
+
+///|
+test "statements out of order are EXPECTED A STATEMENT with a note" {
+  let r = @parser.parse_text(
+    (
+      #|namespace a
+      #|metadata x = "y"
+      #|
+    ),
+  )
+  @expect.expect(
+    codes(
+      (
+        #|namespace a
+        #|metadata x = "y"
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-004"])
+  inspect(
+    r.diagnostics[0].notes[0],
+    content="Control statements (`$...`) come first, then `metadata`, then `namespace`.",
+  )
+  @expect.expect(
+    codes(
+      (
+        #|use a#B
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-004"])
+}
+
+///|
+test "a use statement needs an absolute id" {
+  @expect.expect(
+    codes(
+      (
+        #|namespace a
+        #|use Foo
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-005"])
+  @expect.expect(
+    codes(
+      (
+        #|namespace a
+        #|use a.b#Foo$bar
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-005"])
+}
+
+///|
+test "recovery skips to the next statement and keeps the CST lossless" {
+  let text =
+    #|namespace a
+    #|use Foo
+    #|use smithy.api#String
+    #|
+  let r = @parser.parse_text(text)
+  guard r.ast is Some(f) else { fail("no ast") }
+  @expect.expect_all(e => {
+    e.expect(r.errors().length()).to_equal(1)
+    e.expect(f.uses.length()).to_equal(1)
+    e.expect(r.cst.skipped().length()).to_equal(1)
+    e
+    .expect(r.cst.skipped()[0].to_source())
+    .to_equal(
+      (
+        #|use Foo
+        #|
+      ),
+    )
+    e.expect(r.cst.to_source()).to_equal(text)
+  })
+}
+
+///|
+test "an empty file has no ast and no errors" {
+  let r = @parser.parse_text("")
+  inspect(r.ast is None, content="true")
+  inspect(r.has_errors(), content="false")
+  inspect(
+    @parser.parse_text(
+      (
+        #|// just a comment
+        #|
+      ),
+    ).ast
+    is None,
+    content="true",
+  )
+}
+
+///|
+test "doc comments before a namespace are detached warnings" {
+  let r = @parser.parse_text(
+    (
+      #|/// hi
+      #|namespace a
+      #|
+    ),
+  )
+  @expect.expect(
+    codes(
+      (
+        #|/// hi
+        #|namespace a
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-009"])
+  inspect(r.has_errors(), content="false")
+  inspect(r.diagnostics[0].title, content="DETACHED DOC COMMENT")
+}
+
+///|
+test "a scanner error is a hole the parser steps over" {
+  let r = @parser.parse_text(
+    (
+      #|namespace a
+      #|^
+      #|use a#B
+      #|
+    ),
+  )
+  @expect.expect(
+    codes(
+      (
+        #|namespace a
+        #|^
+        #|use a#B
+        #|
+      ),
+    ),
+  ).to_equal(["SM-SCAN-001"])
+  guard r.ast is Some(f) else { fail("no ast") }
+  inspect(f.uses.length(), content="1")
+}
