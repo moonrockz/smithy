@@ -4,19 +4,21 @@
 
 **Goal:** A new module `moonrockz/smithy-syntax` that scans and parses Smithy IDL 2.0 text into a typed AST with spans, a lossless CST, and Elm/Rust style diagnostics, with recovery per statement and a vendored reference corpus proving parity.
 
-**Architecture:** A lossless scanner (tokens carry their trivia) feeds a recursive-descent parser with two-token lookahead. The parser builds the typed AST (`ast`), groups the token stream per statement into the CST (`cst`), and reports `Diagnostic` records that `report` renders. Packages depend one way: `span` ← `diagnostic` ← `scanner` ← `ast` ← `cst` ← `parser` ← `report` ← root facade.
+**Architecture:** The scanner is a pipeline of pure functions: `scan_at(text, offset)` returns one `Step` (a token or a trivia piece, where the next one starts, and an optional diagnostic), `scan_pieces` unfolds it over the text, and `attach_trivia` groups the pieces into tokens. The parser exposes a pure contract (`parse(SourceText) -> ParseResult`); inside one call a private cursor advances over the token view, and every result, diagnostic and CST group comes back as a value. Packages depend one way: `span` ← `diagnostic` ← `scanner` ← `ast` ← `cst` ← `parser` ← `report` ← root facade.
 
-**Tech Stack:** MoonBit 0.10.15 (moon, moonx), `moonbitlang/core` (bigint, quickcheck, debug), `moonbitlang/x@0.5.5` (decimal), `moonrockz/expect@0.6.1` (test assertions), mise tasks, beads for tracking (epic `smithy-2qe.1`).
+**Tech Stack:** MoonBit 0.10.15 (moon, moonx), `moonbitlang/core` (bigint, quickcheck, debug, strconv), `moonbitlang/x@0.5.5` (decimal), `moonrockz/expect@0.6.1` (test assertions), mise tasks, beads for tracking (epic `smithy-2qe.1`).
 
 **Spec:** `docs/superpowers/specs/2026-10-15-idl-syntax-design.md`
 
 ## Global Constraints
 
-- Module path `pkgs/smithy-syntax`, module name `moonrockz/smithy-syntax`, version `0.1.0`, `source = "src"`, license Apache-2.0.
-- Offsets are UTF-16 code units (`String::length`, `code_unit_at`); `Position` is 1-based line and column, column in UTF-16 units. LF and CRLF are line breaks; a lone CR is not.
-- Every AST node has `span`; every list field is `ArrayView[T]`; every public type derives `Eq, Debug`.
+- Module path `pkgs/smithy-syntax`, module name `moonrockz/smithy-syntax`, version `0.1.0`, `source = "src"`, license Apache-2.0, `warnings = "-implicit_impl_as_method"` in `moon.mod` (the derive promotion warning of this toolchain).
+- No primitive obsession for positions: text positions are `@span.Offset` (a UTF-16 unit index, never negative), counts are `@span.Length` (never negative), lines and columns are `@span.Line` and `@span.Column` (1-based, never zero), nesting is `@parser.Depth`. A raw `Int` is used only for array indexes and loop counters that never leave a function. Newtypes are `pub struct X(Int)` (read-only outside their package) with validating constructors.
+- Functional style: public functions are pure (a value in, a value out, no hidden state). Mutation is allowed only for local accumulators and the parser's private cursor inside one `parse` call. Diagnostics are returned as values, never pushed into shared state across functions. Linear multi-stage flows are written as `|>` pipelines.
+- LF and CRLF are line breaks; a lone CR is not.
+- Every AST node has `span`; every list field is `ArrayView[T]`; every public type derives `Eq, Debug`. `derive(Show)` is deprecated on this toolchain: write `impl Show` by hand where a type needs it.
 - Diagnostic codes are `SM-SCAN-001`..`SM-SCAN-007` and `SM-PARSE-001`..`SM-PARSE-011`, exactly as listed in Task 3; a test checks the table against what is emitted.
-- The parser never panics and never raises out of `parse`; `max_nesting = 100`.
+- The parser never panics and never raises out of `parse`; `max_nesting` is `Depth(100)`.
 - Lossless: `TokenStream::to_source()` and `IdlCst::to_source()` equal the input text, with and without errors.
 - Commits use Conventional Commits, plain English, no AI attribution lines (AGENTS.md). Run `mise run format` before each commit; the pre-commit hook runs `moon fmt --check` and `moon check --deny-warn`.
 - Build and test from the workspace root: `moon check`, `moon test`, `moon test --target js|wasm|wasm-gc|native`. On this ARM64 Windows machine, `.config/mise/config.local.toml` (gitignored) disables the pinned `http:moonbit` and uses `~/.moon/bin`; if `mise run` fails with "No URL for platform windows-arm64", recreate that file (see Task 1 step 1).
@@ -25,11 +27,11 @@
 
 ## Review Focus
 
-1. **CRLF files.** A Windows-authored model (`\r\n`) must scan, parse, and `to_source` byte for byte, with `MISSING LINE BREAK` never reported between two statements separated by CRLF. Test added to Task 4 (scanner) and Task 7 (BR rule).
-2. **Text block edge cases.** A text block whose closing `"""` is on its own line, one whose last line has only spaces, and one with a `\` line continuation must decode exactly as the spec's algorithm says. Tests added to Task 5.
-3. **Adjacent-token shape IDs.** `foo . bar#Baz` (spaces around the dot) is not a shape ID; `string com.foo#Bam` is the reference's parse error at the dot. Tests added to Task 8.
-4. **Deep nesting on wasm.** A trait with 150 nested arrays must produce `TOO MUCH NESTING`, not a stack overflow, on the wasm target. Test added to Task 8, run with `--target wasm-gc`.
-5. **Recovery does not swallow the next statement.** A broken structure followed by a valid `string Foo` must yield one error and still produce `Foo` in the AST, also when the broken shape's brace is unclosed. Tests added to Task 11.
+1. **CRLF files.** A Windows-authored model (`\r\n`) must scan, parse, and `to_source` byte for byte, with `MISSING LINE BREAK` never reported between two statements separated by CRLF. Tests in Task 4 (scanner) and Task 9 (BR rule).
+2. **Text block edge cases.** A text block whose closing `"""` is on its own line, one whose last line has only spaces, and one with a `\` line continuation must decode exactly as the spec's algorithm says. Tests in Task 5.
+3. **Adjacent-token shape IDs.** `foo . bar#Baz` (spaces around the dot) is not a shape ID; `string com.foo#Bam` is the reference's parse error at the dot. Tests in Task 11.
+4. **Deep nesting on wasm.** A trait with 150 nested arrays must produce `TOO MUCH NESTING`, not a stack overflow, on the wasm target. Test in Task 10, run with `--target wasm-gc`.
+5. **Recovery does not swallow the next statement.** A broken structure followed by a valid `string Foo` must yield one error and still produce `Foo` in the AST, also when the broken shape's brace is unclosed. Tests in Task 12.
 
 ---
 
@@ -85,6 +87,8 @@ keywords = [ "smithy", "idl", "parser", "ast", "moonbit" ]
 readme = "README.mbt.md"
 
 source = "src"
+
+warnings = "-implicit_impl_as_method"
 
 import {
   "moonbitlang/x@0.5.5",
@@ -190,22 +194,24 @@ git commit -m "feat(syntax): scaffold the moonrockz/smithy-syntax module"
 
 ---
 
-### Task 2: `span` package
+### Task 2: `span` package: typed offsets, spans, positions and source text
 
 **Files:**
 - Create: `pkgs/smithy-syntax/src/span/moon.pkg`
+- Create: `pkgs/smithy-syntax/src/span/units.mbt`
 - Create: `pkgs/smithy-syntax/src/span/span.mbt`
 - Create: `pkgs/smithy-syntax/src/span/source_text.mbt`
+- Create: `pkgs/smithy-syntax/src/span/units_test.mbt`
 - Create: `pkgs/smithy-syntax/src/span/span_test.mbt`
 - Create: `pkgs/smithy-syntax/src/span/source_text_test.mbt`
 - Create: `pkgs/smithy-syntax/src/span/README.mbt.md`
 
 **Interfaces:**
-- Produces: `Span { start : Int, end : Int }` with `Span::new`, `contains(offset)`, `length()`, `join(other)`, `is_empty()`; `Position { line : Int, column : Int }` with `Position::new`; `SourceText` with `SourceText::new(text : String, name? : String)`, `text()`, `name()`, `length()`, `line_count()`, `position(offset : Int) -> Position`, `line_text(line : Int) -> String?`, `line_span(line : Int) -> Span?`, `slice(span : Span) -> String`.
+- Produces: `Offset(Int)` read-only, with `Offset::new(Int) -> Offset?`, `zero()`, `advance(Length) -> Offset`, `next() -> Offset`, `distance(Offset) -> Length`, `to(Offset) -> Span`, `Compare`; `Length(Int)` read-only, with `Length::new(Int) -> Length?`, `zero()`, `one()`, `of_string(String) -> Length`, `+` (`Add`), `Compare`; `Line(Int)` and `Column(Int)` read-only, with `::new(Int) -> X?`, `first()`, `next()`, `Compare`; `Span { start : Offset, length : Length }` with `Span::new(start, length)`, `end()`, `contains(Offset)`, `is_empty()`, `join(Span)`; `Position { line, column }` with `Position::new`; `SourceText` with `SourceText::new(text, name?)`, `text()`, `name()`, `end() -> Offset`, `line_count() -> Int`, `position(Offset) -> Position`, `line_span(Line) -> Span?`, `line_text(Line) -> String?`, `slice(Span) -> String`.
 
-- [ ] **Step 1: Write the failing span tests**
+- [ ] **Step 1: Write the failing unit-type tests**
 
-`pkgs/smithy-syntax/src/span/moon.pkg`:
+`span/moon.pkg`:
 
 ```
 import {
@@ -218,106 +224,310 @@ import {
 } for "test"
 ```
 
-`pkgs/smithy-syntax/src/span/span_test.mbt`:
+`span/units_test.mbt`:
 
 ```moonbit
 ///|
-test "a span is half open" {
-  let s = @span.Span::new(2, 5)
+fn off(n : Int) -> @span.Offset raise {
+  guard @span.Offset::new(n) is Some(o) else { fail("bad offset \{n}") }
+  o
+}
+
+///|
+fn len(n : Int) -> @span.Length raise {
+  guard @span.Length::new(n) is Some(l) else { fail("bad length \{n}") }
+  l
+}
+
+///|
+test "offsets and lengths are never negative" {
+  inspect(@span.Offset::new(-1), content="None")
+  inspect(@span.Length::new(-1), content="None")
+  inspect(@span.Offset::new(0).map(o => o.0), content="Some(0)")
+  inspect(@span.Line::new(0), content="None")
+  inspect(@span.Column::new(0), content="None")
+  inspect(@span.Line::first().0, content="1")
+}
+
+///|
+test "offset arithmetic" {
   @expect.expect_all(e => {
-    e.expect(s.contains(2)).to_be_true()
-    e.expect(s.contains(4)).to_be_true()
-    e.expect(s.contains(5)).to_be_false()
-    e.expect(s.length()).to_equal(3)
-    e.expect(@span.Span::new(3, 3).is_empty()).to_be_true()
+    e.expect(off(3).advance(len(4))).to_equal(off(7))
+    e.expect(off(3).next()).to_equal(off(4))
+    e.expect(off(3).distance(off(10))).to_equal(len(7))
+    e.expect(off(10).distance(off(3))).to_equal(len(7))
+    e.expect(len(2) + len(3)).to_equal(len(5))
+    e.expect(off(2) < off(3)).to_be_true()
+    e.expect(@span.Length::of_string("héllo")).to_equal(len(5))
   })
 }
 
 ///|
-test "join covers both spans" {
-  let a = @span.Span::new(2, 5)
-  let b = @span.Span::new(9, 12)
-  debug_inspect(a.join(b), content="{ start: 2, end: 12 }")
-  debug_inspect(b.join(a), content="{ start: 2, end: 12 }")
+test "lines and columns step" {
+  inspect(@span.Line::first().next().0, content="2")
+  inspect(@span.Column::first().next().0, content="2")
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
-
-Run: `moon test -p moonrockz/smithy-syntax/span`
-Expected: compile error, `Span` not found.
-
-- [ ] **Step 3: Implement span.mbt**
+- [ ] **Step 2: Implement units.mbt**
 
 ```moonbit
 ///|
-/// A half-open range of UTF-16 code unit offsets in a source text: `start`
-/// included, `end` excluded.
+/// A UTF-16 unit index into a source text. Never negative: `Offset::new`
+/// is the only way in from an `Int`.
+pub struct Offset(Int) derive(Eq, Compare, Hash, Debug)
+
+///|
+pub fn Offset::new(n : Int) -> Offset? {
+  if n < 0 {
+    None
+  } else {
+    Some(Offset(n))
+  }
+}
+
+///|
+pub fn Offset::zero() -> Offset {
+  Offset(0)
+}
+
+///|
+/// `Add` is homogeneous in MoonBit, so stepping an offset by a length is a
+/// named method.
+pub fn Offset::advance(self : Offset, by : Length) -> Offset {
+  Offset(self.0 + by.0)
+}
+
+///|
+pub fn Offset::next(self : Offset) -> Offset {
+  Offset(self.0 + 1)
+}
+
+///|
+/// The number of units between two offsets, in either order.
+pub fn Offset::distance(self : Offset, other : Offset) -> Length {
+  if other.0 >= self.0 {
+    Length(other.0 - self.0)
+  } else {
+    Length(self.0 - other.0)
+  }
+}
+
+///|
+/// The span from `self` to `end`, ordered either way.
+pub fn Offset::to(self : Offset, end : Offset) -> Span {
+  if end.0 >= self.0 {
+    { start: self, length: Length(end.0 - self.0) }
+  } else {
+    { start: end, length: Length(self.0 - end.0) }
+  }
+}
+
+///|
+/// A count of UTF-16 units. Never negative.
+pub struct Length(Int) derive(Eq, Compare, Hash, Debug)
+
+///|
+pub fn Length::new(n : Int) -> Length? {
+  if n < 0 {
+    None
+  } else {
+    Some(Length(n))
+  }
+}
+
+///|
+pub fn Length::zero() -> Length {
+  Length(0)
+}
+
+///|
+pub fn Length::one() -> Length {
+  Length(1)
+}
+
+///|
+/// The length of a string in UTF-16 units.
+pub fn Length::of_string(s : String) -> Length {
+  Length(s.length())
+}
+
+///|
+pub impl Add for Length with add(a, b) {
+  Length(a.0 + b.0)
+}
+
+///|
+/// A 1-based line number.
+pub struct Line(Int) derive(Eq, Compare, Hash, Debug)
+
+///|
+pub fn Line::new(n : Int) -> Line? {
+  if n < 1 {
+    None
+  } else {
+    Some(Line(n))
+  }
+}
+
+///|
+pub fn Line::first() -> Line {
+  Line(1)
+}
+
+///|
+pub fn Line::next(self : Line) -> Line {
+  Line(self.0 + 1)
+}
+
+///|
+/// A 1-based column, counting UTF-16 units as the Java reference does.
+pub struct Column(Int) derive(Eq, Compare, Hash, Debug)
+
+///|
+pub fn Column::new(n : Int) -> Column? {
+  if n < 1 {
+    None
+  } else {
+    Some(Column(n))
+  }
+}
+
+///|
+pub fn Column::first() -> Column {
+  Column(1)
+}
+
+///|
+pub fn Column::next(self : Column) -> Column {
+  Column(self.0 + 1)
+}
+```
+
+- [ ] **Step 3: Write the failing span and position tests**
+
+`span/span_test.mbt`:
+
+```moonbit
+///|
+fn o(n : Int) -> @span.Offset raise {
+  guard @span.Offset::new(n) is Some(x) else { fail("bad offset \{n}") }
+  x
+}
+
+///|
+test "a span is a start and a length, half open" {
+  let s = o(2).to(o(5))
+  @expect.expect_all(e => {
+    e.expect(s.start).to_equal(o(2))
+    e.expect(s.end()).to_equal(o(5))
+    e.expect(s.contains(o(2))).to_be_true()
+    e.expect(s.contains(o(4))).to_be_true()
+    e.expect(s.contains(o(5))).to_be_false()
+    e.expect(o(3).to(o(3)).is_empty()).to_be_true()
+    e.expect(o(5).to(o(2))).to_equal(s)
+  })
+  debug_inspect(s, content="{ start: Offset(2), length: Length(3) }")
+}
+
+///|
+test "join covers both spans" {
+  let a = o(2).to(o(5))
+  let b = o(9).to(o(12))
+  @expect.expect(a.join(b)).to_equal(o(2).to(o(12)))
+  @expect.expect(b.join(a)).to_equal(o(2).to(o(12)))
+}
+
+///|
+test "positions compare and print" {
+  let p = @span.Position::new(@span.Line::first().next(), @span.Column::first())
+  debug_inspect(p, content="{ line: Line(2), column: Column(1) }")
+}
+```
+
+- [ ] **Step 4: Implement span.mbt**
+
+```moonbit
+///|
+/// A half-open range of a source text: `start` included, `length` units.
+/// Built from a length, so the end never precedes the start.
 pub(all) struct Span {
-  start : Int
-  end : Int
+  start : Offset
+  length : Length
 } derive(Eq, Debug, Hash)
 
 ///|
-pub fn Span::new(start : Int, end : Int) -> Span {
-  { start, end }
+pub fn Span::new(start : Offset, length : Length) -> Span {
+  { start, length }
 }
 
 ///|
-/// Whether `offset` lies in the span: `start <= offset < end`.
-pub fn Span::contains(self : Span, offset : Int) -> Bool {
-  self.start <= offset && offset < self.end
+pub fn Span::end(self : Span) -> Offset {
+  self.start.advance(self.length)
 }
 
 ///|
-pub fn Span::length(self : Span) -> Int {
-  self.end - self.start
+pub fn Span::contains(self : Span, offset : Offset) -> Bool {
+  self.start <= offset && offset < self.end()
 }
 
 ///|
 pub fn Span::is_empty(self : Span) -> Bool {
-  self.end <= self.start
+  self.length == Length::zero()
 }
 
 ///|
 /// The smallest span that covers both.
 pub fn Span::join(self : Span, other : Span) -> Span {
-  {
-    start: if self.start < other.start { self.start } else { other.start },
-    end: if self.end > other.end { self.end } else { other.end },
-  }
+  let start = if self.start < other.start { self.start } else { other.start }
+  let end = if self.end() > other.end() { self.end() } else { other.end() }
+  start.to(end)
 }
 
 ///|
-/// A 1-based line and column; the column counts UTF-16 units, as the Java
-/// reference's `SourceLocation` does.
+/// A 1-based line and column.
 pub(all) struct Position {
-  line : Int
-  column : Int
+  line : Line
+  column : Column
 } derive(Eq, Debug, Hash)
 
 ///|
-pub fn Position::new(line : Int, column : Int) -> Position {
+pub fn Position::new(line : Line, column : Column) -> Position {
   { line, column }
 }
 ```
 
-- [ ] **Step 4: Write the failing SourceText tests**
+- [ ] **Step 5: Write the failing SourceText tests**
 
-`pkgs/smithy-syntax/src/span/source_text_test.mbt`:
+`span/source_text_test.mbt`:
 
 ```moonbit
+///|
+fn at(n : Int) -> @span.Offset raise {
+  guard @span.Offset::new(n) is Some(x) else { fail("bad offset \{n}") }
+  x
+}
+
+///|
+fn pos(line : Int, column : Int) -> @span.Position raise {
+  guard @span.Line::new(line) is Some(l) && @span.Column::new(column) is Some(c) else {
+    fail("bad position")
+  }
+  @span.Position::new(l, c)
+}
+
 ///|
 test "positions are 1-based and count UTF-16 units" {
   let st = @span.SourceText::new("ab\ncd\r\nef")
   @expect.expect_all(e => {
     e.expect(st.line_count()).to_equal(3)
-    e.expect(st.position(0)).to_equal(@span.Position::new(1, 1))
-    e.expect(st.position(2)).to_equal(@span.Position::new(1, 3))
-    e.expect(st.position(3)).to_equal(@span.Position::new(2, 1))
-    e.expect(st.position(7)).to_equal(@span.Position::new(3, 1))
+    e.expect(st.position(at(0))).to_equal(pos(1, 1))
+    e.expect(st.position(at(2))).to_equal(pos(1, 3))
+    e.expect(st.position(at(3))).to_equal(pos(2, 1))
+    e.expect(st.position(at(7))).to_equal(pos(3, 1))
     // Past the end clamps to the end of the last line.
-    e.expect(st.position(99)).to_equal(@span.Position::new(3, 3))
+    e.expect(st.position(at(99))).to_equal(pos(3, 3))
+    e.expect(st.end()).to_equal(at(9))
   })
 }
 
@@ -325,26 +535,27 @@ test "positions are 1-based and count UTF-16 units" {
 test "a lone CR is not a line break" {
   let st = @span.SourceText::new("a\rb\nc")
   inspect(st.line_count(), content="2")
-  inspect(st.position(2).line, content="1")
+  inspect(st.position(at(2)).line.0, content="1")
 }
 
 ///|
 test "line_text strips the line break" {
   let st = @span.SourceText::new("ab\ncd\r\nef")
+  let l = (n : Int) => @span.Line::new(n).unwrap()
   @expect.expect_all(e => {
-    e.expect(st.line_text(1)).to_equal(Some("ab"))
-    e.expect(st.line_text(2)).to_equal(Some("cd"))
-    e.expect(st.line_text(3)).to_equal(Some("ef"))
-    e.expect(st.line_text(4)).to_equal(None)
-    e.expect(st.line_span(2)).to_equal(Some(@span.Span::new(3, 5)))
-    e.expect(st.slice(@span.Span::new(3, 5))).to_equal("cd")
+    e.expect(st.line_text(l(1))).to_equal(Some("ab"))
+    e.expect(st.line_text(l(2))).to_equal(Some("cd"))
+    e.expect(st.line_text(l(3))).to_equal(Some("ef"))
+    e.expect(st.line_text(l(4))).to_equal(None)
+    e.expect(st.line_span(l(2))).to_equal(Some(at(3).to(at(5))))
+    e.expect(st.slice(at(3).to(at(5)))).to_equal("cd")
   })
 }
 
 ///|
 test "a surrogate pair is two columns, as the reference counts" {
   let st = @span.SourceText::new("\u{1F600}x")
-  inspect(st.position(2).column, content="3")
+  inspect(st.position(at(2)).column.0, content="3")
 }
 
 ///|
@@ -354,11 +565,12 @@ test "name is optional" {
 }
 ```
 
-- [ ] **Step 5: Implement source_text.mbt**
+- [ ] **Step 6: Implement source_text.mbt**
 
 ```moonbit
 ///|
-/// A source text with its line table. Offsets are UTF-16 code units.
+/// A source text with its line table. The table is built once; every
+/// lookup is a pure function of it.
 pub struct SourceText {
   priv text : String
   priv name : String?
@@ -367,11 +579,10 @@ pub struct SourceText {
 }
 
 ///|
-/// Build the line table once. LF and CRLF end a line; a lone CR does not.
+/// LF and CRLF end a line; a lone CR does not.
 pub fn SourceText::new(text : String, name? : String) -> SourceText {
   let line_starts = [0]
-  let n = text.length()
-  for i in 0..<n {
+  for i in 0..<text.length() {
     if text.code_unit_at(i).to_int() == '\n'.to_int() {
       line_starts.push(i + 1)
     }
@@ -390,9 +601,9 @@ pub fn SourceText::name(self : SourceText) -> String? {
 }
 
 ///|
-/// The length in UTF-16 units.
-pub fn SourceText::length(self : SourceText) -> Int {
-  self.text.length()
+/// The offset just past the last unit.
+pub fn SourceText::end(self : SourceText) -> Offset {
+  Offset(self.text.length())
 }
 
 ///|
@@ -402,13 +613,13 @@ pub fn SourceText::line_count(self : SourceText) -> Int {
 }
 
 ///|
-/// The 0-based index of the line that holds `offset` (clamped to the text).
-fn SourceText::line_index(self : SourceText, offset : Int) -> Int {
+/// The 0-based index of the line that holds `unit` (clamped to the text).
+fn SourceText::line_index(self : SourceText, unit : Int) -> Int {
   let mut lo = 0
   let mut hi = self.line_starts.length() - 1
   while lo < hi {
     let mid = lo + (hi - lo + 1) / 2
-    if self.line_starts[mid] <= offset {
+    if self.line_starts[mid] <= unit {
       lo = mid
     } else {
       hi = mid - 1
@@ -418,28 +629,21 @@ fn SourceText::line_index(self : SourceText, offset : Int) -> Int {
 }
 
 ///|
-/// The 1-based line and column of `offset`. An offset past the end is the
-/// position just after the last unit.
-pub fn SourceText::position(self : SourceText, offset : Int) -> Position {
-  let offset = if offset < 0 {
-    0
-  } else if offset > self.text.length() {
-    self.text.length()
-  } else {
-    offset
-  }
-  let line = self.line_index(offset)
-  Position::new(line + 1, offset - self.line_starts[line] + 1)
+/// The line and column of `offset`. An offset past the end is the position
+/// just after the last unit.
+pub fn SourceText::position(self : SourceText, offset : Offset) -> Position {
+  let unit = if offset.0 > self.text.length() { self.text.length() } else { offset.0 }
+  let line = self.line_index(unit)
+  Position::new(Line(line + 1), Column(unit - self.line_starts[line] + 1))
 }
 
 ///|
-/// The span of a 1-based line, without its line break; `None` when the line
-/// does not exist.
-pub fn SourceText::line_span(self : SourceText, line : Int) -> Span? {
-  guard line >= 1 && line <= self.line_starts.length() else { return None }
-  let start = self.line_starts[line - 1]
-  let mut end = if line < self.line_starts.length() {
-    self.line_starts[line]
+/// The span of a line without its line break; `None` past the last line.
+pub fn SourceText::line_span(self : SourceText, line : Line) -> Span? {
+  guard line.0 <= self.line_starts.length() else { return None }
+  let start = self.line_starts[line.0 - 1]
+  let mut end = if line.0 < self.line_starts.length() {
+    self.line_starts[line.0]
   } else {
     self.text.length()
   }
@@ -449,12 +653,12 @@ pub fn SourceText::line_span(self : SourceText, line : Int) -> Span? {
   if end > start && self.text.code_unit_at(end - 1).to_int() == '\r'.to_int() {
     end -= 1
   }
-  Some(Span::new(start, end))
+  Some(Offset(start).to(Offset(end)))
 }
 
 ///|
-/// The text of a 1-based line, without its line break.
-pub fn SourceText::line_text(self : SourceText, line : Int) -> String? {
+/// The text of a line, without its line break.
+pub fn SourceText::line_text(self : SourceText, line : Line) -> String? {
   self.line_span(line).map(s => self.slice(s))
 }
 
@@ -462,43 +666,41 @@ pub fn SourceText::line_text(self : SourceText, line : Int) -> String? {
 /// The text of `span`, clamped to the text.
 pub fn SourceText::slice(self : SourceText, span : Span) -> String {
   let n = self.text.length()
-  let a = if span.start < 0 { 0 } else if span.start > n { n } else { span.start }
-  let b = if span.end < a { a } else if span.end > n { n } else { span.end }
+  let a = if span.start.0 > n { n } else { span.start.0 }
+  let b = if span.end().0 > n { n } else { span.end().0 }
   self.text.unsafe_substring(start=a, end=b)
 }
 ```
 
-- [ ] **Step 6: Run the tests to see them pass**
+- [ ] **Step 7: Run the tests, write the README, commit**
 
 Run: `moon test -p moonrockz/smithy-syntax/span`
-Expected: all pass.
+Expected: all pass. If a `debug_inspect` of a newtype prints differently (for example `Offset(2)` versus `2`), confirm the value and update the `content`.
 
-- [ ] **Step 7: Write the README and commit**
-
-`pkgs/smithy-syntax/src/span/README.mbt.md`:
+`span/README.mbt.md`:
 
 ````markdown
 # span
 
-Spans (UTF-16 unit offsets, half open), positions (1-based line and column)
-and `SourceText`, which maps offsets to positions and lines.
+Typed positions: `Offset` (a UTF-16 unit index), `Length`, `Line` and
+`Column` are never negative or zero where that makes no sense, because
+their constructors are the only way in. A `Span` is a start and a length.
+`SourceText` maps offsets to positions and lines.
 
 ```mbt check
 test {
   let st = @span.SourceText::new("string Foo\nstring Bar\n", name="a.smithy")
-  debug_inspect(st.position(11), content="{ line: 2, column: 1 }")
-  inspect(st.line_text(2), content="Some(\"string Bar\")")
+  let at = @span.Offset::new(11).unwrap()
+  debug_inspect(st.position(at), content="{ line: Line(2), column: Column(1) }")
+  inspect(st.line_text(@span.Line::first().next()), content="Some(\"string Bar\")")
 }
 ```
 ````
 
-Add `"moonbitlang/core/debug"` to the test imports of `span/moon.pkg` if not present (it is, from Step 1).
-
-Run: `mise run format && moon test -p moonrockz/smithy-syntax/span`
-
 ```bash
+mise run format
 git add pkgs/smithy-syntax/src/span
-git commit -m "feat(syntax): add the span package with Span, Position and SourceText"
+git commit -m "feat(syntax): add the span package with typed offsets, spans and positions"
 ```
 
 ---
@@ -513,12 +715,12 @@ git commit -m "feat(syntax): add the span package with Span, Position and Source
 - Create: `pkgs/smithy-syntax/src/diagnostic/README.mbt.md`
 
 **Interfaces:**
-- Consumes: `@span.Span`.
-- Produces: `Severity = Error | Warning`; `Label { span, text }`; `Diagnostic { code, severity, title, message, span, labels : ArrayView[Label], notes : ArrayView[String], hint : String?, example : String? }`; `Diagnostic::new(code~, severity~, title~, message~, span~, labels? : Array[Label], notes? : Array[String], hint? : String, example? : String)`; `is_error()`; `codes() -> ArrayView[String]`; `description(code) -> String?`.
+- Consumes: `@span.Span`, `@span.Offset`.
+- Produces: `Severity = Error | Warning`; `Label { span, text }`; `Diagnostic { code, severity, title, message, span, labels : ArrayView[Label], notes : ArrayView[String], hint : String?, example : String? }`; `Diagnostic::new(code~, severity~, title~, message~, span~, labels? : Array[Label], notes? : Array[String], hint? : String, example? : String)`; `is_error()`; `with_context(label : Label, note : String) -> Diagnostic` (a copy with the label and note prepended, used by the parser's context stack); `codes() -> ArrayView[String]`; `description(code) -> String?`.
 
 - [ ] **Step 1: Write the failing tests**
 
-`pkgs/smithy-syntax/src/diagnostic/moon.pkg`:
+`diagnostic/moon.pkg`:
 
 ```
 import {
@@ -533,9 +735,15 @@ import {
 } for "test"
 ```
 
-`pkgs/smithy-syntax/src/diagnostic/diagnostic_test.mbt`:
+`diagnostic/diagnostic_test.mbt`:
 
 ```moonbit
+///|
+fn sp(a : Int, b : Int) -> @span.Span raise {
+  guard @span.Offset::new(a) is Some(x) && @span.Offset::new(b) is Some(y) else { fail("bad span") }
+  x.to(y)
+}
+
 ///|
 test "a diagnostic has defaults for the optional parts" {
   let d = @diagnostic.Diagnostic::new(
@@ -543,7 +751,7 @@ test "a diagnostic has defaults for the optional parts" {
     severity=Error,
     title="UNEXPECTED TOKEN",
     message="I was expecting a shape name here",
-    span=@span.Span::new(4, 7),
+    span=sp(4, 7),
   )
   @expect.expect_all(e => {
     e.expect(d.is_error()).to_be_true()
@@ -561,11 +769,31 @@ test "a warning is not an error" {
     severity=Warning,
     title="DETACHED DOC COMMENT",
     message="this documentation comment is not followed by a shape",
-    span=@span.Span::new(0, 10),
+    span=sp(0, 10),
     hint="Move it right before the shape it documents.",
   )
   inspect(d.is_error(), content="false")
   inspect(d.hint, content="Some(\"Move it right before the shape it documents.\")")
+}
+
+///|
+test "with_context prepends a label and a note and keeps the rest" {
+  let d = @diagnostic.Diagnostic::new(
+    code="SM-PARSE-001",
+    severity=Error,
+    title="UNEXPECTED TOKEN",
+    message="m",
+    span=sp(4, 7),
+    notes=["later"],
+  )
+  let c = d.with_context({ span: sp(0, 9), text: "the structure started here" }, "I was parsing a structure.")
+  @expect.expect_all(e => {
+    e.expect(c.labels.length()).to_equal(1)
+    e.expect(c.labels[0].text).to_equal("the structure started here")
+    e.expect(c.notes.to_array()).to_equal(["I was parsing a structure.", "later"])
+    e.expect(c.message).to_equal("m")
+    e.expect(d.labels.length()).to_equal(0)
+  })
 }
 
 ///|
@@ -613,6 +841,7 @@ pub(all) struct Label {
 /// report needs: a `title` in capitals (`UNFINISHED SHAPE`), a one-line
 /// `message` under the primary `span`, secondary `labels`, `notes` in the
 /// first person, an optional `hint` and an optional correct `example`.
+/// Immutable: `with_context` returns a new value.
 pub(all) struct Diagnostic {
   code : String
   severity : Severity
@@ -654,6 +883,16 @@ pub fn Diagnostic::new(
 pub fn Diagnostic::is_error(self : Diagnostic) -> Bool {
   self.severity == Error
 }
+
+///|
+/// A copy with `label` as the first label and `note` as the first note.
+pub fn Diagnostic::with_context(self : Diagnostic, label : Label, note : String) -> Diagnostic {
+  let labels = [label]
+  labels.append(self.labels.to_array())
+  let notes = [note]
+  notes.append(self.notes.to_array())
+  { ..self, labels: labels[:], notes: notes[:] }
+}
 ```
 
 `codes.mbt`:
@@ -661,7 +900,7 @@ pub fn Diagnostic::is_error(self : Diagnostic) -> Bool {
 ```moonbit
 ///|
 /// Every diagnostic code with its one-line description. The scanner and
-/// the parser emit only codes from this table; `codes_test` checks that.
+/// the parser emit only codes from this table; the laws check that.
 let table : Array[(String, String)] = [
   ("SM-SCAN-001", "Unexpected character"),
   ("SM-SCAN-002", "Unterminated string"),
@@ -708,14 +947,15 @@ Expected: all pass.
 
 - [ ] **Step 5: README and commit**
 
-`pkgs/smithy-syntax/src/diagnostic/README.mbt.md`:
+`diagnostic/README.mbt.md`:
 
 ````markdown
 # diagnostic
 
 A `Diagnostic` is a code (`SM-SCAN-nnn`, `SM-PARSE-nnn`), a severity, a
 title, a message under its primary span, secondary labels, notes, and an
-optional hint and example. `codes()` lists every code.
+optional hint and example. It is a value: `with_context` returns a copy.
+`codes()` lists every code.
 
 ```mbt check
 test {
@@ -732,18 +972,19 @@ git commit -m "feat(syntax): add the diagnostic package with the code table"
 
 ---
 
-### Task 4: `scanner` types and the tokenizer for punctuation, identifiers and trivia
+### Task 4: `scanner` types and the pure scanning pipeline (punctuation, identifiers, trivia)
 
 **Files:**
 - Create: `pkgs/smithy-syntax/src/scanner/moon.pkg`
 - Create: `pkgs/smithy-syntax/src/scanner/types.mbt`
-- Create: `pkgs/smithy-syntax/src/scanner/cursor.mbt`
-- Create: `pkgs/smithy-syntax/src/scanner/lexer.mbt`
-- Create: `pkgs/smithy-syntax/src/scanner/lexer_test.mbt`
+- Create: `pkgs/smithy-syntax/src/scanner/chars.mbt`
+- Create: `pkgs/smithy-syntax/src/scanner/scan.mbt`
+- Create: `pkgs/smithy-syntax/src/scanner/pipeline.mbt`
+- Create: `pkgs/smithy-syntax/src/scanner/scan_test.mbt`
 
 **Interfaces:**
-- Consumes: `@span.Span`, `@span.SourceText`, `@diagnostic.Diagnostic`.
-- Produces: `TokenKind` (18 variants listed below), `CommentKind = Line | Doc`, `Comment { kind, text, span }`, `Trivia = Whitespace(String, Span) | Newline(String, Span) | Comma(Span) | Comment(Comment)` with `text()`, `span()`, `is_newline()`, `is_comment()`, `Token { kind, lexeme, span, trivia_before, trivia_after }` with `to_source()`, `TokenStream { tokens, trivia, diagnostics }` with `to_source()` and `has_errors()`, `tokenize(SourceText) -> TokenStream`, `tokenize_text(String) -> TokenStream`.
+- Consumes: `@span.Offset`, `@span.Length`, `@span.Span`, `@span.SourceText`, `@diagnostic.Diagnostic`.
+- Produces: `TokenKind` (18 variants), `CommentKind = Line | Doc`, `Comment { kind, text, span }`, `Trivia = Whitespace(String, Span) | Newline(String, Span) | Comma(Span) | Comment(Comment)` with `text()`, `span()`, `is_newline()`, `is_comment()`; `Token { kind, lexeme, span, trivia_before, trivia_after }` with `to_source()`; `TokenStream { tokens, trivia, diagnostics }` with `to_source()`, `has_errors()`; `Piece = Tok(TokenKind, String, Span) | Triv(Trivia)`; `Step { piece, end : Offset, diagnostics : ArrayView[Diagnostic] }`; the pure functions `scan_at(text : String, at : Offset) -> Step?`, `scan_pieces(text : String) -> Array[Step]`, `attach_trivia(steps : Array[Step]) -> TokenStream`, `tokenize(SourceText) -> TokenStream`, `tokenize_text(String) -> TokenStream`.
 
 - [ ] **Step 1: Write the types**
 
@@ -900,13 +1141,36 @@ pub fn TokenStream::to_source(self : TokenStream) -> String {
 pub fn TokenStream::has_errors(self : TokenStream) -> Bool {
   self.diagnostics.iter().any(d => d.is_error())
 }
+
+///|
+/// What one scanning step produces, in source order.
+pub(all) enum Piece {
+  Tok(TokenKind, String, @span.Span)
+  Triv(Trivia)
+} derive(Eq, Debug)
+
+///|
+/// One step of the scan: the piece read at an offset, where the next step
+/// starts, and the lexical problems found in the piece (several for a
+/// string with several bad escapes).
+pub(all) struct Step {
+  piece : Piece
+  end : @span.Offset
+  diagnostics : ArrayView[@diagnostic.Diagnostic]
+} derive(Eq, Debug)
 ```
 
-- [ ] **Step 2: Write the failing tokenizer tests**
+- [ ] **Step 2: Write the failing tests**
 
-`scanner/lexer_test.mbt`:
+`scanner/scan_test.mbt`:
 
 ```moonbit
+///|
+fn off(n : Int) -> @span.Offset raise {
+  guard @span.Offset::new(n) is Some(o) else { fail("bad offset") }
+  o
+}
+
 ///|
 fn stream(text : String) -> @scanner.TokenStream {
   @scanner.tokenize_text(text)
@@ -925,6 +1189,18 @@ fn lexemes(text : String) -> Array[String] {
 ///|
 fn codes(text : String) -> Array[String] {
   stream(text).diagnostics.iter().map(d => d.code).collect()
+}
+
+///|
+test "scan_at is a pure function of the text and an offset" {
+  let text = "ab cd"
+  guard @scanner.scan_at(text, off(3)) is Some(step) else { fail("no step") }
+  debug_inspect(step.piece, content="Tok(Identifier, \"cd\", { start: Offset(3), length: Length(2) })")
+  inspect(step.end, content="Offset(5)")
+  inspect(step.diagnostics.length(), content="0")
+  inspect(@scanner.scan_at(text, off(5)) is None, content="true")
+  // Calling it twice gives the same answer: nothing is remembered.
+  inspect(@scanner.scan_at(text, off(3)) == @scanner.scan_at(text, off(3)), content="true")
 }
 
 ///|
@@ -954,31 +1230,20 @@ test "a shape id scans as adjacent pieces" {
 test "whitespace, commas and comments are trivia" {
   let s = stream("a, b // c\n/// doc\nd")
   inspect(s.tokens.length(), content="3")
-  let a = s.tokens[0]
-  debug_inspect(
-    a.trivia_after,
-    content="[Comma({ start: 1, end: 2 }), Whitespace(\" \", { start: 2, end: 3 })]",
-  )
-  let b = s.tokens[1]
-  debug_inspect(
-    b.trivia_after,
-    content="[Whitespace(\" \", { start: 4, end: 5 }), Comment({ kind: Line, text: \" c\", span: { start: 5, end: 9 } }), Newline(\"\\n\", { start: 9, end: 10 })]",
-  )
-  let d = s.tokens[2]
-  debug_inspect(
-    d.trivia_before,
-    content="[Comment({ kind: Doc, text: \" doc\", span: { start: 10, end: 17 } }), Newline(\"\\n\", { start: 17, end: 18 })]",
-  )
+  @expect.expect(s.tokens[0].trivia_after.map(t => t.text())).to_equal([",", " "])
+  @expect.expect(s.tokens[1].trivia_after.map(t => t.text())).to_equal([" ", "// c", "\n"])
+  @expect.expect(s.tokens[2].trivia_before.map(t => t.text())).to_equal(["/// doc", "\n"])
+  guard s.tokens[2].trivia_before[0] is Comment(c) else { fail("not a comment") }
+  inspect(c.kind, content="Doc")
+  inspect(c.text, content=" doc")
+  debug_inspect(c.span, content="{ start: Offset(10), length: Length(7) }")
 }
 
 ///|
 test "trivia after a token stops at the first line break" {
   let s = stream("a\n\n  b")
-  debug_inspect(s.tokens[0].trivia_after, content="[Newline(\"\\n\", { start: 1, end: 2 })]")
-  debug_inspect(
-    s.tokens[1].trivia_before,
-    content="[Newline(\"\\n\", { start: 2, end: 3 }), Whitespace(\"  \", { start: 3, end: 5 })]",
-  )
+  @expect.expect(s.tokens[0].trivia_after.map(t => t.text())).to_equal(["\n"])
+  @expect.expect(s.tokens[1].trivia_before.map(t => t.text())).to_equal(["\n", "  "])
 }
 
 ///|
@@ -986,7 +1251,8 @@ test "CRLF is one newline trivia and the scan is lossless" {
   let text = "string Foo\r\nstring Bar\r\n"
   let s = stream(text)
   inspect(s.to_source() == text, content="true")
-  debug_inspect(s.tokens[1].trivia_after, content="[Newline(\"\\r\\n\", { start: 10, end: 12 })]")
+  @expect.expect(s.tokens[1].trivia_after.map(t => t.text())).to_equal(["\r\n"])
+  inspect(s.tokens[1].trivia_after[0].is_newline(), content="true")
 }
 
 ///|
@@ -1008,7 +1274,18 @@ test "an unexpected character is an Error token with SM-SCAN-001" {
 
 ///|
 test "a lone CR is whitespace, not a newline" {
-  debug_inspect(stream("a\rb").tokens[0].trivia_after, content="[Whitespace(\"\\r\", { start: 1, end: 2 })]")
+  @expect.expect(stream("a\rb").tokens[0].trivia_after.map(t => t.text())).to_equal(["\r"])
+  inspect(stream("a\rb").tokens[0].trivia_after[0].is_newline(), content="false")
+}
+
+///|
+test "the pipeline stages compose" {
+  let text = "a b"
+  let steps = @scanner.scan_pieces(text)
+  inspect(steps.length(), content="3")
+  let s = text |> @scanner.scan_pieces |> @scanner.attach_trivia
+  inspect(s.tokens.length(), content="2")
+  inspect(s == stream(text), content="true")
 }
 ```
 
@@ -1017,133 +1294,25 @@ test "a lone CR is whitespace, not a newline" {
 Run: `moon test -p moonrockz/smithy-syntax/scanner`
 Expected: compile error, `tokenize_text` not found.
 
-- [ ] **Step 4: Implement cursor.mbt**
+- [ ] **Step 4: Implement chars.mbt (pure character access)**
 
 ```moonbit
 ///|
-/// The lexer's view of the text: UTF-16 unit positions, one unit of
-/// lookahead beyond the current one.
-priv struct Cursor {
-  text : String
-  mut pos : Int
-}
-
-///|
-fn Cursor::new(text : String) -> Cursor {
-  { text, pos: 0 }
-}
-
-///|
-/// The code unit at `pos + k` as a `Char`, or `None` past the end. A unit
-/// of a surrogate pair comes back as itself; the lexer only compares
-/// against ASCII, and lexemes are sliced from the text, so no character is
-/// lost.
-fn Cursor::peek_at(self : Cursor, k : Int) -> Char? {
-  let i = self.pos + k
-  if i >= self.text.length() {
+/// The code unit at `at` as a `Char`, or `None` past the end. A unit of a
+/// surrogate pair comes back as itself; the scanner only compares against
+/// ASCII, and lexemes are sliced from the text, so no character is lost.
+fn unit_at(text : String, at : @span.Offset) -> Char? {
+  if at.0 >= text.length() {
     None
   } else {
-    Some(self.text.code_unit_at(i).to_int().unsafe_to_char())
+    Some(text.code_unit_at(at.0).to_int().unsafe_to_char())
   }
 }
 
 ///|
-fn Cursor::peek(self : Cursor) -> Char? {
-  self.peek_at(0)
-}
-
-///|
-fn Cursor::peek1(self : Cursor) -> Char? {
-  self.peek_at(1)
-}
-
-///|
-fn Cursor::at_end(self : Cursor) -> Bool {
-  self.pos >= self.text.length()
-}
-
-///|
-fn Cursor::advance(self : Cursor) -> Unit {
-  if self.pos < self.text.length() {
-    self.pos += 1
-  }
-}
-
-///|
-/// Whether the text at `pos` starts with `s`.
-fn Cursor::looking_at(self : Cursor, s : String) -> Bool {
-  let n = s.length()
-  if self.pos + n > self.text.length() {
-    return false
-  }
-  for k in 0..<n {
-    if self.text.code_unit_at(self.pos + k) != s.code_unit_at(k) {
-      return false
-    }
-  }
-  true
-}
-
-///|
-fn Cursor::slice(self : Cursor, start : Int) -> String {
-  self.text.unsafe_substring(start~, end=self.pos)
-}
-```
-
-- [ ] **Step 5: Implement lexer.mbt (punctuation, identifiers, trivia, errors; numbers and strings come in Task 5)**
-
-```moonbit
-///|
-/// What the lexer emits, in source order.
-priv enum Piece {
-  Tok(TokenKind, String, @span.Span)
-  Triv(Trivia)
-}
-
-///|
-priv struct Lexer {
-  cursor : Cursor
-  pieces : Array[Piece]
-  diagnostics : Array[@diagnostic.Diagnostic]
-}
-
-///|
-fn Lexer::new(text : String) -> Lexer {
-  { cursor: Cursor::new(text), pieces: [], diagnostics: [] }
-}
-
-///|
-fn Lexer::emit(self : Lexer, kind : TokenKind, start : Int) -> Unit {
-  let lexeme = self.cursor.slice(start)
-  self.pieces.push(Tok(kind, lexeme, @span.Span::new(start, self.cursor.pos)))
-}
-
-///|
-fn Lexer::trivia(self : Lexer, t : Trivia) -> Unit {
-  self.pieces.push(Triv(t))
-}
-
-///|
-fn Lexer::report(
-  self : Lexer,
-  code : String,
-  title : String,
-  message : String,
-  span : @span.Span,
-  hint? : String,
-  notes? : Array[String],
-) -> Unit {
-  self.diagnostics.push(
-    @diagnostic.Diagnostic::new(
-      code~,
-      severity=Error,
-      title~,
-      message~,
-      span~,
-      hint?,
-      notes?,
-    ),
-  )
+/// The unit `k` places after `at`.
+fn peek(text : String, at : @span.Offset, k : Int) -> Char? {
+  unit_at(text, @span.Offset::new(at.0 + k).unwrap_or(at))
 }
 
 ///|
@@ -1162,17 +1331,82 @@ fn is_ident_char(c : Char) -> Bool {
 }
 
 ///|
-/// `IdentifierStart = (1*"_" (ALPHA / DIGIT)) / ALPHA`: a letter, or
-/// underscores followed by a letter or digit.
-fn Lexer::at_identifier_start(self : Lexer) -> Bool {
-  match self.cursor.peek() {
+fn is_hex(c : Char) -> Bool {
+  is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
+///|
+/// Whether the text at `at` starts with `s`.
+fn looking_at(text : String, at : @span.Offset, s : String) -> Bool {
+  let n = s.length()
+  if at.0 + n > text.length() {
+    return false
+  }
+  for k in 0..<n {
+    if text.code_unit_at(at.0 + k) != s.code_unit_at(k) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// The offset of the first unit at or after `from` that fails `pred` (or
+/// the end of the text).
+fn skip_while(text : String, from : @span.Offset, pred : (Char) -> Bool) -> @span.Offset {
+  let mut at = from
+  while unit_at(text, at) is Some(c) && pred(c) {
+    at = at.next()
+  }
+  at
+}
+
+///|
+fn slice(text : String, from : @span.Offset, to : @span.Offset) -> String {
+  text.unsafe_substring(start=from.0, end=to.0)
+}
+
+///|
+/// A `Step` for a token from `at` to `end`.
+fn token_step(kind : TokenKind, text : String, at : @span.Offset, end : @span.Offset) -> Step {
+  { piece: Tok(kind, slice(text, at, end), at.to(end)), end, diagnostics: [][:] }
+}
+
+///|
+fn trivia_step(t : Trivia, end : @span.Offset) -> Step {
+  { piece: Triv(t), end, diagnostics: [][:] }
+}
+
+///|
+/// A `Step` for an `Error` token with one diagnostic.
+fn error_step(text : String, at : @span.Offset, end : @span.Offset, d : @diagnostic.Diagnostic) -> Step {
+  { piece: Tok(Error, slice(text, at, end), at.to(end)), end, diagnostics: [d][:] }
+}
+
+///|
+fn lexical(
+  code : String,
+  title : String,
+  message : String,
+  span : @span.Span,
+  notes? : Array[String],
+  hint? : String,
+) -> @diagnostic.Diagnostic {
+  @diagnostic.Diagnostic::new(code~, severity=Error, title~, message~, span~, notes?, hint?)
+}
+```
+
+- [ ] **Step 5: Implement scan.mbt (every function is `(text, at) -> Step`)**
+
+```moonbit
+///|
+/// `IdentifierStart = (1*"_" (ALPHA / DIGIT)) / ALPHA`.
+fn at_identifier_start(text : String, at : @span.Offset) -> Bool {
+  match unit_at(text, at) {
     Some(c) if is_alpha(c) => true
     Some('_') => {
-      let mut k = 1
-      while self.cursor.peek_at(k) == Some('_') {
-        k += 1
-      }
-      match self.cursor.peek_at(k) {
+      let after = skip_while(text, at, c => c == '_')
+      match unit_at(text, after) {
         Some(c) => is_alpha(c) || is_digit(c)
         None => false
       }
@@ -1182,157 +1416,170 @@ fn Lexer::at_identifier_start(self : Lexer) -> Bool {
 }
 
 ///|
-fn Lexer::lex_identifier(self : Lexer) -> Unit {
-  let start = self.cursor.pos
-  while self.cursor.peek() is Some(c) && is_ident_char(c) {
-    self.cursor.advance()
-  }
-  self.emit(Identifier, start)
+fn scan_identifier(text : String, at : @span.Offset) -> Step {
+  token_step(Identifier, text, at, skip_while(text, at, is_ident_char))
 }
 
 ///|
 /// Spaces and tabs; a lone `\r` too, since it is not a line break.
-fn Lexer::lex_whitespace(self : Lexer) -> Unit {
-  let start = self.cursor.pos
-  while self.cursor.peek() is Some(' ' | '\t' | '\r') {
-    if self.cursor.peek() == Some('\r') && self.cursor.peek1() == Some('\n') {
+fn scan_whitespace(text : String, at : @span.Offset) -> Step {
+  let mut end = at
+  while unit_at(text, end) is Some(' ' | '\t' | '\r') {
+    if unit_at(text, end) == Some('\r') && peek(text, end, 1) == Some('\n') {
       break
     }
-    self.cursor.advance()
+    end = end.next()
   }
-  let text = self.cursor.slice(start)
-  self.trivia(Whitespace(text, @span.Span::new(start, self.cursor.pos)))
+  trivia_step(Whitespace(slice(text, at, end), at.to(end)), end)
 }
 
 ///|
-fn Lexer::lex_newline(self : Lexer) -> Unit {
-  let start = self.cursor.pos
-  if self.cursor.peek() == Some('\r') {
-    self.cursor.advance()
-  }
-  self.cursor.advance()
-  let text = self.cursor.slice(start)
-  self.trivia(Newline(text, @span.Span::new(start, self.cursor.pos)))
+fn scan_newline(text : String, at : @span.Offset) -> Step {
+  let end = if unit_at(text, at) == Some('\r') { at.next().next() } else { at.next() }
+  trivia_step(Newline(slice(text, at, end), at.to(end)), end)
 }
 
 ///|
 /// `//` or `///` to the end of the line (the line break is not included).
-fn Lexer::lex_comment(self : Lexer) -> Unit {
-  let start = self.cursor.pos
-  self.cursor.advance()
-  self.cursor.advance()
-  let kind = if self.cursor.peek() == Some('/') {
-    self.cursor.advance()
-    Doc
-  } else {
-    Line
-  }
-  let text_start = self.cursor.pos
-  while self.cursor.peek() is Some(c) && c != '\n' {
-    if c == '\r' && self.cursor.peek1() == Some('\n') {
+fn scan_comment(text : String, at : @span.Offset) -> Step {
+  let kind = if peek(text, at, 2) == Some('/') { Doc } else { Line }
+  let text_start = at.advance(if kind == Doc { @span.Length::new(3).unwrap() } else { @span.Length::new(2).unwrap() })
+  let mut end = text_start
+  while unit_at(text, end) is Some(c) && c != '\n' {
+    if c == '\r' && peek(text, end, 1) == Some('\n') {
       break
     }
-    self.cursor.advance()
+    end = end.next()
   }
-  let text = self.cursor.text.unsafe_substring(start=text_start, end=self.cursor.pos)
-  self.trivia(Comment({ kind, text, span: @span.Span::new(start, self.cursor.pos) }))
+  trivia_step(Comment({ kind, text: slice(text, text_start, end), span: at.to(end) }), end)
 }
 
 ///|
-fn Lexer::eat_single(self : Lexer, kind : TokenKind) -> Unit {
-  let start = self.cursor.pos
-  self.cursor.advance()
-  self.emit(kind, start)
+fn scan_single(kind : TokenKind, text : String, at : @span.Offset) -> Step {
+  token_step(kind, text, at, at.next())
 }
 
 ///|
 /// One unexpected character (both units of a surrogate pair) as an `Error`
 /// token with `SM-SCAN-001`.
-fn Lexer::unexpected_character(self : Lexer) -> Unit {
-  let start = self.cursor.pos
-  let c = self.cursor.text.code_unit_at(start).to_int()
-  self.cursor.advance()
-  if c >= 0xD800 && c <= 0xDBFF && self.cursor.peek() is Some(low) &&
-    low.to_int() >= 0xDC00 && low.to_int() <= 0xDFFF {
-    self.cursor.advance()
+fn scan_unexpected(text : String, at : @span.Offset) -> Step {
+  let c = text.code_unit_at(at.0).to_int()
+  let is_high = c >= 0xD800 && c <= 0xDBFF
+  let low_follows = match peek(text, at, 1) {
+    Some(l) => l.to_int() >= 0xDC00 && l.to_int() <= 0xDFFF
+    None => false
   }
-  let span = @span.Span::new(start, self.cursor.pos)
-  let shown = self.cursor.slice(start)
-  self.report(
-    "SM-SCAN-001",
-    "UNEXPECTED CHARACTER",
-    "I don't know what to do with `\{shown}`",
-    span,
-    notes=[
-      "I was reading tokens and found a character that cannot start one. Smithy IDL uses letters, digits, `_`, quotes, numbers and the punctuation `@ : := = . # $ { } [ ] ( ) ,`.",
-    ],
+  let end = if is_high && low_follows { at.next().next() } else { at.next() }
+  let shown = slice(text, at, end)
+  error_step(
+    text,
+    at,
+    end,
+    lexical(
+      "SM-SCAN-001",
+      "UNEXPECTED CHARACTER",
+      "I don't know what to do with `\{shown}`",
+      at.to(end),
+      notes=[
+        "I was reading tokens and found a character that cannot start one. Smithy IDL uses letters, digits, `_`, quotes, numbers and the punctuation `@ : := = . # $ { } [ ] ( ) ,`.",
+      ],
+    ),
   )
-  self.emit(Error, start)
 }
 
 ///|
-/// One token or one piece of trivia.
-fn Lexer::step(self : Lexer) -> Unit {
-  guard self.cursor.peek() is Some(c) else { return }
-  match c {
-    '\n' => self.lex_newline()
-    '\r' =>
-      if self.cursor.peek1() == Some('\n') {
-        self.lex_newline()
-      } else {
-        self.lex_whitespace()
-      }
-    ' ' | '\t' => self.lex_whitespace()
-    ',' => {
-      let start = self.cursor.pos
-      self.cursor.advance()
-      self.trivia(Comma(@span.Span::new(start, self.cursor.pos)))
-    }
-    '/' if self.cursor.peek1() == Some('/') => self.lex_comment()
-    '@' => self.eat_single(At)
-    ':' =>
-      if self.cursor.peek1() == Some('=') {
-        let start = self.cursor.pos
-        self.cursor.advance()
-        self.cursor.advance()
-        self.emit(Walrus, start)
-      } else {
-        self.eat_single(Colon)
-      }
-    '=' => self.eat_single(Equal)
-    '.' => self.eat_single(Dot)
-    '#' => self.eat_single(Pound)
-    '$' => self.eat_single(Dollar)
-    '{' => self.eat_single(LBrace)
-    '}' => self.eat_single(RBrace)
-    '[' => self.eat_single(LBracket)
-    ']' => self.eat_single(RBracket)
-    '(' => self.eat_single(LParen)
-    ')' => self.eat_single(RParen)
-    '"' => self.lex_string_or_text_block()
-    '-' => self.lex_number()
-    _ =>
-      if is_digit(c) {
-        self.lex_number()
-      } else if self.at_identifier_start() {
-        self.lex_identifier()
-      } else {
-        self.unexpected_character()
-      }
+/// One token or one piece of trivia at `at`, or `None` at the end of the
+/// text. Pure: the same text and offset always give the same step.
+pub fn scan_at(text : String, at : @span.Offset) -> Step? {
+  guard unit_at(text, at) is Some(c) else { return None }
+  Some(
+    match c {
+      '\n' => scan_newline(text, at)
+      '\r' =>
+        if peek(text, at, 1) == Some('\n') {
+          scan_newline(text, at)
+        } else {
+          scan_whitespace(text, at)
+        }
+      ' ' | '\t' => scan_whitespace(text, at)
+      ',' => trivia_step(Comma(at.to(at.next())), at.next())
+      '/' if peek(text, at, 1) == Some('/') => scan_comment(text, at)
+      '@' => scan_single(At, text, at)
+      ':' =>
+        if peek(text, at, 1) == Some('=') {
+          token_step(Walrus, text, at, at.next().next())
+        } else {
+          scan_single(Colon, text, at)
+        }
+      '=' => scan_single(Equal, text, at)
+      '.' => scan_single(Dot, text, at)
+      '#' => scan_single(Pound, text, at)
+      '$' => scan_single(Dollar, text, at)
+      '{' => scan_single(LBrace, text, at)
+      '}' => scan_single(RBrace, text, at)
+      '[' => scan_single(LBracket, text, at)
+      ']' => scan_single(RBracket, text, at)
+      '(' => scan_single(LParen, text, at)
+      ')' => scan_single(RParen, text, at)
+      '"' => scan_string_or_text_block(text, at)
+      '-' => scan_number(text, at)
+      _ =>
+        if is_digit(c) {
+          scan_number(text, at)
+        } else if at_identifier_start(text, at) {
+          scan_identifier(text, at)
+        } else {
+          scan_unexpected(text, at)
+        }
+    },
+  )
+}
+```
+
+Until Task 5 lands, add two stubs at the bottom of `scan.mbt` so the package compiles (Task 5 replaces them):
+
+```moonbit
+///|
+fn scan_string_or_text_block(text : String, at : @span.Offset) -> Step {
+  scan_unexpected(text, at)
+}
+
+///|
+fn scan_number(text : String, at : @span.Offset) -> Step {
+  scan_unexpected(text, at)
+}
+```
+
+- [ ] **Step 6: Implement pipeline.mbt**
+
+```moonbit
+///|
+/// Every step of the text, in order: an unfold over `scan_at`. The only
+/// state is the offset local to this function.
+pub fn scan_pieces(text : String) -> Array[Step] {
+  let steps : Array[Step] = []
+  let mut at = @span.Offset::zero()
+  while scan_at(text, at) is Some(step) {
+    steps.push(step)
+    at = step.end
   }
+  steps
 }
 
 ///|
-/// Group the pieces into tokens with trivia: trivia after a token up to
-/// and including the first line break is its `trivia_after`; the rest goes
-/// to the next token's `trivia_before`.
-fn Lexer::finish(self : Lexer) -> TokenStream {
+/// Group the steps into tokens with trivia and collect the diagnostics.
+/// Trivia after a token up to and including the first line break is its
+/// `trivia_after`; the rest goes to the next token's `trivia_before`.
+/// Trailing trivia after the last token's line break stays with that token.
+pub fn attach_trivia(steps : Array[Step]) -> TokenStream {
   let tokens : Array[Token] = []
+  let diagnostics : Array[@diagnostic.Diagnostic] = []
   let mut before : Array[Trivia] = []
   let mut i = 0
-  let n = self.pieces.length()
+  let n = steps.length()
   while i < n {
-    match self.pieces[i] {
+    diagnostics.append(steps[i].diagnostics.to_array())
+    match steps[i].piece {
       Triv(t) => {
         before.push(t)
         i += 1
@@ -1340,79 +1587,54 @@ fn Lexer::finish(self : Lexer) -> TokenStream {
       Tok(kind, lexeme, span) => {
         i += 1
         let after : Array[Trivia] = []
-        while i < n && self.pieces[i] is Triv(t) {
+        while i < n && steps[i].piece is Triv(t) {
           after.push(t)
           i += 1
           if t.is_newline() {
             break
           }
         }
-        tokens.push({
-          kind,
-          lexeme,
-          span,
-          trivia_before: before[:],
-          trivia_after: after[:],
-        })
+        tokens.push({ kind, lexeme, span, trivia_before: before[:], trivia_after: after[:] })
         before = []
       }
     }
   }
-  let trivia = if tokens.is_empty() {
+  let trivia : Array[Trivia] = if tokens.is_empty() {
     before
   } else {
-    // Trailing trivia after the last line break belongs to the last token.
     let last = tokens[tokens.length() - 1]
     let merged = last.trivia_after.to_array()
     merged.append(before)
     tokens[tokens.length() - 1] = { ..last, trivia_after: merged[:] }
     []
   }
-  { tokens: tokens[:], trivia: trivia[:], diagnostics: self.diagnostics[:] }
+  { tokens: tokens[:], trivia: trivia[:], diagnostics: diagnostics[:] }
 }
 
 ///|
-/// Scan `source` into tokens with trivia and diagnostics. The scan never
-/// fails and is lossless: `TokenStream::to_source()` is the text.
+/// Scan `source`: a pipeline of pure stages. The scan never fails and is
+/// lossless: `TokenStream::to_source()` is the text.
 pub fn tokenize(source : @span.SourceText) -> TokenStream {
-  let lx = Lexer::new(source.text())
-  while !lx.cursor.at_end() {
-    lx.step()
-  }
-  lx.finish()
+  source.text() |> scan_pieces |> attach_trivia
 }
 
 ///|
 pub fn tokenize_text(text : String) -> TokenStream {
-  tokenize(@span.SourceText::new(text))
+  @span.SourceText::new(text) |> tokenize
 }
 ```
 
-Until Task 5 lands, add two stubs at the bottom of `lexer.mbt` so the package compiles (Task 5 replaces them):
-
-```moonbit
-///|
-fn Lexer::lex_string_or_text_block(self : Lexer) -> Unit {
-  self.unexpected_character()
-}
-
-///|
-fn Lexer::lex_number(self : Lexer) -> Unit {
-  self.unexpected_character()
-}
-```
-
-- [ ] **Step 6: Run the tests to see them pass**
+- [ ] **Step 7: Run the tests to see them pass**
 
 Run: `moon test -p moonrockz/smithy-syntax/scanner`
-Expected: all pass. If a `debug_inspect` differs only in the `Debug` formatting of a record, check the values are right and then update the `content` string.
+Expected: all pass. If a `debug_inspect` of a span or newtype prints differently from the expected string, confirm the values and update the `content`.
 
-- [ ] **Step 7: Format and commit**
+- [ ] **Step 8: Format and commit**
 
 ```bash
 mise run format
 git add pkgs/smithy-syntax/src/scanner
-git commit -m "feat(syntax): add the scanner types and tokenize punctuation, identifiers and trivia"
+git commit -m "feat(syntax): add the scanner types and the pure scanning pipeline"
 ```
 
 ---
@@ -1420,7 +1642,7 @@ git commit -m "feat(syntax): add the scanner types and tokenize punctuation, ide
 ### Task 5: Scanner numbers, strings, text blocks and the decoders
 
 **Files:**
-- Modify: `pkgs/smithy-syntax/src/scanner/lexer.mbt` (replace the two stubs)
+- Modify: `pkgs/smithy-syntax/src/scanner/scan.mbt` (delete the two stubs)
 - Create: `pkgs/smithy-syntax/src/scanner/numbers.mbt`
 - Create: `pkgs/smithy-syntax/src/scanner/strings.mbt`
 - Create: `pkgs/smithy-syntax/src/scanner/decode.mbt`
@@ -1429,7 +1651,7 @@ git commit -m "feat(syntax): add the scanner types and tokenize punctuation, ide
 - Create: `pkgs/smithy-syntax/src/scanner/decode_test.mbt`
 
 **Interfaces:**
-- Produces: `Number` and `String`/`TextBlock` tokens with raw lexemes; `unescape(lexeme : String) -> String` (the value of a quoted string token, quotes included in the input); `text_block_value(lexeme : String) -> String` (the value of a text block token, the three quotes included in the input); `is_integer_lexeme(lexeme : String) -> Bool` (no fraction, no exponent).
+- Produces: `scan_number(text, at) -> Step`, `scan_string_or_text_block(text, at) -> Step` (private, pure); `unescape(lexeme : String) -> String` (the value of a quoted string token, quotes included in the input); `text_block_value(lexeme : String) -> String` (the value of a text block token, the three quotes included); `is_integer_lexeme(lexeme : String) -> Bool`.
 
 - [ ] **Step 1: Write the failing number tests**
 
@@ -1479,84 +1701,83 @@ test "is_integer_lexeme" {
 }
 ```
 
-- [ ] **Step 2: Implement numbers.mbt and remove the `lex_number` stub**
+- [ ] **Step 2: Implement numbers.mbt and delete the `scan_number` stub**
 
 ```moonbit
 ///|
+/// The digits at `from`: the offset after them and whether there was one.
+fn digits(text : String, from : @span.Offset) -> (@span.Offset, Bool) {
+  let end = skip_while(text, from, is_digit)
+  (end, end > from)
+}
+
+///|
 /// `Number = [Minus] Int [Frac] [Exp]`, with `Int = "0" / DigitOneToNine
 /// *DIGIT`. A run that does not fit is one `Error` token covering every
-/// digit, sign, dot, `e` and `+`/`-` that was read, with `SM-SCAN-007`.
-fn Lexer::lex_number(self : Lexer) -> Unit {
-  let start = self.cursor.pos
+/// digit, sign, dot, `e`, `+`/`-` and glued letter, with `SM-SCAN-007`.
+fn scan_number(text : String, at : @span.Offset) -> Step {
   let mut ok = true
-  if self.cursor.peek() == Some('-') {
-    self.cursor.advance()
+  let mut end = at
+  if unit_at(text, end) == Some('-') {
+    end = end.next()
   }
   // Int
-  match self.cursor.peek() {
+  match unit_at(text, end) {
     Some('0') => {
-      self.cursor.advance()
-      if self.cursor.peek() is Some(c) && is_digit(c) {
+      end = end.next()
+      let (after, more) = digits(text, end)
+      if more {
         ok = false
-        while self.cursor.peek() is Some(c) && is_digit(c) {
-          self.cursor.advance()
-        }
+        end = after
       }
     }
-    Some(c) if is_digit(c) =>
-      while self.cursor.peek() is Some(c) && is_digit(c) {
-        self.cursor.advance()
-      }
+    Some(c) if is_digit(c) => end = digits(text, end).0
     _ => ok = false
   }
   // Frac
-  if self.cursor.peek() == Some('.') {
-    self.cursor.advance()
-    if self.cursor.peek() is Some(c) && is_digit(c) {
-      while self.cursor.peek() is Some(c) && is_digit(c) {
-        self.cursor.advance()
-      }
-    } else {
+  if unit_at(text, end) == Some('.') {
+    let (after, some) = digits(text, end.next())
+    end = after
+    if !some {
       ok = false
     }
   }
   // Exp
-  if self.cursor.peek() is Some('e' | 'E') {
-    self.cursor.advance()
-    if self.cursor.peek() is Some('+' | '-') {
-      self.cursor.advance()
+  if unit_at(text, end) is Some('e' | 'E') {
+    end = end.next()
+    if unit_at(text, end) is Some('+' | '-') {
+      end = end.next()
     }
-    if self.cursor.peek() is Some(c) && is_digit(c) {
-      while self.cursor.peek() is Some(c) && is_digit(c) {
-        self.cursor.advance()
-      }
-    } else {
+    let (after, some) = digits(text, end)
+    end = after
+    if !some {
       ok = false
     }
   }
-  // A letter glued to a number is part of the bad run (`1x`, `-a`).
-  if self.cursor.peek() is Some(c) && (is_ident_char(c) || c == '.') {
+  // A letter or dot glued to a number is part of the bad run (`1x`, `-a`).
+  if unit_at(text, end) is Some(c) && (is_ident_char(c) || c == '.') {
     ok = false
-    while self.cursor.peek() is Some(c) && (is_ident_char(c) || c == '.') {
-      self.cursor.advance()
-    }
+    end = skip_while(text, end, c => is_ident_char(c) || c == '.')
   }
   if ok {
-    self.emit(Number, start)
+    token_step(Number, text, at, end)
   } else {
-    let span = @span.Span::new(start, self.cursor.pos)
-    let shown = self.cursor.slice(start)
-    self.report(
-      "SM-SCAN-007",
-      "INVALID NUMBER",
-      "I cannot read `\{shown}` as a number",
-      span,
-      notes=[
-        "A number is an optional `-`, then `0` or digits with no leading zero, then an optional fraction like `.25` and an optional exponent like `e10` or `E-3`.",
-      ],
-      hint="Write `0.5` rather than `.5`, `1.0` rather than `1.`, and drop leading zeros.",
+    let shown = slice(text, at, end)
+    error_step(
+      text,
+      at,
+      end,
+      lexical(
+        "SM-SCAN-007",
+        "INVALID NUMBER",
+        "I cannot read `\{shown}` as a number",
+        at.to(end),
+        notes=[
+          "A number is an optional `-`, then `0` or digits with no leading zero, then an optional fraction like `.25` and an optional exponent like `e10` or `E-3`.",
+        ],
+        hint="Write `0.5` rather than `.5`, `1.0` rather than `1.`, and drop leading zeros.",
+      ),
     )
-    self.emit(Error, start)
   }
 }
 
@@ -1571,8 +1792,6 @@ pub fn is_integer_lexeme(lexeme : String) -> Bool {
   true
 }
 ```
-
-Delete the `lex_number` stub from `lexer.mbt`.
 
 - [ ] **Step 3: Run the number tests**
 
@@ -1611,9 +1830,10 @@ test "an unterminated string runs to the end and is SM-SCAN-002" {
 }
 
 ///|
-test "a bad escape keeps the String token and reports SM-SCAN-005" {
+test "bad escapes keep the String token and report each one" {
   @expect.expect(skinds("\"a\\qb\"")).to_equal([String])
   @expect.expect(scodes("\"a\\qb\"")).to_equal(["SM-SCAN-005"])
+  @expect.expect(scodes("\"\\q\\z\"")).to_equal(["SM-SCAN-005", "SM-SCAN-005"])
   @expect.expect(scodes("\"\\u12\"")).to_equal(["SM-SCAN-006"])
   @expect.expect(scodes("\"\\u12G4\"")).to_equal(["SM-SCAN-006"])
   @expect.expect(scodes("\"\\n\\t\\r\\b\\f\\/\\\\\\\"\\u00e9\"")).to_equal([])
@@ -1647,159 +1867,166 @@ test "an unterminated text block is SM-SCAN-003" {
 }
 ```
 
-- [ ] **Step 5: Implement strings.mbt and remove the `lex_string_or_text_block` stub**
+- [ ] **Step 5: Implement strings.mbt and delete the `scan_string_or_text_block` stub**
 
 ```moonbit
 ///|
-fn is_hex(c : Char) -> Bool {
-  is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-}
-
-///|
-/// Validate one escape at the cursor (which is on the `\`), reporting
-/// `SM-SCAN-005` or `SM-SCAN-006`, and move past it. The token is still
-/// emitted as a string; `unescape` keeps a bad escape verbatim.
-fn Lexer::check_escape(self : Lexer) -> Unit {
-  let start = self.cursor.pos
-  self.cursor.advance()
-  match self.cursor.peek() {
-    Some('\\' | '"' | 'b' | 'f' | 'n' | 'r' | 't' | '/') => self.cursor.advance()
+/// Check one escape at `at` (which holds the `\`): the offset after it and
+/// its diagnostic, if any. The token is still a string; `unescape` keeps a
+/// bad escape verbatim.
+fn check_escape(text : String, at : @span.Offset) -> (@span.Offset, @diagnostic.Diagnostic?) {
+  match unit_at(text, at.next()) {
+    Some('\\' | '"' | 'b' | 'f' | 'n' | 'r' | 't' | '/') => (at.next().next(), None)
     Some('u') => {
-      self.cursor.advance()
+      let mut end = at.next().next()
       let mut good = 0
-      while good < 4 && self.cursor.peek() is Some(c) && is_hex(c) {
-        self.cursor.advance()
+      while good < 4 && unit_at(text, end) is Some(c) && is_hex(c) {
+        end = end.next()
         good += 1
       }
       if good < 4 {
-        let span = @span.Span::new(start, self.cursor.pos)
-        self.report(
-          "SM-SCAN-006",
-          "INVALID UNICODE ESCAPE",
-          "a `\\u` escape needs exactly four hex digits",
-          span,
-          hint="Write the code point as four hex digits, like `\\u00e9`.",
+        (
+          end,
+          Some(
+            lexical(
+              "SM-SCAN-006",
+              "INVALID UNICODE ESCAPE",
+              "a `\\u` escape needs exactly four hex digits",
+              at.to(end),
+              hint="Write the code point as four hex digits, like `\\u00e9`.",
+            ),
+          ),
         )
+      } else {
+        (end, None)
       }
     }
     Some(c) => {
-      self.cursor.advance()
-      let span = @span.Span::new(start, self.cursor.pos)
-      self.report(
-        "SM-SCAN-005",
-        "UNKNOWN ESCAPE",
-        "I don't know the escape `\\\{c}`",
-        span,
-        notes=[
-          "The escapes I know are `\\\\`, `\\\"`, `\\b`, `\\f`, `\\n`, `\\r`, `\\t`, `\\/` and `\\uXXXX`.",
-        ],
+      let end = at.next().next()
+      (
+        end,
+        Some(
+          lexical(
+            "SM-SCAN-005",
+            "UNKNOWN ESCAPE",
+            "I don't know the escape `\\\{c}`",
+            at.to(end),
+            notes=[
+              "The escapes I know are `\\\\`, `\\\"`, `\\b`, `\\f`, `\\n`, `\\r`, `\\t`, `\\/` and `\\uXXXX`.",
+            ],
+          ),
+        ),
       )
     }
-    None => ()
+    None => (at.next(), None)
   }
 }
 
 ///|
 /// A quoted string (which may span lines) or a text block.
-fn Lexer::lex_string_or_text_block(self : Lexer) -> Unit {
-  if self.cursor.looking_at("\"\"\"") {
-    self.lex_text_block()
+fn scan_string_or_text_block(text : String, at : @span.Offset) -> Step {
+  if looking_at(text, at, "\"\"\"") {
+    scan_text_block(text, at)
   } else {
-    self.lex_quoted()
+    scan_quoted(text, at)
   }
 }
 
 ///|
-fn Lexer::lex_quoted(self : Lexer) -> Unit {
-  let start = self.cursor.pos
-  self.cursor.advance()
-  while true {
-    match self.cursor.peek() {
-      None => {
-        self.report(
+/// Read string content from `from` until `closer` matches. The offset of
+/// the closer (or the end of the text) and the escape diagnostics found.
+fn string_body(text : String, from : @span.Offset, closer : String) -> (@span.Offset, Array[@diagnostic.Diagnostic]) {
+  let found : Array[@diagnostic.Diagnostic] = []
+  let mut at = from
+  while unit_at(text, at) is Some(c) {
+    if c == '"' && looking_at(text, at, closer) {
+      return (at, found)
+    }
+    if c == '\\' {
+      let (after, d) = check_escape(text, at)
+      if d is Some(x) {
+        found.push(x)
+      }
+      at = after
+    } else {
+      at = at.next()
+    }
+  }
+  (at, found)
+}
+
+///|
+fn scan_quoted(text : String, at : @span.Offset) -> Step {
+  let (closer, found) = string_body(text, at.next(), "\"")
+  match unit_at(text, closer) {
+    Some(_) => {
+      let end = closer.next()
+      { piece: Tok(String, slice(text, at, end), at.to(end)), end, diagnostics: found[:] }
+    }
+    None =>
+      error_step(
+        text,
+        at,
+        closer,
+        lexical(
           "SM-SCAN-002",
           "UNTERMINATED STRING",
           "this string never ends",
-          @span.Span::new(start, self.cursor.pos),
+          at.to(closer),
           hint="Add the closing `\"`.",
           notes=[
             "I found an opening quote but reached the end of the file before the closing one. A string may span lines, so I read everything after the quote as the string.",
           ],
-        )
-        self.emit(Error, start)
-        return
-      }
-      Some('"') => {
-        self.cursor.advance()
-        self.emit(String, start)
-        return
-      }
-      Some('\\') => self.check_escape()
-      Some(_) => self.cursor.advance()
-    }
+        ),
+      )
   }
 }
 
 ///|
 /// `TextBlock = ThreeDquotes [SP] NL *TextBlockContent ThreeDquotes`.
-fn Lexer::lex_text_block(self : Lexer) -> Unit {
-  let start = self.cursor.pos
-  self.cursor.advance()
-  self.cursor.advance()
-  self.cursor.advance()
-  // [SP] NL
-  while self.cursor.peek() is Some(' ' | '\t') {
-    self.cursor.advance()
+fn scan_text_block(text : String, at : @span.Offset) -> Step {
+  let three = @span.Length::new(3).unwrap()
+  let after_quotes = skip_while(text, at.advance(three), c => c == ' ' || c == '\t')
+  let (content_start, has_break) = match unit_at(text, after_quotes) {
+    Some('\n') => (after_quotes.next(), true)
+    Some('\r') if peek(text, after_quotes, 1) == Some('\n') => (after_quotes.next().next(), true)
+    _ => (at.advance(three), false)
   }
-  let has_break = match self.cursor.peek() {
-    Some('\n') => {
-      self.cursor.advance()
-      true
-    }
-    Some('\r') if self.cursor.peek1() == Some('\n') => {
-      self.cursor.advance()
-      self.cursor.advance()
-      true
-    }
-    _ => false
-  }
+  let found : Array[@diagnostic.Diagnostic] = []
   if !has_break {
-    self.report(
-      "SM-SCAN-004",
-      "TEXT BLOCK MUST START WITH A LINE BREAK",
-      "the opening `\"\"\"` must be followed by a line break",
-      @span.Span::new(start, self.cursor.pos),
-      hint="Put the text on the line after the opening quotes, and the closing quotes on their own line.",
+    found.push(
+      lexical(
+        "SM-SCAN-004",
+        "TEXT BLOCK MUST START WITH A LINE BREAK",
+        "the opening `\"\"\"` must be followed by a line break",
+        at.to(content_start),
+        hint="Put the text on the line after the opening quotes, and the closing quotes on their own line.",
+      ),
     )
   }
-  while true {
-    match self.cursor.peek() {
-      None => {
-        self.report(
+  let (closer, escapes) = string_body(text, content_start, "\"\"\"")
+  found.append(escapes)
+  match unit_at(text, closer) {
+    Some(_) => {
+      let end = closer.advance(three)
+      { piece: Tok(TextBlock, slice(text, at, end), at.to(end)), end, diagnostics: found[:] }
+    }
+    None =>
+      error_step(
+        text,
+        at,
+        closer,
+        lexical(
           "SM-SCAN-003",
           "UNTERMINATED TEXT BLOCK",
           "this text block never ends",
-          @span.Span::new(start, self.cursor.pos),
+          at.to(closer),
           hint="Add the closing `\"\"\"`.",
-        )
-        self.emit(Error, start)
-        return
-      }
-      Some('"') if self.cursor.looking_at("\"\"\"") => {
-        self.cursor.advance()
-        self.cursor.advance()
-        self.cursor.advance()
-        self.emit(TextBlock, start)
-        return
-      }
-      Some('\\') => self.check_escape()
-      Some(_) => self.cursor.advance()
-    }
+        ),
+      )
   }
 }
 ```
-
-Delete the `lex_string_or_text_block` stub from `lexer.mbt`.
 
 - [ ] **Step 6: Run the string tests**
 
@@ -1867,14 +2094,15 @@ test "quotes inside a text block" {
 }
 ```
 
-- [ ] **Step 8: Implement decode.mbt**
+- [ ] **Step 8: Implement decode.mbt (pure functions from lexeme to value)**
 
 ```moonbit
 ///|
-/// Append the decoded form of `s[from:]` to `sb`: the escapes the
-/// specification lists; an unknown or malformed escape is kept verbatim.
-/// `\` before a line break (text blocks) adds nothing.
-fn unescape_into(sb : StringBuilder, s : String) -> Unit {
+/// The decoded form of `s`: the escapes the specification lists; an
+/// unknown or malformed escape is kept verbatim; `\` before a line break
+/// (text blocks) adds nothing.
+fn decode_escapes(s : String) -> String {
+  let sb = StringBuilder()
   let n = s.length()
   let mut i = 0
   while i < n {
@@ -1941,6 +2169,7 @@ fn unescape_into(sb : StringBuilder, s : String) -> Unit {
       }
     }
   }
+  sb.to_string()
 }
 
 ///|
@@ -1952,17 +2181,52 @@ pub fn unescape(lexeme : String) -> String {
   } else {
     ""
   }
-  let sb = StringBuilder()
-  unescape_into(sb, inner)
-  sb.to_string()
+  decode_escapes(inner)
+}
+
+///|
+fn leading_spaces(line : String) -> Int {
+  let mut k = 0
+  while k < line.length() && line.code_unit_at(k).to_int() == ' '.to_int() {
+    k += 1
+  }
+  k
+}
+
+///|
+fn is_blank(line : String) -> Bool {
+  leading_spaces(line) == line.length()
+}
+
+///|
+/// The lines of a text block body, line breaks removed (`\r\n` and `\n`).
+fn block_lines(body : String) -> Array[String] {
+  body.split("\n").map(raw => raw.to_string().trim_end(chars="\r").to_string()).collect()
+}
+
+///|
+/// The common leading-space count: over the non-blank lines, and over the
+/// last line even when blank (it holds the closing quotes' indent).
+fn common_indent(lines : Array[String]) -> Int {
+  let last = lines.length() - 1
+  let mut common = -1
+  for idx, line in lines {
+    if idx != last && is_blank(line) {
+      continue
+    }
+    let k = leading_spaces(line)
+    if common < 0 || k < common {
+      common = k
+    }
+  }
+  if common < 0 { 0 } else { common }
 }
 
 ///|
 /// The value of a `TextBlock` token, per the specification: drop the
 /// opening quotes, optional spaces and the first line break; split the rest
-/// into lines; the common leading-space count of the non-blank lines (and
-/// of the last line, even when blank) is removed from every line; trailing
-/// spaces go; lines are joined with `\n`; then escapes are decoded.
+/// into lines; remove the common indent and trailing spaces; join with
+/// `\n`; then decode escapes.
 pub fn text_block_value(lexeme : String) -> String {
   let n = lexeme.length()
   guard n >= 6 else { return "" }
@@ -1976,59 +2240,28 @@ pub fn text_block_value(lexeme : String) -> String {
   if i < n && lexeme.code_unit_at(i).to_int() == '\n'.to_int() {
     i += 1
   }
-  let body = lexeme.unsafe_substring(start=i, end=n - 3)
-  let lines : Array[String] = []
-  for raw in body.split("\n") {
-    lines.push(raw.to_owned().trim_end(chars="\r").to_owned())
-  }
-  fn leading_spaces(line : String) -> Int {
-    let mut k = 0
-    while k < line.length() && line.code_unit_at(k).to_int() == ' '.to_int() {
-      k += 1
-    }
-    k
-  }
-
-  fn is_blank(line : String) -> Bool {
-    leading_spaces(line) == line.length()
-  }
-
+  let lines = block_lines(lexeme.unsafe_substring(start=i, end=n - 3))
+  let common = common_indent(lines)
   let last = lines.length() - 1
-  let mut common = -1
-  for idx, line in lines {
-    if idx != last && is_blank(line) {
-      continue
-    }
-    let k = leading_spaces(line)
-    if common < 0 || k < common {
-      common = k
-    }
-  }
-  if common < 0 {
-    common = 0
-  }
-  let out : Array[String] = []
-  for idx, line in lines {
-    let cut = if leading_spaces(line) < common { leading_spaces(line) } else { common }
-    let stripped = line.unsafe_substring(start=cut, end=line.length())
-    let stripped = stripped.trim_end(chars=" ").to_owned()
+  lines
+  .mapi((idx, line) => {
     if idx == last && is_blank(line) {
       // The closing quotes stood on their own line: the value ends with `\n`.
-      out.push("")
+      ""
     } else {
-      out.push(stripped)
+      let cut = if leading_spaces(line) < common { leading_spaces(line) } else { common }
+      line.unsafe_substring(start=cut, end=line.length()).trim_end(chars=" ").to_string()
     }
-  }
-  let sb = StringBuilder()
-  unescape_into(sb, out.join("\n"))
-  sb.to_string()
+  })
+  .join("\n")
+  |> decode_escapes
 }
 ```
 
 - [ ] **Step 9: Run every scanner test**
 
 Run: `moon test -p moonrockz/smithy-syntax/scanner`
-Expected: all pass. If `trim_end` returns a view that needs `.to_owned()` differently on this toolchain, adjust; the behavior is what the tests pin.
+Expected: all pass. If `trim_end` returns a view that needs `.to_string()` differently on this toolchain, adjust; the behavior is what the tests pin.
 
 - [ ] **Step 10: Format and commit**
 
@@ -2047,6 +2280,7 @@ git commit -m "feat(syntax): scan numbers, strings and text blocks, and decode t
 - Create: `pkgs/smithy-syntax/src/lawkit/smithy_text.mbt`
 - Create: `pkgs/smithy-syntax/src/lawkit/smithy_text_test.mbt`
 - Create: `pkgs/smithy-syntax/src/scanner/scanner_law_test.mbt`
+- Modify: `pkgs/smithy-syntax/src/scanner/moon.pkg` (test imports)
 
 **Interfaces:**
 - Produces: `@lawkit.SmithyText` (quickcheck `Arbitrary` and `Shrink`) with `text()`; `@lawkit.token_pieces()`, `@lawkit.broken_pieces()`, `@lawkit.edge_chars()`, `@lawkit.small_model()` (a valid 2.0 model), `@lawkit.units(Array[Int]) -> String`.
@@ -2130,7 +2364,8 @@ pub fn broken_pieces() -> Array[String] {
 }
 
 ///|
-/// A small valid Smithy 2.0 model.
+/// A small valid Smithy 2.0 model: every statement form, every shape
+/// kind, docs, traits, mixins, elision, an inline shape and an apply.
 pub fn small_model() -> String {
   (
     #|$version: "2"
@@ -2285,7 +2520,7 @@ test "the small model is non-empty and ends with a line break" {
 }
 ```
 
-Add `"moonrockz/smithy-syntax/lawkit"` and `"moonbitlang/core/quickcheck/splitmix"` to the scanner's test imports in `scanner/moon.pkg`.
+Add `"moonrockz/smithy-syntax/lawkit"` to the scanner's test imports in `scanner/moon.pkg`.
 
 - [ ] **Step 2: Write the scanner laws**
 
@@ -2306,16 +2541,35 @@ test "law: the scan is lossless for any text" {
 }
 
 ///|
+test "law: scan_at is pure and its steps chain to the end of the text" {
+  @quickcheck.check(
+    (t : @lawkit.SmithyText) => {
+      let text = t.text()
+      let mut at = @span.Offset::zero()
+      let mut ok = true
+      while @scanner.scan_at(text, at) is Some(step) {
+        ok = ok && step.end > at && @scanner.scan_at(text, at) == Some(step)
+        at = step.end
+      }
+      ok && at.0 == text.length()
+    },
+    count=400,
+    max_size=16,
+    seed=2037,
+  )
+}
+
+///|
 test "law: token and trivia spans tile the text in order" {
   @quickcheck.check(
     (t : @lawkit.SmithyText) => {
       let text = t.text()
       let s = @scanner.tokenize_text(text)
-      let mut at = 0
+      let mut at = @span.Offset::zero()
       let mut ok = true
       let step = (span : @span.Span) => {
-        ok = ok && span.start == at && span.end >= span.start
-        at = span.end
+        ok = ok && span.start == at
+        at = span.end()
       }
       for tr in s.trivia {
         step(tr.span())
@@ -2329,7 +2583,7 @@ test "law: token and trivia spans tile the text in order" {
           step(tr.span())
         }
       }
-      ok && at == text.length()
+      ok && at.0 == text.length()
     },
     count=400,
     max_size=16,
@@ -2344,17 +2598,14 @@ test "law: every Error token has exactly one diagnostic that starts inside it" {
       let s = @scanner.tokenize_text(t.text())
       let errors = s.tokens.iter().filter(tok => tok.kind == Error).collect()
       let error_codes = ["SM-SCAN-001", "SM-SCAN-002", "SM-SCAN-003", "SM-SCAN-007"]
-      let error_diags = s.diagnostics
-        .iter()
-        .filter(d => error_codes.contains(d.code))
-        .collect()
+      let error_diags = s.diagnostics.iter().filter(d => error_codes.contains(d.code)).collect()
       if errors.length() != error_diags.length() {
         return false
       }
       let mut ok = true
       for i, tok in errors {
         let d = error_diags[i]
-        ok = ok && d.span.start >= tok.span.start && d.span.start <= tok.span.end
+        ok = ok && d.span.start >= tok.span.start && d.span.start <= tok.span.end()
       }
       ok
     },
@@ -2370,11 +2621,7 @@ test "law: a lexeme is the source text of its span" {
     (t : @lawkit.SmithyText) => {
       let text = t.text()
       let s = @scanner.tokenize_text(text)
-      let mut ok = true
-      for tok in s.tokens {
-        ok = ok && text.unsafe_substring(start=tok.span.start, end=tok.span.end) == tok.lexeme
-      }
-      ok
+      s.tokens.iter().all(tok => text.unsafe_substring(start=tok.span.start.0, end=tok.span.end().0) == tok.lexeme)
     },
     count=300,
     max_size=16,
@@ -2389,11 +2636,10 @@ test "law: trivia_after holds at most one newline, and it is last" {
       let s = @scanner.tokenize_text(t.text())
       let mut ok = true
       for i, tok in s.tokens {
-        let is_last = i == s.tokens.length() - 1
-        let newlines = tok.trivia_after.iter().filter(x => x.is_newline()).count()
-        if is_last {
+        if i == s.tokens.length() - 1 {
           continue
         }
+        let newlines = tok.trivia_after.iter().filter(x => x.is_newline()).count()
         ok = ok && newlines <= 1
         if newlines == 1 {
           ok = ok && tok.trivia_after[tok.trivia_after.length() - 1].is_newline()
@@ -2424,7 +2670,7 @@ test "law: every diagnostic code is in the table" {
 - [ ] **Step 3: Run the laws on two targets**
 
 Run: `moon test -p moonrockz/smithy-syntax/scanner && moon test -p moonrockz/smithy-syntax/scanner --target js`
-Expected: all pass. A failing law prints a shrunk counterexample; fix the lexer, not the law, unless the law mis-states the spec.
+Expected: all pass. A failing law prints a shrunk counterexample; fix the scanner, not the law, unless the law mis-states the spec.
 
 - [ ] **Step 4: Format and commit**
 
@@ -2728,6 +2974,31 @@ pub(all) enum ShapeKind {
 } derive(Eq, Debug, Hash)
 
 ///|
+/// `Simple(String)`, `Aggregate(Structure)`, ... for messages and CST names.
+pub impl Show for ShapeKind with output(self, logger) {
+  match self {
+    Simple(t) => logger.write_string("Simple(\{t.keyword()})")
+    Enum(Enum) => logger.write_string("Enum(Enum)")
+    Enum(IntEnum) => logger.write_string("Enum(IntEnum)")
+    Aggregate(t) => logger.write_string("Aggregate(\{t.keyword()})")
+    Entity(Service) => logger.write_string("Entity(Service)")
+    Entity(Resource) => logger.write_string("Entity(Resource)")
+    Operation => logger.write_string("Operation")
+  }
+}
+
+///|
+pub fn AggregateType::keyword(self : AggregateType) -> String {
+  match self {
+    List => "List"
+    Map => "Map"
+    Union => "Union"
+    Structure => "Structure"
+    Set => "Set"
+  }
+}
+
+///|
 /// The shape kind a keyword starts, or `None`.
 pub fn ShapeKind::of(word : String) -> ShapeKind? {
   match word {
@@ -2977,8 +3248,9 @@ pub fn IdlFile::control_value(self : IdlFile, key : String) -> NodeValue? {
 
 ```moonbit
 ///|
-fn sp(a : Int, b : Int) -> @span.Span {
-  @span.Span::new(a, b)
+fn sp(a : Int, b : Int) -> @span.Span raise {
+  guard @span.Offset::new(a) is Some(x) && @span.Offset::new(b) is Some(y) else { fail("bad span") }
+  x.to(y)
 }
 
 ///|
@@ -2997,6 +3269,8 @@ test "keywords map to shape kinds" {
     e.expect(@ast.ShapeKind::of("operation")).to_equal(Some(Operation))
     e.expect(@ast.ShapeKind::of("apply")).to_equal(None)
     e.expect(@ast.SimpleType::Timestamp.keyword()).to_equal("timestamp")
+    e.expect(@ast.ShapeKind::Aggregate(Structure).to_string()).to_equal("Aggregate(Structure)")
+    e.expect(@ast.ShapeKind::Simple(String).to_string()).to_equal("Simple(string)")
   })
 }
 
@@ -3020,7 +3294,7 @@ test "node values expose strings and object keys" {
   )
   inspect(obj.get("a").bind(v => v.as_string()), content="Some(\"x\")")
   inspect(obj.get("b"), content="None")
-  inspect(obj.span(), content="{ start: 0, end: 8 }")
+  debug_inspect(obj.span(), content="{ start: Offset(0), length: Length(8) }")
 }
 
 ///|
@@ -3034,7 +3308,7 @@ test "a shape reports its name and kind" {
 - [ ] **Step 6: Run the tests**
 
 Run: `moon test -p moonrockz/smithy-syntax/ast`
-Expected: all pass. `inspect` on `Span` needs `Show`; if the compiler complains, use `debug_inspect` for spans and keep the content the same.
+Expected: all pass.
 
 - [ ] **Step 7: README and commit**
 
@@ -3097,6 +3371,12 @@ import {
 
 ```moonbit
 ///|
+fn o(n : Int) -> @span.Offset raise {
+  guard @span.Offset::new(n) is Some(x) else { fail("bad offset") }
+  x
+}
+
+///|
 test "statements tile the stream and print the source back" {
   let text = "namespace a.b\n\nstring Foo // c\n"
   let s = @scanner.tokenize_text(text)
@@ -3107,8 +3387,8 @@ test "statements tile the stream and print the source back" {
     e.expect(cst.to_source()).to_equal(text)
     e.expect(ns.to_source()).to_equal("namespace a.b\n\n")
     e.expect(foo.to_source()).to_equal("string Foo // c\n")
-    e.expect(ns.span).to_equal(@span.Span::new(0, 13))
-    e.expect(foo.span).to_equal(@span.Span::new(15, 25))
+    e.expect(ns.span).to_equal(o(0).to(o(13)))
+    e.expect(foo.span).to_equal(o(15).to(o(25)))
     e.expect(cst.skipped().length()).to_equal(0)
   })
 }
@@ -3117,7 +3397,7 @@ test "statements tile the stream and print the source back" {
 test "an empty statement has an empty span" {
   let s = @scanner.tokenize_text("")
   let st = @cst.StatementCst::new(kind=Skipped, name=None, tokens=s.tokens[0:0])
-  inspect(st.span, content="{ start: 0, end: 0 }")
+  debug_inspect(st.span, content="{ start: Offset(0), length: Length(0) }")
   inspect(@cst.IdlCst::new(s, [st]).to_source(), content="")
 }
 
@@ -3147,10 +3427,24 @@ pub(all) enum StatementKind {
 } derive(Eq, Debug)
 
 ///|
+/// `Control`, `Shape(Aggregate(Structure))`, ... for tests and tools.
+pub impl Show for StatementKind with output(self, logger) {
+  match self {
+    Control => logger.write_string("Control")
+    Metadata => logger.write_string("Metadata")
+    Namespace => logger.write_string("Namespace")
+    Use => logger.write_string("Use")
+    Shape(k) => logger.write_string("Shape(\{k})")
+    Apply => logger.write_string("Apply")
+    Skipped => logger.write_string("Skipped")
+  }
+}
+
+///|
 /// The tokens of one statement, with their trivia. `name` is the control
 /// key, metadata key, namespace, used shape ID, shape name or apply
 /// target; `None` for a skipped run. `span` runs from the first token's
-/// start to the last token's end, trivia excluded; `0..0` with no token.
+/// start to the last token's end, trivia excluded; empty at 0 with no token.
 pub(all) struct StatementCst {
   kind : StatementKind
   name : String?
@@ -3165,9 +3459,9 @@ pub fn StatementCst::new(
   tokens~ : ArrayView[@scanner.Token],
 ) -> StatementCst {
   let span = if tokens.length() == 0 {
-    @span.Span::new(0, 0)
+    @span.Offset::zero().to(@span.Offset::zero())
   } else {
-    @span.Span::new(tokens[0].span.start, tokens[tokens.length() - 1].span.end)
+    tokens[0].span.start.to(tokens[tokens.length() - 1].span.end())
   }
   { kind, name, tokens, span }
 }
@@ -3261,7 +3555,7 @@ git commit -m "feat(syntax): add the statement-level CST"
 
 **Interfaces:**
 - Consumes: scanner, ast, cst, diagnostic, span.
-- Produces: `Version = V1 | V2`; `ParseResult { ast : @ast.IdlFile?, cst : @cst.IdlCst, version : Version?, diagnostics : ArrayView[Diagnostic] }` with `has_errors()`, `errors()`; `parse(SourceText) -> ParseResult`; `parse_tokens(TokenStream) -> ParseResult`; `parse_text(String) -> ParseResult`; `max_nesting : Int = 100`; `suberror ParseError { ParseError(@diagnostic.Diagnostic) }`. Internal helpers later tasks call: `Parser::peek() -> Token?`, `peek1()`, `advance()`, `at_keyword(word)`, `expect_kind(kind, what) -> Token raise ParseError`, `expect_identifier(what)`, `adjacent()`, `expect_br()`, `fail(code, title, message, span, ...) -> T raise ParseError`, `push_context(name, span)`, `pop_context()`, `enter()`, `leave()`, `take_docs_before(offset) -> Array[DocComment]`, `parse_shape_id() -> Node[ShapeId] raise ParseError`, `parse_node_value() -> NodeValue raise ParseError`.
+- Produces: `Version = V1 | V2`; `ParseResult { ast : @ast.IdlFile?, cst : @cst.IdlCst, version : Version?, diagnostics : ArrayView[Diagnostic] }` with `has_errors()`, `errors()`; `parse(SourceText) -> ParseResult`; `parse_tokens(TokenStream) -> ParseResult`; `parse_text(String) -> ParseResult`; `Depth` (a nesting count: `Depth::zero()`, `deeper()`, `shallower()`, `Compare`), `max_nesting : Depth`; `suberror ParseError { ParseError(@diagnostic.Diagnostic) }`. Internal helpers later tasks call: `Parser::peek() -> Token?`, `peek1()`, `advance()`, `at_keyword(word)`, `expect_kind(kind, what) -> Token raise ParseError`, `expect_identifier(what)`, `adjacent()`, `expect_br()`, `fail(code, title, message, span, ...) -> T raise ParseError`, `push_context(name, span)`, `pop_context()`, `enter()`, `leave()`, `take_docs_before(offset : @span.Offset) -> Array[DocComment]`, `parse_shape_id() -> Node[ShapeId] raise ParseError`, `parse_node_value() -> NodeValue raise ParseError`.
 
 - [ ] **Step 1: Write the error and result types**
 
@@ -3347,9 +3641,32 @@ pub fn ParseResult::errors(self : ParseResult) -> Array[@diagnostic.Diagnostic] 
 }
 
 ///|
-/// Deepest nesting of node values, member blocks and trait bodies the
-/// parser enters; deeper text is `SM-PARSE-010`, never a stack overflow.
-pub let max_nesting : Int = 100
+/// A nesting count of node values, member blocks and trait bodies.
+pub struct Depth(Int) derive(Eq, Compare, Debug)
+
+///|
+pub fn Depth::zero() -> Depth {
+  Depth(0)
+}
+
+///|
+pub fn Depth::deeper(self : Depth) -> Depth {
+  Depth(self.0 + 1)
+}
+
+///|
+pub fn Depth::shallower(self : Depth) -> Depth {
+  if self.0 > 0 {
+    Depth(self.0 - 1)
+  } else {
+    self
+  }
+}
+
+///|
+/// Deepest nesting the parser enters; deeper text is `SM-PARSE-010`, never
+/// a stack overflow.
+pub let max_nesting : Depth = Depth(100)
 ```
 
 - [ ] **Step 2: Write the parser state and helpers**
@@ -3369,9 +3686,10 @@ priv struct Context {
 /// skips them (the scanner already reported them).
 priv struct Parser {
   tokens : ArrayView[@scanner.Token]
-  text_end : Int
+  text_end : @span.Offset
+  /// The array index of the next token; an index, so an `Int`.
   mut pos : Int
-  mut depth : Int
+  mut depth : Depth
   contexts : Array[Context]
   diagnostics : Array[@diagnostic.Diagnostic]
   /// Every doc comment in order, and the first one not yet taken.
@@ -3396,12 +3714,12 @@ fn Parser::new(stream : @scanner.TokenStream) -> Parser {
     gather(token.trivia_before)
     gather(token.trivia_after)
   }
-  let text_end = stream.to_source().length()
+  let text_end = @span.Offset::zero().advance(@span.Length::of_string(stream.to_source()))
   let p = {
     tokens: stream.tokens,
     text_end,
     pos: 0,
-    depth: 0,
+    depth: Depth::zero(),
     contexts: [],
     diagnostics: [],
     doc_comments,
@@ -3474,7 +3792,7 @@ fn Parser::adjacent(self : Parser) -> Bool {
   guard self.pos > 0 && self.pos < self.tokens.length() else { return false }
   let prev = self.tokens[self.pos - 1]
   let cur = self.tokens[self.pos]
-  prev.trivia_after.length() == 0 && cur.trivia_before.length() == 0 && prev.span.end == cur.span.start
+  prev.trivia_after.length() == 0 && cur.trivia_before.length() == 0 && prev.span.end() == cur.span.start
 }
 
 ///|
@@ -3483,7 +3801,7 @@ fn Parser::adjacent(self : Parser) -> Bool {
 fn Parser::here(self : Parser) -> @span.Span {
   match self.peek() {
     Some(t) => t.span
-    None => @span.Span::new(self.text_end, self.text_end)
+    None => self.text_end.to(self.text_end)
   }
 }
 
@@ -3525,27 +3843,31 @@ fn[T] Parser::fail(
   example? : String,
   labels? : Array[@diagnostic.Label],
 ) -> T raise ParseError {
-  let all_notes : Array[String] = []
-  let all_labels : Array[@diagnostic.Label] = labels.unwrap_or([])
-  if self.contexts.length() > 0 {
-    let c = self.contexts[self.contexts.length() - 1]
-    all_notes.push("I was parsing \{c.what} when I got stuck.")
-    all_labels.push({ span: c.span, text: "\{c.what} started here" })
+  let code = if self.peek() is None && code == "SM-PARSE-001" {
+    "SM-PARSE-002"
+  } else {
+    code
   }
-  all_notes.append(notes.unwrap_or([]))
-  let code = if self.peek() is None && code == "SM-PARSE-001" { "SM-PARSE-002" } else { code }
+  let base = @diagnostic.Diagnostic::new(
+    code~,
+    severity=Error,
+    title~,
+    message~,
+    span~,
+    labels?,
+    notes?,
+    hint?,
+    example?,
+  )
   raise ParseError(
-    @diagnostic.Diagnostic::new(
-      code~,
-      severity=Error,
-      title~,
-      message~,
-      span~,
-      labels=all_labels,
-      notes=all_notes,
-      hint?,
-      example?,
-    ),
+    match self.contexts.last() {
+      Some(c) =>
+        base.with_context(
+          { span: c.span, text: "\{c.what} started here" },
+          "I was parsing \{c.what} when I got stuck.",
+        )
+      None => base
+    },
   )
 }
 
@@ -3620,12 +3942,12 @@ fn Parser::expect_br(self : Parser) -> Unit raise ParseError {
 
 ///|
 fn Parser::enter(self : Parser) -> Unit raise ParseError {
-  self.depth += 1
+  self.depth = self.depth.deeper()
   if self.depth > max_nesting {
     self.fail(
       "SM-PARSE-010",
       "TOO MUCH NESTING",
-      "this is nested more than \{max_nesting} levels deep",
+      "this is nested more than \{max_nesting.0} levels deep",
       self.here(),
       hint="Flatten the value; nothing in Smithy needs nesting this deep.",
     )
@@ -3634,12 +3956,12 @@ fn Parser::enter(self : Parser) -> Unit raise ParseError {
 
 ///|
 fn Parser::leave(self : Parser) -> Unit {
-  self.depth -= 1
+  self.depth = self.depth.shallower()
 }
 
 ///|
 /// The pending doc comments that start before `offset`, in order.
-fn Parser::take_docs_before(self : Parser, offset : Int) -> Array[@ast.DocComment] {
+fn Parser::take_docs_before(self : Parser, offset : @span.Offset) -> Array[@ast.DocComment] {
   let out = []
   while self.doc_head < self.doc_comments.length() &&
         self.doc_comments[self.doc_head].span.start < offset {
@@ -3651,7 +3973,7 @@ fn Parser::take_docs_before(self : Parser, offset : Int) -> Array[@ast.DocCommen
 
 ///|
 /// Report every pending doc comment before `offset` as detached.
-fn Parser::detach_docs_before(self : Parser, offset : Int) -> Unit {
+fn Parser::detach_docs_before(self : Parser, offset : @span.Offset) -> Unit {
   for d in self.take_docs_before(offset) {
     self.report(
       "SM-PARSE-009",
@@ -3673,7 +3995,7 @@ fn Parser::detach_docs_before(self : Parser, offset : Int) -> Unit {
 fn Parser::parse_shape_id(self : Parser) -> @ast.Node[@ast.ShapeId] raise ParseError {
   let first = self.expect_identifier("a shape ID")
   let start = first.span.start
-  let mut end = first.span.end
+  let mut end = first.span.end()
   let parts = [first.value]
   let mut namespace : String? = None
   let mut name = first.value
@@ -3692,7 +4014,7 @@ fn Parser::parse_shape_id(self : Parser) -> @ast.Node[@ast.ShapeId] raise ParseE
     }
     let seg = self.expect_identifier("a namespace segment")
     parts.push(seg.value)
-    end = seg.span.end
+    end = seg.span.end()
   }
   if self.at_kind(Pound) && self.adjacent() {
     ignore(self.advance())
@@ -3708,13 +4030,13 @@ fn Parser::parse_shape_id(self : Parser) -> @ast.Node[@ast.ShapeId] raise ParseE
     let n = self.expect_identifier("a shape name")
     namespace = Some(parts.join("."))
     name = n.value
-    end = n.span.end
+    end = n.span.end()
   } else if saw_dot {
     self.fail(
       "SM-PARSE-005",
       "INVALID SHAPE ID",
       "`\{parts.join(".")}` looks like a namespace, but a shape ID needs `#` and a shape name after it",
-      @span.Span::new(start, end),
+      start.to(end),
       hint="Write `\{parts.join(".")}#Name`, or just `Name` for a shape in this namespace.",
     )
   }
@@ -3732,9 +4054,9 @@ fn Parser::parse_shape_id(self : Parser) -> @ast.Node[@ast.ShapeId] raise ParseE
     }
     let m = self.expect_identifier("a member name")
     member = Some(m.value)
-    end = m.span.end
+    end = m.span.end()
   }
-  @ast.Node::new({ namespace, name, member }, @span.Span::new(start, end))
+  @ast.Node::new({ namespace, name, member }, start.to(end))
 }
 ```
 
@@ -3786,7 +4108,7 @@ fn Parser::recover(self : Parser, from : Int, out : Array[@cst.StatementCst]) ->
   out.push(@cst.StatementCst::new(kind=Skipped, name=None, tokens=self.tokens[from:i]))
   if i > from {
     // Doc comments inside the skipped run belong to it.
-    let run_end = self.tokens[i - 1].span.end
+    let run_end = self.tokens[i - 1].span.end()
     while self.doc_head < self.doc_comments.length() &&
           self.doc_comments[self.doc_head].span.start < run_end {
       self.doc_head += 1
@@ -3794,7 +4116,7 @@ fn Parser::recover(self : Parser, from : Int, out : Array[@cst.StatementCst]) ->
   }
   self.pos = i
   self.skip_holes()
-  self.depth = 0
+  self.depth = Depth::zero()
   self.contexts.clear()
 }
 
@@ -3856,7 +4178,7 @@ fn Parser::parse_namespace(self : Parser) -> @ast.NamespaceStatement raise Parse
   self.push_context("a namespace statement", kw.span)
   let first = self.expect_identifier("a namespace like `com.example`")
   let parts = [first.value]
-  let mut end = first.span.end
+  let mut end = first.span.end()
   while self.at_kind(Dot) && self.adjacent() {
     ignore(self.advance())
     guard self.adjacent() && self.at_kind(Identifier) else {
@@ -3870,11 +4192,11 @@ fn Parser::parse_namespace(self : Parser) -> @ast.NamespaceStatement raise Parse
     }
     let seg = self.expect_identifier("a namespace segment")
     parts.push(seg.value)
-    end = seg.span.end
+    end = seg.span.end()
   }
   self.expect_br()
   self.pop_context()
-  let span = @span.Span::new(first.span.start, end)
+  let span = first.span.start.to(end)
   { namespace: @ast.Node::new(parts.join("."), span), span: kw.span.join(span) }
 }
 
@@ -3988,7 +4310,7 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
       }
     }
   }
-  p.detach_docs_before(p.text_end + 1)
+  p.detach_docs_before(p.text_end.next())
   let ast : @ast.IdlFile? = if read_anything {
     Some({
       control: control[:],
@@ -3996,15 +4318,29 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
       namespace,
       uses: uses[:],
       statements: statements[:],
-      span: @span.Span::new(0, p.text_end),
+      span: @span.Offset::zero().to(p.text_end),
     })
   } else {
     None
   }
-  let all = stream.diagnostics.to_array()
-  all.append(p.diagnostics)
-  all.sort_by(fn(a, b) { a.span.start.compare(b.span.start) })
-  { ast, cst: @cst.IdlCst::new(stream, cst_statements), version: p.version, diagnostics: all[:] }
+  {
+    ast,
+    cst: @cst.IdlCst::new(stream, cst_statements),
+    version: p.version,
+    diagnostics: order_diagnostics(stream.diagnostics, p.diagnostics[:])[:],
+  }
+}
+
+///|
+/// Every diagnostic by position: a pure function of both lists.
+fn order_diagnostics(
+  scanner : ArrayView[@diagnostic.Diagnostic],
+  parser : ArrayView[@diagnostic.Diagnostic],
+) -> Array[@diagnostic.Diagnostic] {
+  let all = scanner.to_array()
+  all.append(parser.to_array())
+  all.sort_by((a, b) => a.span.start.compare(b.span.start))
+  all
 }
 
 ///|
@@ -4043,14 +4379,15 @@ fn[T] Parser::expected_statement(self : Parser, section : Section, has_namespace
 }
 
 ///|
-/// Parse Smithy IDL source text.
+/// Parse Smithy IDL source text: a pipeline of the pure scanner and the
+/// parser.
 pub fn parse(source : @span.SourceText) -> ParseResult {
-  parse_tokens(@scanner.tokenize(source))
+  source |> @scanner.tokenize |> parse_tokens
 }
 
 ///|
 pub fn parse_text(text : String) -> ParseResult {
-  parse(@span.SourceText::new(text))
+  @span.SourceText::new(text) |> parse
 }
 ```
 
@@ -4849,7 +5186,7 @@ fn Parser::parse_trait(self : Parser) -> @ast.Trait raise ParseError {
   }
   let id = self.parse_shape_id()
   self.push_context("the trait `@\{id.value}`", at.span)
-  let mut end = id.span.end
+  let mut end = id.span.end()
   let body : @ast.TraitBody? = if self.at_kind(LParen) {
     ignore(self.advance())
     self.enter()
@@ -4863,13 +5200,13 @@ fn Parser::parse_trait(self : Parser) -> @ast.Trait raise ParseError {
     }
     let close = self.expect_kind(RParen, "`)` to close the trait body")
     self.leave()
-    end = close.span.end
+    end = close.span.end()
     Some(b)
   } else {
     None
   }
   self.pop_context()
-  { id, body, span: @span.Span::new(at.span.start, end) }
+  { id, body, span: at.span.start.to(end) }
 }
 
 ///|
@@ -4963,10 +5300,10 @@ fn Parser::parse_shape_name(self : Parser, keyword : String) -> @ast.Node[String
   if (self.at_kind(Dot) || self.at_kind(Pound) || self.at_kind(Dollar)) && self.adjacent() {
     // Read the rest of the ID to show it whole.
     let start = name.span.start
-    let mut end = name.span.end
+    let mut end = name.span.end()
     while (self.at_kind(Dot) || self.at_kind(Pound) || self.at_kind(Dollar) || self.at_kind(Identifier)) && self.adjacent() {
       match self.advance() {
-        Some(t) => end = t.span.end
+        Some(t) => end = t.span.end()
         None => ()
       }
     }
@@ -4978,7 +5315,7 @@ fn Parser::parse_shape_name(self : Parser, keyword : String) -> @ast.Node[String
       "SM-PARSE-005",
       "INVALID SHAPE NAME",
       "a shape name is a plain identifier, but `\{shown}` \{reason}",
-      @span.Span::new(start, end),
+      start.to(end),
       notes=["A shape is defined in the file's namespace, so its name carries no namespace, and members are declared inside the shape."],
       hint="Write `\{keyword} \{name.value}`.",
     )
@@ -4988,10 +5325,10 @@ fn Parser::parse_shape_name(self : Parser, keyword : String) -> @ast.Node[String
 
 ///|
 /// The source text between two offsets (from the tokens' lexemes).
-fn Parser::text_between(self : Parser, start : Int, end : Int) -> String {
+fn Parser::text_between(self : Parser, start : @span.Offset, end : @span.Offset) -> String {
   let sb = StringBuilder()
   for t in self.tokens {
-    if t.span.start >= start && t.span.end <= end {
+    if t.span.start >= start && t.span.end() <= end {
       sb.write_string(t.lexeme)
     }
   }
@@ -5108,8 +5445,8 @@ fn Parser::parse_member(self : Parser) -> @ast.Member raise ParseError {
     (n, Explicit(target))
   }
   let mut end = match target {
-    Explicit(t) => t.span.end
-    Elided => name.span.end
+    Explicit(t) => t.span.end()
+    Elided => name.span.end()
   }
   let default : @ast.NodeValue? = if self.at_kind(Equal) {
     ignore(self.advance())
@@ -5120,7 +5457,7 @@ fn Parser::parse_member(self : Parser) -> @ast.Member raise ParseError {
     None
   }
   let start = if traits.length() > 0 { traits[0].span.start } else { name.span.start }
-  { docs: docs[:], traits: traits[:], name, target, default, span: @span.Span::new(start, end) }
+  { docs: docs[:], traits: traits[:], name, target, default, span: start.to(end) }
 }
 
 ///|
@@ -5183,7 +5520,7 @@ fn Parser::parse_enum_member(self : Parser) -> @ast.EnumMember raise ParseError 
     )
   }
   let name = self.expect_identifier("an enum member name")
-  let mut end = name.span.end
+  let mut end = name.span.end()
   let value : @ast.NodeValue? = if self.at_kind(Equal) {
     ignore(self.advance())
     let v = self.parse_node_value()
@@ -5193,7 +5530,7 @@ fn Parser::parse_enum_member(self : Parser) -> @ast.EnumMember raise ParseError 
     None
   }
   let start = if traits.length() > 0 { traits[0].span.start } else { name.span.start }
-  { docs: docs[:], traits: traits[:], name, value, span: @span.Span::new(start, end) }
+  { docs: docs[:], traits: traits[:], name, value, span: start.to(end) }
 }
 
 ///|
@@ -5207,8 +5544,8 @@ fn Parser::parse_inline_shape(self : Parser, walrus : @scanner.Token) -> @ast.In
   self.push_context("an inline shape", walrus.span)
   let members = self.parse_members("the inline shape")
   self.pop_context()
-  let end = self.tokens[self.pos - 1].span.end
-  { docs: docs[:], traits: traits[:], for_resource, mixins, members: members[:], span: @span.Span::new(walrus.span.start, end) }
+  let end = self.tokens[self.pos - 1].span.end()
+  { docs: docs[:], traits: traits[:], for_resource, mixins, members: members[:], span: walrus.span.start.to(end) }
 }
 
 ///|
@@ -5247,8 +5584,8 @@ fn Parser::parse_operation_body(self : Parser, owner : String) -> Array[@ast.Ope
           ignore(self.expect_kind(Colon, "`:` or `:=` after `\{key.lexeme}`"))
           Reference(self.parse_shape_id())
         }
-        let end = self.tokens[self.pos - 1].span.end
-        let span = @span.Span::new(key.span.start, end)
+        let end = self.tokens[self.pos - 1].span.end()
+        let span = key.span.start.to(end)
         props.push(if key.lexeme == "input" { Input(target, span) } else { Output(target, span) })
       }
       "errors" => {
@@ -5292,7 +5629,7 @@ fn Parser::parse_shape(
   self : Parser,
   docs : Array[@ast.DocComment],
   traits : Array[@ast.Trait],
-  start : Int,
+  start : @span.Offset,
 ) -> @ast.ShapeStatement raise ParseError {
   guard self.peek() is Some(kw) && kw.kind == Identifier && @ast.ShapeKind::of(kw.lexeme) is Some(kind) else {
     if traits.length() > 0 || docs.length() > 0 {
@@ -5345,13 +5682,13 @@ fn Parser::parse_shape(
     }
   }
   self.pop_context()
-  let end = self.tokens[self.pos - 1].span.end
-  { docs: docs[:], traits: traits[:], shape, span: @span.Span::new(start, end) }
+  let end = self.tokens[self.pos - 1].span.end()
+  { docs: docs[:], traits: traits[:], shape, span: start.to(end) }
 }
 
 ///|
 /// `ApplyStatement = ApplyStatementSingular / ApplyStatementBlock`.
-fn Parser::parse_apply(self : Parser, start : Int) -> @ast.ApplyStatement raise ParseError {
+fn Parser::parse_apply(self : Parser, start : @span.Offset) -> @ast.ApplyStatement raise ParseError {
   let kw = self.expect_kind(Identifier, "`apply`")
   self.push_context("an apply statement", kw.span)
   let target = self.parse_shape_id()
@@ -5374,8 +5711,8 @@ fn Parser::parse_apply(self : Parser, start : Int) -> @ast.ApplyStatement raise 
     ([self.parse_trait()], false)
   }
   self.pop_context()
-  let end = self.tokens[self.pos - 1].span.end
-  { target, traits: traits[:], block, span: @span.Span::new(start, end) }
+  let end = self.tokens[self.pos - 1].span.end()
+  { target, traits: traits[:], block, span: start.to(end) }
 }
 
 ///|
@@ -5502,9 +5839,11 @@ test "the reference's error-recovery cases: resume at a doc comment, a dollar, a
 }
 ```
 
-`StatementKind` needs `Show` for the string interpolation above: add `derive(Show)` next to `derive(Eq, Debug)` on `StatementKind` and `@ast.ShapeKind`, `SimpleType`, `EnumType`, `AggregateType`, `EntityType` (Task 7 and Task 8 types); the expected strings above are the derived `Show` forms.
+The string interpolation above uses the hand-written `Show` impls of `@cst.StatementKind` (Task 8) and `@ast.ShapeKind` (Task 7).
 
 - [ ] **Step 2: Write the edit generator**
+
+Add `"moonrockz/smithy-syntax/span"` to the imports of `lawkit/moon.pkg`.
 
 `lawkit/edits.mbt`:
 
@@ -5516,7 +5855,7 @@ test "the reference's error-recovery cases: resume at a doc comment, a dollar, a
 /// most a few diagnostics come out of a single edit.
 pub(all) struct EditedModel {
   text : String
-  edit_offset : Int
+  edit_offset : @span.Offset
 } derive(Debug)
 
 ///|
@@ -5534,7 +5873,7 @@ pub impl @quickcheck.Arbitrary for EditedModel with fn arbitrary(_size, rs) {
     1 => m.unsafe_substring(start=0, end=at) + piece + m.unsafe_substring(start=at, end=m.length())
     _ => m.unsafe_substring(start=0, end=at) + piece + m.unsafe_substring(start=at + 1, end=m.length())
   }
-  { text, edit_offset: at }
+  { text, edit_offset: @span.Offset::new(at).unwrap_or(@span.Offset::zero()) }
 }
 
 ///|
@@ -5589,11 +5928,11 @@ test "law: every AST statement span lies inside the file span and statements are
     (t : @lawkit.SmithyText) => {
       let r = @parser.parse_text(t.text())
       guard r.ast is Some(f) else { return true }
-      let mut last = -1
+      let mut last = @span.Offset::zero()
       let mut ok = true
       for s in f.statements {
         let sp = s.span()
-        ok = ok && sp.start >= last && sp.end >= sp.start && sp.end <= f.span.end
+        ok = ok && sp.start >= last && sp.end() <= f.span.end()
         last = sp.start
       }
       ok
@@ -5611,7 +5950,7 @@ test "law: every diagnostic code is in the table and every span is inside the te
       let text = t.text()
       let r = @parser.parse_text(text)
       r.diagnostics.iter().all(d => @diagnostic.description(d.code) is Some(_) &&
-        d.span.start >= 0 && d.span.end <= text.length() && d.span.start <= d.span.end)
+        d.span.end().0 <= text.length())
     },
     count=400,
     max_size=16,
@@ -5881,9 +6220,9 @@ fn reflow(text : String, max : Int) -> Array[String] {
 ///|
 /// A label on one line of the excerpt.
 priv struct LineLabel {
-  line : Int
-  start_col : Int
-  end_col : Int
+  line : @span.Line
+  start_col : @span.Column
+  end_col : @span.Column
   text : String
   primary : Bool
 }
@@ -5891,12 +6230,10 @@ priv struct LineLabel {
 ///|
 fn label_for(source : @span.SourceText, span : @span.Span, text : String, primary : Bool) -> LineLabel {
   let start = source.position(span.start)
-  let line_span = source.line_span(start.line).unwrap_or(@span.Span::new(0, 0))
-  let end_offset = if span.end > line_span.end { line_span.end } else { span.end }
-  let mut end_col = end_offset - line_span.start + 1
-  if end_col <= start.column {
-    end_col = start.column + 1
-  }
+  let line_span = source.line_span(start.line).unwrap_or(@span.Offset::zero().to(@span.Offset::zero()))
+  let end_offset = if span.end() > line_span.end() { line_span.end() } else { span.end() }
+  let end_col = @span.Column::new(end_offset.0 - line_span.start.0 + 1).unwrap_or(@span.Column::first())
+  let end_col = if end_col <= start.column { start.column.next() } else { end_col }
   { line: start.line, start_col: start.column, end_col, text, primary }
 }
 
@@ -5905,7 +6242,7 @@ fn label_for(source : @span.SourceText, span : @span.Span, text : String, primar
 pub fn render_short(d : @diagnostic.Diagnostic, source : @span.SourceText) -> String {
   let p = source.position(d.span.start)
   let sev = if d.severity is Error { "error" } else { "warning" }
-  "\{source.name().unwrap_or("<input>")}:\{p.line}:\{p.column}: \{sev}[\{d.code}]: \{d.message}"
+  "\{source.name().unwrap_or("<input>")}:\{p.line.0}:\{p.column.0}: \{sev}[\{d.code}]: \{d.message}"
 }
 
 ///|
@@ -5929,44 +6266,44 @@ pub fn render_terminal(
     labels.push(label_for(source, l.span, l.text, false))
   }
   labels.sort_by(fn(a, b) { a.line.compare(b.line) })
-  let max_line = labels.iter().map(l => l.line).fold(init=1, (a, b) => if a > b { a } else { b })
+  let max_line = labels.iter().map(l => l.line.0).fold(init=1, (a, b) => if a > b { a } else { b })
   let gutter = max_line.to_string().length()
   let pad = " ".repeat(gutter)
   let p = source.position(d.span.start)
   out.border()
   out.write("\{pad} --> ")
   out.reset()
-  out.write("\{source.name().unwrap_or("<input>")}:\{p.line}:\{p.column}\n")
+  out.write("\{source.name().unwrap_or("<input>")}:\{p.line.0}:\{p.column.0}\n")
   out.border()
   out.write("\{pad}  |\n")
   out.reset()
-  let mut last_line = -1
+  let mut last_line : @span.Line? = None
   for l in labels {
-    if l.line != last_line {
-      if last_line >= 0 && l.line > last_line + 1 {
+    if last_line != Some(l.line) {
+      if last_line is Some(prev) && l.line.0 > prev.0 + 1 {
         out.border()
         out.write("\{pad} ...\n")
         out.reset()
       }
-      let number = l.line.to_string()
+      let number = l.line.0.to_string()
       let num_pad = " ".repeat(gutter - number.length())
       out.border()
       out.write("\{num_pad}\{number} | ")
       out.reset()
       out.write(source.line_text(l.line).unwrap_or(""))
       out.write("\n")
-      last_line = l.line
+      last_line = Some(l.line)
     }
     out.border()
     out.write("\{pad}  | ")
     out.reset()
-    out.write(" ".repeat(l.start_col - 1))
+    out.write(" ".repeat(l.start_col.0 - 1))
     if l.primary {
       out.primary()
     } else {
       out.secondary()
     }
-    out.write((if l.primary { "^" } else { "-" }).repeat(l.end_col - l.start_col))
+    out.write((if l.primary { "^" } else { "-" }).repeat(l.end_col.0 - l.start_col.0))
     out.write(" \{l.text}")
     out.reset()
     out.write("\n")
@@ -6165,7 +6502,7 @@ pub fn version() -> String {
 
 ///|
 /// Spans (UTF-16 unit offsets), positions and source text.
-pub using @span {type Span, type Position, type SourceText}
+pub using @span {type Span, type Offset, type Length, type Line, type Column, type Position, type SourceText}
 
 ///|
 /// Diagnostics: severity, labels and the problem record.
@@ -6693,7 +7030,7 @@ test "every invalid case produces an error on the reference's line" {
     // Semantic cases (line 0) only need some error; syntax cases must match the line.
     if line > 0 {
       let p = source.position(errs[0].span.start)
-      if p.line != line {
+      if p.line.0 != line {
         failures.push("\{c.path}: expected line \{line} (\{message}) but got \{@syntax.render_short(errs[0], source)}")
       }
     }
@@ -6788,8 +7125,11 @@ Open a pull request from this branch to `main` with the beads epic ID in the des
 
 ---
 
+
 ## Self-review notes
 
 - Spec coverage: module and packages (Tasks 1, 14), positions (2), scanner (4, 5, 6), AST (7), CST (8), parser and recovery (9, 10, 11, 12), diagnostics (3, 11), report (13), testing and corpus (6, 12, 15), documentation (14, 16), out of scope untouched.
+- Functional style: the scanner is `scan_at` (pure) unfolded by `scan_pieces` and grouped by `attach_trivia`, composed with `|>` in `tokenize`; diagnostics travel inside `Step` values. The parser's only mutable state is the private `Parser` cursor inside one `parse` call; `order_diagnostics` and the CST grouping are pure functions of their inputs; `parse` and `parse_text` are pipelines.
+- Typed units: `Offset`, `Length`, `Line`, `Column` (Task 2) and `Depth` (Task 9) replace raw ints for positions, counts and nesting; `Span` is start plus length so its end never precedes its start. Raw `Int` remains only for array indexes (`pos`, `doc_head`, loop counters) and display widths.
 - Review Focus coverage: CRLF (Task 4 test "CRLF is one newline trivia", Task 9 test "two statements on one line"), text blocks (Task 5 decode tests), adjacent shape IDs (Task 11 "spaces inside a shape id" and "a shape name must be an identifier"), deep nesting on wasm (Task 10 "150 nested arrays"), recovery keeps the next statement (Task 12 recovery tests).
-- Type names used across tasks: `Span`, `Position`, `SourceText`, `Diagnostic`, `Label`, `TokenKind`, `Trivia`, `Token`, `TokenStream`, `Node`, `ShapeId`, `DocComment`, `NodeValue`, `NodeKvp`, `NumberLiteral`, `NumberValue`, `Shape`, `ShapeKind`, `Member`, `MemberTarget`, `EnumMember`, `InlineShape`, `OperationTarget`, `OperationProperty`, `Trait`, `TraitBody`, `Mixins`, `IdlFile`, `Statement`, `ShapeStatement`, `ApplyStatement`, `StatementCst`, `StatementKind`, `IdlCst`, `ParseResult`, `ParseError`, `Version`. Task 12 adds `derive(Show)` to the kind enums; Task 7 and 8 code may carry it from the start.
+- Type names used across tasks: `Offset`, `Length`, `Line`, `Column`, `Span`, `Position`, `SourceText`, `Diagnostic`, `Label`, `TokenKind`, `Trivia`, `Token`, `TokenStream`, `Piece`, `Step`, `Node`, `ShapeId`, `DocComment`, `NodeValue`, `NodeKvp`, `NumberLiteral`, `NumberValue`, `Shape`, `ShapeKind`, `Member`, `MemberTarget`, `EnumMember`, `InlineShape`, `OperationTarget`, `OperationProperty`, `Trait`, `TraitBody`, `Mixins`, `IdlFile`, `Statement`, `ShapeStatement`, `ApplyStatement`, `StatementCst`, `StatementKind`, `IdlCst`, `ParseResult`, `ParseError`, `Version`, `Depth`. `Show` is hand-written for `ShapeKind` (Task 7), `StatementKind` (Task 8) and `ShapeId` (Task 7); `derive(Show)` is not used.
