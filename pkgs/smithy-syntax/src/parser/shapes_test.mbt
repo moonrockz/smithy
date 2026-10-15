@@ -408,14 +408,39 @@ test "an unindented structure member and trait are not an unfinished block (find
 
 ///|
 test "operation properties accept a comma separator (finding 4 regression)" {
-  let ss = shapes(
+  let r = model(
     (
       #|operation O { input: A, output: B }
       #|
     ),
   )
-  guard ss[0].shape is Operation(properties~, ..) else {
+  inspect(r.errors().length(), content="0")
+  guard r.ast is Some(f) && f.shapes()[0].shape is Operation(properties~, ..) else {
     fail("not an operation")
   }
   inspect(properties.length(), content="2")
+}
+
+///|
+test "recovery keeps the next member's first token when nothing was consumed (finding 2 follow-up)" {
+  let r = model(
+    (
+      #|structure S {
+      #|  a:
+      #|  @required
+      #|  b: String
+      #|}
+      #|
+    ),
+  )
+  inspect(r.errors().length(), content="1")
+  guard r.ast is Some(f) && f.shapes()[0].shape is Aggregate(members~, ..) else {
+    fail("not a structure")
+  }
+  @expect.expect_all(e => {
+    e.expect(members.length()).to_equal(1)
+    e.expect(members[0].name.value).to_equal("b")
+    e.expect(members[0].traits.length()).to_equal(1)
+    e.expect(members[0].traits[0].id.value.name).to_equal("required")
+  })
 }

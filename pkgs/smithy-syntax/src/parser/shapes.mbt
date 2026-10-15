@@ -174,17 +174,24 @@ fn Parser::check_unfinished(
 
 ///|
 /// Skip to the next member start or the closing brace after an error in a
-/// member, so one bad member does not drop the shape. Always advances at
-/// least one token first, so a member that failed without consuming
-/// anything can never make this loop spin forever on the same token.
-/// Returns `true` when it stops at `}` or at any first-on-line member
-/// start (`@`, `$`, or an identifier), so the caller may record the
-/// diagnostic and keep going; `false` when it instead reaches a
-/// block-breaking statement (`at_block_breaking_statement`) or the end of
-/// the file, so the caller must re-raise the original error instead of
-/// reporting a second one.
-fn Parser::recover_member(self : Parser) -> Bool {
-  if !self.at_end() && !self.at_kind(RBrace) {
+/// member, so one bad member does not drop the shape. `start_pos` is
+/// `self.pos` from before the failed item was attempted: when the item
+/// consumed nothing at all (`self.pos` is still `start_pos`), the current
+/// token is itself the thing that failed to parse, so it is always
+/// advanced past before looking for a stop point — otherwise, if that
+/// token already satisfies a stop condition (an indented `$member`, say),
+/// this would return without moving and the caller would retry the same
+/// token forever. When the item consumed something before failing,
+/// `self.pos` is left exactly where it should resume (often the very next
+/// member's first token, e.g. after `a:` fails to find a target and the
+/// next token is `@required`), so nothing is skipped. Returns `true` when
+/// it stops at `}` or at any first-on-line member start (`@`, `$`, or an
+/// identifier), so the caller may record the diagnostic and keep going;
+/// `false` when it instead reaches a block-breaking statement
+/// (`at_block_breaking_statement`) or the end of the file, so the caller
+/// must re-raise the original error instead of reporting a second one.
+fn Parser::recover_member(self : Parser, start_pos : Int32) -> Bool {
+  if self.pos == start_pos && !self.at_end() && !self.at_kind(RBrace) {
     ignore(self.advance())
   }
   while !self.at_end() && !self.at_kind(RBrace) {
@@ -241,6 +248,7 @@ fn[T] Parser::parse_block_items(
   let items : Array[T] = []
   while !self.at_kind(RBrace) {
     self.check_unfinished(title, "the members of \{owner}")
+    let start_pos = self.pos
     let ctx_len = self.contexts.length()
     let depth0 = self.depth
     match parse_item() {
@@ -255,7 +263,7 @@ fn[T] Parser::parse_block_items(
           ignore(self.contexts.pop())
         }
         self.depth = depth0
-        if self.recover_member() {
+        if self.recover_member(start_pos) {
           self.diagnostics.push(e.diagnostic())
         } else {
           raise e
