@@ -17,7 +17,7 @@
 - Functional style: public functions are pure (a value in, a value out, no hidden state). Mutation is allowed only for local accumulators and the parser's private cursor inside one `parse` call. Diagnostics are returned as values, never pushed into shared state across functions. Linear multi-stage flows are written as `|>` pipelines.
 - Text output goes through core's `Logger` trait (`&Logger`), the sink that `StringBuilder`, `@buffer.Buffer` and `Show::output` share; a renderer never holds a concrete `StringBuilder` in its API. The async `@io.Writer` of `moonbitlang/async` is byte-oriented and belongs to the CLI boundary (sub-project 5), which writes rendered strings to it.
 - Every value type with an invariant (`Offset`, `Length`, `Line`, `Column`, `Span`, `Depth`) has quickcheck laws beside its unit tests, in a `*_law_test.mbt` file.
-- Three test layers: unit and law tests inside `pkgs/smithy-syntax` (every target), the corpus parity tests in `harness/corpus`, and acceptance features in Gherkin (`tests/features/*.feature`) run by `moonrockz/moonspec@0.11.0` from `harness/bdd`. The harness module depends on `moonbitlang/async`, which supports js and native, so `mise run test` runs the harness on those two targets only; the library runs on all four.
+- Three test layers: unit and law tests inside `pkgs/smithy-syntax` (every target), the corpus parity tests in `tests/corpus`, and acceptance features in Gherkin (`tests/features/*.feature`) run by `moonrockz/moonspec@0.11.0` from `tests/bdd`. The tests module depends on `moonbitlang/async`, which supports js and native, so `mise run test` runs the tests module on those two targets only; the library runs on all four.
 - LF and CRLF are line breaks; a lone CR is not.
 - Every AST node has `span`; every list field is `ArrayView[T]`; every public type derives `Eq, Debug`. `derive(Show)` is deprecated on this toolchain: write `impl Show` by hand where a type needs it.
 - Diagnostic codes are `SM-SCAN-001`..`SM-SCAN-007` and `SM-PARSE-001`..`SM-PARSE-011`, exactly as listed in Task 3; a test checks the table against what is emitted.
@@ -7715,18 +7715,18 @@ git commit -m "docs(syntax): add the root facade, the cookbook and the package R
 
 ---
 
-### Task 15: Vendor the reference corpus and the parity harness
+### Task 15: Vendor the reference corpus and the parity tests
 
 **Files:**
 - Create: `scripts/vendor-corpus.mbtx`
 - Modify: `.config/mise/config.toml` (task `corpus:vendor`)
-- Create: `harness/moon.mod`, `harness/README.md`, `harness/NOTICE` (the harness module; Task 16 adds its `bdd` package)
-- Create: `harness/corpus/moon.pkg`, `harness/corpus/types.mbt`
-- Create: `harness/corpus/cases/...` (vendored `.smithy` files)
-- Create: `harness/corpus/cases.mbt` (generated)
-- Create: `harness/corpus/corpus_test.mbt`
-- Modify: `moon.work` (add `./harness`)
-- Modify: `scripts/test.mbtx` (the harness runs on js and native only; see Step 2)
+- Create: `tests/moon.mod`, `tests/README.md`, `tests/NOTICE` (the tests module; Task 16 adds its `bdd` package)
+- Create: `tests/corpus/moon.pkg`, `tests/corpus/types.mbt`
+- Create: `tests/corpus/cases/...` (vendored `.smithy` files)
+- Create: `tests/corpus/cases.mbt` (generated)
+- Create: `tests/corpus/corpus_test.mbt`
+- Modify: `moon.work` (add `./tests`)
+- Modify: `scripts/test.mbtx` (the tests module runs on js and native only; see Step 2)
 
 Beads: this is task `smithy-2qe.1.3`; claim it, and record skipped cases in its notes.
 
@@ -7740,7 +7740,7 @@ Beads: this is task `smithy-2qe.1.3`; claim it, and record skipped cases in its 
 ```moonbit
 ///|
 /// Vendor the IDL cases of the Java reference's loader tests into
-/// `harness/corpus/cases/` and generate `harness/corpus/cases.mbt`, so the
+/// `tests/corpus/cases/` and generate `tests/corpus/cases.mbt`, so the
 /// parity tests need no network and no file system on any target.
 ///
 /// Usage: `mise run corpus:vendor [-- <git ref>]` (default `main`). Needs `curl`.
@@ -7857,7 +7857,7 @@ async fn main {
     for path in list_smithy(ref_, "\{base}/\{dir}") {
       let text = fetch("https://raw.githubusercontent.com/smithy-lang/smithy/\{sha}/\{path}")
       let rel = path.substring(start=base.length() + 1)
-      let local = "harness/corpus/cases/\{rel}"
+      let local = "tests/corpus/cases/\{rel}"
       let parent = local.substring(start=0, end=local.rev_find("/").unwrap_or(0))
       @fs.create_dir(parent, recursive=true)
       @fs.write_file(local, text)
@@ -7895,8 +7895,8 @@ async fn main {
       #|
     ),
   )
-  @fs.write_file("harness/corpus/cases.mbt", gen.to_string())
-  @fs.write_file("harness/corpus/CORPUS_SHA", sha + "\n")
+  @fs.write_file("tests/corpus/cases.mbt", gen.to_string())
+  @fs.write_file("tests/corpus/CORPUS_SHA", sha + "\n")
   println("✅ Vendored \{count} cases")
 }
 
@@ -7927,20 +7927,20 @@ Add `"moonbitlang/core/strconv"` to the script's imports. In `.config/mise/confi
 
 ```toml
 [tasks."corpus:vendor"]
-description = "Vendor the Java reference's loader test corpus into harness/corpus (args: git ref)"
+description = "Vendor the Java reference's loader test corpus into tests/corpus (args: git ref)"
 run = "moonx scripts/vendor-corpus.mbtx"
 ```
 
-- [ ] **Step 2: Create the harness module and run the vendoring**
+- [ ] **Step 2: Create the tests module and run the vendoring**
 
-`harness/moon.mod`:
+`tests/moon.mod`:
 
 ```toml
-name = "moonrockz/smithy_harness"
+name = "moonrockz/smithy_tests"
 
 version = "0.1.0"
 
-description = "Test harness for moonrockz/smithy-syntax: reference corpus parity and moonspec acceptance features; not published"
+description = "Test module for moonrockz/smithy-syntax: reference corpus parity and moonspec acceptance features; not published"
 
 repository = "https://github.com/moonrockz/smithy"
 
@@ -7959,22 +7959,22 @@ import {
 }
 ```
 
-`harness/corpus/moon.pkg`:
+`tests/corpus/moon.pkg`:
 
 ```
 import {
 }
 
 import {
-  "moonrockz/smithy_harness/corpus" @corpus,
+  "moonrockz/smithy_tests/corpus" @corpus,
   "moonrockz/smithy-syntax" @syntax,
   "moonrockz/expect",
 } for "test"
 ```
 
-In `scripts/test.mbtx`, run the harness only where `moonbitlang/async` builds. Replace the single `moon test --target <t>` call per target with: for every target, `moon test pkgs/smithy pkgs/smithy-syntax apps/smithy docs/cookbook --target <t>` (one call per path if `moon test` takes a single path on this toolchain), and for `js` and `native` also `moon test harness --target <t>`. Keep the exit-code handling. Update the script's doc comment and the README task table line for `test` to say the harness runs on js and native.
+In `scripts/test.mbtx`, run the tests module only where `moonbitlang/async` builds. Replace the single `moon test --target <t>` call per target with: for every target, `moon test pkgs/smithy pkgs/smithy-syntax apps/smithy docs/cookbook --target <t>` (one call per path if `moon test` takes a single path on this toolchain), and for `js` and `native` also `moon test tests --target <t>`. Keep the exit-code handling. Update the script's doc comment and the README task table line for `test` to say the tests module runs on js and native.
 
-`harness/corpus/types.mbt`:
+`tests/corpus/types.mbt`:
 
 ```moonbit
 ///|
@@ -7992,18 +7992,18 @@ pub(all) struct Case {
 } derive(Debug)
 ```
 
-`harness/NOTICE`: copy the `NOTICE` file from the smithy-lang/smithy repository root verbatim, with a first line "The files under corpus/cases/ are copied from https://github.com/smithy-lang/smithy (Apache-2.0)."
+`tests/NOTICE`: copy the `NOTICE` file from the smithy-lang/smithy repository root verbatim, with a first line "The files under corpus/cases/ are copied from https://github.com/smithy-lang/smithy (Apache-2.0)."
 
-`harness/README.md`: three lines naming the two packages (`corpus`: parity over the vendored reference corpus; `bdd`: moonspec acceptance features from `tests/features`) and that the module is not published.
+`tests/README.md`: three lines naming the two packages (`corpus`: parity over the vendored reference corpus; `bdd`: moonspec acceptance features from `tests/features`) and that the module is not published.
 
-Add `"./harness"` to `moon.work`.
+Add `"./tests"` to `moon.work`.
 
 Run: `mise run corpus:vendor`
-Expected: `✅ Vendored N cases` with N around 150, `harness/corpus/cases.mbt` and `harness/corpus/CORPUS_SHA` written. Then `moon check` must be clean; if a vendored text contains a sequence the `#|` literal cannot hold, the generator must switch that case to a regular escaped literal (`@json.stringify(String(text))`).
+Expected: `✅ Vendored N cases` with N around 150, `tests/corpus/cases.mbt` and `tests/corpus/CORPUS_SHA` written. Then `moon check` must be clean; if a vendored text contains a sequence the `#|` literal cannot hold, the generator must switch that case to a regular escaped literal (`@json.stringify(String(text))`).
 
 - [ ] **Step 3: Write the parity tests**
 
-`harness/corpus/corpus_test.mbt`:
+`tests/corpus/corpus_test.mbt`:
 
 ```moonbit
 ///|
@@ -8083,13 +8083,13 @@ Many `invalid/` cases are semantic (duplicate shapes, bad trait values) and the 
 
 - [ ] **Step 4: Run, fix, record**
 
-Run: `moon test harness --target js` then `mise run test`
+Run: `moon test tests --target js` then `mise run test`
 Expected: green. Each failure is either a parser bug (fix it in `pkgs/smithy-syntax`, with a unit test that pins it) or a case outside sub-project 1's scope (add to `skipped` with the reason). Then:
 
 ```bash
 bd update smithy-2qe.1.3 --append-notes "Vendored <N> cases at <sha>. Skipped: <list with reasons>."
 mise run format
-git add scripts/vendor-corpus.mbtx scripts/test.mbtx .config/mise/config.toml moon.work README.md harness
+git add scripts/vendor-corpus.mbtx scripts/test.mbtx .config/mise/config.toml moon.work README.md tests
 git commit -m "test(syntax): vendor the reference loader corpus and check parity"
 bd close smithy-2qe.1.3 --reason "Corpus vendored and parity tests green"
 ```
@@ -8102,8 +8102,8 @@ bd close smithy-2qe.1.3 --reason "Corpus vendored and parity tests green"
 - Create: `tests/features/parsing.feature`
 - Create: `tests/features/diagnostics.feature`
 - Create: `tests/features/recovery.feature`
-- Create: `harness/bdd/moon.pkg`
-- Create: `harness/bdd/syntax_world_wbtest.mbt`
+- Create: `tests/bdd/moon.pkg`
+- Create: `tests/bdd/syntax_world_wbtest.mbt`
 - Modify: `.config/mise/config.toml` (task `test:bdd`)
 - Modify: `README.md` (task table)
 
@@ -8326,7 +8326,7 @@ Feature: Recovery per statement
 
 - [ ] **Step 2: Write the world**
 
-`harness/bdd/moon.pkg`:
+`tests/bdd/moon.pkg`:
 
 ```
 import {
@@ -8337,7 +8337,7 @@ import {
 } for "wbtest"
 ```
 
-`harness/bdd/syntax_world_wbtest.mbt`:
+`tests/bdd/syntax_world_wbtest.mbt`:
 
 ```moonbit
 ///|
@@ -8493,7 +8493,7 @@ impl @moonspec.World for SyntaxWorld with fn configure(self, setup) {
 async test "parsing feature" {
   @moonspec.run_or_fail(
     SyntaxWorld::new,
-    @moonspec.RunOptions::new([@moonspec.FeatureSource::File("../tests/features/parsing.feature")]),
+    @moonspec.RunOptions::new([@moonspec.FeatureSource::File("../features/parsing.feature")]),
   )
   |> ignore
 }
@@ -8502,7 +8502,7 @@ async test "parsing feature" {
 async test "diagnostics feature" {
   @moonspec.run_or_fail(
     SyntaxWorld::new,
-    @moonspec.RunOptions::new([@moonspec.FeatureSource::File("../tests/features/diagnostics.feature")]),
+    @moonspec.RunOptions::new([@moonspec.FeatureSource::File("../features/diagnostics.feature")]),
   )
   |> ignore
 }
@@ -8511,7 +8511,7 @@ async test "diagnostics feature" {
 async test "recovery feature" {
   @moonspec.run_or_fail(
     SyntaxWorld::new,
-    @moonspec.RunOptions::new([@moonspec.FeatureSource::File("../tests/features/recovery.feature")]),
+    @moonspec.RunOptions::new([@moonspec.FeatureSource::File("../features/recovery.feature")]),
   )
   |> ignore
 }
@@ -8525,8 +8525,8 @@ In `.config/mise/config.toml`:
 
 ```toml
 [tasks."test:bdd"]
-description = "Run the moonspec acceptance features (harness/bdd, js target)"
-run = "moon test harness/bdd --target js"
+description = "Run the moonspec acceptance features (tests/bdd, js target)"
+run = "moon test tests/bdd --target js"
 ```
 
 Add the row to the README task table. Run: `mise run test:bdd` then `mise run test`.
@@ -8536,7 +8536,7 @@ Expected: every scenario passes. A scenario that fails on wording is a real diff
 
 ```bash
 mise run format
-git add tests/features harness/bdd .config/mise/config.toml README.md
+git add tests/features tests/bdd .config/mise/config.toml README.md
 git commit -m "test(syntax): add moonspec acceptance features for parsing, diagnostics and recovery"
 ```
 
@@ -8547,7 +8547,7 @@ git commit -m "test(syntax): add moonspec acceptance features for parsing, diagn
 **Files:**
 - Modify: `AGENTS.md` (an "Architecture" note for `pkgs/smithy-syntax` and the diagnostics table pointer)
 - Modify: `README.md` (status)
-- Modify: `.github/workflows/ci.yml` only if a new mise task must run in CI (none expected: `mise run test` runs the library on every target, and the harness and cookbook on js and native)
+- Modify: `.github/workflows/ci.yml` only if a new mise task must run in CI (none expected: `mise run test` runs the library on every target, and the tests module and cookbook on js and native)
 
 - [ ] **Step 1: Document the module for agents**
 
@@ -8565,10 +8565,10 @@ the API changes. Rules that tests enforce:
   first person and name the construct and the token found.
 - The parser never panics and never raises out of `parse`; laws in
   `*_law_test.mbt` check this with quickcheck.
-- `harness/corpus` holds the vendored reference corpus; refresh it with
+- `tests/corpus` holds the vendored reference corpus; refresh it with
   `mise run corpus:vendor`, and record skipped cases on the beads task.
 - `tests/features/*.feature` are the acceptance contract, run by moonspec from
-  `harness/bdd` (`mise run test:bdd`). Change the scenario when you change the
+  `tests/bdd` (`mise run test:bdd`). Change the scenario when you change the
   behavior.
 ```
 
