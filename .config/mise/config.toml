@@ -89,11 +89,15 @@ run = "moonx scripts/lint-yaml.mbtx"
 
 [tasks.validate]
 description = "Run all validation checks"
-depends = ["validate:packages"]
+depends = ["validate:packages", "validate:versions"]
 
 [tasks."validate:packages"]
 description = "Verify the workspace package structure against moon.work"
 run = "moonx scripts/validate-packages.mbtx"
+
+[tasks."validate:versions"]
+description = "Verify that every module and version string has the version of the root moon.mod"
+run = "moonx scripts/versions.mbtx check"
 
 [tasks."build:release"]
 description = "Build the release outputs (native binaries for 5 targets, 2 wasm files) and pack them into dist/"
