@@ -185,3 +185,44 @@ build-zigcc-host.log and build-zigcc-host2.log (host-target zig cc, showing the 
 failure then the fix), build-win-x64.log, build-linux-x64.log, build-macos-arm64.log,
 build-macos-x64.log (the four cross targets on the toy module), build-smithy-macos-arm64.log,
 build-smithy-winx64.log (the real apps/smithy copy).
+
+## Outcome (2026-10-16)
+
+The release work (beads smithy-2qe.7) used the zig approach in real use. The tool is the module
+`apps/zig-cross` (`moonrockz/zig-cross`). The build machine for this check was macOS arm64, with moon 0.1.20261012,
+MoonBit 0.10.15+943464bfa and zig 0.17.0.
+
+### New finding: host-only simdutf and libbacktrace objects
+
+The spike said the prebuilt objects were not used by `--release` builds and marked the SIMD path as untested.
+That is no longer true. Moon now always compiles the runtime with `-DMOONBIT_USE_SIMDUTF`. It archives the
+prebuilt host objects `lib/moonbit_simdutf.o` and `lib/simdutf.o` into the runtime library. On Apple targets it
+also links the prebuilt host `lib/libbacktrace.a`. For any other architecture, these objects cause
+`undefined symbol: moonbit_simdutf_*` or `invalid cpu architecture`.
+
+The fix is in the wrappers of `zig-cross`. For each named target, the cc wrapper drops `-DMOONBIT_USE_SIMDUTF` and
+each argument that ends in `/moonbit_simdutf.o`, `/simdutf.o` or `/libbacktrace.a`. The ar wrapper drops the two
+simdutf objects. The runtime then uses its scalar UTF code path. The `host` wrapper drops nothing, because the
+debug test builds need libbacktrace. Every wrapper still adds `-D_CRT_RAND_S` (the `rand_s` finding above).
+
+### What the work confirmed
+
+- **All 5 targets build** from one machine: linux-x64, linux-arm64, darwin-arm64, darwin-x64 and windows-x64.
+  linux-arm64 was untested in the spike. `zig-cross` checks the header of each binary (ELF, Mach-O, PE and the
+  machine field), and a wrong architecture fails the build.
+- **musl works.** The Linux targets use `x86_64-linux-musl` and `aarch64-linux-musl`. Both build and link with
+  `moonbitlang/async`. The gnu fallback was not needed. The Linux binaries are static.
+- **Native tests under zig.** `moon test --target native` with the `host` wrapper (`mise run test:native-zig`)
+  passed 299 of 299 tests.
+- **The binaries run.** On macOS arm64, `smithy version` from the darwin-arm64 binary and from the darwin-x64
+  binary (under Rosetta) prints `smithy 0.1.0 (Smithy 2.0)`. The linux and windows binaries have the right
+  headers. They were not run on this machine, because the Docker daemon was not running. The `smoke` job of the
+  Release workflow runs each binary on a runner of its own OS (linux-x64, linux-arm64, darwin-arm64, darwin-x64,
+  windows-x64). Its first result comes from the first Release run.
+
+### Still open
+
+- **TLS and macOS frameworks.** No smithy code uses the network, so nothing needed CoreFoundation, Security or
+  another framework. This stays untested. Beads has a follow-up issue.
+- **The upstream bugs.** The `rand_s` ordering and the host-only objects are workarounds in the wrappers. A draft
+  report exists; it is not filed. Beads has a follow-up issue to remove the workarounds after the fix.

@@ -83,6 +83,49 @@ enforce:
 - With the same `Control` decisions, every style gives the same enter and leave order; laws in
   `src/traversal/*_law_test.mbt` check this.
 
+## Release process
+
+Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every release in `CHANGELOG.md`.
+
+- The release-manager skill (`.claude/skills/release-manager/`) walks an agent through a release, the
+  troubleshooting (`TROUBLESHOOTING.md`) and the improvement of the process. Agents other than Claude Code can read
+  its `SKILL.md`.
+- `mise run release:status` checks that main, the tags, the GitHub release and mooncakes.io agree. Each problem it
+  prints names the command that fixes it.
+- All modules share one version. The root `moon.mod` is the source of truth. `mise run validate:versions` (part of
+  `validate`) fails when a module, a sibling import or a `version()` string has another version.
+  `moonx scripts/versions.mbtx set X.Y.Z` rewrites them. The first release is `0.0.1`.
+- To release, run `mise run release:prepare [X.Y.Z]` on a clean working tree. It computes the next version with
+  git-cliff (`cliff.toml`), sets the version everywhere, prepends the section to `CHANGELOG.md`, commits
+  `chore(release): vX.Y.Z` on `release/vX.Y.Z`, pushes it and opens a draft pull request. `--local` stops before
+  the push.
+- Replace the highlights comment in `CHANGELOG.md` with a few sentences. Push, then run `mise run release:refresh`.
+  It writes the notes into the pull request body and marks the pull request ready. Then merge. Do not bump the
+  version in another pull request.
+- The merge changes `moon.mod` on main, so the Release workflow (`.github/workflows/release.yml`) runs. The jobs are:
+  - `plan` (`mise run release:plan`) releases when `vX.Y.Z` has no GitHub release and `CHANGELOG.md` has the
+    section with its highlights. It fails when the section is missing or has the placeholder.
+  - `validate` runs `mise run check`, `mise run test:scripts` and the version check.
+  - `build` (`mise run build:release`) cross-builds five native binaries with zig on one Ubuntu runner, builds
+    `smithy.wasm` and `smithy-gc.wasm`, and packs `dist/` (`mise run release:assets`).
+  - `smoke` runs `smithy version` from each archive on a runner of its own OS.
+  - `publish` (`release:credentials`, `release:publish`) publishes the modules in `scripts/publish.mbtx`:
+    `pkgs/smithy-syntax` and `apps/zig-cross`. It needs the `MOONCAKES_USER_TOKEN` org secret. It runs after
+    `smoke`, because a mooncakes.io version is permanent.
+  - `release` (`release:notes`, `release:github`) creates the tag and the GitHub release with the 8 assets.
+- A pull request that changes a release file, and a manual run with `dry_run`, run `plan`, `validate`, `build` and
+  `smoke` only. They never publish and never create a release.
+- **Re-run failed jobs.** After a transient failure, use "Re-run failed jobs" on the run (or
+  `gh run rerun <run-id> --failed`). GitHub runs the failed job again, and the jobs after it. The jobs that passed
+  keep their outputs and the `dist` artifact (30 days), so the retry ships the bytes that `smoke` checked.
+  `publish` skips a version that is already published, and `release` uploads only the missing assets, so a retry
+  after a partial run continues where it stopped. Network calls also retry 3 times (waits of 5, 20 and 60 s), but
+  not after a 401, 403 or 409. For any other failure, run `mise run release:status` first.
+- The zig cross-build is the module `apps/zig-cross` (`moonrockz/zig-cross`). The wrappers add `-D_CRT_RAND_S` and,
+  for each named target, drop the host-only simdutf and libbacktrace objects. See `apps/zig-cross/README.md`.
+  `mise run build:cross` builds some targets, and `mise run test:native-zig` runs the native tests with zig.
+- Write commit and pull request titles for the changelog: the squash-merge title is the changelog line.
+
 ## Work tracking
 
 Issues live in [beads](https://github.com/steveyegge/beads) (`bd`), in a Dolt database that syncs through

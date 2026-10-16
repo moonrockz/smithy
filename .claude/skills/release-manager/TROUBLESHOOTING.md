@@ -1,0 +1,140 @@
+# Release troubleshooting
+
+Each entry has the symptom (the text you see), the cause and the fix. Start with `mise run release:status`.
+
+A transient failure in `publish` or `release` needs no change. Use "Re-run failed jobs" on the run
+(or `gh run rerun <run-id> --failed`). GitHub runs again the failed job and the jobs after it. The jobs that
+passed keep their outputs and the `dist` artifact, so the retry ships the bytes that `smoke` checked. `publish`
+skips a version that mooncakes.io already has. `release` creates the GitHub release only if it does not exist,
+and uploads only the missing assets. Do not use "Re-run all jobs": it builds again.
+
+Add an entry for every new failure. Keep the newest entries at the end of their section.
+
+## release:prepare
+
+**`the working tree has changes; commit them or set them aside first`**
+Cause: `prepare` switches to `origin/main` and needs a clean tree.
+Fix: commit the work on its branch, or set it aside with a WIP commit.
+
+**`git-cliff could not compute the next version; run mise run release:prepare so mise provides git-cliff`**
+Cause: git-cliff is not on the PATH. mise installs it from `.config/mise/config.toml`.
+Fix: `mise install`, then run the task through mise.
+
+**`version X is not above the latest tag vY; nothing to release, or pass a higher version`**
+Cause: no commit since the last tag changes the version, or the version you passed is too low.
+Fix: if a release is still wanted, pass a version: `mise run release:prepare 0.0.2`.
+
+**`tag vX.Y.Z already exists`, or a branch `release/vX.Y.Z` already exists**
+Cause: an earlier `prepare` for the same version.
+Fix: for a branch, close its pull request, delete the branch (`git branch -D release/vX.Y.Z` and
+`git push origin --delete release/vX.Y.Z`), then run `prepare` again.
+
+## Release pull request
+
+**A pull request merged to main after `prepare`**
+Cause: the new section was made before that merge. The tag will include the commit, but no section lists it.
+Fix before the release merges: close the release pull request, delete its branch, run `prepare` again.
+Fix after: add the line to the released section in a `docs(changelog)` pull request, then
+`gh release edit vX.Y.Z --notes-file <(mise run release:notes X.Y.Z 2>/dev/null)`.
+
+**The pull request body still shows the highlights placeholder, or the pull request stays a draft**
+Cause: `prepare` writes the body before the highlights exist, or the pushed section has no highlights.
+Fix: push the highlights commit, then run `mise run release:refresh` on `release/vX.Y.Z`. It is safe to repeat.
+
+## Release workflow
+
+**`plan` fails: "still has the highlights placeholder"**
+Cause: the release pull request merged without its highlights.
+Fix: write the highlights in a `docs(changelog)` pull request. That merge does not change `moon.mod`, so run
+`gh workflow run release.yml --ref main` after it.
+
+**No Release run started after the release pull request merged**
+Cause: the workflow runs on a push to main only when `moon.mod` changes, or the workflow is disabled.
+Fix: `gh workflow run release.yml --ref main`.
+
+**`plan`: `tag vA does not match moon.mod version B`**
+Cause: a tag was pushed by hand for a commit whose `moon.mod` has another version.
+Fix: with the user's approval, delete that tag (`git push origin --delete vA`) and release through
+`release:prepare`.
+
+**`validate` fails**
+Cause: main is not releasable, or a module has another version than the root `moon.mod`.
+Fix: read the failed step. For a version error, run `moonx scripts/versions.mbtx check` to list each place,
+then `moonx scripts/versions.mbtx set X.Y.Z`. Fix other errors on main with a normal pull request. Then run
+`gh workflow run release.yml --ref main`.
+
+**`publish`: `401` or `403`**
+Cause: the `MOONCAKES_USER_TOKEN` org secret is missing or expired. The job fails at once and does not retry.
+Fix: ask the user to renew the secret, then "Re-run failed jobs".
+
+**`publish`: `is duplicated with an existing version`**
+Not an error: the script reports the module as already published and goes on.
+
+**`release`: `403` or `Resource not accessible by integration`**
+Cause: the job lacks `contents: write`.
+Fix: check the `permissions` of the `release` job in `release.yml`.
+
+## zig cross-build
+
+**`build` fails with `undefined symbol: moonbit_simdutf_*` or `invalid cpu architecture`**
+Cause: moon links the prebuilt host objects `moonbit_simdutf.o`, `simdutf.o` and (on macOS) `libbacktrace.a`
+for every target. Their architecture is not the target architecture. The cc and ar wrappers of
+`apps/zig-cross` drop them for each named target.
+Fix: check that the wrapper still drops `-DMOONBIT_USE_SIMDUTF` and the arguments that end in
+`/moonbit_simdutf.o`, `/simdutf.o` and `/libbacktrace.a`. Run `moonx scripts/dist.mbtx build` with the
+moon version of CI to reproduce. A new moon version can add one more host object: add it to the wrapper.
+
+**`build` fails with `call to undeclared function 'rand_s'` (windows-x64)**
+Cause: `env.c` of the MoonBit runtime includes `<stdlib.h>` before it defines `_CRT_RAND_S`. The mingw headers
+of zig then never declare `rand_s`.
+Fix: every wrapper must pass `-D_CRT_RAND_S`. See the README of `apps/zig-cross`.
+
+**`build` fails with a wrong-architecture message**
+Cause: the header check of `zig-cross` found a binary whose machine field does not match the target.
+Fix: look at the table that `zig-cross` prints. Check that `MOON_CC` and `MOON_AR` point to the wrapper of that
+target, and delete `_build/cross/<target>` for a stale build.
+
+**`build` fails after a zig version change**
+Cause: the zig version is pinned in `.config/mise/config.toml` (0.17.0). A new zig can change the flags or the
+bundled headers.
+Fix: pin zig back, or fix the wrapper, and record the cause in the README of `apps/zig-cross`.
+
+## smoke
+
+**One `smoke` leg fails, the others pass**
+Cause: the binary of that OS does not start, or `smithy version` did not print the version.
+Fix: open the leg and read the output. A crash at start-up on one OS is a build problem for that target (for
+example a missing host-only object, or a wrong header): reproduce with `moonx scripts/dist.mbtx build` and fix
+the wrapper. Do not merge or re-run `publish` while any leg is red: `publish` needs all legs.
+A runner problem (the runner did not start) is transient: use "Re-run failed jobs".
+If `macos-15-intel` is not available, change the `darwin-x64` leg to run on `macos-latest` with
+`arch -x86_64`.
+
+**`smoke`: `the plan gave no version`**
+Cause: `plan` wrote no `version` output.
+Fix: read the `plan` job. Run `gh workflow run release.yml --ref main`.
+
+## After a partial release
+
+**`status`: `vX.Y.Z is tagged but has no GitHub release`, or `lacks assets`, or `mooncakes.io has ...`**
+Cause: the run stopped after the tag was made, or a transient failure stopped `publish` or `release`.
+Fix: `gh workflow run release.yml --ref vX.Y.Z`. The run is safe to repeat.
+
+**A version is on mooncakes.io but has no GitHub release**
+Cause: `publish` passed and `release` failed (for example a network failure while it uploaded the assets).
+The mooncakes.io version is permanent, so do not bump the version.
+Fix: "Re-run failed jobs" on the run. If the artifact has expired (30 days), run
+`gh workflow run release.yml --ref vX.Y.Z`: it builds again and `publish` skips the published modules.
+Then `mise run release:status`. Check that the 8 assets are on the release.
+
+**`status`: `moon.mod on main is X but vX has no tag`**
+Cause: the Release run for the merge failed or has not finished.
+Fix: read the run (`gh run view <run-id> --log-failed`), fix the cause, then
+`gh workflow run release.yml --ref main`.
+
+**The GitHub release notes are wrong or out of date**
+Fix: correct `CHANGELOG.md` in a `docs(changelog)` pull request, then
+`gh release edit vX.Y.Z --notes-file <(mise run release:notes X.Y.Z 2>/dev/null)`.
+
+**A broken version is on mooncakes.io**
+A version cannot be replaced or deleted. Fix forward: release a patch version with the fix.
