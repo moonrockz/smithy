@@ -1,10 +1,10 @@
 ///|
 test "parse_args build with targets and paths" {
   assert_eq(
-    parse_args(["build", "linux-x64", "darwin-arm64", "--", "apps/smithy"]),
+    parse_args(["build", "linux-x64", "darwin-arm64", "--", "apps/myapp"]),
     Ok(
       Build(target_dir="_build/cross", targets=[LinuxX64, DarwinArm64], paths=[
-        "apps/smithy",
+        "apps/myapp",
       ]),
     ),
   )

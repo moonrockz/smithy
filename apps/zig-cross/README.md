@@ -14,7 +14,7 @@ This tool will move to its own repository.
 ## Usage
 
 ```sh
-moonx moonrockz/zig-cross@<version> build linux-x64 darwin-arm64 -- apps/smithy
+moonx moonrockz/zig-cross@<version> build linux-x64 darwin-arm64 -- apps/myapp
 moonx moonrockz/zig-cross@<version> exec host -- moon test --target native
 moonx moonrockz/zig-cross@<version> --help
 ```
