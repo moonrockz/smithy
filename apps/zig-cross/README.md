@@ -47,7 +47,8 @@ target. Use `host` to compile the tests of a package with zig.
 A `windows-x64` binary that zig cross-builds is wrong for MoonBit code that uses `OsString`: arguments,
 environment variables and paths. The `core` library is prebuilt for the host. Its `#cfg(platform="windows")`
 setting is resolved from the host OS, not from the target. A Windows binary built on Linux or macOS therefore
-reads its arguments wrongly. Build Windows binaries on Windows until moon can set the target platform.
+reads its arguments wrongly. Build Windows binaries on Windows until moon can set the target platform
+([moonbitlang/moon#2320](https://github.com/moonbitlang/moon/issues/2320)).
 
 ## What the wrappers change, and why
 
@@ -55,9 +56,10 @@ Two upstream bugs make a plain `MOON_CC="zig cc -target ..."` fail.
 
 - Every wrapper adds `-D_CRT_RAND_S`. The MoonBit runtime file `env.c` includes `<stdlib.h>` before it defines
   `_CRT_RAND_S`, so `rand_s` is not declared on Windows. The flag defines it before the first include.
+  Upstream: [moonbitlang/moonbit-native-runtime#2](https://github.com/moonbitlang/moonbit-native-runtime/issues/2).
 - A cross wrapper drops `-DMOONBIT_USE_SIMDUTF` and the arguments that end in `/moonbit_simdutf.o`,
   `/simdutf.o` and `/libbacktrace.a`. moon links these prebuilt objects for the machine that runs moon. They have
   the wrong architecture for the target. The `ar` wrapper drops the two simdutf objects. The `host` wrapper
-  drops nothing.
+  drops nothing. Upstream: [moonbitlang/moon#2320](https://github.com/moonbitlang/moon/issues/2320).
 - The `host` wrapper adds `-lunwind` on Linux, for link steps only. A debug build there compiles `backtrace.c`,
   which needs the unwinder. gcc links its unwinder by itself, but `zig cc` does not. macOS needs nothing.
