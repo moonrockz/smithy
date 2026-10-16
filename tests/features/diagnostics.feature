@@ -18,16 +18,16 @@ Feature: Diagnostics
     And the first diagnostic renders as:
       """
       error[SM-PARSE-001]: UNEXPECTED TOKEN
-        --> model.smithy:5:7
-         |
+       --> model.smithy:5:7
+        |
       4 | structure S {
-         | --------- the structure `S` started here
+        | --------- the structure `S` started here
       5 |     a String
-         |       ^^^^^^ I was expecting `:` after the member name `a` but found `String`
-         |
-         = I was parsing the structure `S` when I got stuck.
-         = example:
-             a: String
+        |       ^^^^^^ I was expecting `:` after the member name `a` but found `String`
+        |
+        = I was parsing the structure `S` when I got stuck.
+        = example:
+            a: String
 
       """
     And the short form is "model.smithy:5:7: error[SM-PARSE-001]: I was expecting `:` after the member name `a` but found `String`"

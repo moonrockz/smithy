@@ -39,16 +39,16 @@ test "render_plain shows the excerpt, labels, notes and hint" {
     @report.render_plain(d, source),
     content=(
       #|error[SM-PARSE-001]: UNEXPECTED TOKEN
-      #|  --> model.smithy:5:7
-      #|   |
+      #| --> model.smithy:5:7
+      #|  |
       #|4 | structure S {
-      #|   | --------- the structure `S` started here
+      #|  | --------- the structure `S` started here
       #|5 |     a String
-      #|   |       ^^^^^^ I was expecting `:` after the member name `a` but found `String`
-      #|   |
-      #|   = I was parsing the structure `S` when I got stuck.
-      #|   = example:
-      #|       a: String
+      #|  |       ^^^^^^ I was expecting `:` after the member name `a` but found `String`
+      #|  |
+      #|  = I was parsing the structure `S` when I got stuck.
+      #|  = example:
+      #|      a: String
       #|
     ),
   )
@@ -110,10 +110,79 @@ test "a span at the end of the file renders a caret after the last character" {
     out.contains(
       (
         #|2 | string
-        #|   |       ^ 
+        #|  |       ^ 
       ),
     ),
     content="true",
+  )
+}
+
+///|
+test "a two-digit line number widens the gutter and right-aligns the numbers" {
+  let (d, source) = first_error(
+    (
+      #|$version: "2"
+      #|namespace com.foo
+      #|
+      #|
+      #|
+      #|
+      #|
+      #|
+      #|structure S {
+      #|    a String
+      #|}
+      #|
+    ),
+  )
+  inspect(
+    @report.render_plain(d, source),
+    content=(
+      #|error[SM-PARSE-001]: UNEXPECTED TOKEN
+      #|  --> model.smithy:10:7
+      #|   |
+      #| 9 | structure S {
+      #|   | --------- the structure `S` started here
+      #|10 |     a String
+      #|   |       ^^^^^^ I was expecting `:` after the member name `a` but found `String`
+      #|   |
+      #|   = I was parsing the structure `S` when I got stuck.
+      #|   = example:
+      #|       a: String
+      #|
+    ),
+  )
+}
+
+///|
+test "a primary and a secondary label on the same line each sit under their columns" {
+  let source = @span.SourceText::new("structure Foo String\n", name="m.smithy")
+  let at = (start : Int32, len : Int32) => {
+    @span.Span::new(
+      @span.Offset::new(start).unwrap(),
+      @span.Length::new(len).unwrap(),
+    )
+  }
+  let d = @diagnostic.Diagnostic::new(
+    code="SM-TEST-000",
+    severity=Error,
+    title="TEST",
+    message="the primary label",
+    span=at(14, 6),
+    labels=[{ span: at(10, 3), text: "the secondary label", }],
+  )
+  inspect(
+    @report.render_plain(d, source),
+    content=(
+      #|error[SM-TEST-000]: TEST
+      #| --> m.smithy:1:15
+      #|  |
+      #|1 | structure Foo String
+      #|  |               ^^^^^^ the primary label
+      #|  |           --- the secondary label
+      #|  |
+      #|
+    ),
   )
 }
 
@@ -176,13 +245,13 @@ test "long notes reflow at 80 columns" {
     out,
     content=(
       #|error[SM-PARSE-004]: EXPECTED A STATEMENT
-      #|  --> m.smithy:2:1
-      #|   |
+      #| --> m.smithy:2:1
+      #|  |
       #|2 | metadata x = "y"
-      #|   | ^^^^^^^^ I was expecting `use`, a shape statement, or `apply` but found `metadata`
-      #|   |
-      #|   = Control statements (`$...`) come first, then `metadata`, then
-      #|     `namespace`.
+      #|  | ^^^^^^^^ I was expecting `use`, a shape statement, or `apply` but found `metadata`
+      #|  |
+      #|  = Control statements (`$...`) come first, then `metadata`, then
+      #|    `namespace`.
       #|
     ),
   )

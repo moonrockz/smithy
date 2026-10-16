@@ -157,7 +157,10 @@ pub fn render_short(
 
 ///|
 /// The Rust and codespan layout: header, location, excerpt with labels,
-/// notes, hint and example, written into `logger`.
+/// notes, hint and example, written into `logger`. The gutter is as wide
+/// as the largest line number shown; numbered lines are `N | text` and
+/// every other excerpt line is `<gutter> | ...`, so a label's first
+/// caret sits exactly under its column.
 pub fn render_terminal_to(
   d : @diagnostic.Diagnostic,
   source : @span.SourceText,
@@ -190,13 +193,13 @@ pub fn render_terminal_to(
   let pad = " ".repeat(gutter)
   let p = anchor(source, d.span)
   out.border()
-  out.write("\{pad} --> ")
+  out.write("\{pad}--> ")
   out.reset()
   out.write("\{source.name().unwrap_or("<input>")}:\{p.line.0}:\{p.column.0}\n")
   out.border()
   out.write(
     (
-      $|\{pad}  |
+      $|\{pad} |
       $|
     ),
   )
@@ -229,7 +232,7 @@ pub fn render_terminal_to(
       last_line = Some(l.line)
     }
     out.border()
-    out.write("\{pad}  | ")
+    out.write("\{pad} | ")
     out.reset()
     out.write(" ".repeat(l.start_col.0 - 1))
     if l.primary {
@@ -252,7 +255,7 @@ pub fn render_terminal_to(
   out.border()
   out.write(
     (
-      $|\{pad}  |
+      $|\{pad} |
       $|
     ),
   )
@@ -261,7 +264,7 @@ pub fn render_terminal_to(
   for note in d.notes {
     for i, line in reflow(note, body_width) {
       out.border()
-      out.write(if i == 0 { "\{pad}  = " } else { "\{pad}    " })
+      out.write(if i == 0 { "\{pad} = " } else { "\{pad}   " })
       out.reset()
       out.write(
         (
@@ -275,7 +278,7 @@ pub fn render_terminal_to(
     Some(h) =>
       for i, line in reflow(h, body_width - 6) {
         out.border()
-        out.write(if i == 0 { "\{pad}  = " } else { "\{pad}    " })
+        out.write(if i == 0 { "\{pad} = " } else { "\{pad}   " })
         out.reset()
         if i == 0 {
           out.bold()
@@ -296,7 +299,7 @@ pub fn render_terminal_to(
   match d.example {
     Some(ex) => {
       out.border()
-      out.write("\{pad}  = ")
+      out.write("\{pad} = ")
       out.reset()
       out.bold()
       out.write(
@@ -315,7 +318,7 @@ pub fn render_terminal_to(
         ) {
         out.write(
           (
-            $|\{pad}      \{line}
+            $|\{pad}     \{line}
             $|
           ),
         )
