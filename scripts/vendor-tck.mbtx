@@ -266,7 +266,8 @@ async fn main {
   // run through `moon fmt`'s own layout rules.
   let fmt_code = @process.run("moon", ["fmt"])
   if fmt_code != 0 {
-    println("⚠️  moon fmt exited \{fmt_code}; tests/tck/cases.mbt may not be formatted")
+    println("❌ moon fmt exited \{fmt_code}; tests/tck/cases.mbt is not formatted")
+    @sys.exit(1)
   }
   println("✅ Vendored \{count} cases")
 }

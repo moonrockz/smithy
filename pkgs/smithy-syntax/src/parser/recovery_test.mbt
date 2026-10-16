@@ -149,3 +149,28 @@ test "a failed statement with leading docs and traits is reported once" {
   guard r.ast is Some(f) else { fail("no ast") }
   @expect.expect(f.shapes().map(s => s.shape.name().value)).to_equal(["Foo"])
 }
+
+///|
+test "recovery after traits before apply resumes at the apply" {
+  let r = rmodel(
+    (
+      #|@deprecated
+      #|apply Foo @sensitive
+      #|
+      #|string Bar
+      #|
+    ),
+  )
+  let skipped = r.cst.statements.filter(s => s.kind is Skipped)
+  @expect.expect_all(e => {
+    e.expect(r.errors().length()).to_equal(1)
+    e.expect(skipped.length()).to_equal(1)
+    e
+    .expect(skipped[0].tokens.iter().any(t => t.lexeme == "apply"))
+    .to_be_false()
+    e.expect(r.cst.statements.iter().any(s => s.kind is Apply)).to_be_true()
+    e
+    .expect(r.cst.statements.iter().any(s => s.name == Some("Bar")))
+    .to_be_true()
+  })
+}

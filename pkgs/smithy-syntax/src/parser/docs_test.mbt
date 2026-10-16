@@ -283,3 +283,22 @@ test "a 1.0 file reports its 2.0-only constructs once, at the first" {
     .to_equal("Mixins can only be used with Smithy version 2 or later")
   })
 }
+
+///|
+test "a 2.0 file reports its set shapes once, at the first" {
+  let r = @parser.parse_text(
+    (
+      #|$version: "2"
+      #|namespace a
+      #|set A { member: String }
+      #|set B { member: String }
+      #|
+    ),
+  )
+  @expect.expect(r.diagnostics.iter().map(d => d.code).collect()).to_equal([
+    "SM-PARSE-018",
+  ])
+  @expect.expect(r.diagnostics[0].message).to_equal(
+    "set shapes cannot be used in Smithy version 2.0",
+  )
+}

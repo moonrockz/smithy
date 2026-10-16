@@ -52,10 +52,22 @@ fn Parser::parse_trait(self : Parser) -> @ast.Trait raise ParseError {
 /// Whether a 2.0-only construct must be reported here: the file is known to
 /// be 1.0 and no such construct has been reported yet. Marks it reported.
 fn Parser::claim_v2_report(self : Parser) -> Bool {
-  guard !self.version_unknown && self.version != Some(V2) && !self.v2_reported else {
+  guard !self.version_unknown &&
+    self.version != Some(V2) &&
+    !self.version_reported else {
     return false
   }
-  self.v2_reported = true
+  self.version_reported = true
+  true
+}
+
+///|
+/// Whether a 1.0-only construct must be reported here: the file says
+/// `$version: "2"` and no version mismatch has been reported yet. Marks
+/// it reported.
+fn Parser::claim_v1_report(self : Parser) -> Bool {
+  guard self.version is Some(V2) && !self.version_reported else { return false }
+  self.version_reported = true
   true
 }
 

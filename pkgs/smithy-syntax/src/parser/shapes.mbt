@@ -712,12 +712,6 @@ fn Parser::parse_operation_body(
 }
 
 ///|
-/// Whether `traits` applies `@mixin`.
-fn has_mixin_trait(traits : Array[@ast.Trait]) -> Bool {
-  traits.iter().any(t => t.id.value.name == "mixin")
-}
-
-///|
 /// The value of the node object key `key` in `body`, if `body` is an
 /// object and has it.
 fn object_key(body : @ast.NodeValue, key : String) -> @ast.NodeValue? {
@@ -728,71 +722,6 @@ fn object_key(body : @ast.NodeValue, key : String) -> @ast.NodeValue? {
     }
   }
   None
-}
-
-///|
-/// A same-file, no-model check: an intEnum member's value must be a
-/// 32-bit integer; an enum member's value must be a string. (These are
-/// the loader's checks, not the grammar's, but both are purely local to
-/// the member being checked.)
-fn Parser::check_enum_member_value(
-  self : Parser,
-  kind : @ast.EnumType,
-  m : @ast.EnumMember,
-) -> Unit {
-  guard m.value is Some(v) else { return }
-  match kind {
-    Enum =>
-      if !(v is String(_, _)) {
-        self.report(
-          "SM-PARSE-016",
-          Error,
-          "INVALID ENUM VALUE",
-          "enum member `\{m.name.value}` must have a string value",
-          v.span(),
-          notes=["An enum member's value, if given, must be a quoted string."],
-          hint="Write a string value, like `\{m.name.value} = \"\{m.name.value}\"`.",
-        )
-      }
-    IntEnum =>
-      match v {
-        Number(lit, _) =>
-          match lit.value {
-            Integer(b) =>
-              if b < BigInt::from_int64(-2147483648L) ||
-                b > BigInt::from_int64(2147483647L) {
-                self.report(
-                  "SM-PARSE-016",
-                  Error,
-                  "INVALID ENUM VALUE",
-                  "intEnum member `\{m.name.value}` must fit in a 32-bit integer",
-                  v.span(),
-                  notes=[
-                    "An intEnum member's value must be an integer between -2147483648 and 2147483647.",
-                  ],
-                )
-              }
-            Decimal(_) =>
-              self.report(
-                "SM-PARSE-016",
-                Error,
-                "INVALID ENUM VALUE",
-                "intEnum member `\{m.name.value}` must be an integer, not a decimal",
-                v.span(),
-                notes=["An intEnum member's value must be a whole number."],
-              )
-          }
-        _ =>
-          self.report(
-            "SM-PARSE-016",
-            Error,
-            "INVALID ENUM VALUE",
-            "intEnum member `\{m.name.value}` must have a numeric value",
-            v.span(),
-            notes=["An intEnum member's value, if given, must be an integer."],
-          )
-      }
-  }
 }
 
 ///|
@@ -828,45 +757,19 @@ fn Parser::parse_shape(
   let name = self.parse_shape_name(kw)
   let owner = "the \{kw.lexeme} `\{name.value}`"
   self.push_context(owner, kw.span)
-  // `@mixin` is a Smithy 2.0 feature, on any shape kind.
-  if has_mixin_trait(traits) {
-    for t in traits {
-      if t.id.value.name == "mixin" {
-        self.require_v2("mixins", t.span)
-      }
-    }
-  }
   let shape : @ast.Shape = match kind {
     Simple(t) => Simple(kind=t, name~, mixins=self.parse_mixins())
     Enum(t) => {
       self.require_v2("enum", kw.span)
       let mixins = self.parse_mixins()
-      let diags_before = self.diagnostics.length()
       let members = self.parse_enum_members(owner)
-      // Only when the emptiness is not itself a recovery artifact (a bad
-      // member that recovery discarded already reported its own error)
-      // and there are no mixins to contribute a member instead.
-      if members.is_empty() &&
-        self.diagnostics.length() == diags_before &&
-        mixins is None {
-        self.report(
-          "SM-PARSE-015",
-          Error,
-          "INVALID MEMBER COUNT",
-          "\{owner} must have at least one member",
-          kw.span,
-          notes=["Each enum or intEnum needs at least one member."],
-        )
-      }
-      for m in members {
-        self.check_enum_member_value(t, m)
-      }
       Enum(kind=t, name~, mixins~, members=members[:])
     }
     Aggregate(t) => {
-      // `set` parses in every version; the loader rejects it in 2.0 (lists
-      // took over, with `@uniqueItems` for the old `set` behavior).
-      if t is Set && self.version is Some(V2) {
+      // `set` is not a shape type keyword in IDL 2.0 (lists took over,
+      // with `@uniqueItems` for the old `set` behavior). Like
+      // `require_v2`, this reports once per file.
+      if t is Set && self.claim_v1_report() {
         self.report(
           "SM-PARSE-018",
           Error,
@@ -878,44 +781,7 @@ fn Parser::parse_shape(
       }
       let for_resource = self.parse_for_resource()
       let mixins = self.parse_mixins()
-      let diags_before = self.diagnostics.length()
       let members = self.parse_members(owner)
-      // Only when recovery did not already report something, and there
-      // are no mixins to contribute members instead (a textually empty
-      // `list Foo with [Mix] {}` can be perfectly valid).
-      let clean = self.diagnostics.length() == diags_before && mixins is None
-      match t {
-        List | Set =>
-          if members.length() != 1 && clean {
-            self.report(
-              "SM-PARSE-015",
-              Error,
-              "INVALID MEMBER COUNT",
-              "\{owner} needs exactly one member",
-              kw.span,
-              notes=["A list or set has exactly one member, named `member`."],
-            )
-          }
-        Map => {
-          let names = members.iter().map(m => m.name.value).collect()
-          if clean &&
-            (
-              names.length() != 2 ||
-              !names.contains("key") ||
-              !names.contains("value")
-            ) {
-            self.report(
-              "SM-PARSE-015",
-              Error,
-              "INVALID MEMBER COUNT",
-              "\{owner} needs exactly a `key` and a `value` member",
-              kw.span,
-              notes=["A map has exactly two members, named `key` and `value`."],
-            )
-          }
-        }
-        Union | Structure => ()
-      }
       Aggregate(kind=t, name~, for_resource~, mixins~, members=members[:])
     }
     Entity(t) => {
@@ -949,39 +815,12 @@ fn Parser::parse_shape(
             hint="Add `$version: \"2\"` as the first line of the file.",
           )
         }
-        if has_mixin_trait(traits) &&
-          body is Object(kvps, _) &&
-          kvps.length() > 0 {
-          self.report(
-            "SM-PARSE-017",
-            Error,
-            "INVALID MIXIN",
-            "a resource with the `@mixin` trait may not define any properties",
-            body.span(),
-            notes=[
-              "A resource mixin shape `\{name.value}` defines content; resource mixins contribute no identifiers or properties of their own.",
-            ],
-          )
-        }
       }
       Entity(kind=t, name~, mixins~, body~)
     }
     Operation => {
       let mixins = self.parse_mixins()
       let properties = self.parse_operation_body(owner)
-      if has_mixin_trait(traits) &&
-        properties.iter().any(p => p is Input(_, _) || p is Output(_, _)) {
-        self.report(
-          "SM-PARSE-017",
-          Error,
-          "INVALID MIXIN",
-          "an operation with the `@mixin` trait must target `smithy.api#Unit` for its input and output",
-          kw.span,
-          notes=[
-            "Operation mixin shape `\{name.value}` defines an `input` or `output`; operation mixins must leave both as the default `Unit`.",
-          ],
-        )
-      }
       Operation(name~, mixins~, properties=properties[:])
     }
   }
@@ -1069,7 +908,13 @@ fn Parser::parse_shape_or_apply(
     return Apply(a)
   }
   let traits = self.parse_traits()
-  self.keyword_index = self.pos
+  // Only a shape type keyword after the traits belongs to this statement
+  // for recovery; anything else (`apply`, say) is a statement of its own.
+  if self.peek() is Some(k) &&
+    k.kind == Identifier &&
+    @ast.ShapeKind::of(k.lexeme) is Some(_) {
+    self.keyword_index = self.pos
+  }
   docs.append(self.take_docs_before(self.here().start))
   let s = self.parse_shape(docs, traits, start)
   self.expect_br()

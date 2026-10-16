@@ -48,17 +48,58 @@ let skipped : Array[(String, String)] = [
 ]
 
 ///|
-/// The one invalid case that genuinely cannot produce any diagnostic
-/// without data a syntax parser does not have: resolving a bare
-/// identifier as a shape ID against the prelude's shape list. (Faking a
-/// signal here - say, flagging every unqualified identifier that is not
-/// `true`/`false`/`null` - would risk false positives on every other
-/// case that legitimately references a shape by a bare name.) Unlike
-/// `skipped`, this also excuses the "produces at least one error" check:
-/// there is, deliberately, nothing to report.
-let needs_prelude : Array[String] = [
-  "invalid/metadata/space-after-node-array-keyword.smithy",
+/// Invalid cases whose error is a loader or validation check (name
+/// resolution, mixin application, model validation), with the reason.
+/// Their syntax is valid, so the test asserts the opposite of the other
+/// invalid cases: they parse with no error at all. A syntax parser that
+/// rejected them would be doing the loader's job, and would report false
+/// errors on valid multi-file models. This list shrinks when sub-project
+/// 4's loader takes these cases over.
+let semantic : Array[(String, String)] = [
+  ("invalid/elision/elide-nonexistent-id.smithy", "member elision resolution"),
+  (
+    "invalid/elision/elided-property-type-conflicts.smithy", "member elision resolution",
+  ),
+  ("invalid/elision/elided-type-conflicts.smithy", "member elision resolution"),
+  (
+    "invalid/elision/for-referencing-non-resource.smithy", "name resolution of the `for` target",
+  ),
+  ("invalid/enums/enum-with-bad-values.smithy", "enum value validation"),
+  ("invalid/enums/enum-without-member.smithy", "member count validation"),
+  ("invalid/enums/int-enum-without-member.smithy", "member count validation"),
+  ("invalid/enums/intEnum-with-bad-value.smithy", "enum value validation"),
+  ("invalid/enums/intEnum-with-float.smithy", "enum value validation"),
+  ("invalid/enums/intEnum-with-long.smithy", "enum value validation"),
+  ("invalid/lists/list-empty-members.smithy", "member count validation"),
+  ("invalid/lists/set-empty-members.smithy", "member count validation"),
+  ("invalid/maps/map-empty-members.smithy", "member count validation"),
+  (
+    "invalid/metadata/space-after-node-array-keyword.smithy", "needs the prelude to resolve a bare shape ID",
+  ),
+  ("invalid/mixins/member-mixin-conflict-1.smithy", "mixin application"),
+  ("invalid/mixins/member-mixin-conflict-2.smithy", "mixin application"),
+  ("invalid/mixins/mix-types.smithy", "mixin resolution"),
+  (
+    "invalid/mixins/mixins-trait-in-explicit-1-0.smithy", "trait resolution of `@mixin`",
+  ),
+  (
+    "invalid/mixins/mixins-trait-in-implicit-1-0.smithy", "trait resolution of `@mixin`",
+  ),
+  (
+    "invalid/mixins/operation-mixin-with-io.smithy", "mixin validation (needs `@mixin` resolved)",
+  ),
+  (
+    "invalid/mixins/resource-mixin-with-properties.smithy", "mixin validation (needs `@mixin` resolved)",
+  ),
+  ("invalid/use/conflicting-shape-def.smithy", "name resolution"),
+  ("invalid/use/conflicting-trait-def.smithy", "name resolution"),
+  ("invalid/use/conflicting-use.smithy", "name resolution"),
 ]
+
+///|
+fn is_semantic(path : String) -> Bool {
+  semantic.iter().any(s => s.0 == path)
+}
 
 ///|
 fn is_skipped(path : String) -> Bool {
@@ -87,12 +128,20 @@ test "every invalid case produces an error on the reference's line" {
     let source = @syntax.SourceText::new(c.text, name=c.path)
     let r = @syntax.parse(source)
     let errs = r.errors()
-    // Every invalid case must produce at least one error, skipped or
-    // not: `skipped` excuses a reporting-convention difference, never a
-    // silent false negative. `needs_prelude` is the one narrower,
-    // explicit exception: a case that provably needs data (the prelude)
-    // no syntax parser has.
-    if errs.length() == 0 && !needs_prelude.contains(c.path) {
+    // A loader-level case has valid syntax: it must parse clean.
+    if is_semantic(c.path) {
+      if errs.length() > 0 {
+        let rendered = @syntax.render_short(errs[0], source)
+        failures.push(
+          "\{c.path}: listed as semantic but has a syntax error: \{rendered}",
+        )
+      }
+      continue
+    }
+    // Every other invalid case must produce at least one error, skipped
+    // or not: `skipped` excuses a reporting-convention difference, never
+    // a silent false negative.
+    if errs.length() == 0 {
       failures.push(
         "\{c.path}: expected an error at \{line}:\{column} (\{message}) but parsed clean",
       )
@@ -100,9 +149,7 @@ test "every invalid case produces an error on the reference's line" {
     }
     // Semantic cases (line 0) only need some error; syntax cases must match
     // the line, unless skipped (a known position-reporting difference).
-    // `errs.length() > 0` guards the `needs_prelude` case above, which
-    // reaches here with no errors at all.
-    if line > 0 && !is_skipped(c.path) && errs.length() > 0 {
+    if line > 0 && !is_skipped(c.path) {
       let p = source.position(errs[0].span.start)
       if p.line.0 != line {
         let rendered = @syntax.render_short(errs[0], source)
