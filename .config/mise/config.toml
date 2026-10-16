@@ -15,6 +15,12 @@ yamllint = "1.38.0"
 # Git hooks manager; the hooks are in lefthook.yml
 lefthook = "2.1.1"
 
+# C cross compiler for apps/zig-cross (native binaries for Linux, macOS and Windows from one machine)
+zig = "0.17.0"
+
+# Changelog generator for the release notes
+"aqua:orhun/git-cliff" = "2.14.2"
+
 # MoonBit toolchain, pinned. mise cannot resolve "latest" for an http: tool, and a pinned version
 # keeps CI and every machine on the same compiler. To move to a newer release, change the version
 # here and in each URL (with "+" written as "%2B"), taken from
@@ -57,6 +63,10 @@ run = "moonx scripts/build.mbtx js"
 description = "Build all workspace members as native release executables"
 run = "moonx scripts/build.mbtx native --release"
 
+[tasks."build:cross"]
+description = "Cross-compile native binaries with zig (args: build targets, then -- and package paths)"
+run = "moon run apps/zig-cross --target wasm -- build"
+
 [tasks.test]
 description = "Run tests for all workspace members (args: targets; default: wasm wasm-gc js native)"
 run = "moonx scripts/test.mbtx"
@@ -88,6 +98,10 @@ run = "moonx scripts/validate-packages.mbtx"
 [tasks."tck:vendor"]
 description = "Vendor the Java reference's loader test corpus into tests/tck, the compatibility kit (args: git ref)"
 run = "moonx scripts/vendor-tck.mbtx"
+
+[tasks."test:native-zig"]
+description = "Run the native tests with zig as the C compiler (the host wrapper of zig-cross)"
+run = "moon run apps/zig-cross --target wasm -- exec host -- moonx scripts/test.mbtx native"
 
 [tasks."test:bdd"]
 description = "Run the moonspec acceptance features (tests/bdd, js target)"

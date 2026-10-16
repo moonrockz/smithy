@@ -3,6 +3,7 @@ members = [
   "./pkgs/smithy",
   "./pkgs/smithy-syntax",
   "./apps/smithy",
+  "./apps/zig-cross",
   "./docs/cookbook",
   "./tests",
 ]
