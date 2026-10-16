@@ -15,6 +15,8 @@
 # again the failed job and the jobs after it. The jobs that passed keep their outputs and their
 # artifacts, so the retry ships the same bytes that smoke checked. publish and release are
 # idempotent, so a retry after a partial publish or a partial upload continues where it stopped.
+# Release runs never overlap: they share one concurrency group. A pull request run has its own group.
+# The dist artifact is kept 30 days, the same as the GitHub re-run window.
 # For a failure that is not transient, run `mise run release:status` first.
 
 name: Release
@@ -45,7 +47,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release
+  group: ${{ github.event_name == 'pull_request' && format('release-pr-{0}', github.event.number) || 'release' }}
   cancel-in-progress: false
 
 env:
@@ -127,7 +129,7 @@ jobs:
           name: dist
           path: dist/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 30
 
   # These runners only run the binaries. They never build, so they need no mise.
   smoke:
@@ -184,10 +186,13 @@ jobs:
           chmod +x "$bin" || true
           out="$("$bin" version)"
           echo "$out"
-          case "$out" in
-            *"$EXPECTED"*) ;;
-            *) echo "::error::smithy version did not print $EXPECTED"; exit 1 ;;
-          esac
+          if [ -z "$EXPECTED" ]; then
+            echo "::error::the plan gave no version"; exit 1
+          fi
+          pattern="(^|[^0-9.])${EXPECTED//./\\.}([^0-9.]|$)"
+          if ! grep -Eq "$pattern" <<<"$out"; then
+            echo "::error::smithy version did not print $EXPECTED"; exit 1
+          fi
 
   publish:
     name: Publish to mooncakes.io
