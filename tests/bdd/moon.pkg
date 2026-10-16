@@ -1,0 +1,6 @@
+import {
+  "moonrockz/smithy-syntax" @syntax,
+  "moonrockz/moonspec",
+  "moonrockz/expect",
+  "moonbitlang/async",
+} for "wbtest"

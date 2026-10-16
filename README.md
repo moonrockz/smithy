@@ -52,6 +52,7 @@ mise run format                # moon fmt
 mise run validate              # package structure against moon.work
 mise run test                  # all targets; the tests module runs on js and native only
 mise run test -- js native     # some targets
+mise run test:bdd              # moonspec acceptance features (tests/bdd, js target)
 mise run build                 # all targets
 mise run build:native          # native release build
 mise run clean

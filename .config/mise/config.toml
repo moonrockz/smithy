@@ -89,6 +89,10 @@ run = "moonx scripts/validate-packages.mbtx"
 description = "Vendor the Java reference's loader test corpus into tests/tck, the compatibility kit (args: git ref)"
 run = "moonx scripts/vendor-tck.mbtx"
 
+[tasks."test:bdd"]
+description = "Run the moonspec acceptance features (tests/bdd, js target)"
+run = "moon test tests/bdd --target js"
+
 [tasks.check]
 description = "Run lint, validate, test and build"
 run = "moonx scripts/check.mbtx"

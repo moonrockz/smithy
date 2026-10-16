@@ -38,7 +38,7 @@ let library_paths : Array[String] = [
 
 ///|
 /// The `tests` module's packages, tested on js and native only.
-let test_paths : Array[String] = ["tests/tck"]
+let test_paths : Array[String] = ["tests/tck", "tests/bdd"]
 
 ///|
 async fn moon_test(paths : Array[String], target : String) -> Int {
