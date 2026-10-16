@@ -23,13 +23,13 @@ the compiler-shaped diagnostics. Where this document says "as in gleam-parser", 
 | Parser | Recursive descent over a lossless token stream, two-token lookahead |
 | CST | Token stream grouped per statement, `to_source` byte for byte |
 | Recovery | Per statement, and per member inside a member block; one diagnostic per recovery |
-| Oracle | The Java reference implementation; its loader test corpus is vendored into a harness |
+| Oracle | The Java reference implementation; its loader test corpus is vendored into the `tests` module as a compatibility kit (`tests/tck`) |
 | Numbers | Exact: `BigInt` for integers, `moonbitlang/x/decimal` for decimals, raw text kept |
 | Diagnostics | Elm and Rust style: title, primary and secondary labels, notes, hint, example |
 
 ## Module and packages
 
-Add `./pkgs/smithy-syntax` and `./harness/corpus` to `moon.work`. The module has `source = "src"` and
+Add `./pkgs/smithy-syntax`, `./docs/cookbook` and `./tests` to `moon.work`. The module has `source = "src"` and
 depends on `moonbitlang/x` (decimal), `moonbitlang/core` (bigint, quickcheck) and `moonrockz/expect`
 (tests only).
 
@@ -51,7 +51,7 @@ in this sub-project.
 ## Positions
 
 - Offsets count UTF-16 code units, which MoonBit strings index and which the Java reference counts for
-  its columns. `Span { start, end }` is half open.
+  its columns. `Span { start, length }` is half open; its end is `start.advance(length)`, so it never precedes its start. Offsets, lengths, lines and columns are newtypes (`Offset`, `Length`, `Line`, `Column`) with validating constructors.
 - `Position { line, column }` is 1-based; the column counts UTF-16 units, so positions match the
   reference's `SourceLocation`.
 - A line break is LF or CRLF. A lone CR is not a line break, as the specification's `NL` rule says.
@@ -205,7 +205,7 @@ All tests run on wasm, wasm-gc, js and native through `mise run test`.
   text and are monotonic; `cst.to_source()` equals the input with and without errors; CST statements
   tile the token array; AST spans lie inside their parent's; the parser never panics on random text,
   random token sequences, or valid text with one random edit.
-- Corpus harness `harness/corpus`, a workspace member that is not published. It vendors the reference's
+- Compatibility kit `tests/tck` in the `tests` module (`moonrockz/smithy_tests`, not published; it depends on `moonbitlang/async`, so it runs on js and native). `tests/bdd` runs the moonspec acceptance features in `tests/features`. It vendors the reference's
   loader tests (`smithy-model/src/test/resources/software/amazon/smithy/model/loader`, Apache-2.0, notice
   kept) and its idl-serialization cases. Valid files must parse clean, with shape names and `$version`
   checked. Invalid files must produce an error, compared on line and on the facts of the message. The
@@ -214,7 +214,7 @@ All tests run on wasm, wasm-gc, js and native through `mise run test`.
 ## Documentation
 
 `README.mbt.md` per package, `docs/cookbook/parsing.mbt.md` and `docs/cookbook/diagnostics.mbt.md` with
-checked examples, and the root README package table updated with the module and the harness.
+checked examples, and the root README package table updated with the module, the cookbook and the tests module. `src/lawkit` holds the quickcheck generators shared by the law tests.
 
 ## Out of scope
 
