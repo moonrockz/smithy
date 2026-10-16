@@ -8,8 +8,7 @@
 /// module of the workspace) and the version strings in the files of `version_files`.
 /// An import of a third-party module, or a version string in any other file, stays as it is.
 ///
-/// The script reads `moon.mod` and `moon.work` with line matching. `moonbitlang/moon_config` is not used:
-/// it targets the JSON format of the old configuration files, and these files use the new format.
+/// The script reads `moon.mod` and `moon.work` with line matching. This is enough and adds no dependency.
 ///
 /// Usage: `mise run validate:versions`, or `moonx scripts/versions.mbtx check [X.Y.Z]`
 /// or `moonx scripts/versions.mbtx set X.Y.Z`. The script exits with a non-zero code on failure.
@@ -26,14 +25,20 @@ import {
 let usage : String = "Usage: versions.mbtx check [X.Y.Z] | set X.Y.Z"
 
 ///|
-/// The source files that hold a version string, with the text that comes before the version in the string.
+/// The source files that hold a version string, with the text that comes right before the version.
+/// The text ends with the opening quote. Only a string with this text before it counts, so another
+/// version-like string in the same file (for example a specification version) is not touched.
 let version_files : Array[(String, String)] = [
-  ("pkgs/smithy/smithy.mbt", ""),
-  ("pkgs/smithy/smithy_test.mbt", ""),
-  ("pkgs/smithy-syntax/src/lib.mbt", ""),
-  ("pkgs/smithy-syntax/src/lib_test.mbt", ""),
-  ("apps/zig-cross/version.mbt", ""),
-  ("apps/zig-cross/cli_wbtest.mbt", "zig-cross "),
+  ("pkgs/smithy/smithy.mbt", "pub fn version() -> String {\n  \""),
+  ("pkgs/smithy/smithy_test.mbt", "inspect(@smithy.version(), content=\""),
+  ("pkgs/smithy-syntax/src/lib.mbt", "pub fn version() -> String {\n  \""),
+  (
+    "pkgs/smithy-syntax/src/lib_test.mbt", "inspect(@syntax.version(), content=\"",
+  ),
+  ("apps/zig-cross/version.mbt", "pub let version : String = \""),
+  (
+    "apps/zig-cross/cli_wbtest.mbt", "inspect(version_text(), content=\"zig-cross ",
+  ),
 ]
 
 ///|
@@ -179,21 +184,27 @@ fn replace_quoted(text : String, old : String, new : String) -> String {
 }
 
 ///|
-/// The text that comes before the version in the version strings of a file.
-fn prefix_of(path : String) -> String {
+/// The text that comes right before the version in a file of `version_files`.
+fn head_of(path : String) -> String {
   for entry in version_files {
     if entry.0 == path {
       return entry.1
     }
   }
-  ""
+  "\""
+}
+
+///|
+/// The text of a file of `version_files` with its version set to `version`.
+fn set_source_version(path : String, text : String, version : String) -> String {
+  splice(text, versions_after(text, head_of(path)), version)
 }
 
 ///|
 /// The lines `<path>: found X, expected Y` for each version in `files` that is not `expected`.
 /// A file is `(path, text)`. A `moon.mod` file is checked for its version and its sibling imports.
 /// The sibling modules are the other `moon.mod` files in `files`. Any other file is checked for the
-/// version strings that follow the prefix of `version_files`.
+/// version strings that follow the text of `version_files`.
 fn mismatches(files : Array[(String, String)], expected : String) -> Array[String] {
   let siblings = []
   for file in files {
@@ -214,7 +225,7 @@ fn mismatches(files : Array[(String, String)], expected : String) -> Array[Strin
       }
       versions
     } else {
-      versions_after(text, "\"\{prefix_of(path)}").map(place => place.2)
+      versions_after(text, head_of(path)).map(place => place.2)
     }
     for v in found {
       if v != expected {
@@ -319,8 +330,7 @@ async fn set(version : String) -> Unit {
         }
       }
     } else {
-      let prefix = prefix_of(path)
-      splice(text, versions_after(text, "\"\{prefix}"), version)
+      set_source_version(path, text, version)
     }
     if updated != text {
       @fs.write_file(path, updated)
@@ -402,6 +412,11 @@ impl @moonspec.World for VersionsWorld with fn configure(self, setup) {
   })
   setup.when1("I look for versions other than {string}", fn(expected : String) {
     self.found = mismatches(self.files, expected)
+  })
+  setup.when1("I set the versions of the files to {string}", fn(version : String) {
+    self.result = self.files
+      .map(file => set_source_version(file.0, file.1, version))
+      .join("|")
   })
   setup.then1("the mismatches are {string}", fn(expected : String) raise {
     @expect.expect(self.found.join("|")).to_equal(expected)

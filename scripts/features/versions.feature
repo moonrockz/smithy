@@ -113,3 +113,30 @@ Feature: One version across the workspace
       """
     When I look for versions other than "0.0.1"
     Then the mismatches are "apps/zig-cross/cli_wbtest.mbt: found 0.1.0, expected 0.0.1"
+
+  Scenario: An unrelated version-like string in a version file is left alone
+    Given a file "pkgs/smithy-syntax/src/lib.mbt" with the text:
+      """
+      pub let spec : String = "1.0.0"
+
+      pub fn version() -> String {
+        "0.1.0"
+      }
+      """
+    When I look for versions other than "0.1.0"
+    Then the mismatches are ""
+    When I look for versions other than "0.0.1"
+    Then the mismatches are "pkgs/smithy-syntax/src/lib.mbt: found 0.1.0, expected 0.0.1"
+
+  Scenario: Set changes only the version of a version file
+    Given a file "pkgs/smithy-syntax/src/lib_test.mbt" with the text:
+      """
+      inspect("1.0.0", content="1.0.0")
+      inspect(@syntax.version(), content="0.1.0")
+      """
+    When I set the versions of the files to "0.0.1"
+    Then the result is:
+      """
+      inspect("1.0.0", content="1.0.0")
+      inspect(@syntax.version(), content="0.0.1")
+      """
