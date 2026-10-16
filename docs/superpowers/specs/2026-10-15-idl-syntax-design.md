@@ -159,7 +159,7 @@ read; otherwise it is the partial tree.
   elision, resource properties and inline input or output are errors with the reference's facts.
 - Doc comments are gathered from the trivia of the token that starts a shape, member, enum member or
   inline shape. A doc comment anywhere else stays in trivia and gets the warning "DETACHED DOC COMMENT".
-  Docs before `apply` are an error, as in the reference.
+  Docs before `apply` are a warning (`SM-PARSE-008`), as the reference's own corpus shows (`valid/doc-comments`).
 
 Recovery: on an error inside a statement the parser records one diagnostic, then skips tokens until it
 finds a token that is the first on its line and begins a statement: a shape type keyword, `apply`,
@@ -174,7 +174,7 @@ innermost one, and the construct's start becomes a secondary label.
 
 `Diagnostic { code, severity, title, message, span, labels, notes, hint?, example? }`.
 
-- `code`: `SM-SCAN-nnn` or `SM-PARSE-nnn`, listed in `codes()`; a test checks the table against the
+- `code`: `SM-SCAN-nnn` or `SM-PARSE-nnn`, listed in `codes()`; the TCK added `SM-PARSE-012` (duplicate operation property), `SM-PARSE-013` (duplicate control statement) and `SM-PARSE-014` (duplicate member name), all reported by the reference as syntax errors; a test checks the table against the
   codes the scanner and parser emit.
 - `severity`: `Error | Warning`.
 - `title`: short and in capitals, Elm style: `UNFINISHED SHAPE`, `MISSING LINE BREAK`, `UNKNOWN ESCAPE`.
