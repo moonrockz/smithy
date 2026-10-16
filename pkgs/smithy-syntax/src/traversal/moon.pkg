@@ -1,0 +1,14 @@
+warnings = "-reserved_keyword"
+
+import {
+  "moonrockz/smithy-syntax/span",
+  "moonrockz/smithy-syntax/scanner",
+  "moonrockz/smithy-syntax/ast",
+  "moonrockz/smithy-syntax/parser",
+}
+
+import {
+  "moonrockz/smithy-syntax/traversal",
+  "moonrockz/smithy-syntax/parser",
+  "moonrockz/smithy-syntax/span",
+} for "test"
