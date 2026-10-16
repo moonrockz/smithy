@@ -1,0 +1,50 @@
+///|
+/// Run the tests of the task scripts.
+///
+/// A script is tested when `scripts/features/<stem>.feature` exists, where `<stem>` is the script name
+/// without `.mbtx` and with `-` replaced by `_`. `moon test` of a package does not include `.mbtx` files,
+/// so this script is their only test runner. It uses the wasm backend, as `moonx` does for a standalone
+/// `.mbtx` file. It stops at the first failure.
+///
+/// Usage: `mise run test:scripts`, or `moonx scripts/test-scripts.mbtx`.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let scripts_dir : String = "scripts"
+
+///|
+/// The feature file name that belongs to a script file name, or `None` for a file that is not a script.
+fn feature_name(file : String) -> String? {
+  guard file.has_suffix(".mbtx") else { return None }
+  let stem = file[:file.length() - 5].to_owned()
+  Some(stem.replace(old="-", new="_") + ".feature")
+}
+
+///|
+async fn main {
+  let files = @fs.readdir(scripts_dir, sort=true)
+  let mut tested = 0
+  for file in files {
+    guard feature_name(file) is Some(feature) else { continue }
+    guard @fs.exists("\{scripts_dir}/features/\{feature}") else { continue }
+    println("🧪 Testing \{scripts_dir}/\{file}")
+    let code = @process.run(
+      "moon",
+      ["test", "--deny-warn", "--target", "wasm", "\{scripts_dir}/\{file}"],
+      stdout=@stdio.stdout,
+      stderr=@stdio.stderr,
+    )
+    if code != 0 {
+      eprintln("❌ The tests of \{scripts_dir}/\{file} failed.")
+      @sys.exit(if code > 0 { code } else { 1 })
+    }
+    tested += 1
+  }
+  println("✅ Tested \{tested} scripts")
+}

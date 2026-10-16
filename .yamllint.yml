@@ -6,6 +6,8 @@ ignore:
   - .mooncakes/
   - node_modules/
   - .git/
+  - .dev/  # gitignored scratch area
+  - .superpowers/  # gitignored agent notes
   - .beads/  # bd rewrites config.yaml with its own indentation
 
 rules:
