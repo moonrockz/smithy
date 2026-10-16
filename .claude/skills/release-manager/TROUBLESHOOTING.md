@@ -67,6 +67,11 @@ then `moonx scripts/versions.mbtx set X.Y.Z`. Fix other errors on main with a no
 Cause: the `MOONCAKES_USER_TOKEN` org secret is missing or expired. The job fails at once and does not retry.
 Fix: ask the user to renew the secret, then "Re-run failed jobs".
 
+**`publish`: `failed to open credentials file` or `Not logged in`**
+Cause: `moon` reads `$MOON_HOME/credentials.json`. The setup action sets `MOON_HOME`, so a file in `~/.moon` is not found.
+`scripts/credentials.mbtx` writes to `$MOON_HOME` when it is set. Check that the `credentials` step ran after `setup`.
+Fix: correct the step order in `release.yml`, then "Re-run failed jobs".
+
 **`publish`: `is duplicated with an existing version`**
 Not an error: the script reports the module as already published and goes on.
 
@@ -124,7 +129,7 @@ Fix: `gh workflow run release.yml --ref vX.Y.Z`. The run is safe to repeat.
 Cause: `publish` passed and `release` failed (for example a network failure while it uploaded the assets).
 The mooncakes.io version is permanent, so do not bump the version.
 Fix: "Re-run failed jobs" on the run. If the artifact has expired (30 days), run
-`gh workflow run release.yml --ref vX.Y.Z`: it builds again and `publish` skips the published modules.
+`gh workflow run release.yml --ref main`: it builds again and `publish` skips the published modules.
 Then `mise run release:status`. Check that the 8 assets are on the release.
 
 **`status`: `moon.mod on main is X but vX has no tag`**
