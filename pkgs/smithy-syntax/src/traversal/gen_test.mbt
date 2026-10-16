@@ -126,3 +126,49 @@ fn deep_value(depth : Int32) -> String {
   let close = "]".repeat(depth)
   "$version: \"2\"\nnamespace a\n\n@t(\{open}\{close})\nstring S\n"
 }
+
+///|
+/// What an `Enter` shows of a node: category/kind@start (no length yet).
+fn start_tag(category : String, kind : String, start : @span.Offset) -> String {
+  "\{category}/\{kind}@\{start.0}"
+}
+
+///|
+/// walk's events under `p`, with each enter shown as an `Enter` shows it.
+fn walk_projection(root : @traversal.NodeRef, p : Policy) -> Array[String] {
+  let events = []
+  let mut k = 0
+  @traversal.walk(
+    root,
+    n => {
+      events.push("+" + start_tag(n.category(), n.kind(), n.span().start))
+      k = k + 1
+      decide(p, k - 1)
+    },
+    leave=n => events.push("-" + tag(n)),
+  )
+  events
+}
+
+///|
+/// The events a reader gives when its caller follows `p` after each `Enter`.
+fn reader_events(root : @traversal.NodeRef, p : Policy) -> Array[String] {
+  let r = @traversal.EventReader::new(root)
+  let events = []
+  let mut k = 0
+  while r.next() is Some(e) {
+    match e {
+      Enter(e) => {
+        events.push("+" + start_tag(e.category, e.kind, e.start))
+        k = k + 1
+        match decide(p, k - 1) {
+          Continue => ()
+          SkipChildren => r.skip_children()
+          Stop => break
+        }
+      }
+      Leave(e) => events.push("-" + tag(e.node))
+    }
+  }
+  events
+}
