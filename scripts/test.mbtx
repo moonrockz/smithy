@@ -27,11 +27,13 @@ let library_paths : Array[String] = [
   "pkgs/smithy-syntax/src/ast",
   "pkgs/smithy-syntax/src/cst",
   "pkgs/smithy-syntax/src/diagnostic",
+  "pkgs/smithy-syntax/src/json_ast",
   "pkgs/smithy-syntax/src/lawkit",
   "pkgs/smithy-syntax/src/parser",
   "pkgs/smithy-syntax/src/report",
   "pkgs/smithy-syntax/src/scanner",
   "pkgs/smithy-syntax/src/span",
+  "pkgs/smithy-syntax/src/traversal",
   "apps/smithy",
   "docs/cookbook",
 ]
