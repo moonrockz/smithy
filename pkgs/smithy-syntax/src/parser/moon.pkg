@@ -1,0 +1,17 @@
+warnings = "-reserved_keyword"
+
+import {
+  "moonrockz/smithy-syntax/span",
+  "moonrockz/smithy-syntax/diagnostic",
+  "moonrockz/smithy-syntax/scanner",
+  "moonrockz/smithy-syntax/ast",
+  "moonrockz/smithy-syntax/cst",
+  "moonbitlang/x/decimal",
+}
+
+import {
+  "moonrockz/smithy-syntax/parser",
+  "moonrockz/smithy-syntax/lawkit",
+  "moonrockz/expect",
+  "moonbitlang/core/quickcheck",
+} for "test"

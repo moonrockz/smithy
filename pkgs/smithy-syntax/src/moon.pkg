@@ -1,0 +1,13 @@
+import {
+  "moonrockz/smithy-syntax/span",
+  "moonrockz/smithy-syntax/diagnostic",
+  "moonrockz/smithy-syntax/scanner",
+  "moonrockz/smithy-syntax/ast",
+  "moonrockz/smithy-syntax/cst",
+  "moonrockz/smithy-syntax/parser",
+  "moonrockz/smithy-syntax/report",
+}
+
+import {
+  "moonrockz/smithy-syntax" @syntax,
+} for "test"

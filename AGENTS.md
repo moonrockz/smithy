@@ -38,3 +38,32 @@ and test. `mise run check` runs lint, validate, test and build, which is what CI
 - Commits use Conventional Commits, in plain English, with no AI attribution and no `Co-Authored-By` lines.
 - Run `mise run format` before you commit MoonBit code.
 - New packages go under `pkgs/` (libraries) or `apps/` (executables), and into `moon.work`.
+
+## Syntax module
+
+`pkgs/smithy-syntax` is the IDL syntax layer. Its design is
+`docs/superpowers/specs/2026-10-15-idl-syntax-design.md`; keep it current when
+the API changes. Rules that tests enforce:
+
+- The scanner and the CST are lossless: `to_source()` is the input text.
+- Every diagnostic code is in `src/diagnostic/codes.mbt`; messages are in the
+  first person and name the construct and the token found.
+- The parser never panics and never raises out of `parse`; laws in
+  `*_law_test.mbt` check this with quickcheck.
+- `tests/tck` holds the vendored reference corpus; refresh it with
+  `mise run tck:vendor`, and record skipped cases on the beads task.
+- `tests/features/*.feature` are the acceptance contract, run by moonspec from
+  `tests/bdd` (`mise run test:bdd`). Change the scenario when you change the
+  behavior.
+
+## Work tracking
+
+Issues live in [beads](https://github.com/steveyegge/beads) (`bd`), in a Dolt database that syncs through
+`refs/dolt/data` on the GitHub origin, separate from the source branches. The config in `.beads/` is
+committed; the database is not. On a fresh clone run `bd bootstrap`, or `bd init -p smithy --shared-server`
+when the clone has no Dolt data yet.
+
+- `bd prime` prints the workflow; `bd ready` lists unblocked work; `bd show <id>` gives the context.
+- `bd update <id> --claim` before starting, `bd close <id> --reason "..."` when done.
+- `bd sync` publishes issue changes. Run it at the end of a session; it needs no commit.
+- The top epic is `smithy-2qe`, one child epic per sub-project.

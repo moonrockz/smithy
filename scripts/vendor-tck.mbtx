@@ -1,0 +1,273 @@
+///|
+/// Vendor the IDL cases of the Java reference's loader tests into
+/// `tests/tck/cases/` and generate `tests/tck/cases.mbt`, so the
+/// parity tests need no network and no file system on any target.
+///
+/// Usage: `mise run tck:vendor [-- <git ref>]` (default `main`). Needs `curl`.
+/// Source: https://github.com/smithy-lang/smithy, Apache-2.0; the NOTICE is kept.
+///
+/// Set `GITHUB_TOKEN` to raise the GitHub API's 60/hour unauthenticated limit
+/// (the listing alone makes about 30 calls); raw downloads need no token.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let base : String = "smithy-model/src/test/resources/software/amazon/smithy/model/loader"
+
+///|
+/// The directories to vendor and the kind of each.
+let groups : Array[(String, String)] = [
+  ("valid", "valid"),
+  ("invalid", "invalid"),
+  ("error-recovery", "recovery"),
+]
+
+///|
+/// The `-H` args for a GitHub API request, authenticated when `GITHUB_TOKEN`
+/// is set in the environment.
+fn auth_args() -> Array[String] {
+  match @env.get_env_var("GITHUB_TOKEN") {
+    Some(token) => ["-H", "Authorization: Bearer \{token}"]
+    None => []
+  }
+}
+
+///|
+/// Report a `curl` failure and exit. `api` adds a `GITHUB_TOKEN` reminder:
+/// the api.github.com rate limit is the most likely cause.
+fn curl_failed(url : String, err : String, api~ : Bool = false) -> Unit {
+  println("❌ curl failed for \{url}")
+  if !err.is_empty() {
+    println(err)
+  }
+  if api && @env.get_env_var("GITHUB_TOKEN") is None {
+    println(
+      "   Set GITHUB_TOKEN to raise the GitHub API's 60/hour unauthenticated limit, e.g. (PowerShell) $env:GITHUB_TOKEN = (gh auth token)",
+    )
+  }
+  @sys.exit(1)
+}
+
+///|
+/// GET `url` with `curl`, exiting the script on failure.
+async fn fetch(url : String) -> String {
+  let (code, out, err) = @process.collect_output("curl", ["-fsSL", url])
+  if code != 0 {
+    curl_failed(url, err.text())
+  }
+  out.text()
+}
+
+///|
+/// GET a `api.github.com` URL, with the `GITHUB_TOKEN` header when set.
+async fn fetch_api(url : String) -> String {
+  let args : Array[String] = ["-fsSL"]
+  args.append(auth_args())
+  args.push(url)
+  let (code, out, err) = @process.collect_output("curl", args)
+  if code != 0 {
+    curl_failed(url, err.text(), api=true)
+  }
+  out.text()
+}
+
+///|
+/// Every `.smithy` file path under `dir` (recursive) at `sha`, via the
+/// GitHub API.
+async fn list_smithy(sha : String, dir : String) -> Array[String] {
+  let listing = fetch_api(
+    "https://api.github.com/repos/smithy-lang/smithy/contents/\{dir}?ref=\{sha}",
+  )
+  let found : Array[String] = []
+  guard @json.parse(listing) is Array(entries) else {
+    println("❌ unexpected listing for \{dir}")
+    @sys.exit(1)
+    return found
+  }
+  for e in entries {
+    guard e is Object(o) &&
+      o.get("type") is Some(String(t)) &&
+      o.get("path") is Some(String(p)) else {
+      continue
+    }
+    if t == "dir" {
+      found.append(list_smithy(sha, p))
+    } else if p.has_suffix(".smithy") {
+      found.push(p)
+    }
+  }
+  found
+}
+
+///|
+/// `s` as a non-negative decimal integer, or `None` if any character is not
+/// an ASCII digit (including when `s` is empty).
+fn digits(s : String) -> Int? {
+  if s.is_empty() {
+    return None
+  }
+  let mut value = 0
+  for ch in s {
+    if ch < '0' || ch > '9' {
+      return None
+    }
+    value = value * 10 + (ch.to_int() - '0'.to_int())
+  }
+  Some(value)
+}
+
+///|
+/// The line, column and message from an invalid case's first line, when it
+/// is a syntax-error header (`// Syntax error at line L, column C: message`
+/// or `// Parse error at line L, column C near ...: message`). `None` for a
+/// semantic case: the loader reports those, not the parser, so the parity
+/// test only checks that *some* error is reported.
+fn parse_header(line : String) -> (Int, Int, String)? {
+  guard line.has_prefix("//") else { return None }
+  guard line.find("at line ") is Some(i) else { return None }
+  let rest = line.unsafe_substring(start=i + 8, end=line.length())
+  guard rest.find(", column ") is Some(j) else { return None }
+  guard digits(rest.unsafe_substring(start=0, end=j)) is Some(line_no) else {
+    return None
+  }
+  let rest2 = rest.unsafe_substring(start=j + 9, end=rest.length())
+  let chars = rest2.to_array()
+  let mut k = 0
+  while k < chars.length() && chars[k] >= '0' && chars[k] <= '9' {
+    k += 1
+  }
+  guard digits(rest2.unsafe_substring(start=0, end=k)) is Some(column) else {
+    return None
+  }
+  let after = rest2.unsafe_substring(start=k, end=rest2.length())
+  let message = match after.find(": ") {
+    Some(m) => after.unsafe_substring(start=m + 2, end=after.length())
+    None => after
+  }
+  Some((line_no, column, message))
+}
+
+///|
+/// MoonBit multi-line string literal syntax for `s` (the `#|` form), or
+/// `None` when `s` cannot be held that way: the `#|` form always holds at
+/// least one (possibly empty) line, so it cannot represent a truly empty
+/// string; and each `#|` line is written with its own `\r` trimmed, so a
+/// lone `\r` (a CRLF file) would not round-trip.
+fn literal(s : String) -> String? {
+  if s.is_empty() || s.find("\r") is Some(_) {
+    return None
+  }
+  let sb = StringBuilder()
+  sb.write_string("(\n")
+  for line in s.split("\n") {
+    sb.write_string("      #|")
+    sb.write_string(line.to_owned().trim_end(chars="\r").to_owned())
+    sb.write_string("\n")
+  }
+  sb.write_string("    )")
+  Some(sb.to_string())
+}
+
+///|
+/// A MoonBit string literal for `s`: the lossless multi-line `#|` form when
+/// possible, else an escaped literal via JSON string syntax (which MoonBit
+/// string literals can also read).
+fn text_expr(s : String) -> String {
+  match literal(s) {
+    Some(lit) => lit
+    None => Json::string(s).stringify()
+  }
+}
+
+///|
+async fn main {
+  let args = @env.args()[1:]
+  let ref_ : String = if args.length() > 0 { args[0] } else { "main" }
+  let sha_json = fetch_api(
+    "https://api.github.com/repos/smithy-lang/smithy/commits/\{ref_}",
+  )
+  let sha = match @json.parse(sha_json) {
+    Object(o) =>
+      match o.get("sha") {
+        Some(String(s)) => s
+        _ => {
+          println("❌ no `sha` in the commit lookup response for \{ref_}")
+          @sys.exit(1)
+          ref_
+        }
+      }
+    _ => {
+      println("❌ unexpected commit lookup response for \{ref_}")
+      @sys.exit(1)
+      ref_
+    }
+  }
+  println("📥 Vendoring the loader corpus at \{sha}")
+  if @fs.exists("tests/tck/cases") {
+    @fs.rmdir("tests/tck/cases", recursive=true)
+  }
+  let gen = StringBuilder()
+  gen.write_string(
+    "// Generated by scripts/vendor-tck.mbtx from smithy-lang/smithy at \{sha}. Do not edit.\n\n",
+  )
+  gen.write_string("///|\npub fn cases() -> Array[Case] {\n  [\n")
+  let mut count = 0
+  for g in groups {
+    let (dir, kind) = g
+    // List and download at the same resolved commit, not the (possibly
+    // moving) ref, so the two can never disagree.
+    for path in list_smithy(sha, "\{base}/\{dir}") {
+      let text = fetch(
+        "https://raw.githubusercontent.com/smithy-lang/smithy/\{sha}/\{path}",
+      )
+      let rel = path.unsafe_substring(start=base.length() + 1, end=path.length())
+      let dest = "tests/tck/cases/\{rel}"
+      let parent_end = match dest.rev_find("/") {
+        Some(i) => i
+        None => 0
+      }
+      let parent = dest.unsafe_substring(start=0, end=parent_end)
+      @fs.mkdir(parent, recursive=true, allow_exist=true)
+      @fs.write_file(dest, text)
+      let kind_expr = match kind {
+        "valid" => "Valid"
+        "recovery" => "Recovery"
+        _ => {
+          // `// Syntax error at line L, column C: message` or `// Parse
+          // error at line L, column C near ...: message`; a semantic case's
+          // first line does not match and becomes `line=0`.
+          let first = match text.split("\n").next() {
+            Some(l) => l.to_owned()
+            None => ""
+          }
+          match parse_header(first) {
+            Some((line, column, message)) =>
+              "Invalid(line=\{line}, column=\{column}, message=\{Json::string(message).stringify()})"
+            None => "Invalid(line=0, column=0, message=\"\")"
+          }
+        }
+      }
+      gen.write_string(
+        "    { path: \"\{rel}\", kind: \{kind_expr}, text: \{text_expr(text)} },\n",
+      )
+      count += 1
+    }
+  }
+  gen.write_string("  ]\n}\n")
+  @fs.write_file("tests/tck/cases.mbt", gen.to_string())
+  @fs.write_file("tests/tck/TCK_SHA", sha + "\n")
+  // So a re-run produces no diff: `cases.mbt` is hand-formatted above, not
+  // run through `moon fmt`'s own layout rules.
+  let fmt_code = @process.run("moon", ["fmt"])
+  if fmt_code != 0 {
+    println("❌ moon fmt exited \{fmt_code}; tests/tck/cases.mbt is not formatted")
+    @sys.exit(1)
+  }
+  println("✅ Vendored \{count} cases")
+}

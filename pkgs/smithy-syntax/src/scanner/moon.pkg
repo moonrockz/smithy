@@ -1,0 +1,13 @@
+import {
+  "moonrockz/smithy-syntax/span",
+  "moonrockz/smithy-syntax/diagnostic",
+}
+
+import {
+  "moonrockz/smithy-syntax/scanner",
+  "moonrockz/smithy-syntax/span",
+  "moonrockz/smithy-syntax/diagnostic",
+  "moonrockz/expect",
+  "moonrockz/smithy-syntax/lawkit",
+  "moonbitlang/core/quickcheck",
+} for "test"
