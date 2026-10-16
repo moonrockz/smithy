@@ -1,6 +1,6 @@
 name = "moonrockz/smithy_cookbook"
 
-version = "0.1.0"
+version = "0.0.1"
 
 description = "Cookbook for moonrockz/smithy-syntax: task articles whose code is tested; not published"
 
@@ -11,6 +11,6 @@ license = "Apache-2.0"
 source = "."
 
 import {
-  "moonrockz/smithy-syntax@0.1.0",
+  "moonrockz/smithy-syntax@0.0.1",
   "moonrockz/expect@0.6.1",
 }
