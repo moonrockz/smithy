@@ -91,3 +91,5 @@ sort_commits = "oldest"
 # else the patch version. Go to 1.0.0 on purpose (release:prepare -- 1.0.0).
 features_always_bump_minor = true
 breaking_always_bump_major = false
+# The first version, when no tag exists yet.
+initial_tag = "v0.0.1"
