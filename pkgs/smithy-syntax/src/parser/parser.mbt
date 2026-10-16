@@ -52,7 +52,17 @@ fn Parser::new(stream : @scanner.TokenStream) -> Parser {
   gather(stream.trivia)
   for token in stream.tokens {
     gather(token.trivia_before)
-    gather(token.trivia_after)
+    // A comment after a token on the same line is an ordinary comment,
+    // even when it starts with three slashes.
+    let mut next_line = false
+    for trivia in token.trivia_after {
+      if next_line && trivia is Comment(c) && c.kind == Doc {
+        doc_comments.push({ text: c.text, span: c.span, })
+      }
+      if trivia.is_newline() {
+        next_line = true
+      }
+    }
   }
   let text_end = @span.Offset::zero().advance(
     @span.Length::of_string(stream.to_source()),
@@ -114,6 +124,9 @@ fn Parser::at_end(self : Parser) -> Bool {
 fn Parser::advance(self : Parser) -> @scanner.Token? {
   let t = self.peek()
   if t is Some(_) {
+    // Documentation not claimed before consuming its next token belongs to
+    // an expression or another construct that cannot accept documentation.
+    self.take_docs_before(t.unwrap().span.start) |> ignore
     self.pos += 1
     self.skip_holes()
   }

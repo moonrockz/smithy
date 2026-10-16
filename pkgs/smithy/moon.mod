@@ -10,4 +10,10 @@ license = "Apache-2.0"
 
 keywords = [ "smithy", "idl", "api", "moonbit" ]
 
-readme = "README.md"
+readme = "README.mbt.md"
+
+warnings = "-implicit_impl_as_method"
+
+import {
+  "moonrockz/smithy-syntax@0.0.1",
+}

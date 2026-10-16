@@ -1,8 +1,8 @@
 # moonrockz/smithy-syntax
 
-Smithy IDL syntax for MoonBit: a lossless scanner, a typed AST with spans, a
+Smithy syntax for MoonBit: a lossless IDL scanner, a typed AST with spans, a
 CST that prints the source back byte for byte, a parser with recovery per
-statement, and diagnostics in the style of Elm and Rust.
+statement, diagnostics in the style of Elm and Rust, and a typed JSON AST codec.
 
 ## Status
 
@@ -12,7 +12,7 @@ statement, and diagnostics in the style of Elm and Rust.
 - Parser: done.
 - Diagnostics: done.
 - Traversal: done (`traversal`: `NodeRef`, `walk`, `fold`, `reduce`, `accept`, events, `Tree`, `TreeCursor`).
-- JSON AST: planned, in a later sub-project.
+- JSON AST: done (`json_ast`: typed records, decoder and encoder with exact numeric text round trips).
 
 ## Example
 
@@ -50,9 +50,15 @@ moon add moonrockz/smithy-syntax
 | `parser` | `.../parser` | `parse`, `parse_tokens`, `ParseResult`, `Version`, `max_nesting` |
 | `traversal` | `.../traversal` | `NodeRef`, `walk`, `fold`, `reduce`, `reduce_pruned`, `accept`, `EventReader`, `push_events`, `Tree`, `TreeCursor`, `NodePath`, `kind_table` |
 | `report` | `.../report` | `render_terminal`, `render_plain`, `render_short` |
-| root | `moonrockz/smithy-syntax` | `parse_idl`, re-exports of every public type |
+| `json_ast` | `.../json_ast` | `JsonAst`, shape records, `parse`, `decode`, `encode`, `stringify` |
+| root | `moonrockz/smithy-syntax` | `parse_idl`, `parse_json_ast`, `decode_json_ast`, `encode_json_ast`, public type re-exports |
 
 Dependencies point one way: `span` ← `diagnostic` ← `scanner` ← `ast` ← `cst` ← `parser` ← `traversal` and `report` ← root (`traversal` and `report` do not import each other).
 Each package has a `README.mbt.md` with checked examples. See the design in
 `docs/superpowers/specs/2026-10-15-idl-syntax-design.md`, and the cookbook in `docs/cookbook` for task
 articles.
+
+The JSON AST package depends on core JSON and the IDL AST's simple-type enum.
+Its [package guide](src/json_ast/README.mbt.md) defines the codec's preservation
+and validation rules. The semantic loader and IDL-to-JSON conversion are available
+in `moonrockz/smithy`.

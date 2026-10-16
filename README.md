@@ -4,13 +4,17 @@ A [Smithy](https://smithy.io/) implementation for the MoonBit ecosystem, organiz
 
 ## Status
 
-The Smithy IDL 2.0 syntax layer (scanner, AST, CST, parser with recovery, diagnostics) is implemented in `pkgs/smithy-syntax` and checked against the Java reference's loader corpus. The semantic model, loader, JSON AST and CLI commands are the next sub-projects.
+The Smithy IDL 2.0 syntax layer (scanner, AST, CST, parser with recovery, diagnostics)
+and the typed JSON AST codec are implemented in `pkgs/smithy-syntax` and checked
+against the Java reference's loader corpus. `pkgs/smithy` assembles IDL and JSON
+files into a semantic model with the prelude, reference resolution, mixins,
+trait applications and metadata merging. CLI commands are the next sub-project.
 
 ## Packages
 
 | Path | Module | Purpose |
 |------|--------|---------|
-| `pkgs/smithy` | `moonrockz/smithy` | Smithy model library |
+| `pkgs/smithy` | `moonrockz/smithy` | Semantic model and multi-file IDL/JSON loader |
 | `pkgs/smithy-syntax` | `moonrockz/smithy-syntax` | Smithy IDL scanner, AST, CST, parser and diagnostics |
 | `docs/cookbook` | `moonrockz/smithy_cookbook` | Tested cookbook articles for the syntax module |
 | `tests` | `moonrockz/smithy_tests` | Compatibility kit (vendored reference corpus) and moonspec acceptance features; not published |
@@ -103,6 +107,8 @@ mise run validate              # package structure against moon.work
 mise run test                  # all targets; the tests module runs on js and native only
 mise run test -- js native     # some targets
 mise run test:bdd              # moonspec acceptance features (tests/bdd, js target)
+mise run tck:vendor:json -- REF # refresh the vendored JSON AST reference corpus
+mise run prelude:vendor -- REF # refresh the embedded standard prelude
 mise run build                 # all targets
 mise run build:native          # native release build
 mise run clean

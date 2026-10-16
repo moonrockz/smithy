@@ -29,8 +29,9 @@ test "doc comments attach to shapes, members, enum members and inline shapes" {
       #|}
       #|
       #|operation Op {
+      #|    input :=
       #|    /// Inline docs.
-      #|    input := {}
+      #|    {}
       #|}
       #|
     ),
@@ -53,7 +54,7 @@ test "doc comments attach to shapes, members, enum members and inline shapes" {
 }
 
 ///|
-test "docs between the traits and the keyword still attach" {
+test "docs between the traits and the keyword are ordinary comments" {
   let r = dmodel(
     (
       #|@a
@@ -63,7 +64,7 @@ test "docs between the traits and the keyword still attach" {
     ),
   )
   guard r.ast is Some(f) else { fail("no ast") }
-  inspect(f.shapes()[0].docs.length(), content="1")
+  inspect(f.shapes()[0].docs.length(), content="0")
   inspect(r.has_errors(), content="false")
 }
 

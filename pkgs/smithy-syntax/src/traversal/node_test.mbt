@@ -293,8 +293,9 @@ let inline_docs : String =
   #|namespace a
   #|
   #|operation Op {
+  #|    input :=
   #|    /// in
-  #|    input := {
+  #|    {
   #|        a: String
   #|    }
   #|}
@@ -310,8 +311,8 @@ test "an input property covers the docs of its inline shape" {
   guard nodes.search_by(n => n.kind() == "inline") is Some(i) else {
     fail("no inline shape")
   }
-  assert_eq(nodes[p].span().start, doc)
-  assert_eq(nodes[i].span().start, doc)
+  assert_true(nodes[p].span().start <= doc && nodes[p].span().end() > doc)
+  assert_true(nodes[i].span().start <= doc && nodes[i].span().end() > doc)
 }
 
 ///|

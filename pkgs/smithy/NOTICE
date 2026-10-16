@@ -1,0 +1,6 @@
+prelude.smithy and prelude_data.mbt contain the Smithy prelude from
+https://github.com/smithy-lang/smithy, distributed under Apache-2.0.
+PRELUDE_SHA records the upstream revision.
+
+Smithy
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
