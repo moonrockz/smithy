@@ -2,12 +2,18 @@
 
 A [Smithy](https://smithy.io/) implementation for the MoonBit ecosystem, organized as a monorepo.
 
+## Status
+
+The Smithy IDL 2.0 syntax layer (scanner, AST, CST, parser with recovery, diagnostics) is implemented in `pkgs/smithy-syntax` and checked against the Java reference's loader corpus. The semantic model, loader, JSON AST and CLI commands are the next sub-projects.
+
 ## Packages
 
 | Path | Module | Purpose |
 |------|--------|---------|
 | `pkgs/smithy` | `moonrockz/smithy` | Smithy model library |
 | `pkgs/smithy-syntax` | `moonrockz/smithy-syntax` | Smithy IDL scanner, AST, CST, parser and diagnostics |
+| `docs/cookbook` | `moonrockz/smithy_cookbook` | Tested cookbook articles for the syntax module |
+| `tests` | `moonrockz/smithy_tests` | Compatibility kit (vendored reference corpus) and moonspec acceptance features; not published |
 | `apps/smithy` | `moonrockz/smithy-cli` | Command-line application |
 
 The workspace members are listed in `moon.work`.
@@ -73,6 +79,8 @@ smithy/
 ├── apps/smithy/               # CLI (moonrockz/smithy-cli)
 ├── pkgs/smithy/               # library (moonrockz/smithy)
 ├── pkgs/smithy-syntax/        # IDL syntax (moonrockz/smithy-syntax)
+├── docs/cookbook/             # tested cookbook articles (moonrockz/smithy_cookbook)
+├── tests/                     # compatibility kit and acceptance features (moonrockz/smithy_tests)
 ├── scripts/*.mbtx             # task scripts, run with moonx
 ├── moon.mod                   # workspace root module
 └── moon.work                  # workspace members
