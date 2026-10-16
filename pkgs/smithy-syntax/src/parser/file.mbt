@@ -110,6 +110,20 @@ fn Parser::parse_control(
   self.expect_br()
   self.pop_context()
   if key.value == "version" {
+    // A second `$version` is a duplicate control statement; reject it before
+    // touching the recorded version, so the first statement stays in force.
+    if self.version is Some(_) {
+      self.fail(
+        "SM-PARSE-013",
+        "DUPLICATE CONTROL STATEMENT",
+        "Duplicate control statement `version`",
+        key.span,
+        notes=[
+          "I already saw a `version` control statement; each control statement key may be set at most once.",
+        ],
+        hint="Remove the duplicate `version` statement.",
+      )
+    }
     match value {
       String(v, _) =>
         match Version::of(v) {

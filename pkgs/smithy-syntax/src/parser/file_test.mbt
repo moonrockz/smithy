@@ -77,6 +77,26 @@ test "a control statement key may be set at most once" {
 }
 
 ///|
+/// A duplicate `$version` must not change the version the first one set,
+/// so later version gating follows the first statement.
+test "a duplicate version keeps the first version in force" {
+  let r = @parser.parse_text(
+    (
+      #|$version: "1"
+      #|$version: "2"
+      #|namespace a
+      #|
+      #|string S with [M]
+      #|
+    ),
+  )
+  @expect.expect(r.diagnostics.map(d => d.code)).to_equal([
+    "SM-PARSE-013", "SM-PARSE-007",
+  ])
+  debug_inspect(r.version, content="Some(V1)")
+}
+
+///|
 /// `MetadataStatement = "metadata" SP NodeObjectKey [SP] "=" [SP] NodeValue
 /// BR`: a mandatory `SP` right after `metadata`, then only `[SP]` (not a
 /// line break or a comment) around the key and `=`. Pins the reference's
