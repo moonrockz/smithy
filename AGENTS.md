@@ -69,6 +69,20 @@ the API changes. Rules that tests enforce:
   `tests/bdd` (`mise run test:bdd`). Change the scenario when you change the
   behavior.
 
+## Traversal
+
+`pkgs/smithy-syntax/src/traversal` is the node model and the traversal styles over the AST. Rules that tests
+enforce:
+
+- No walk recurses: `walk`, `fold`, `reduce`, the event reader, `Tree` and the cursor each keep their own stack.
+- The kind table in `src/traversal/README.mbt.md` (between `<!-- kinds:start -->` and `<!-- kinds:end -->`)
+  is the contract. `tests/features/traversal.feature` checks it against `kind_table()`. When you add a kind or
+  a field, update both.
+- Kind and field names follow the Smithy JSON AST where it has a name, and the IDL grammar for the rest.
+- `NodeRef::span()` widens the AST span over doc comments, so a child always lies inside its parent.
+- With the same `Control` decisions, every style gives the same enter and leave order; laws in
+  `src/traversal/*_law_test.mbt` check this.
+
 ## Work tracking
 
 Issues live in [beads](https://github.com/steveyegge/beads) (`bd`), in a Dolt database that syncs through

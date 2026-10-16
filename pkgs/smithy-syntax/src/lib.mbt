@@ -90,6 +90,82 @@ pub using @cst {type IdlCst, type StatementCst, type StatementKind}
 pub using @parser {type ParseResult, type ParseError, type Version, type Depth}
 
 ///|
+/// The traversal: the node model, the cursor, the tree and the event types.
+pub using @traversal {
+  type NodeRef,
+  type Control,
+  type PathStep,
+  type NodePath,
+  type EnterEvent,
+  type LeaveEvent,
+  type Event,
+  type EventReader,
+  type Tree,
+  type TreeCursor,
+  trait EventSource,
+  trait Handler,
+  trait Visitor,
+}
+
+///|
+/// Visit `root` and every node below it in pre-order; see `@traversal.walk`.
+pub fn walk(
+  root : NodeRef,
+  enter : (NodeRef) -> Control,
+  leave~ : (NodeRef) -> Unit = _ => (),
+) -> Unit {
+  @traversal.walk(root, enter, leave~)
+}
+
+///|
+/// Thread an accumulator through a walk; see `@traversal.fold`.
+pub fn[A] fold(
+  root : NodeRef,
+  init : A,
+  enter : (A, NodeRef) -> (A, Control),
+  leave~ : (A, NodeRef) -> A = (a, _) => a,
+) -> A {
+  @traversal.fold(root, init, enter, leave~)
+}
+
+///|
+/// Reduce `root` bottom up; see `@traversal.reduce`.
+pub fn[R] reduce(root : NodeRef, f : (NodeRef, ArrayView[R]) -> R) -> R {
+  @traversal.reduce(root, f)
+}
+
+///|
+/// Reduce bottom up, steered by `enter`; see `@traversal.reduce_pruned`.
+pub fn[R] reduce_pruned(
+  root : NodeRef,
+  enter : (NodeRef) -> Control,
+  f : (NodeRef, ArrayView[R]) -> R,
+) -> R? {
+  @traversal.reduce_pruned(root, enter, f)
+}
+
+///|
+/// Call one `Visitor` method per node; see `@traversal.accept`.
+pub fn[V : Visitor] accept(root : NodeRef, visitor : V) -> Unit {
+  @traversal.accept(root, visitor)
+}
+
+///|
+/// Drive an event source into a handler; see `@traversal.push_events`.
+pub fn[S : EventSource, H : Handler] push_events(
+  source : S,
+  handler : H,
+) -> Unit {
+  @traversal.push_events(source, handler)
+}
+
+///|
+/// Every node type: (category, kind, fields); see `@traversal.kind_table`.
+pub fn kind_table() -> Array[(String, String, Array[String])] {
+  @traversal.kind_table()
+}
+
+///|
 /// Parse a source text with recovery per statement.
 pub fn parse(source : SourceText) -> ParseResult {
   @parser.parse(source)
