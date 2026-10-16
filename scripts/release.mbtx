@@ -243,6 +243,18 @@ let release_assets : Array[String] = [
 ]
 
 ///|
+/// A release is done only when it exists, is not a draft, and holds every expected asset. A release
+/// that lacks assets is not done: the repair run (`gh workflow run release.yml --ref vX.Y.Z`) must
+/// reach `release:github`, which uploads them.
+fn release_complete(
+  exists : Bool,
+  draft : Bool,
+  assets : Array[String],
+) -> Bool {
+  exists && !draft && missing_names(release_assets, assets).is_empty()
+}
+
+///|
 /// The names in `expected` that `present` lacks, in the order of `expected`.
 fn missing_names(
   expected : Array[String],
@@ -993,8 +1005,8 @@ async fn run_plan() -> Unit {
         false
       }
     }
-    let (exists, _, draft) = inspect_release("v\{version}")
-    released = exists && !draft
+    let (exists, assets, draft) = inspect_release("v\{version}")
+    released = release_complete(exists, draft, assets)
   }
   match
     plan(
@@ -1297,10 +1309,12 @@ struct ReleaseWorld {
   mut local_assets : Array[String]
   mut remote_assets : Array[String]
   mut facts : Facts
+  /// The text of `scripts/dist.mbtx`.
+  dist_source : String
 }
 
 ///|
-fn ReleaseWorld::new() -> ReleaseWorld {
+fn ReleaseWorld::new(dist_source : String) -> ReleaseWorld {
   {
     exit_code: 0,
     stdout: "",
@@ -1326,6 +1340,7 @@ fn ReleaseWorld::new() -> ReleaseWorld {
       unreleased: 0,
       release_prs: [],
     },
+    dist_source,
   }
 }
 
@@ -1534,6 +1549,29 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
   setup.given1("the GitHub release exists: {string}", fn(answer : String) {
     self.released = yes(answer)
   })
+  setup.given2("the GitHub release exists with draft {string} and the assets {string}", fn(
+    draft : String,
+    assets : String,
+  ) {
+    self.released = release_complete(true, yes(draft), words(assets))
+  })
+  setup.given0("the GitHub release has every expected asset", fn() {
+    self.released = release_complete(true, false, release_assets)
+  })
+  setup.then0("the expected assets are the names that dist.mbtx writes", fn() raise {
+    let source = self.dist_source
+    for name in release_assets {
+      // `smithy-<target>.tar.gz` and `.zip` names are built from the target; check the target part.
+      let found = if name.has_suffix(".tar.gz") || name.has_suffix(".zip") {
+        let target = name[:name.length() - (if name.has_suffix(".zip") { 4 } else { 7 })][7:].to_owned()
+        source.contains("\"\{target}\"")
+      } else {
+        source.contains("\"\{name}\"")
+      }
+      @expect.expect(found).to_equal(true)
+    }
+    @expect.expect(release_assets.length()).to_equal(8)
+  })
   setup.given1("the changelog has the section: {string}", fn(answer : String) {
     self.has_section = yes(answer)
   })
@@ -1706,8 +1744,9 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
 
 ///|
 async test "release feature" {
+  let dist_source = @fs.read_file("dist.mbtx").text()
   @moonspec.run_or_fail(
-    ReleaseWorld::new,
+    () => ReleaseWorld::new(dist_source),
     @moonspec.RunOptions::new([
       @moonspec.FeatureSource::File("features/release.feature"),
     ]),

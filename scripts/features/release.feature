@@ -550,3 +550,18 @@ Feature: Release tooling
       | 0    |                       | on main                                                                                                                                                                |
       | 1    |                       | not on main                                                                                                                                                            |
       | 128  | fatal: no merge base  | error: cannot tell whether v0.0.1 is on main: `git merge-base --is-ancestor HEAD origin/main` exited with 128: fatal: no merge base                                  |
+
+  Scenario Outline: A release counts as done only with every asset
+    Given the event is "push", the ref type is "tag" and the ref name is "v0.0.1"
+    And the GitHub release exists with draft "<draft>" and the assets "<assets>"
+    Then the plan for version "0.0.1" is "<plan>"
+
+    Examples:
+      | draft | assets                                                                                                                                       | plan                             |
+      | no    | smithy-linux-x64.tar.gz smithy-linux-arm64.tar.gz smithy-darwin-arm64.tar.gz smithy-darwin-x64.tar.gz smithy-windows-x64.zip smithy.wasm smithy-gc.wasm checksums.txt | skip: v0.0.1 is already released |
+      | no    | smithy-linux-x64.tar.gz smithy-linux-arm64.tar.gz smithy-darwin-arm64.tar.gz smithy-darwin-x64.tar.gz smithy-windows-x64.zip smithy.wasm smithy-gc.wasm | release 0.0.1                    |
+      | no    |                                                                                                                                              | release 0.0.1                    |
+      | yes   | smithy-linux-x64.tar.gz smithy-linux-arm64.tar.gz smithy-darwin-arm64.tar.gz smithy-darwin-x64.tar.gz smithy-windows-x64.zip smithy.wasm smithy-gc.wasm checksums.txt | release 0.0.1                    |
+
+  Scenario: The expected assets are the files that dist.mbtx writes
+    Then the expected assets are the names that dist.mbtx writes
