@@ -139,6 +139,36 @@ test "a visitor" {
 }
 ```
 
+A `Handler` for `push_events` steers the run with the `Control` of
+`on_enter`:
+
+```mbt check
+///|
+struct Paths(Array[String])
+
+///|
+impl @traversal.Handler for Paths with fn on_enter(self, e) {
+  self.0.push(e.path.to_string())
+  if e.category == "shape" {
+    SkipChildren
+  } else {
+    Continue
+  }
+}
+
+///|
+test "push events into a handler" {
+  let r = @parser.parse_text("namespace a\n\nstring S\n")
+  let root = @traversal.NodeRef::of_result(r).unwrap()
+  let paths = Paths([])
+  @traversal.push_events(@traversal.EventReader::new(root), paths)
+  debug_inspect(
+    paths.0,
+    content="[\"\", \"namespace[0]\", \"namespace[0].name[0]\", \"shapes[0]\"]",
+  )
+}
+```
+
 ## Tree, cursor and paths
 
 ```mbt check

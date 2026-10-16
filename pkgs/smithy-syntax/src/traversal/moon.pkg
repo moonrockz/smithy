@@ -14,6 +14,8 @@ import {
   "moonrockz/smithy-syntax/parser",
   "moonrockz/smithy-syntax/span",
   "moonrockz/smithy-syntax/lawkit",
+  "moonrockz/smithy-syntax/ast",
+  "moonbitlang/core/env",
   "moonbitlang/core/quickcheck",
   "moonbitlang/core/quickcheck/splitmix",
 } for "test"

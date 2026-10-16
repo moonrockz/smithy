@@ -90,6 +90,11 @@ pub fn Tree::field_of(self : Tree, n : NodeRef) -> String? {
 
 ///|
 fn Tree::parent_entry(self : Tree, n : NodeRef) -> (NodeRef, PathStep)? {
+  // Only the root is a file, and it has no parent. Its span joins every
+  // comment, so skipping it keeps each lookup independent of the comments.
+  if n is File(_, _) {
+    return None
+  }
   guard self.parents.get(identity(n)) is Some(bucket) else { return None }
   for entry in bucket {
     if same(entry.0, n) {
