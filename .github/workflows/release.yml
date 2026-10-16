@@ -36,6 +36,8 @@ on:
       - scripts/credentials.mbtx
       - apps/zig-cross/**
       - .config/mise/config.toml
+      - moon.mod
+      - CHANGELOG.md
   workflow_dispatch:
     inputs:
       dry_run:
