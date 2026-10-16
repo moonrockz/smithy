@@ -1,6 +1,6 @@
 name = "smithy-monorepo"
 
-version = "0.1.0"
+version = "0.0.1"
 
 description = "Smithy for the MoonBit ecosystem: workspace root"
 
