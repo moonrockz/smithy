@@ -4,6 +4,7 @@
 pub struct Offset(Int32) derive(Eq, Compare, Hash, Debug)
 
 ///|
+/// The offset `n`, or `None` when `n` is negative.
 pub fn Offset::new(n : Int32) -> Offset? {
   if n < 0 {
     None
@@ -13,6 +14,7 @@ pub fn Offset::new(n : Int32) -> Offset? {
 }
 
 ///|
+/// The offset of the first unit of a text.
 pub fn Offset::zero() -> Offset {
   Offset(0)
 }
@@ -25,6 +27,7 @@ pub fn Offset::advance(self : Offset, by : Length) -> Offset {
 }
 
 ///|
+/// The offset one unit after `self`.
 pub fn Offset::next(self : Offset) -> Offset {
   Offset(self.0 + 1)
 }
@@ -54,6 +57,7 @@ pub fn Offset::to(self : Offset, end : Offset) -> Span {
 pub struct Length(Int32) derive(Eq, Compare, Hash, Debug)
 
 ///|
+/// The length `n`, or `None` when `n` is negative.
 pub fn Length::new(n : Int32) -> Length? {
   if n < 0 {
     None
@@ -63,11 +67,13 @@ pub fn Length::new(n : Int32) -> Length? {
 }
 
 ///|
+/// The length of an empty range.
 pub fn Length::zero() -> Length {
   Length(0)
 }
 
 ///|
+/// The length of a single unit.
 pub fn Length::one() -> Length {
   Length(1)
 }
@@ -79,6 +85,7 @@ pub fn Length::of_string(s : String) -> Length {
 }
 
 ///|
+/// The sum of two lengths.
 pub impl Add for Length with fn add(a, b) {
   Length(a.0 + b.0)
 }
@@ -88,6 +95,7 @@ pub impl Add for Length with fn add(a, b) {
 pub struct Line(Int32) derive(Eq, Compare, Hash, Debug)
 
 ///|
+/// The line `n`, or `None` when `n` is less than 1.
 pub fn Line::new(n : Int32) -> Line? {
   if n < 1 {
     None
@@ -97,11 +105,13 @@ pub fn Line::new(n : Int32) -> Line? {
 }
 
 ///|
+/// The first line of a text, line 1.
 pub fn Line::first() -> Line {
   Line(1)
 }
 
 ///|
+/// The line after `self`.
 pub fn Line::next(self : Line) -> Line {
   Line(self.0 + 1)
 }
@@ -111,6 +121,7 @@ pub fn Line::next(self : Line) -> Line {
 pub struct Column(Int32) derive(Eq, Compare, Hash, Debug)
 
 ///|
+/// The column `n`, or `None` when `n` is less than 1.
 pub fn Column::new(n : Int32) -> Column? {
   if n < 1 {
     None
@@ -120,11 +131,13 @@ pub fn Column::new(n : Int32) -> Column? {
 }
 
 ///|
+/// The first column of a line, column 1.
 pub fn Column::first() -> Column {
   Column(1)
 }
 
 ///|
+/// The column after `self`.
 pub fn Column::next(self : Column) -> Column {
   Column(self.0 + 1)
 }

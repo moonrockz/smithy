@@ -21,11 +21,13 @@ pub fn SourceText::new(text : String, name? : String) -> SourceText {
 }
 
 ///|
+/// The whole source text.
 pub fn SourceText::text(self : SourceText) -> String {
   self.text
 }
 
 ///|
+/// The name given at construction (a file name), if any.
 pub fn SourceText::name(self : SourceText) -> String? {
   self.name
 }

@@ -7,21 +7,25 @@ pub(all) struct Span {
 } derive(Eq, Debug, Hash)
 
 ///|
+/// The span of `length` units starting at `start`.
 pub fn Span::new(start : Offset, length : Length) -> Span {
   { start, length, }
 }
 
 ///|
+/// The offset just past the last unit of the span.
 pub fn Span::end(self : Span) -> Offset {
   self.start.advance(self.length)
 }
 
 ///|
+/// Whether `offset` lies inside the span (the end is excluded).
 pub fn Span::contains(self : Span, offset : Offset) -> Bool {
   self.start <= offset && offset < self.end()
 }
 
 ///|
+/// Whether the span covers no units.
 pub fn Span::is_empty(self : Span) -> Bool {
   self.length == Length::zero()
 }
@@ -42,6 +46,7 @@ pub(all) struct Position {
 } derive(Eq, Debug, Hash)
 
 ///|
+/// The position at `line` and `column`.
 pub fn Position::new(line : Line, column : Column) -> Position {
   { line, column, }
 }
