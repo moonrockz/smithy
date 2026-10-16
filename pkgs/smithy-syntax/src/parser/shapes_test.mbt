@@ -46,6 +46,57 @@ test "simple shapes" {
 }
 
 ///|
+/// `Mixins = [SP] "with" [WS] "[" ...`: `with` on the next line is not a
+/// `Mixins` clause, so the shape has none and `with` starts a new
+/// (invalid) statement. Pins the reference's
+/// `invalid/mixins/with-on-next-line-structure.smithy`.
+test "with on the next line is not a mixins clause" {
+  @expect.expect(
+    scodes(
+      (
+        #|structure Foo
+        #|    with [Mix] {
+        #|}
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-001"])
+  let ss = shapes(
+    (
+      #|blob Bar with [Mix]
+      #|
+    ),
+  )
+  guard ss[0].shape is Simple(mixins=Some(m), ..) else { fail("no mixins") }
+  inspect(m.ids[0].value, content="Mix")
+}
+
+///|
+/// An inline shape's `with` may follow a trait that ends its own line: the
+/// `BR` there belongs to the trait, not to `Mixins`. Pins the reference's
+/// `valid/inline-io.smithy`.
+test "an inline shape's with may follow a trait on its own line" {
+  let ss = shapes(
+    (
+      #|operation Op {
+      #|    input :=
+      #|        @sensitive
+      #|        with [Mix] {
+      #|            id: String
+      #|        }
+      #|}
+      #|
+    ),
+  )
+  guard ss[0].shape is Operation(properties~, ..) &&
+    properties[0] is Input(Inline(inline), _) else {
+    fail("no inline input")
+  }
+  guard inline.mixins is Some(m) else { fail("no mixins") }
+  inspect(m.ids[0].value, content="Mix")
+}
+
+///|
 test "structures with explicit and elided members and defaults" {
   let ss = shapes(
     (
@@ -199,6 +250,45 @@ test "an unknown operation property is SM-PARSE-011" {
 }
 
 ///|
+/// Pins the reference's `invalid/operations/input-defined-twice.smithy`.
+test "an operation property may be set at most once" {
+  @expect.expect(
+    scodes(
+      (
+        #|operation Op {
+        #|    input: Foo
+        #|    input: Foo
+        #|}
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-012"])
+}
+
+///|
+/// `ApplyStatementBlock = "apply" SP ShapeId WS "{" ...`: a mandatory `WS`
+/// between the target and `{`, not zero. Pins the reference's
+/// `invalid/apply/apply-missing-space.smithy`.
+test "apply needs whitespace before its trait block" {
+  @expect.expect(
+    scodes(
+      (
+        #|apply Foo{ @sensitive }
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-001"])
+  @expect.expect(
+    scodes(
+      (
+        #|apply Foo { @sensitive }
+        #|
+      ),
+    ),
+  ).to_equal([])
+}
+
+///|
 test "a shape name must be an identifier (the reference's parse errors)" {
   let r = model(
     (
@@ -264,7 +354,13 @@ test "a shape keyword needs a name on the same line" {
 }
 
 ///|
-test "members need a line break between them" {
+/// `ShapeMembers = "{" [WS] *(ShapeMember [WS]) "}"` and `WS = 1*(SP / NL /
+/// Comment / Comma)`: unlike a statement's `BR`, members need only
+/// whitespace between them, not a line break, a comment or a comma
+/// specifically. A plain space is enough, as the reference's
+/// `valid/maps-2.0.smithy` (`map H{key:String value:String}`) and
+/// `valid/enums/short-form-enum.smithy` (`enum A { FOO BAR BAZ }`) pin.
+test "members need only whitespace between them, not a line break" {
   @expect.expect(
     scodes(
       (
@@ -272,7 +368,7 @@ test "members need a line break between them" {
         #|
       ),
     ),
-  ).to_equal(["SM-PARSE-003"])
+  ).to_equal([])
   @expect.expect(
     scodes(
       (
@@ -281,6 +377,50 @@ test "members need a line break between them" {
       ),
     ),
   ).to_equal([])
+  @expect.expect(
+    scodes(
+      (
+        #|structure S {a: String"b"}
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-003"])
+}
+
+///|
+/// `ValueAssignment = [SP] "=" [SP] NodeValue [SP] [Comma] BR`: unlike a
+/// bare member, a member with an explicit value ends with a true `BR`, so
+/// two of them cannot share a line even separated by a space. Pins the
+/// reference's `invalid/defaults/missing-newline-after-assignment.smithy`
+/// and `invalid/enums/missing-newline-after-assignment.smithy`.
+test "a member's value assignment still needs a line break before the next member" {
+  @expect.expect(
+    scodes(
+      (
+        #|structure S { bar: String = "Hi" baz: String = "Hi" }
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-003"])
+  @expect.expect(
+    scodes(
+      (
+        #|structure S {
+        #|    bar: String = "Hi"
+        #|    baz: String = "Hi"
+        #|}
+        #|
+      ),
+    ),
+  ).to_equal([])
+  @expect.expect(
+    scodes(
+      (
+        #|intEnum Foo { BAR = 1 BAZ = 2 }
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-003"])
 }
 
 ///|

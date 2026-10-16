@@ -38,6 +38,108 @@ test "control, metadata, namespace and use parse in order" {
 }
 
 ///|
+/// `ControlStatement = "$" NodeObjectKey [SP] ":" [SP] NodeValue BR`: only
+/// `[SP]` around `:`, not a line break or a comment. Pins the reference's
+/// `invalid/control/control-newline.smithy` and `control-colon-newline.smithy`.
+test "a control statement's key and value must stay on one line" {
+  @expect.expect(
+    codes(
+      (
+        #|$version
+        #|: "2"
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-001"])
+  @expect.expect(
+    codes(
+      (
+        #|$version:
+        #|"2"
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-001"])
+}
+
+///|
+/// Pins the reference's `invalid/control/control-version-defined-twice.smithy`.
+test "a control statement key may be set at most once" {
+  @expect.expect(
+    codes(
+      (
+        #|$version: "2"
+        #|$version: "2"
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-013"])
+}
+
+///|
+/// `MetadataStatement = "metadata" SP NodeObjectKey [SP] "=" [SP] NodeValue
+/// BR`: a mandatory `SP` right after `metadata`, then only `[SP]` (not a
+/// line break or a comment) around the key and `=`. Pins the reference's
+/// `invalid/metadata/not-newline-after-metadata.smithy`,
+/// `space-after-metadata-quoted.smithy` and `metadata-multiple-lines.smithy`.
+test "a metadata statement's key and value must stay on one line" {
+  @expect.expect(
+    codes(
+      (
+        #|metadata
+        #|foo = "bar"
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-001"])
+  @expect.expect(
+    codes(
+      (
+        #|metadata"foo"="bar"
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-001"])
+  @expect.expect(
+    codes(
+      (
+        #|metadata foo =
+        #|"bar"
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-001"])
+}
+
+///|
+/// `NamespaceStatement = "namespace" SP Namespace BR` and `UseStatement =
+/// "use" SP AbsoluteRootShapeId BR`: only `[SP]` right after the keyword,
+/// not a line break or a comment. Pins the reference's
+/// `invalid/namespace/namespace-multiple-lines.smithy` and
+/// `invalid/use/use-multiple-lines.smithy`.
+test "namespace and use must stay on one line as their keyword" {
+  @expect.expect(
+    codes(
+      (
+        #|namespace
+        #|com.foo
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-001"])
+  @expect.expect(
+    codes(
+      (
+        #|namespace com.foo
+        #|use
+        #|smithy.api#String
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-001"])
+}
+
+///|
 test "an unsupported version is SM-PARSE-006" {
   @expect.expect(
     codes(

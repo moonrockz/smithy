@@ -50,7 +50,7 @@ mise run check                 # lint, validate, test, build
 mise run lint                  # yamllint, moon fmt --check, moon check
 mise run format                # moon fmt
 mise run validate              # package structure against moon.work
-mise run test                  # all targets
+mise run test                  # all targets; the tests module runs on js and native only
 mise run test -- js native     # some targets
 mise run build                 # all targets
 mise run build:native          # native release build

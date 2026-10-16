@@ -102,7 +102,10 @@ test "a doc comment with no shape after it is a warning" {
 }
 
 ///|
-test "docs before apply are an error" {
+/// Pins the reference's `valid/doc-comments.smithy`: a doc comment right
+/// before `apply` is read as an ordinary comment, with only a warning (not
+/// an error), since `apply` cannot take documentation.
+test "docs before apply are a warning, not an error" {
   @expect.expect(
     dcodes(
       (
@@ -112,6 +115,16 @@ test "docs before apply are an error" {
       ),
     ),
   ).to_equal(["SM-PARSE-008"])
+  inspect(
+    dmodel(
+      (
+        #|/// no
+        #|apply Foo @a
+        #|
+      ),
+    ).has_errors(),
+    content="false",
+  )
 }
 
 ///|

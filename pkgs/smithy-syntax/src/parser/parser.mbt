@@ -276,17 +276,71 @@ fn Parser::expect_identifier(
 }
 
 ///|
+/// Whether a line break or a comment separates the token at `self.pos`
+/// from the one before it (a `BR`, not just whitespace).
+fn Parser::has_br_before(self : Parser) -> Bool {
+  guard self.pos > 0 && self.pos < self.tokens.length() else { return false }
+  let prev = self.tokens[self.pos - 1]
+  let next = self.tokens[self.pos]
+  prev.trivia_after.iter().any(t => t.is_newline() || t.is_comment()) ||
+  next.trivia_before.iter().any(t => t.is_newline() || t.is_comment())
+}
+
+///|
+/// The grammar's `SP` right after the token just consumed: unlike most
+/// gaps (which accept a line break or a comment as whitespace too), a few
+/// spots allow only a plain space or tab before the next token - `$key`
+/// and `:` in a control statement, `metadata` and the key, `=` and the
+/// value, `namespace`/`use` and what follows. A line break or a comment
+/// there is the reference's own unexpected token, so the error points at
+/// it, not at the next real token after it.
+fn Parser::expect_sp_after(
+  self : Parser,
+  what : String,
+) -> Unit raise ParseError {
+  // At the true end of the file there is no "next real token" to be
+  // misplaced; that is a missing-value error, not a misplaced one, and
+  // whatever parses next already reports it.
+  guard self.pos > 0 && self.peek() is Some(_) else { return }
+  let prev = self.tokens[self.pos - 1]
+  for t in prev.trivia_after {
+    if t.is_newline() || t.is_comment() {
+      self.fail(
+        "SM-PARSE-001",
+        "UNEXPECTED LINE BREAK",
+        "I was expecting \{what} right after `\{prev.lexeme}`, on the same line, but found a line break or a comment",
+        t.span(),
+        hint="Move \{what} onto the same line as `\{prev.lexeme}`.",
+      )
+    }
+  }
+}
+
+///|
+/// The grammar's mandatory `SP` (or `WS`) right after the token just
+/// consumed: a few spots need at least one separator, not zero
+/// (`metadata"key"`, `apply Foo{...}`).
+fn Parser::expect_sp_present(
+  self : Parser,
+  what : String,
+) -> Unit raise ParseError {
+  if self.adjacent() {
+    self.fail(
+      "SM-PARSE-001",
+      "MISSING WHITESPACE",
+      "I was expecting whitespace before \{what} but found \{self.found()} right after `\{self.tokens[self.pos - 1].lexeme}`",
+      self.here(),
+    )
+  }
+}
+
+///|
 /// The grammar's `BR`: after a statement there must be a line break or a
 /// comment before the next token (or the end of the file).
 fn Parser::expect_br(self : Parser) -> Unit raise ParseError {
   guard self.pos > 0 else { return }
   guard self.peek() is Some(next) else { return }
-  let prev = self.tokens[self.pos - 1]
-  let has_break = prev.trivia_after
-    .iter()
-    .any(t => t.is_newline() || t.is_comment()) ||
-    next.trivia_before.iter().any(t => t.is_newline() || t.is_comment())
-  if !has_break {
+  if !self.has_br_before() {
     self.fail(
       "SM-PARSE-003",
       "MISSING LINE BREAK",

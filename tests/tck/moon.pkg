@@ -1,0 +1,8 @@
+import {
+}
+
+import {
+  "moonrockz/smithy_tests/tck",
+  "moonrockz/smithy-syntax" @syntax,
+  "moonrockz/expect",
+} for "test"

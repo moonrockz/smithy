@@ -4,4 +4,5 @@ members = [
   "./pkgs/smithy-syntax",
   "./apps/smithy",
   "./docs/cookbook",
+  "./tests",
 ]

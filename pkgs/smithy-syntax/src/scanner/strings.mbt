@@ -9,6 +9,11 @@ fn check_escape(
   match unit_at(text, at.next()) {
     Some('\\' | '"' | 'b' | 'f' | 'n' | 'r' | 't' | '/') =>
       (at.next().next(), None)
+    // `\` before a line break is the text block line-continuation escape
+    // (the specification's "escapes in text blocks"); `decode_escapes`
+    // already reads it as adding nothing. A quoted string can span lines
+    // too, so this is accepted there as well, for the same reason.
+    Some('\n') => (at.next().next(), None)
     Some('u') => {
       let mut end = at.next().next()
       let mut good = 0

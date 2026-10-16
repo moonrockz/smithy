@@ -1,7 +1,19 @@
 ///|
-/// `Mixins = [SP] "with" [WS] "[" [WS] 1*(ShapeId [WS]) "]"`.
-fn Parser::parse_mixins(self : Parser) -> @ast.Mixins? raise ParseError {
-  guard self.at_keyword("with") else { return None }
+/// `Mixins = [SP] "with" [WS] "[" [WS] 1*(ShapeId [WS]) "]"`. `[SP]`, not
+/// `[WS]` or `[BR]`: right after a top-level shape's name (or its
+/// `ForResource`), `with` on the next line is not a `Mixins` clause (the
+/// shape has none), so the caller's `BR` check runs into it as a new
+/// statement instead ("Unknown shape type: with", matching the reference).
+/// `same_line` is `false` for an inline shape (`:=`), where `with` may
+/// follow a trait that ends its own line (the reference's
+/// `valid/inline-io.smithy`: `input :=\n  @sensitive\n  with [M] {...}`).
+fn Parser::parse_mixins(
+  self : Parser,
+  same_line~ : Bool = true,
+) -> @ast.Mixins? raise ParseError {
+  guard self.at_keyword("with") && (!same_line || !self.has_br_before()) else {
+    return None
+  }
   let kw = self.expect_kind(Identifier, "`with`")
   self.require_v2("mixins", kw.span)
   ignore(self.expect_kind(LBracket, "`[` after `with`"))
@@ -249,28 +261,26 @@ fn Parser::recover_member(self : Parser, start_pos : Int32) -> Bool {
 }
 
 ///|
-/// The `BR` between two members: a line break, a comment, or a comma (the
-/// grammar's `WS` separates members; only statements need a true `BR`).
+/// The `WS` between two members: the grammar is `ShapeMembers = "{" [WS]
+/// *(ShapeMember [WS]) "}"`, and `WS = 1*(SP / NL / Comment / Comma)`, so
+/// any whitespace at all separates members (unlike a statement's `BR`,
+/// members do not need a line break, a comment or a comma specifically:
+/// `enum A { FOO BAR BAZ }` and `map H { key: String value: String }` are
+/// both valid, with members separated only by a space).
 fn Parser::expect_member_br(self : Parser) -> Unit raise ParseError {
   guard self.pos > 0 else { return }
   guard self.peek() is Some(next) else { return }
   let prev = self.tokens[self.pos - 1]
-  let has_sep = prev.trivia_after
-    .iter()
-    .any(t => t.is_newline() || t.is_comment() || t is Comma(_)) ||
-    next.trivia_before
-    .iter()
-    .any(t => t.is_newline() || t.is_comment() || t is Comma(_))
+  let has_sep = prev.trivia_after.length() > 0 ||
+    next.trivia_before.length() > 0
   if !has_sep {
     self.fail(
       "SM-PARSE-003",
       "MISSING LINE BREAK",
-      "I was expecting a line break here but found \{self.found()}",
+      "I was expecting whitespace here but found \{self.found()}",
       next.span,
-      notes=[
-        "Each member ends with a line break, a comment or a comma before the next one.",
-      ],
-      hint="Put `\{next.lexeme}` on its own line, or separate it with a comma.",
+      notes=["Each member must be separated from the next by whitespace."],
+      hint="Put a space before `\{next.lexeme}`.",
     )
   }
 }
@@ -286,6 +296,7 @@ fn[T] Parser::parse_block_items(
   title : String,
   owner : String,
   parse_item : () -> Result[T, ParseError],
+  needs_br? : (T) -> Bool,
 ) -> Array[T] raise ParseError {
   let items : Array[T] = []
   while !self.at_kind(RBrace) {
@@ -295,9 +306,20 @@ fn[T] Parser::parse_block_items(
     let depth0 = self.depth
     match parse_item() {
       Ok(m) => {
+        let strict = match needs_br {
+          Some(f) => f(m)
+          None => false
+        }
         items.push(m)
         if !self.at_kind(RBrace) {
-          self.expect_member_br()
+          // `ValueAssignment` ends with a true `BR`, stricter than the
+          // `[WS]` that otherwise separates members (`FOO = 1 BAR = 2` on
+          // one line is invalid, but `FOO BAR` is fine).
+          if strict {
+            self.expect_br()
+          } else {
+            self.expect_member_br()
+          }
         }
       }
       Err(e) => {
@@ -326,13 +348,18 @@ fn Parser::parse_members(
 ) -> Array[@ast.Member] raise ParseError {
   let open = self.expect_kind(LBrace, "`{` to start the members of \{owner}")
   self.enter()
-  let members = self.parse_block_items("UNFINISHED SHAPE", owner, () => {
-    try Ok(self.parse_member()) catch {
-      e => Err(e)
-    } noraise {
-      v => v
-    }
-  })
+  let members = self.parse_block_items(
+    "UNFINISHED SHAPE",
+    owner,
+    () => {
+      try Ok(self.parse_member()) catch {
+        e => Err(e)
+      } noraise {
+        v => v
+      }
+    },
+    needs_br=m => m.default is Some(_),
+  )
   ignore(self.expect_kind(RBrace, "`}`"))
   self.leave()
   ignore(open)
@@ -414,6 +441,7 @@ fn Parser::parse_member(self : Parser) -> @ast.Member raise ParseError {
   }
   let default : @ast.NodeValue? = if self.at_kind(Equal) {
     ignore(self.advance())
+    self.expect_sp_after("the default value")
     let v = self.parse_node_value()
     end = v.span().end()
     Some(v)
@@ -443,13 +471,18 @@ fn Parser::parse_enum_members(
 ) -> Array[@ast.EnumMember] raise ParseError {
   ignore(self.expect_kind(LBrace, "`{` to start the members of \{owner}"))
   self.enter()
-  let members = self.parse_block_items("UNFINISHED ENUM", owner, () => {
-    try Ok(self.parse_enum_member()) catch {
-      e => Err(e)
-    } noraise {
-      v => v
-    }
-  })
+  let members = self.parse_block_items(
+    "UNFINISHED ENUM",
+    owner,
+    () => {
+      try Ok(self.parse_enum_member()) catch {
+        e => Err(e)
+      } noraise {
+        v => v
+      }
+    },
+    needs_br=m => m.value is Some(_),
+  )
   ignore(self.expect_kind(RBrace, "`}`"))
   self.leave()
   members
@@ -492,6 +525,7 @@ fn Parser::parse_enum_member(self : Parser) -> @ast.EnumMember raise ParseError 
   let mut end = name.span.end()
   let value : @ast.NodeValue? = if self.at_kind(Equal) {
     ignore(self.advance())
+    self.expect_sp_after("the enum value")
     let v = self.parse_node_value()
     end = v.span().end()
     Some(v)
@@ -516,7 +550,7 @@ fn Parser::parse_inline_shape(
   let docs = self.take_docs_before(walrus.span.start)
   let traits = self.parse_traits()
   let for_resource = self.parse_for_resource()
-  let mixins = self.parse_mixins()
+  let mixins = self.parse_mixins(same_line=false)
   self.push_context("an inline shape", walrus.span)
   let members = self.parse_members("the inline shape")
   self.pop_context()
@@ -549,6 +583,23 @@ fn Parser::parse_operation_body(
         "UNEXPECTED TOKEN",
         "I was expecting `input`, `output` or `errors` but found \{self.found()}",
         self.here(),
+      )
+    }
+    let duplicate = match key.lexeme {
+      "input" => props.iter().any(p => p is Input(_, _))
+      "output" => props.iter().any(p => p is Output(_, _))
+      "errors" => props.iter().any(p => p is Errors(_, _))
+      _ => false
+    }
+    if duplicate {
+      self.fail(
+        "SM-PARSE-012",
+        "DUPLICATE OPERATION PROPERTY",
+        "Duplicate operation \{key.lexeme} property for \{owner}",
+        key.span,
+        notes=[
+          "An operation body holds `input`, `output` and `errors`, each at most once.",
+        ],
       )
     }
     match key.lexeme {
@@ -705,6 +756,7 @@ fn Parser::parse_apply(
   let kw = self.expect_kind(Identifier, "`apply`")
   self.push_context("an apply statement", kw.span)
   let target = self.parse_shape_id()
+  self.expect_sp_present("the trait or `{` after the apply target")
   let (traits, block) : (Array[@ast.Trait], Bool) = if self.at_kind(LBrace) {
     ignore(self.advance())
     self.enter()
@@ -754,10 +806,14 @@ fn Parser::parse_shape_or_apply(
   let docs = self.take_docs_before(start)
   if self.at_keyword("apply") {
     if docs.length() > 0 {
-      self.fail(
+      // An `apply` statement adds traits to a shape defined elsewhere, so it
+      // cannot take documentation: the reference treats a doc comment here
+      // as an ordinary comment (dropped, not an error).
+      self.report(
         "SM-PARSE-008",
+        Warning,
         "DOCS BEFORE APPLY",
-        "a documentation comment cannot be applied with an apply statement",
+        "a documentation comment cannot be applied with an apply statement, so I read it as an ordinary comment",
         docs[0].span,
         notes=[
           "An `apply` statement adds traits to a shape defined elsewhere; documentation is written where the shape is defined, or applied as `@documentation(\"...\")`.",

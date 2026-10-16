@@ -88,6 +88,21 @@ test "a text block may hold one or two quotes in a row" {
 }
 
 ///|
+/// Pins the reference's `valid/text-blocks.smithy` and `valid/traits.smithy`:
+/// `\` before a line break is the text block line-continuation escape, not
+/// an unknown escape.
+test "a backslash before a line break escapes the line break" {
+  let text =
+    #|"""
+    #|    Hi \
+    #|    there \
+    #|    bye"""
+  @expect.expect(skinds(text)).to_equal([TextBlock])
+  @expect.expect(scodes(text)).to_equal([])
+  @expect.expect(@scanner.text_block_value(text)).to_equal("Hi there bye")
+}
+
+///|
 test "a text block must start with a line break" {
   @expect.expect(scodes("\"\"\"hello\"\"\"")).to_equal(["SM-SCAN-004"])
   @expect.expect(skinds("\"\"\"hello\"\"\"")).to_equal([TextBlock])

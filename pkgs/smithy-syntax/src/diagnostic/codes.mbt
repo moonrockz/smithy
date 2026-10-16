@@ -20,6 +20,8 @@ let table : Array[(String, String)] = [
   ("SM-PARSE-009", "Detached documentation comment (warning)"),
   ("SM-PARSE-010", "Too much nesting"),
   ("SM-PARSE-011", "Unknown operation property"),
+  ("SM-PARSE-012", "Duplicate operation property"),
+  ("SM-PARSE-013", "Duplicate control statement"),
 ]
 
 ///|

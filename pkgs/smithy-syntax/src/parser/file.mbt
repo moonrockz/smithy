@@ -95,7 +95,9 @@ fn Parser::parse_control(
   let dollar = self.expect_kind(Dollar, "`$`")
   self.push_context("a control statement", dollar.span)
   let key = self.parse_object_key()
+  self.expect_sp_after("`:`")
   ignore(self.expect_kind(Colon, "`:` after the control key"))
+  self.expect_sp_after("the control value")
   let value = self.parse_node_value()
   self.expect_br()
   self.pop_context()
@@ -134,8 +136,12 @@ fn Parser::parse_metadata(
 ) -> @ast.MetadataStatement raise ParseError {
   let kw = self.expect_kind(Identifier, "`metadata`")
   self.push_context("a metadata statement", kw.span)
+  self.expect_sp_present("the metadata key")
+  self.expect_sp_after("the metadata key")
   let key = self.parse_object_key()
+  self.expect_sp_after("`=`")
   ignore(self.expect_kind(Equal, "`=` after the metadata key"))
+  self.expect_sp_after("the metadata value")
   let value = self.parse_node_value()
   self.expect_br()
   self.pop_context()
@@ -149,6 +155,7 @@ fn Parser::parse_namespace(
 ) -> @ast.NamespaceStatement raise ParseError {
   let kw = self.expect_kind(Identifier, "`namespace`")
   self.push_context("a namespace statement", kw.span)
+  self.expect_sp_after("the namespace")
   let first = self.expect_identifier("a namespace like `com.example`")
   let parts = [first.value]
   let mut end = first.span.end()
@@ -181,6 +188,7 @@ fn Parser::parse_namespace(
 fn Parser::parse_use(self : Parser) -> @ast.UseStatement raise ParseError {
   let kw = self.expect_kind(Identifier, "`use`")
   self.push_context("a use statement", kw.span)
+  self.expect_sp_after("the shape ID to use")
   let id = self.parse_shape_id()
   if !id.value.is_absolute() || id.value.member is Some(_) {
     self.fail(
@@ -248,6 +256,15 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
         section is ControlSection {
         p.detach_docs_before(start_offset)
         let c = p.parse_control()
+        if control.iter().any(x => x.key.value == c.key.value) {
+          p.fail(
+            "SM-PARSE-013",
+            "DUPLICATE CONTROL STATEMENT",
+            "Duplicate control statement `\{c.key.value}`",
+            c.key.span,
+            notes=["Each control statement key may be set at most once."],
+          )
+        }
         control.push(c)
         Ok((@cst.StatementKind::Control, Some(c.key.value)))
       } else if p.at_keyword("metadata") &&
