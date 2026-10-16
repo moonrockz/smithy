@@ -57,6 +57,12 @@ pub fn zig_triple(target : Target) -> String? {
 }
 
 ///|
+/// The `Host` wrapper has one more rule. On Linux, a debug build compiles `backtrace.c`, which calls
+/// `_Unwind_Backtrace`. gcc links its unwinder (libgcc) by itself, but `zig cc` does not, so a link
+/// step needs zig's bundled `-lunwind`. macOS has the unwinder in libSystem and needs nothing. The
+/// tool can run on wasm, so the wrapper decides at run time with `uname -s`. A compile step (`-c`)
+/// does not link, so it gets no library.
+///
 /// The `cc` wrapper for `MOON_CC`: a /bin/sh script that runs `zig cc`.
 ///
 /// A cross build needs two workarounds for upstream bugs in moon and in the MoonBit runtime:
@@ -71,7 +77,11 @@ pub fn zig_triple(target : Target) -> String? {
 ///    A cross wrapper removes the flag and the three files. The `Host` wrapper removes nothing.
 pub fn cc_wrapper(target : Target) -> String {
   match zig_triple(target) {
-    None => "#!/bin/sh\nexec zig cc -D_CRT_RAND_S \"$@\"\n"
+    None =>
+      "#!/bin/sh\n" +
+      "case \"$(uname -s)\" in Linux) unwind=-lunwind;; *) unwind=;; esac\n" +
+      "for a in \"$@\"; do case \"$a\" in -c) unwind=;; esac; done\n" +
+      "exec zig cc -D_CRT_RAND_S \"$@\" $unwind\n"
     Some(triple) =>
       "#!/bin/sh\n" +
       "for a in \"$@\"; do shift; case \"$a\" in -DMOONBIT_USE_SIMDUTF|*/moonbit_simdutf.o|*/simdutf.o|*/libbacktrace.a) ;; *) set -- \"$@\" \"$a\";; esac; done\n" +

@@ -43,7 +43,9 @@ test "cc_wrapper for the host strips nothing" {
     cc_wrapper(Host),
     content=(
       #|#!/bin/sh
-      #|exec zig cc -D_CRT_RAND_S "$@"
+      #|case "$(uname -s)" in Linux) unwind=-lunwind;; *) unwind=;; esac
+      #|for a in "$@"; do case "$a" in -c) unwind=;; esac; done
+      #|exec zig cc -D_CRT_RAND_S "$@" $unwind
       #|
     ),
   )
@@ -117,5 +119,41 @@ async test "ar_wrapper drops the simdutf objects and keeps the order" {
       #|ar rcs lib.a m.o n.o
       #|
     ),
+  )
+}
+
+///|
+/// Run the host `cc` wrapper with `uname` stubbed to print `os`. Return what the wrapper runs.
+#cfg(target="native")
+async fn run_host_wrapper(os : String, args : Array[String]) -> String {
+  let dir = "_build/zig-cross-test/" + os
+  @fs.mkdir(dir, recursive=true, allow_exist=true)
+  @fs.write_file(
+    dir + "/uname",
+    "#!/bin/sh\necho " + os + "\n",
+    permission=0o755,
+  )
+  @fs.chmod(dir + "/uname", 0o755)
+  let cwd = @env.current_dir().unwrap_or(".")
+  let script = cc_wrapper(Host).replace(old="exec zig", new="exec echo")
+  @fs.write_file(dir + "/cc", script, permission=0o755)
+  let env = { "PATH": cwd + "/" + dir + ":/usr/bin:/bin" }
+  @shell.Cmd("/bin/sh", [dir + "/cc", ..args], env~).output().stdout()
+}
+
+///|
+#cfg(target="native")
+async test "host cc wrapper adds -lunwind only for Linux link steps" {
+  assert_eq(
+    run_host_wrapper("Linux", ["a.o", "-o", "out"]),
+    "cc -D_CRT_RAND_S a.o -o out -lunwind\n",
+  )
+  assert_eq(
+    run_host_wrapper("Linux", ["-c", "a.c", "-o", "a.o"]),
+    "cc -D_CRT_RAND_S -c a.c -o a.o\n",
+  )
+  assert_eq(
+    run_host_wrapper("Darwin", ["a.o", "-o", "out"]),
+    "cc -D_CRT_RAND_S a.o -o out\n",
   )
 }

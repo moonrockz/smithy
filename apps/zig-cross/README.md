@@ -52,3 +52,5 @@ Two upstream bugs make a plain `MOON_CC="zig cc -target ..."` fail.
   `/simdutf.o` and `/libbacktrace.a`. moon links these prebuilt objects for the machine that runs moon. They have
   the wrong architecture for the target. The `ar` wrapper drops the two simdutf objects. The `host` wrapper
   drops nothing.
+- The `host` wrapper adds `-lunwind` on Linux, for link steps only. A debug build there compiles `backtrace.c`,
+  which needs the unwinder. gcc links its unwinder by itself, but `zig cc` does not. macOS needs nothing.
