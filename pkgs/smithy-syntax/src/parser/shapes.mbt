@@ -931,9 +931,7 @@ fn Parser::parse_shape(
       }
       let body = self.parse_node_value()
       if t is Resource {
-        if object_key(body, "properties") is Some(_) &&
-          self.version != Some(V2) &&
-          !self.version_unknown {
+        if object_key(body, "properties") is Some(_) && self.claim_v2_report() {
           self.report(
             "SM-PARSE-007",
             Error,
@@ -1071,6 +1069,7 @@ fn Parser::parse_shape_or_apply(
     return Apply(a)
   }
   let traits = self.parse_traits()
+  self.keyword_index = self.pos
   docs.append(self.take_docs_before(self.here().start))
   let s = self.parse_shape(docs, traits, start)
   self.expect_br()

@@ -60,13 +60,21 @@ fn Parser::at_statement_start(self : Parser, i : Int32) -> Bool {
 
 ///|
 /// Skip from `from` to the next statement start (or the end), and record
-/// the run as `Skipped`.
+/// the run as `Skipped`. The scan starts after the failed statement's own
+/// shape keyword (`keyword_index`), which follows its traits and so is at
+/// a statement start itself.
 fn Parser::recover(
   self : Parser,
   from : Int32,
   out : Array[@cst.StatementCst],
 ) -> Unit {
-  let mut i = from + 1
+  let resume = if self.keyword_index > from { self.keyword_index } else { from }
+  // Traits that run to the end of the file leave `keyword_index` at the end.
+  let mut i = if resume < self.tokens.length() {
+    resume + 1
+  } else {
+    self.tokens.length()
+  }
   while i < self.tokens.length() && !self.at_statement_start(i) {
     i += 1
   }
@@ -245,6 +253,7 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
   let mut reported_missing_namespace = false
   while !p.at_end() {
     let start_index = p.pos
+    p.keyword_index = start_index
     guard p.peek() is Some(t) else { break }
     let start_offset = t.span.start
     let outcome = try {

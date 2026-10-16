@@ -26,6 +26,16 @@ priv struct Parser {
   /// report 1.0-only gating errors on the strength of a version we
   /// don't actually know.
   mut version_unknown : Bool
+  /// Set once `require_v2` has reported a 2.0-only construct. A file
+  /// reports the version mismatch once, at the first 2.0-only construct:
+  /// one mistyped `$version` would otherwise flag every such construct
+  /// in the file.
+  mut v2_reported : Bool
+  /// The token index of the current statement's shape keyword, once its
+  /// leading traits are read; the statement's first index before that.
+  /// Recovery scans past it: the failed statement's own keyword is not
+  /// a new statement, and resuming there would report the failure twice.
+  mut keyword_index : Int32
 }
 
 ///|
@@ -58,6 +68,8 @@ fn Parser::new(stream : @scanner.TokenStream) -> Parser {
     doc_head: 0,
     version: None,
     version_unknown: false,
+    v2_reported: false,
+    keyword_index: 0,
   }
   p.skip_holes()
   p

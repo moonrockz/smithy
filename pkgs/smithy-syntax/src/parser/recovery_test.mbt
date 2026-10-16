@@ -122,3 +122,30 @@ test "the reference's error-recovery cases: resume at a doc comment, a dollar, a
   @expect.expect(r.errors().length() <= 2).to_be_true()
   @expect.expect(f.shapes().map(s => s.shape.name().value).contains("Foo")).to_be_true()
 }
+
+///|
+test "a failed statement with leading docs and traits is reported once" {
+  let missing_name =
+    #|/// docs
+    #|@deprecated
+    #|structure {}
+    #|
+  let bad_mixins =
+    #|@deprecated
+    #|string S with
+    #|
+  let then_next =
+    #|/// docs
+    #|@deprecated
+    #|structure {}
+    #|
+    #|string Foo
+    #|
+  for body in [missing_name, bad_mixins, then_next] {
+    let r = rmodel(body)
+    @expect.expect(r.diagnostics.length()).because(body).to_equal(1)
+  }
+  let r = rmodel(then_next)
+  guard r.ast is Some(f) else { fail("no ast") }
+  @expect.expect(f.shapes().map(s => s.shape.name().value)).to_equal(["Foo"])
+}

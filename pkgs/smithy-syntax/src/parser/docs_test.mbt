@@ -262,3 +262,24 @@ test "a statement that swallows the $version line also makes the version unknown
     e.expect(r.errors().length()).to_equal(1)
   })
 }
+
+///|
+test "a 1.0 file reports its 2.0-only constructs once, at the first" {
+  let r = @parser.parse_text(
+    (
+      #|$version: "1.0"
+      #|namespace a
+      #|structure S with [M] {}
+      #|structure T for R { $id }
+      #|operation O { input := {} }
+      #|
+    ),
+  )
+  let gated = r.diagnostics.filter(d => d.code == "SM-PARSE-007")
+  @expect.expect_all(e => {
+    e.expect(gated.length()).to_equal(1)
+    e
+    .expect(gated[0].message)
+    .to_equal("Mixins can only be used with Smithy version 2 or later")
+  })
+}

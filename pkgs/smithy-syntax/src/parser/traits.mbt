@@ -49,17 +49,28 @@ fn Parser::parse_trait(self : Parser) -> @ast.Trait raise ParseError {
 }
 
 ///|
+/// Whether a 2.0-only construct must be reported here: the file is known to
+/// be 1.0 and no such construct has been reported yet. Marks it reported.
+fn Parser::claim_v2_report(self : Parser) -> Bool {
+  guard !self.version_unknown && self.version != Some(V2) && !self.v2_reported else {
+    return false
+  }
+  self.v2_reported = true
+  true
+}
+
+///|
 /// An error for 2.0-only syntax in a 1.0 file. The messages are the
 /// reference's. Reports nothing when `version_unknown`: a broken `$`
 /// control statement might have been `$version: "2"`, so gating on 1.0
-/// would be reporting an error we can't actually back up.
+/// would be reporting an error we can't actually back up. Reports once per
+/// file: after the first, later 2.0-only constructs pass silently.
 fn Parser::require_v2(
   self : Parser,
   feature : String,
   span : @span.Span,
 ) -> Unit raise ParseError {
-  guard !self.version_unknown else { return }
-  guard self.version != Some(V2) else { return }
+  guard self.claim_v2_report() else { return }
   let message = match feature {
     "mixins" => "Mixins can only be used with Smithy version 2 or later"
     "elision" => "Members can only elide targets in IDL version 2 or later"
