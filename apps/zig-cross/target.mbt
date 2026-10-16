@@ -70,11 +70,12 @@ pub fn zig_triple(target : Target) -> String? {
 /// 1. The runtime file `env.c` includes <stdlib.h> before it defines `_CRT_RAND_S`. On Windows
 ///    (mingw), `rand_s` is then not declared and the compile fails. A `-D_CRT_RAND_S` on the
 ///    command line defines it before the first include. The flag does no harm on other targets,
-///    so every wrapper has it.
+///    so every wrapper has it. Upstream: https://github.com/moonbitlang/moonbit-native-runtime/issues/2
 /// 2. moon passes `-DMOONBIT_USE_SIMDUTF` and links the prebuilt objects `moonbit_simdutf.o`,
 ///    `simdutf.o` and `libbacktrace.a`. These objects are built for the machine that runs moon,
 ///    not for `MOON_CC`'s target, so the link fails or the binary gets the wrong architecture.
 ///    A cross wrapper removes the flag and the three files. The `Host` wrapper removes nothing.
+///    Upstream: https://github.com/moonbitlang/moon/issues/2320
 pub fn cc_wrapper(target : Target) -> String {
   match zig_triple(target) {
     None =>
