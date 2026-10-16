@@ -1,6 +1,8 @@
 warnings = "-reserved_keyword"
 
 import {
+  "moonbitlang/core/debug",
+  "moonbitlang/core/list",
   "moonrockz/smithy-syntax/span",
   "moonrockz/smithy-syntax/scanner",
   "moonrockz/smithy-syntax/ast",

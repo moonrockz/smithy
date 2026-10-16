@@ -1,11 +1,4 @@
 ///|
-/// One step of a path: the field that holds a child and its index there.
-pub(all) struct PathStep {
-  field : String
-  index : Int32
-} derive(Eq, Hash, Debug)
-
-///|
 fn[T : Eq] same_value(x : T, y : T) -> Bool {
   physical_equal(x, y) || x == y
 }
