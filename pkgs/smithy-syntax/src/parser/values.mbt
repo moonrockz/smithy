@@ -40,10 +40,18 @@ fn number_digits(chars : Array[Char], start : Int32) -> (String, Int32) {
 }
 
 ///|
+/// The largest exponent magnitude a number lexeme may have. Past it the
+/// exact value would need `10^n` digits for a huge `n`, so the parser
+/// reports the number instead of computing it.
+let max_number_exponent : Int32 = 4096
+
+///|
 /// Split a scanner-validated `Number` lexeme (`[-] int [. frac]
 /// [e|E [+|-] digits]`) into its sign, integer digits, fraction digits
 /// (empty when there is no `.`) and exponent (`0` when there is no
-/// `e`/`E`).
+/// `e`/`E`). The exponent saturates: once its magnitude passes
+/// `max_number_exponent` it stops growing, so a long run of exponent
+/// digits never overflows.
 fn split_number_lexeme(text : String) -> (String, String, String, Int32) {
   let chars = text.to_array()
   let n = chars.length()
@@ -77,6 +85,9 @@ fn split_number_lexeme(text : String) -> (String, String, String, Int32) {
     let (exp_digits, _) = number_digits(chars, i)
     let mut exp_value = 0
     for ch in exp_digits {
+      if exp_value > max_number_exponent {
+        break
+      }
       exp_value = exp_value * 10 + (ch.to_int() - '0'.to_int())
     }
     exp_sign * exp_value
@@ -97,6 +108,15 @@ fn Parser::decimal_from_lexeme(
   span : @span.Span,
 ) -> @decimal.Decimal raise ParseError {
   let (sign, int_digits, frac_digits, exponent) = split_number_lexeme(text)
+  if exponent > max_number_exponent || exponent < -max_number_exponent {
+    self.fail(
+      "SM-PARSE-001",
+      "NUMBER TOO LARGE",
+      "I cannot represent `\{text}` exactly: its exponent is beyond \{max_number_exponent}",
+      span,
+      hint="Use an exponent between -\{max_number_exponent} and \{max_number_exponent}.",
+    )
+  }
   let mut coefficient = BigInt::from_string(sign + int_digits + frac_digits)
   let mut scale = frac_digits.length() - exponent
   if scale < 0 {

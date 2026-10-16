@@ -30,8 +30,10 @@ pub fn Version::of(text : String) -> Version? {
 }
 
 ///|
-/// What `parse` returns. `ast` is `None` only when nothing at all could be
-/// read; otherwise it is the (possibly partial) tree. `cst` has every
+/// What `parse` returns. `ast` is the (possibly partial) tree whenever at
+/// least one statement parsed, and an empty `IdlFile` (with an empty span)
+/// for a file with no tokens (empty or only comments); it is `None` only
+/// when the file has tokens and every statement failed. `cst` has every
 /// token. `version` is the declared `$version`, `None` when absent.
 pub(all) struct ParseResult {
   ast : @ast.IdlFile?

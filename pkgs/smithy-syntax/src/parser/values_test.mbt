@@ -97,6 +97,35 @@ test "a number needing more than 28 decimal places is reported" {
 }
 
 ///|
+test "a number whose exponent is beyond 4096 is reported, not computed" {
+  for
+    text in [
+      "1e2147483648", "1e-2147483648", "1e4294967297", "1e99999999999", "1e10000000",
+    ] {
+    let r = @parser.parse_text("metadata v = \{text}\n")
+    @expect.expect(r.diagnostics.iter().map(d => d.code).collect()).to_equal([
+      "SM-PARSE-001",
+    ])
+    inspect(r.errors()[0].title, content="NUMBER TOO LARGE")
+    inspect(
+      r.errors()[0].message,
+      content="I cannot represent `\{text}` exactly: its exponent is beyond 4096",
+    )
+    debug_inspect(
+      r.errors()[0].hint,
+      content=(
+        #|Some("Use an exponent between -4096 and 4096.")
+      ),
+    )
+  }
+  // The bound itself still parses, exactly.
+  guard value("1e4096") is Number(n, _) else { fail("not a number") }
+  guard n.value is Decimal(d) else { fail("not a decimal") }
+  inspect(d.scale(), content="0")
+  inspect(n.text, content="1e4096")
+}
+
+///|
 test "a value missing at the end of the file is still SM-PARSE-002" {
   // Unlike the too-precise number above, this diagnostic's span really is
   // the end-of-input span (nothing follows `=`), so the remap applies.

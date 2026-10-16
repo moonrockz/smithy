@@ -383,20 +383,22 @@ test "recovery is not fooled by a comma into stopping at column 1" {
 }
 
 ///|
-test "an empty file has no ast and no errors" {
+test "an empty file is an empty IdlFile with no errors" {
   let r = @parser.parse_text("")
-  inspect(r.ast is None, content="true")
+  guard r.ast is Some(f) else { fail("no ast for an empty file") }
+  inspect(f.statements.length(), content="0")
+  inspect(f.span.is_empty(), content="true")
   inspect(r.has_errors(), content="false")
-  inspect(
-    @parser.parse_text(
-      (
-        #|// just a comment
-        #|
-      ),
-    ).ast
-    is None,
-    content="true",
+  let r = @parser.parse_text(
+    (
+      #|// just a comment
+      #|
+    ),
   )
+  guard r.ast is Some(f) else { fail("no ast for a comment-only file") }
+  inspect(f.statements.length(), content="0")
+  inspect(f.span.is_empty(), content="true")
+  inspect(r.has_errors(), content="false")
 }
 
 ///|

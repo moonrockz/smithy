@@ -103,6 +103,18 @@ test "a backslash before a line break escapes the line break" {
 }
 
 ///|
+test "a backslash before a CRLF line break is the same continuation escape" {
+  let block = "\"\"\"\r\na\\\r\nb\r\n\"\"\""
+  @expect.expect(skinds(block)).to_equal([TextBlock])
+  @expect.expect(scodes(block)).to_equal([])
+  @expect.expect(@scanner.text_block_value(block)).to_equal("ab\n")
+  // A quoted string spanning lines decodes it the same way.
+  let quoted = "\"a\\\r\nb\""
+  @expect.expect(scodes(quoted)).to_equal([])
+  @expect.expect(@scanner.unescape(quoted)).to_equal("ab")
+}
+
+///|
 test "a text block must start with a line break" {
   @expect.expect(scodes("\"\"\"hello\"\"\"")).to_equal(["SM-SCAN-004"])
   @expect.expect(skinds("\"\"\"hello\"\"\"")).to_equal([TextBlock])

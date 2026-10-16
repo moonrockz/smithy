@@ -385,14 +385,23 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
     }
   }
   p.detach_docs_before(p.text_end.next())
-  let ast : @ast.IdlFile? = if read_anything {
+  // A tree when a statement was read, or when there was nothing to read:
+  // an empty or comment-only file is a valid, empty `IdlFile` with an
+  // empty span. `None` only when there were tokens and every statement
+  // failed.
+  let ast : @ast.IdlFile? = if read_anything || p.tokens.is_empty() {
+    let span = if read_anything {
+      @span.Offset::zero().to(p.text_end)
+    } else {
+      @span.Offset::zero().to(@span.Offset::zero())
+    }
     Some({
       control: control[:],
       metadata: metadata[:],
       namespace,
       uses: uses[:],
       statements: statements[:],
-      span: @span.Offset::zero().to(p.text_end),
+      span,
     })
   } else {
     None

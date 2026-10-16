@@ -50,7 +50,7 @@ fn Parser::parse_for_resource(
 ) -> @ast.Node[@ast.ShapeId]? raise ParseError {
   guard self.at_keyword("for") else { return None }
   let kw = self.expect_kind(Identifier, "`for`")
-  self.require_v2("for", kw.span)
+  self.require_v2("resource_binding", kw.span)
   Some(self.parse_shape_id())
 }
 
@@ -160,10 +160,21 @@ fn Parser::at_member_start(self : Parser) -> Bool {
 /// or `namespace` at column 1. These are the only tokens whose appearance
 /// inside an unclosed block means the block was left open: `@`, `$` and a
 /// doc comment are themselves legal member/trait starts at any column
-/// (including column 1), so they never end a block on their own.
+/// (including column 1), so they never end a block on their own. A
+/// keyword followed by `:` never starts a statement: it is a member
+/// named like one (`namespace: String`).
 fn Parser::at_block_breaking_statement(self : Parser, i : Int32) -> Bool {
   guard self.first_on_line(i) && self.at_column_one(i) else { return false }
-  self.tokens[i].kind == Identifier && statement_keyword(self.tokens[i].lexeme)
+  guard self.tokens[i].kind == Identifier &&
+    statement_keyword(self.tokens[i].lexeme) else {
+    return false
+  }
+  // The token after the keyword, holes skipped, as `peek1` does.
+  let mut next = i + 1
+  while next < self.tokens.length() && self.tokens[next].kind == Error {
+    next += 1
+  }
+  !(next < self.tokens.length() && self.tokens[next].kind == Colon)
 }
 
 ///|
@@ -326,9 +337,12 @@ fn[T] Parser::parse_block_items(
         match name_of {
           Some(f) => {
             let name = f(m)
+            // Reported, not raised: the shape and both members stay in
+            // the AST, so editors and generators keep the shape.
             if seen_names.contains(name.value) {
-              self.fail(
+              self.report(
                 "SM-PARSE-014",
+                Error,
                 "DUPLICATE MEMBER",
                 "Found conflicting member name, `\{name.value}`",
                 name.span,

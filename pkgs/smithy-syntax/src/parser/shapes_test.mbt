@@ -499,6 +499,46 @@ test "a repeated member or enum member name is SM-PARSE-014" {
 }
 
 ///|
+test "a repeated member name keeps the shape and both members" {
+  let r = model(
+    (
+      #|structure Foo {
+      #|    bar: String
+      #|    bar: Integer
+      #|}
+      #|
+    ),
+  )
+  @expect.expect(r.diagnostics.iter().map(d => d.code).collect()).to_equal([
+    "SM-PARSE-014",
+  ])
+  guard r.ast is Some(f) else { fail("no ast") }
+  let shapes = f.shapes()
+  inspect(shapes.length(), content="1")
+  guard shapes[0].shape is Aggregate(members~, ..) else { fail("no members") }
+  inspect(members.length(), content="2")
+}
+
+///|
+test "a member named like a statement keyword at column 1 is a member" {
+  let r = model(
+    (
+      #|structure S {
+      #|namespace: String
+      #|resource: String
+      #|}
+      #|
+    ),
+  )
+  @expect.expect(r.diagnostics.iter().map(d => d.code).collect()).to_equal([])
+  guard r.ast is Some(f) else { fail("no ast") }
+  let shapes = f.shapes()
+  inspect(shapes.length(), content="1")
+  guard shapes[0].shape is Aggregate(members~, ..) else { fail("no members") }
+  inspect(members.length(), content="2")
+}
+
+///|
 test "an unclosed structure is reported once, with the structure as context" {
   let r = model(
     (

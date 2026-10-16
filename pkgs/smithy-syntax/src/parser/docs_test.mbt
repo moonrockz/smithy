@@ -230,6 +230,24 @@ test "version 1 files reject 2.0 syntax with the reference's facts" {
 }
 
 ///|
+test "binding a structure to a resource in IDL 1.0 names the binding, not resource properties" {
+  let r = @parser.parse_text(
+    (
+      #|namespace a
+      #|structure S for R {}
+      #|
+    ),
+  )
+  @expect.expect(r.diagnostics.iter().map(d => d.code).collect()).to_equal([
+    "SM-PARSE-007",
+  ])
+  inspect(
+    r.errors()[0].message,
+    content="Structures can only be bound to resources with Smithy version 2 or later",
+  )
+}
+
+///|
 test "a broken control statement makes the version unknown, not 1.0, so v2 gating does not fire" {
   let r = @parser.parse_text(
     (

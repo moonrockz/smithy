@@ -1,7 +1,7 @@
 ///|
 /// The decoded form of `s`: the escapes the specification lists; an
 /// unknown or malformed escape is kept verbatim; `\` before a line break
-/// (text blocks) adds nothing.
+/// (`\n` or `\r\n`; text blocks) adds nothing.
 fn decode_escapes(s : String) -> String {
   let sb = StringBuilder()
   let n = s.length()
@@ -40,6 +40,8 @@ fn decode_escapes(s : String) -> String {
         i += 2
       }
       '\n' => i += 2
+      '\r' if i + 2 < n && s.code_unit_at(i + 2).to_int() == '\n'.to_int() =>
+        i += 3
       'u' => {
         let mut value = 0
         let mut good = 0

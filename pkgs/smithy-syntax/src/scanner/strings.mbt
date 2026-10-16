@@ -12,8 +12,11 @@ fn check_escape(
     // `\` before a line break is the text block line-continuation escape
     // (the specification's "escapes in text blocks"); `decode_escapes`
     // already reads it as adding nothing. A quoted string can span lines
-    // too, so this is accepted there as well, for the same reason.
+    // too, so this is accepted there as well, for the same reason. A CRLF
+    // line break is one break: `\` + `\r\n` is the same escape.
     Some('\n') => (at.next().next(), None)
+    Some('\r') if unit_at(text, at.next().next()) is Some('\n') =>
+      (at.next().next().next(), None)
     Some('u') => {
       let mut end = at.next().next()
       let mut good = 0

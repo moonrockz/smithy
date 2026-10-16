@@ -86,8 +86,8 @@ fn Parser::require_v2(
   let message = match feature {
     "mixins" => "Mixins can only be used with Smithy version 2 or later"
     "elision" => "Members can only elide targets in IDL version 2 or later"
-    "for" =>
-      "Resource properties can only be used with Smithy version 2 or later"
+    "resource_binding" =>
+      "Structures can only be bound to resources with Smithy version 2 or later"
     "default" =>
       "@default assignment is only supported in IDL version 2 or later"
     "enum" => "enum shapes cannot be used in Smithy version 1.0"
