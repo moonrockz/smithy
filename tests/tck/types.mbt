@@ -11,3 +11,11 @@ pub(all) struct Case {
   kind : CaseKind
   text : String
 } derive(Debug)
+
+///|
+/// A vendored reference JSON model, embedded so compatibility checks need no
+/// network or file system.
+pub(all) struct JsonCase {
+  path : String
+  text : String
+} derive(Debug)

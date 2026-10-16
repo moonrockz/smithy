@@ -1,0 +1,9 @@
+import {
+  "moonbitlang/core/json",
+  "moonrockz/smithy-syntax/ast",
+}
+
+import {
+  "moonrockz/smithy-syntax/json_ast",
+  "moonbitlang/core/quickcheck",
+} for "test"

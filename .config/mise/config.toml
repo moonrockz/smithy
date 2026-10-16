@@ -119,6 +119,10 @@ run = "moonx scripts/vendor-tck.mbtx"
 description = "Run the native tests with zig as the C compiler (the host wrapper of zig-cross)"
 run = "moon run apps/zig-cross --target wasm -- exec host -- moonx scripts/test.mbtx native"
 
+[tasks."tck:vendor:json"]
+description = "Vendor the Java reference's JSON AST corpus (args: git ref)"
+run = "moonx scripts/vendor-tck.mbtx --json"
+
 [tasks."test:scripts"]
 description = "Run the tests of the task scripts (scripts/*.mbtx that have a scripts/features/*.feature)"
 run = "moonx scripts/test-scripts.mbtx"

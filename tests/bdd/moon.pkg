@@ -5,4 +5,5 @@ import {
   "moonrockz/moonspec",
   "moonrockz/expect",
   "moonbitlang/async",
+  "moonbitlang/core/json",
 } for "wbtest"

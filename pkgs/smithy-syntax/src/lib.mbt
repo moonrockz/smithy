@@ -5,6 +5,38 @@ pub fn version() -> String {
 }
 
 ///|
+/// Typed Smithy JSON AST records. The IDL AST and JSON AST are separate
+/// representations; converting between them requires the semantic loader.
+pub using @json_ast {
+  type JsonAst,
+  type JsonShape,
+  type JsonShapeKind,
+  type JsonReference,
+  type JsonMember,
+  type JsonOperation,
+  type JsonService,
+  type JsonResource,
+}
+
+///|
+/// Parse a Smithy JSON AST document from text.
+pub fn parse_json_ast(text : String) -> JsonAst raise {
+  @json_ast.parse(text)
+}
+
+///|
+/// Decode a Smithy JSON AST value, with JSON Pointer paths on errors.
+pub fn decode_json_ast(value : Json) -> JsonAst raise @json.JsonDecodeError {
+  @json_ast.decode(value)
+}
+
+///|
+/// Encode a typed Smithy JSON AST document.
+pub fn encode_json_ast(document : JsonAst) -> Json {
+  @json_ast.encode(document)
+}
+
+///|
 /// Spans (UTF-16 unit offsets), positions and source text.
 pub using @span {
   type Span,

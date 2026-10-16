@@ -2,7 +2,7 @@ name = "moonrockz/smithy-syntax"
 
 version = "0.0.1"
 
-description = "Smithy IDL syntax for MoonBit: lossless scanner, typed AST, CST, parser and diagnostics"
+description = "Smithy syntax for MoonBit: lossless IDL parser, traversal, diagnostics and typed JSON AST codec"
 
 repository = "https://github.com/moonrockz/smithy"
 

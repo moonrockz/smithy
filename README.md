@@ -4,7 +4,10 @@ A [Smithy](https://smithy.io/) implementation for the MoonBit ecosystem, organiz
 
 ## Status
 
-The Smithy IDL 2.0 syntax layer (scanner, AST, CST, parser with recovery, diagnostics) is implemented in `pkgs/smithy-syntax` and checked against the Java reference's loader corpus. The semantic model, loader, JSON AST and CLI commands are the next sub-projects.
+The Smithy IDL 2.0 syntax layer (scanner, AST, CST, parser with recovery, diagnostics)
+and the typed JSON AST codec are implemented in `pkgs/smithy-syntax` and checked
+against the Java reference's loader corpus. The semantic model, loader and CLI
+commands are the next sub-projects.
 
 ## Packages
 
@@ -103,6 +106,7 @@ mise run validate              # package structure against moon.work
 mise run test                  # all targets; the tests module runs on js and native only
 mise run test -- js native     # some targets
 mise run test:bdd              # moonspec acceptance features (tests/bdd, js target)
+mise run tck:vendor:json -- REF # refresh the vendored JSON AST reference corpus
 mise run build                 # all targets
 mise run build:native          # native release build
 mise run clean
