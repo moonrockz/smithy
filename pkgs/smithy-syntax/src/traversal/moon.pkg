@@ -1,0 +1,21 @@
+warnings = "-reserved_keyword"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/core/list",
+  "moonrockz/smithy-syntax/span",
+  "moonrockz/smithy-syntax/scanner",
+  "moonrockz/smithy-syntax/ast",
+  "moonrockz/smithy-syntax/parser",
+}
+
+import {
+  "moonrockz/smithy-syntax/traversal",
+  "moonrockz/smithy-syntax/parser",
+  "moonrockz/smithy-syntax/span",
+  "moonrockz/smithy-syntax/lawkit",
+  "moonrockz/smithy-syntax/ast",
+  "moonbitlang/core/env",
+  "moonbitlang/core/quickcheck",
+  "moonbitlang/core/quickcheck/splitmix",
+} for "test"

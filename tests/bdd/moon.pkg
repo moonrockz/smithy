@@ -1,5 +1,7 @@
 import {
   "moonrockz/smithy-syntax" @syntax,
+  "moonrockz/smithy_tests/tck",
+  "moonbitlang/x/fs" @xfs,
   "moonrockz/moonspec",
   "moonrockz/expect",
   "moonbitlang/async",

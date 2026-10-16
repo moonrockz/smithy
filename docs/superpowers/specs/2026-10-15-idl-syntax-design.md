@@ -41,10 +41,11 @@ depends on `moonbitlang/x` (decimal), `moonbitlang/core` (bigint, quickcheck) an
 | `ast` | `.../ast` | the typed IDL tree |
 | `cst` | `.../cst` | `IdlCst`, `StatementCst`, `StatementKind` |
 | `parser` | `.../parser` | `parse`, `parse_tokens`, `ParseResult`, `Version`, `max_nesting` |
+| `traversal` | `.../traversal` | `NodeRef`, the traversal styles, `Tree`, `TreeCursor` (sub-project 2) |
 | `report` | `.../report` | `render_terminal`, `render_plain`, `render_short` |
 | root | `moonrockz/smithy-syntax` | `parse_idl`, re-exports of every public type |
 
-Dependencies point one way: `span` ← `diagnostic` ← `scanner` ← `ast` ← `cst` ← `parser` ← `report` ← root.
+Dependencies point one way: `span` ← `diagnostic` ← `scanner` ← `ast` ← `cst` ← `parser` ← `traversal` and `report` ← root (`traversal` and `report` do not import each other).
 Each package has a `README.mbt.md` with checked examples. `pkgs/smithy` and `apps/smithy` do not change
 in this sub-project.
 

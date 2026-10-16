@@ -68,3 +68,7 @@ lefthook-local.yml
 
 .DS_Store
 *.log
+
+# AI working documents (specs, plans, scratch)
+
+.dev/

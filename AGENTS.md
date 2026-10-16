@@ -39,6 +39,19 @@ and test. `mise run check` runs lint, validate, test and build, which is what CI
 - Run `mise run format` before you commit MoonBit code.
 - New packages go under `pkgs/` (libraries) or `apps/` (executables), and into `moon.work`.
 
+## Working documents
+
+`.dev/` is a gitignored area for AI-assisted work: specs, plans, brainstorming notes, scratch scripts and
+their output. Nothing in it is committed. This overrides the default location of every skill or tool.
+
+- Specs (superpowers `brainstorming`): `.dev/docs/superpowers/specs/YYYY-MM-DD-<topic>-design.html`.
+- Plans (superpowers `writing-plans`): `.dev/docs/superpowers/plans/YYYY-MM-DD-<topic>-plan.html`.
+- Scratch scripts and output: `.dev/scripts/`, `.dev/out/`.
+- Write these documents as standalone HTML, not Markdown: one file with inline CSS that works in light and
+  dark mode, and inline SVG for diagrams. Screenshots go next to the file.
+- Never put a spec or plan under `docs/`, and never `git add` anything under `.dev/`. When a design is
+  final and meant for readers, write it up on purpose in a committed location.
+
 ## Syntax module
 
 `pkgs/smithy-syntax` is the IDL syntax layer. Its design is
@@ -55,6 +68,20 @@ the API changes. Rules that tests enforce:
 - `tests/features/*.feature` are the acceptance contract, run by moonspec from
   `tests/bdd` (`mise run test:bdd`). Change the scenario when you change the
   behavior.
+
+## Traversal
+
+`pkgs/smithy-syntax/src/traversal` is the node model and the traversal styles over the AST. Rules that tests
+enforce:
+
+- No walk recurses: `walk`, `fold`, `reduce`, the event reader, `Tree` and the cursor each keep their own stack.
+- The kind table in `src/traversal/README.mbt.md` (between `<!-- kinds:start -->` and `<!-- kinds:end -->`)
+  is the contract. `tests/features/traversal.feature` checks it against `kind_table()`. When you add a kind or
+  a field, update both.
+- Kind and field names follow the Smithy JSON AST where it has a name, and the IDL grammar for the rest.
+- `NodeRef::span()` widens the AST span over doc comments, so a child always lies inside its parent.
+- With the same `Control` decisions, every style gives the same enter and leave order; laws in
+  `src/traversal/*_law_test.mbt` check this.
 
 ## Work tracking
 

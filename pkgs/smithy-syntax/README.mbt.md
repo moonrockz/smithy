@@ -11,7 +11,8 @@ statement, and diagnostics in the style of Elm and Rust.
 - CST: done.
 - Parser: done.
 - Diagnostics: done.
-- Traversal and the JSON AST: planned, in a later sub-project.
+- Traversal: done (`traversal`: `NodeRef`, `walk`, `fold`, `reduce`, `accept`, events, `Tree`, `TreeCursor`).
+- JSON AST: planned, in a later sub-project.
 
 ## Example
 
@@ -47,10 +48,11 @@ moon add moonrockz/smithy-syntax
 | `ast` | `.../ast` | the typed IDL tree |
 | `cst` | `.../cst` | `IdlCst`, `StatementCst`, `StatementKind` |
 | `parser` | `.../parser` | `parse`, `parse_tokens`, `ParseResult`, `Version`, `max_nesting` |
+| `traversal` | `.../traversal` | `NodeRef`, `walk`, `fold`, `reduce`, `reduce_pruned`, `accept`, `EventReader`, `push_events`, `Tree`, `TreeCursor`, `NodePath`, `kind_table` |
 | `report` | `.../report` | `render_terminal`, `render_plain`, `render_short` |
 | root | `moonrockz/smithy-syntax` | `parse_idl`, re-exports of every public type |
 
-Dependencies point one way: `span` ← `diagnostic` ← `scanner` ← `ast` ← `cst` ← `parser` ← `report` ← root.
+Dependencies point one way: `span` ← `diagnostic` ← `scanner` ← `ast` ← `cst` ← `parser` ← `traversal` and `report` ← root (`traversal` and `report` do not import each other).
 Each package has a `README.mbt.md` with checked examples. See the design in
 `docs/superpowers/specs/2026-10-15-idl-syntax-design.md`, and the cookbook in `docs/cookbook` for task
 articles.
