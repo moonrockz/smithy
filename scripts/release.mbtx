@@ -1,10 +1,12 @@
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/http",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/async@0.22.5/stdio",
   "moonbitlang/x@0.5.5/sys",
   "moonbitlang/core/env",
+  "moonbitlang/core/json",
   "moonrockz/moonspec@0.11.0",
   "moonrockz/expect@0.6.1",
 }
@@ -20,9 +22,12 @@ import {
 ///                                     open the release pull request
 ///   release.mbtx notes <version>      print the GitHub release notes
 ///   release.mbtx refresh              update the release pull request body
+///   release.mbtx plan                 decide what the Release workflow does (writes GITHUB_OUTPUT)
+///   release.mbtx github <version>     create the GitHub release, or upload the assets it lacks
+///   release.mbtx status               check that main, the tags, the GitHub release and mooncakes.io agree
 
 ///|
-let usage : String = "Usage: release.mbtx version | prepare [<version>] [--local] | notes <version> | refresh"
+let usage : String = "Usage: release.mbtx version | prepare [<version>] [--local] | notes <version> | refresh | plan | github <version> | status"
 
 ///|
 let initial_version : String = "v0.0.1"
@@ -216,6 +221,36 @@ fn release_notes(version : Version, section : String) -> String {
 }
 
 ///|
+/// The packages that the Release workflow publishes to mooncakes.io, with their module names.
+/// `scripts/publish.mbtx` keeps the same list.
+let publish_list : Array[(String, String)] = [
+  ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
+  ("apps/zig-cross", "moonrockz/zig-cross"),
+]
+
+///|
+/// The files that a GitHub release holds. `dist/` has exactly these.
+let release_assets : Array[String] = [
+  "smithy-linux-x64.tar.gz",
+  "smithy-linux-arm64.tar.gz",
+  "smithy-darwin-arm64.tar.gz",
+  "smithy-darwin-x64.tar.gz",
+  "smithy-windows-x64.zip",
+  "smithy.wasm",
+  "smithy-gc.wasm",
+  "checksums.txt",
+]
+
+///|
+/// The names in `expected` that `present` lacks, in the order of `expected`.
+fn missing_names(
+  expected : Array[String],
+  present : Array[String],
+) -> Array[String] {
+  expected.filter(name => !present.contains(name))
+}
+
+///|
 /// The start of the comment that git-cliff writes where the highlights go
 /// (cliff.toml).
 let highlights_marker : String = "<!-- Highlights:"
@@ -224,6 +259,130 @@ let highlights_marker : String = "<!-- Highlights:"
 /// The section has its highlights: the placeholder comment is gone.
 fn has_highlights(section : String) -> Bool {
   !section.contains(highlights_marker)
+}
+
+///|
+/// What the Release workflow does for one run.
+enum Plan {
+  Release(Version)
+  DryRun(Version)
+  Skip(String)
+} derive(Eq, Debug)
+
+///|
+/// Decide whether a Release run releases. A pull request run and a run with `dry_run` only check:
+/// they never release, whatever the tags and the changelog say. Any other run must be on main. A tag
+/// push must name the version in moon.mod. The version is released when its GitHub release does not
+/// exist: a tag that a failed run left behind does not block a re-run. A release needs its section in
+/// CHANGELOG.md, with the highlights written.
+fn plan(
+  event : String,
+  ref_type : String,
+  ref_name : String,
+  on_main : Bool,
+  dry_run : Bool,
+  version : Version,
+  released : Bool,
+  has_section : Bool,
+  highlights~ : Bool,
+) -> Result[Plan, String] {
+  if event == "pull_request" || dry_run {
+    return Ok(DryRun(version))
+  }
+  let tag = "v\{version}"
+  if ref_type == "tag" && ref_name != tag {
+    return Err(
+      "tag \{ref_name} does not match moon.mod version \{version} (\{tag})",
+    )
+  }
+  if !on_main {
+    return Err("\{ref_name} is not on main")
+  }
+  if released {
+    return Ok(Skip("\{tag} is already released"))
+  }
+  if !has_section {
+    return Err(
+      "CHANGELOG.md has no section for \{version}; release with `mise run release:prepare`",
+    )
+  }
+  if !highlights {
+    return Err(
+      "the CHANGELOG.md section for \{version} still has the highlights placeholder; write the highlights on release/v\{version}, then merge",
+    )
+  }
+  Ok(Release(version))
+}
+
+///|
+/// Lines for $GITHUB_OUTPUT.
+fn plan_outputs(p : Plan) -> String {
+  match p {
+    Release(v) => "release=true\ndry_run=false\nversion=\{v}\ntag=v\{v}\n"
+    DryRun(v) => "release=false\ndry_run=true\nversion=\{v}\ntag=v\{v}\n"
+    Skip(_) => "release=false\ndry_run=false\n"
+  }
+}
+
+///|
+/// The `gh` commands that bring the GitHub release of `tag` to the state where it has every local
+/// asset. Nothing to do gives `[]`. Without a release, one `release create` makes it, with all the
+/// assets. With a release that lacks some assets, one `release upload --clobber` adds them, so a re-run
+/// after a partial upload finishes the work and never fails on "already exists".
+fn github_steps(
+  release_exists : Bool,
+  remote_assets : Array[String],
+  local_assets : Array[String],
+  tag~ : String,
+  target~ : String,
+  notes_file~ : String,
+  dir~ : String = "dist",
+) -> Array[Array[String]] {
+  if !release_exists {
+    let args = [
+      "release", "create", tag, "--target", target, "--title", tag, "--notes-file",
+      notes_file,
+    ]
+    for name in local_assets {
+      args.push("\{dir}/\{name}")
+    }
+    return [args]
+  }
+  let missing = missing_names(local_assets, remote_assets)
+  if missing.is_empty() {
+    return []
+  }
+  let args = ["release", "upload", tag]
+  for name in missing {
+    args.push("\{dir}/\{name}")
+  }
+  args.push("--clobber")
+  [args]
+}
+
+///|
+/// A failed network command is worth a retry only when the failure is probably temporary. A refusal
+/// (401, 403) or a conflict (409) is not, and it wins over the transient words.
+fn is_transient(exit_code : Int, output : String) -> Bool {
+  if exit_code == 0 {
+    return false
+  }
+  let text = output.to_lower()
+  for word in ["401", "403", "409"] {
+    if text.contains(word) {
+      return false
+    }
+  }
+  [
+    "timed out", "timeout", "connection reset", "connection refused", "temporary failure",
+    "eof", "502", "503", "504", "rate limit",
+  ].any(word => text.contains(word))
+}
+
+///|
+/// The output tells that the server refused the credentials.
+fn is_refusal(output : String) -> Bool {
+  output.contains("401") || output.contains("403")
 }
 
 ///|
@@ -403,6 +562,138 @@ fn refresh_commands(
 }
 
 ///|
+/// What `status` collects about the release state.
+struct Facts {
+  /// The version in moon.mod on origin/main.
+  main_version : Version
+  /// The highest `vX.Y.Z` tag on origin.
+  latest_tag : Version?
+  /// `v<main_version>` is tagged.
+  tagged : Bool
+  /// `v<main_version>` has a GitHub release.
+  github_release : Bool
+  /// The assets that the GitHub release lacks. It is empty when there is no release.
+  missing_assets : Array[String]
+  /// The latest version of each published module on mooncakes.io, or `None` when it cannot be read.
+  mooncakes : Array[(String, Version?)]
+  /// Commits on origin/main after the latest tag.
+  unreleased : Int
+  /// Head branches of open release pull requests.
+  release_prs : Array[String]
+}
+
+///|
+/// One line of the `status` report.
+enum Finding {
+  Good(String)
+  Info(String)
+  Problem(String)
+} derive(Eq, Debug)
+
+///|
+fn finding_line(f : Finding) -> String {
+  match f {
+    Good(m) => "ok: \{m}"
+    Info(m) => "info: \{m}"
+    Problem(m) => "problem: \{m}"
+  }
+}
+
+///|
+/// What mooncakes.io has, in one phrase. Modules that agree give one version.
+fn mooncakes_summary(modules : Array[(String, Version?)]) -> String {
+  if modules.all(m => m.1 is None) {
+    return "mooncakes.io could not be read"
+  }
+  match modules[0].1 {
+    Some(first) if modules.all(m => m.1 is Some(v) && v == first) =>
+      "mooncakes.io has \{first}"
+    _ => {
+      let parts = modules.map(m => {
+        let seen = match m.1 {
+          Some(v) => "\{v}"
+          None => "nothing readable"
+        }
+        "\{m.0} \{seen}"
+      })
+      "mooncakes.io has " + parts.join(", ")
+    }
+  }
+}
+
+///|
+/// Check that main, the tags, the GitHub release and mooncakes.io agree.
+/// Each problem names the command that fixes it.
+fn diagnose(f : Facts) -> Array[Finding] {
+  let v = f.main_version
+  let tag = "v\{v}"
+  let out : Array[Finding] = []
+  let published = mooncakes_summary(f.mooncakes)
+  if f.tagged {
+    let on_mooncakes = !f.mooncakes.is_empty() &&
+      f.mooncakes.all(m => m.1 is Some(x) && x == v)
+    let rerun = "run `gh workflow run release.yml --ref \{tag}`"
+    if !f.github_release {
+      out.push(Problem("\{tag} is tagged but has no GitHub release; \{rerun}"))
+    } else if !f.missing_assets.is_empty() {
+      out.push(
+        Problem(
+          "the GitHub release \{tag} lacks assets: \{f.missing_assets.join(", ")}; \{rerun}",
+        ),
+      )
+    }
+    if !on_mooncakes {
+      out.push(Problem("\{tag} is tagged but \{published}; \{rerun}"))
+    }
+    if f.github_release && f.missing_assets.is_empty() && on_mooncakes {
+      out.push(Good("\{tag} is released: tag, GitHub release and mooncakes.io"))
+    }
+  } else {
+    match f.latest_tag {
+      Some(t) if v <= t =>
+        out.push(
+          Problem(
+            "moon.mod on main is \{v} but the latest tag is v\{t}; set moon.mod to the released version or release a higher one",
+          ),
+        )
+      Some(_) =>
+        out.push(
+          Problem(
+            "moon.mod on main is \{v} but \{tag} has no tag (\{published}); check the latest Release run (`gh run list --workflow release.yml`), fix the cause, then run `gh workflow run release.yml --ref main`",
+          ),
+        )
+      None => out.push(Info("Nothing released yet; moon.mod on main is \{v}"))
+    }
+  }
+  if f.unreleased > 0 {
+    let since = match f.latest_tag {
+      Some(t) => " since v\{t}"
+      None => ""
+    }
+    out.push(Info("\{f.unreleased} commits on main\{since}"))
+  }
+  match f.release_prs {
+    [] => ()
+    [one] => out.push(Info("open release pull request: \{one}"))
+    many =>
+      out.push(
+        Problem(
+          "more than one open release pull request (\{many.join(", ")}); close all but one",
+        ),
+      )
+  }
+  out
+}
+
+///|
+/// The `version` of a mooncakes.io module API answer.
+fn mooncakes_version(text : String) -> Version? {
+  let json = @json.parse(text) catch { _ => return None }
+  guard json is { "version": String(v), .. } else { return None }
+  parse_version(v).to_option()
+}
+
+///|
 fn fail_with(message : String) -> Unit {
   eprintln("❌ \{message}")
   @sys.exit(1)
@@ -434,6 +725,36 @@ async fn stdout_of(cmd : String, args : Array[String]) -> (Int, String) {
     _ => (1, b"", b"")
   }
   (code, out.text())
+}
+
+///|
+/// Run a command and return its exit code and its stdout and stderr together. A command that cannot
+/// start gives code 1.
+async fn output_of(cmd : String, args : Array[String]) -> (Int, String) {
+  let (code, out, err) = @process.collect_output(cmd, args) catch {
+    _ => return (1, "cannot start \{cmd}")
+  }
+  (code, out.text() + err.text())
+}
+
+///|
+/// Run `action` again after a transient failure: attempts at once, then after 5, 20 and 60 seconds.
+/// It stops early on a failure that a retry does not fix.
+async fn with_retry(
+  label : String,
+  action : async () -> (Int, String),
+) -> (Int, String) {
+  let waits = [5000, 20000, 60000]
+  let mut result = action()
+  for i, wait in waits {
+    if !is_transient(result.0, result.1) {
+      break
+    }
+    eprintln("↻ \{label}: attempt \{i + 2}/4")
+    @async.sleep(wait)
+    result = action()
+  }
+  result
 }
 
 ///|
@@ -575,6 +896,154 @@ async fn prepare(requested : String?, local_only : Bool) -> Unit {
 }
 
 ///|
+/// Whether the GitHub release of `tag` exists, and the names of its assets. A release that is not there
+/// gives `(false, [])`. Any other failure stops the script.
+async fn inspect_release(tag : String) -> (Bool, Array[String]) {
+  let (code, out) = with_retry("gh release view", () => output_of("gh", [
+    "release", "view", tag, "--json", "assets", "--jq", ".assets[].name",
+  ]))
+  if code == 0 {
+    let names = out.split("\n").filter(n => n.trim() != "").map(n => n.trim().to_owned()).collect()
+    return (true, names)
+  }
+  if out.to_lower().contains("release not found") {
+    return (false, [])
+  }
+  fail_with("`gh release view \{tag}` failed: \{out.trim()}")
+  (false, [])
+}
+
+///|
+async fn run_plan() -> Unit {
+  let version = match parse_version(current_version()) {
+    Ok(v) => v
+    Err(message) => {
+      fail_with(message)
+      return
+    }
+  }
+  let event = @env.get_env_var("GITHUB_EVENT_NAME").unwrap_or("")
+  let ref_type = @env.get_env_var("GITHUB_REF_TYPE").unwrap_or("")
+  let ref_name = @env.get_env_var("GITHUB_REF_NAME").unwrap_or("")
+  let dry_run = @env.get_env_var("DRY_RUN").unwrap_or("") == "true"
+  let changelog = if @fs.exists(changelog_path) {
+    @fs.read_file(changelog_path).text()
+  } else {
+    ""
+  }
+  let section = changelog_section(changelog, version)
+  let highlights = section.map(has_highlights).unwrap_or(true)
+  // A run that only checks needs no facts from the remote.
+  let checks_only = event == "pull_request" || dry_run
+  let mut on_main = false
+  let mut released = false
+  if !checks_only {
+    let (_, _) = output_of("git", ["fetch", "--quiet", "origin", "main"])
+    let (code, _) = output_of("git", [
+      "merge-base", "--is-ancestor", "HEAD", "origin/main",
+    ])
+    on_main = code == 0
+    released = inspect_release("v\{version}").0
+  }
+  match
+    plan(
+      event,
+      ref_type,
+      ref_name,
+      on_main,
+      dry_run,
+      version,
+      released,
+      section is Some(_),
+      highlights~,
+    ) {
+    Err(message) => fail_with(message)
+    Ok(p) => {
+      match p {
+        Release(v) => println("Release \{v}")
+        DryRun(v) => println("Dry run of \{v}: nothing is published")
+        Skip(reason) => println(reason)
+      }
+      match @env.get_env_var("GITHUB_OUTPUT") {
+        Some(path) if path != "" =>
+          @fs.write_file(path, plan_outputs(p), append=true)
+        _ => println(plan_outputs(p).trim_end())
+      }
+    }
+  }
+}
+
+///|
+/// Create the GitHub release of a version, or upload the assets it lacks. A re-run after a partial
+/// failure finishes the work. After each round the script reads the release again: it succeeds only
+/// when the release holds every asset.
+async fn github(version : String) -> Unit {
+  let version = match parse_version(version) {
+    Ok(v) => v
+    Err(message) => {
+      fail_with(message)
+      return
+    }
+  }
+  let tag = "v\{version}"
+  let target = @env.get_env_var("GITHUB_SHA").unwrap_or("")
+  let temp = @env.get_env_var("RUNNER_TEMP").unwrap_or("")
+  if target == "" || temp == "" {
+    fail_with("GITHUB_SHA and RUNNER_TEMP must be set")
+  }
+  let notes_file = "\{temp}/notes.md"
+  if !@fs.exists(notes_file) {
+    fail_with("\{notes_file} does not exist; write the release notes first")
+  }
+  let local_assets = @fs.readdir("dist")
+  let lacking = missing_names(release_assets, local_assets)
+  if !lacking.is_empty() {
+    fail_with("dist/ lacks: \{lacking.join(", ")}; run `mise run build:release`")
+  }
+  let mut last = ""
+  for _ in 0..<3 {
+    let (exists, remote) = inspect_release(tag)
+    let steps = github_steps(
+      exists,
+      remote,
+      release_assets,
+      tag~,
+      target~,
+      notes_file~,
+    )
+    if steps.is_empty() {
+      println("The GitHub release \{tag} has all \{release_assets.length()} assets.")
+      return
+    }
+    for args in steps {
+      let (code, out) = with_retry("gh \{args[0]} \{args[1]}", () => output_of(
+        "gh", args,
+      ))
+      if code != 0 {
+        if is_refusal(out) {
+          fail_with("`gh \{args[0]} \{args[1]}` was refused: \{out.trim()}")
+        }
+        last = out.trim().to_owned()
+        eprintln("`gh \{args[0]} \{args[1]}` failed: \{last}; I read the release again")
+        break
+      }
+      println("done: gh \{args[0]} \{args[1]} \{tag}")
+    }
+  }
+  fail_with("the GitHub release \{tag} is still not complete: \{last}")
+}
+
+///|
+/// The latest version of a module on mooncakes.io, or `None` when it cannot be read.
+async fn fetch_mooncakes(name : String) -> Version? {
+  let (response, body) = @http.get("https://mooncakes.io/api/v0/modules/\{name}") catch {
+    _ => return None
+  }
+  guard response.code == 200 else { return None }
+  mooncakes_version(body.text() catch { _ => return None })
+}
+
+///|
 async fn notes(version : String) -> Unit {
   let version = match parse_version(version) {
     Ok(v) => v
@@ -651,6 +1120,69 @@ async fn refresh() -> Unit {
 }
 
 ///|
+async fn status() -> Unit {
+  run_or_fail("git", ["fetch", "--quiet", "--tags", "origin", "main"])
+  let (_, moon_mod) = stdout_of("git", ["show", "origin/main:moon.mod"])
+  let main_version = match mod_version(moon_mod).map(parse_version) {
+    Some(Ok(v)) => v
+    _ => {
+      fail_with("moon.mod on origin/main has no version")
+      return
+    }
+  }
+  let (_, tags) = stdout_of("git", ["tag", "--list", "v*"])
+  let tag_names = tags.split("\n").map(t => t.to_owned()).collect()
+  let latest_tag = latest_version(tag_names)
+  let tag = "v\{main_version}"
+  let tagged = tag_names.contains(tag)
+  let (github_release, remote_assets) = inspect_release(tag)
+  let mooncakes = []
+  for entry in publish_list {
+    mooncakes.push((entry.1, fetch_mooncakes(entry.1)))
+  }
+  let range = match latest_tag {
+    Some(t) => "v\{t}..origin/main"
+    None => "origin/main"
+  }
+  let (_, count) = stdout_of("git", ["rev-list", "--count", range])
+  let (_, prs) = stdout_of("gh", [
+    "pr", "list", "--state", "open", "--json", "headRefName", "--jq", ".[].headRefName",
+  ])
+  let release_prs = prs
+    .split("\n")
+    .filter(b => b.has_prefix("release/v"))
+    .map(b => b.to_owned())
+    .collect()
+  let findings = diagnose({
+    main_version,
+    latest_tag,
+    tagged,
+    github_release,
+    missing_assets: if github_release {
+      missing_names(release_assets, remote_assets)
+    } else {
+      []
+    },
+    mooncakes,
+    unreleased: parse_number(count.trim()).unwrap_or(0),
+    release_prs,
+  })
+  for f in findings {
+    println(finding_line(f))
+  }
+  let (_, run) = stdout_of("gh", [
+    "run", "list", "--workflow", "release.yml", "--limit", "1", "--json", "status,conclusion,event,headBranch,url",
+    "--jq", ".[] | \"latest Release run: \\(.event) on \\(.headBranch), \\(.status) \\(.conclusion) \\(.url)\"",
+  ])
+  if run.trim() != "" {
+    println("info: \{run.trim()}")
+  }
+  if findings.iter().any(f => f is Problem(_)) {
+    @sys.exit(1)
+  }
+}
+
+///|
 async fn main {
   match @env.args()[1:] {
     ["version"] => println(computed_version())
@@ -661,6 +1193,9 @@ async fn main {
       prepare(Some(version), true)
     ["notes", version] => notes(version)
     ["refresh"] => refresh()
+    ["plan"] => run_plan()
+    ["github", version] => github(version)
+    ["status"] => status()
     _ => {
       eprintln(usage)
       @sys.exit(2)
@@ -676,11 +1211,46 @@ struct ReleaseWorld {
   mut text : String
   mut result : Result[String, String]
   mut highlights : Bool
+  mut event : String
+  mut ref_type : String
+  mut ref_name : String
+  mut on_main : Bool
+  mut dry_run : Bool
+  mut released : Bool
+  mut has_section : Bool
+  mut local_assets : Array[String]
+  mut remote_assets : Array[String]
+  mut facts : Facts
 }
 
 ///|
 fn ReleaseWorld::new() -> ReleaseWorld {
-  { exit_code: 0, stdout: "", text: "", result: Err("not run"), highlights: true }
+  {
+    exit_code: 0,
+    stdout: "",
+    text: "",
+    result: Err("not run"),
+    highlights: true,
+    event: "",
+    ref_type: "",
+    ref_name: "",
+    on_main: true,
+    dry_run: false,
+    released: false,
+    has_section: true,
+    local_assets: [],
+    remote_assets: [],
+    facts: {
+      main_version: { major: 0, minor: 0, patch: 0 },
+      latest_tag: None,
+      tagged: false,
+      github_release: false,
+      missing_assets: [],
+      mooncakes: [],
+      unreleased: 0,
+      release_prs: [],
+    },
+  }
 }
 
 ///|
@@ -688,6 +1258,35 @@ fn version_of(text : String) -> Version raise {
   match parse_version(text) {
     Ok(v) => v
     Err(message) => fail(message)
+  }
+}
+
+///|
+fn plan_name(r : Result[Plan, String]) -> String {
+  match r {
+    Ok(Release(v)) => "release \{v}"
+    Ok(DryRun(v)) => "dry run \{v}"
+    Ok(Skip(reason)) => "skip: \{reason}"
+    Err(message) => "error: \{message}"
+  }
+}
+
+///|
+fn words(text : String) -> Array[String] {
+  text.split(" ").filter(w => w != "").map(w => w.to_owned()).collect()
+}
+
+///|
+fn yes(answer : String) -> Bool {
+  answer == "yes"
+}
+
+///|
+fn version_option(text : String) -> Version? raise {
+  if text == "" {
+    None
+  } else {
+    Some(version_of(text))
   }
 }
 
@@ -841,6 +1440,152 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
     text : String,
   ) raise {
     @expect.expect(pr_body(version_of(version), "")).to_contain(text)
+  })
+  setup.given3(
+    "the event is {string}, the ref type is {string} and the ref name is {string}",
+    fn(event : String, ref_type : String, ref_name : String) {
+      self.event = event
+      self.ref_type = ref_type
+      self.ref_name = ref_name
+    },
+  )
+  setup.given1("the commit is on main: {string}", fn(answer : String) {
+    self.on_main = yes(answer)
+  })
+  setup.given1("the dry run input is: {string}", fn(answer : String) {
+    self.dry_run = yes(answer)
+  })
+  setup.given1("the GitHub release exists: {string}", fn(answer : String) {
+    self.released = yes(answer)
+  })
+  setup.given1("the changelog has the section: {string}", fn(answer : String) {
+    self.has_section = yes(answer)
+  })
+  setup.then2("the plan for version {string} is {string}", fn(
+    version : String,
+    expected : String,
+  ) raise {
+    let r = plan(
+      self.event,
+      self.ref_type,
+      self.ref_name,
+      self.on_main,
+      self.dry_run,
+      version_of(version),
+      self.released,
+      self.has_section,
+      highlights=self.highlights,
+    )
+    @expect.expect(plan_name(r)).to_equal(expected)
+  })
+  setup.then3("the outputs for a {string} of {string} are:", fn(
+    kind : String,
+    version : String,
+    doc : @moonspec.DocString,
+  ) raise {
+    let v = version_of(version)
+    let p = match kind {
+      "release" => Release(v)
+      "dry run" => DryRun(v)
+      _ => Skip("skipped")
+    }
+    @expect.expect(plan_outputs(p)).to_equal(doc.content + "\n")
+  })
+  setup.given2("the local assets are {string} and the GitHub release has {string}", fn(
+    here : String,
+    remote : String,
+  ) {
+    self.local_assets = words(here)
+    self.remote_assets = words(remote)
+  })
+  setup.then2(
+    "the gh steps when the release exists: {string} are {string}",
+    fn(exists : String, expected : String) raise {
+      let steps = github_steps(
+        yes(exists),
+        self.remote_assets,
+        self.local_assets,
+        tag="v0.0.1",
+        target="abc123",
+        notes_file="notes.md",
+      )
+      @expect.expect(steps.map(args => args.join(" ")).join(" | ")).to_equal(
+        expected,
+      )
+    },
+  )
+  setup.then3("a command that exits with {int} and prints {string} is transient: {string}", fn(
+    code : Int,
+    output : String,
+    expected : String,
+  ) raise {
+    let actual = if is_transient(code, output) { "yes" } else { "no" }
+    @expect.expect(actual).to_equal(expected)
+  })
+  setup.given2("moon.mod on main is {string} and the latest tag is {string}", fn(
+    main : String,
+    latest : String,
+  ) raise {
+    self.facts = {
+      ..self.facts,
+      main_version: version_of(main),
+      latest_tag: version_option(latest),
+    }
+  })
+  setup.given3(
+    "the main version is tagged: {string}, has a GitHub release: {string}, mooncakes.io has {string}",
+    fn(tagged : String, release : String, mooncakes : String) raise {
+      let seen = version_option(mooncakes)
+      self.facts = {
+        ..self.facts,
+        tagged: yes(tagged),
+        github_release: yes(release),
+        mooncakes: publish_list.map(entry => (entry.1, seen)),
+      }
+    },
+  )
+  setup.given4(
+    "mooncakes.io has {string} for {string} and {string} for {string}",
+    fn(first : String, first_name : String, second : String, second_name : String) raise {
+      self.facts = {
+        ..self.facts,
+        mooncakes: [
+          (first_name, version_option(first)),
+          (second_name, version_option(second)),
+        ],
+      }
+    },
+  )
+  setup.given1("the GitHub release lacks the assets {string}", fn(names : String) {
+    self.facts = { ..self.facts, missing_assets: words(names) }
+  })
+  setup.given2("{int} unreleased commits and release pull requests {string}", fn(
+    n : Int,
+    prs : String,
+  ) {
+    self.facts = {
+      ..self.facts,
+      unreleased: n,
+      release_prs: if prs == "" {
+        []
+      } else {
+        prs.split(",").map(b => b.trim().to_owned()).collect()
+      },
+    }
+  })
+  setup.then1("the status report is:", fn(doc : @moonspec.DocString) raise {
+    @expect.expect(diagnose(self.facts).map(finding_line).join("\n")).to_equal(
+      doc.content,
+    )
+  })
+  setup.then1("the mooncakes.io version is {string}", fn(
+    expected : String,
+  ) raise {
+    let actual = match mooncakes_version(self.text) {
+      Some(v) => "\{v}"
+      None => "none"
+    }
+    @expect.expect(actual).to_equal(expected)
   })
   setup.then2("the latest version of tags {string} is {string}", fn(
     tags : String,

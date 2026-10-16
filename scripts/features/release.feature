@@ -302,3 +302,219 @@ Feature: Release tooling
       | v0.10.0 v0.9.0 v0.2.0        | 0.10.0 |
       | v0.2.0 0.3.0 vnext v1.0      | 0.2.0  |
       | other                        | none   |
+
+  Scenario Outline: Decide whether a Release run releases
+    Given the event is "<event>", the ref type is "<type>" and the ref name is "<name>"
+    And the commit is on main: "<main>"
+    And the dry run input is: "<dry>"
+    And the GitHub release exists: "<released>"
+    And the changelog has the section: "<section>"
+    Then the plan for version "0.0.1" is "<plan>"
+
+    Examples:
+      | event             | type   | name   | main | dry | released | section | plan                                                                                  |
+      | pull_request      | branch | 12/merge | no   | no  | no       | no      | dry run 0.0.1                                                                         |
+      | pull_request      | branch | 12/merge | no   | no  | yes      | yes     | dry run 0.0.1                                                                         |
+      | workflow_dispatch | branch | main   | yes  | yes | no       | yes     | dry run 0.0.1                                                                         |
+      | workflow_dispatch | branch | main   | yes  | yes | yes      | no      | dry run 0.0.1                                                                         |
+      | push              | branch | main   | yes  | no  | no       | yes     | release 0.0.1                                                                         |
+      | workflow_dispatch | branch | main   | yes  | no  | no       | yes     | release 0.0.1                                                                         |
+      | push              | branch | main   | yes  | no  | yes      | yes     | skip: v0.0.1 is already released                                                      |
+      | push              | branch | main   | yes  | no  | no       | no      | error: CHANGELOG.md has no section for 0.0.1; release with `mise run release:prepare` |
+      | push              | tag    | v0.0.1 | yes  | no  | no       | yes     | release 0.0.1                                                                         |
+      | push              | tag    | v0.0.1 | yes  | no  | yes      | yes     | skip: v0.0.1 is already released                                                      |
+      | push              | tag    | v0.0.1 | no   | no  | no       | yes     | error: v0.0.1 is not on main                                                          |
+      | push              | tag    | v0.0.2 | yes  | no  | no       | yes     | error: tag v0.0.2 does not match moon.mod version 0.0.1 (v0.0.1)                      |
+      | push              | branch | topic  | no   | no  | no       | yes     | error: topic is not on main                                                           |
+
+  Scenario Outline: A release needs its highlights
+    Given the event is "push", the ref type is "branch" and the ref name is "main"
+    And the changelog section has highlights: "<highlights>"
+    Then the plan for version "0.0.1" is "<plan>"
+
+    Examples:
+      | highlights | plan                                                                                                                                  |
+      | yes        | release 0.0.1                                                                                                                         |
+      | no         | error: the CHANGELOG.md section for 0.0.1 still has the highlights placeholder; write the highlights on release/v0.0.1, then merge |
+
+  Scenario: A dry run needs no highlights
+    Given the event is "pull_request", the ref type is "branch" and the ref name is "7/merge"
+    And the changelog section has highlights: "no"
+    Then the plan for version "0.0.1" is "dry run 0.0.1"
+
+  Scenario: Outputs for the workflow
+    Then the outputs for a "release" of "0.0.1" are:
+      """
+      release=true
+      dry_run=false
+      version=0.0.1
+      tag=v0.0.1
+      """
+
+  Scenario: Outputs for a dry run
+    Then the outputs for a "dry run" of "0.0.1" are:
+      """
+      release=false
+      dry_run=true
+      version=0.0.1
+      tag=v0.0.1
+      """
+
+  Scenario: Outputs for a skip
+    Then the outputs for a "skip" of "0.0.1" are:
+      """
+      release=false
+      dry_run=false
+      """
+
+  Scenario Outline: The gh commands of the GitHub release step
+    Given the local assets are "smithy.wasm checksums.txt" and the GitHub release has "<remote>"
+    Then the gh steps when the release exists: "<exists>" are "<steps>"
+
+    Examples:
+      | exists | remote                    | steps                                                                                                   |
+      | no     |                           | release create v0.0.1 --target abc123 --title v0.0.1 --notes-file notes.md dist/smithy.wasm dist/checksums.txt |
+      | yes    | smithy.wasm checksums.txt |                                                                                                         |
+      | yes    | smithy.wasm               | release upload v0.0.1 dist/checksums.txt --clobber                                                      |
+      | yes    |                           | release upload v0.0.1 dist/smithy.wasm dist/checksums.txt --clobber                                     |
+
+  Scenario Outline: Retry only the failures that a retry can fix
+    Then a command that exits with <code> and prints "<output>" is transient: "<transient>"
+
+    Examples:
+      | code | output                           | transient |
+      | 0    | timed out                        | no        |
+      | 1    | Connection reset by peer         | yes       |
+      | 1    | HTTP 503 Service Unavailable     | yes       |
+      | 1    | API rate limit exceeded          | yes       |
+      | 1    | HTTP 403 rate limit exceeded     | no        |
+      | 1    | HTTP 401 Unauthorized            | no        |
+      | 1    | HTTP 409 timeout                 | no        |
+      | 1    | release not found                | no        |
+
+  Scenario: The version mooncakes.io publishes
+    Given the text:
+      """
+      {"module":"moonrockz/smithy-syntax","version":"0.0.1","yanked":false}
+      """
+    Then the mooncakes.io version is "0.0.1"
+
+  Scenario Outline: mooncakes.io answers without a version
+    Given the text:
+      """
+      <answer>
+      """
+    Then the mooncakes.io version is "none"
+
+    Examples:
+      | answer                   |
+      | {"error":"not found"}    |
+      | <html>Bad gateway</html> |
+      | {"version":"latest"}     |
+
+  Scenario: Released
+    Given moon.mod on main is "0.0.1" and the latest tag is "0.0.1"
+    And the main version is tagged: "yes", has a GitHub release: "yes", mooncakes.io has "0.0.1"
+    And 0 unreleased commits and release pull requests ""
+    Then the status report is:
+      """
+      ok: v0.0.1 is released: tag, GitHub release and mooncakes.io
+      """
+
+  Scenario: Released, with work on main and an open release pull request
+    Given moon.mod on main is "0.0.1" and the latest tag is "0.0.1"
+    And the main version is tagged: "yes", has a GitHub release: "yes", mooncakes.io has "0.0.1"
+    And 4 unreleased commits and release pull requests "release/v0.0.2"
+    Then the status report is:
+      """
+      ok: v0.0.1 is released: tag, GitHub release and mooncakes.io
+      info: 4 commits on main since v0.0.1
+      info: open release pull request: release/v0.0.2
+      """
+
+  Scenario: Tagged without a GitHub release
+    Given moon.mod on main is "0.0.1" and the latest tag is "0.0.1"
+    And the main version is tagged: "yes", has a GitHub release: "no", mooncakes.io has "0.0.1"
+    And 0 unreleased commits and release pull requests ""
+    Then the status report is:
+      """
+      problem: v0.0.1 is tagged but has no GitHub release; run `gh workflow run release.yml --ref v0.0.1`
+      """
+
+  Scenario: The GitHub release lacks assets
+    Given moon.mod on main is "0.0.1" and the latest tag is "0.0.1"
+    And the main version is tagged: "yes", has a GitHub release: "yes", mooncakes.io has "0.0.1"
+    And the GitHub release lacks the assets "smithy.wasm checksums.txt"
+    And 0 unreleased commits and release pull requests ""
+    Then the status report is:
+      """
+      problem: the GitHub release v0.0.1 lacks assets: smithy.wasm, checksums.txt; run `gh workflow run release.yml --ref v0.0.1`
+      """
+
+  Scenario: Tagged but not published
+    Given moon.mod on main is "0.0.2" and the latest tag is "0.0.2"
+    And the main version is tagged: "yes", has a GitHub release: "yes", mooncakes.io has "0.0.1"
+    And 0 unreleased commits and release pull requests ""
+    Then the status report is:
+      """
+      problem: v0.0.2 is tagged but mooncakes.io has 0.0.1; run `gh workflow run release.yml --ref v0.0.2`
+      """
+
+  Scenario: One module is behind on mooncakes.io
+    Given moon.mod on main is "0.0.2" and the latest tag is "0.0.2"
+    And the main version is tagged: "yes", has a GitHub release: "yes", mooncakes.io has "0.0.2"
+    And mooncakes.io has "0.0.2" for "moonrockz/smithy-syntax" and "0.0.1" for "moonrockz/zig-cross"
+    And 0 unreleased commits and release pull requests ""
+    Then the status report is:
+      """
+      problem: v0.0.2 is tagged but mooncakes.io has moonrockz/smithy-syntax 0.0.2, moonrockz/zig-cross 0.0.1; run `gh workflow run release.yml --ref v0.0.2`
+      """
+
+  Scenario: mooncakes.io cannot be read
+    Given moon.mod on main is "0.0.1" and the latest tag is "0.0.1"
+    And the main version is tagged: "yes", has a GitHub release: "yes", mooncakes.io has ""
+    And 0 unreleased commits and release pull requests ""
+    Then the status report is:
+      """
+      problem: v0.0.1 is tagged but mooncakes.io could not be read; run `gh workflow run release.yml --ref v0.0.1`
+      """
+
+  Scenario: The version on main has no tag
+    Given moon.mod on main is "0.0.2" and the latest tag is "0.0.1"
+    And the main version is tagged: "no", has a GitHub release: "no", mooncakes.io has "0.0.2"
+    And 1 unreleased commits and release pull requests ""
+    Then the status report is:
+      """
+      problem: moon.mod on main is 0.0.2 but v0.0.2 has no tag (mooncakes.io has 0.0.2); check the latest Release run (`gh run list --workflow release.yml`), fix the cause, then run `gh workflow run release.yml --ref main`
+      info: 1 commits on main since v0.0.1
+      """
+
+  Scenario: The version on main is below the latest tag
+    Given moon.mod on main is "0.0.1" and the latest tag is "0.0.2"
+    And the main version is tagged: "no", has a GitHub release: "no", mooncakes.io has "0.0.2"
+    And 0 unreleased commits and release pull requests ""
+    Then the status report is:
+      """
+      problem: moon.mod on main is 0.0.1 but the latest tag is v0.0.2; set moon.mod to the released version or release a higher one
+      """
+
+  Scenario: Nothing released yet
+    Given moon.mod on main is "0.0.1" and the latest tag is ""
+    And the main version is tagged: "no", has a GitHub release: "no", mooncakes.io has ""
+    And 12 unreleased commits and release pull requests ""
+    Then the status report is:
+      """
+      info: Nothing released yet; moon.mod on main is 0.0.1
+      info: 12 commits on main
+      """
+
+  Scenario: Two open release pull requests
+    Given moon.mod on main is "0.0.2" and the latest tag is "0.0.2"
+    And the main version is tagged: "yes", has a GitHub release: "yes", mooncakes.io has "0.0.2"
+    And 2 unreleased commits and release pull requests "release/v0.0.3, release/v0.0.4"
+    Then the status report is:
+      """
+      ok: v0.0.2 is released: tag, GitHub release and mooncakes.io
+      info: 2 commits on main since v0.0.2
+      problem: more than one open release pull request (release/v0.0.3, release/v0.0.4); close all but one
+      """

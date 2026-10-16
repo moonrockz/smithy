@@ -157,3 +157,15 @@ run = "moonx scripts/release.mbtx refresh"
 [tasks."release:notes"]
 description = "Print the GitHub release notes of a version (args: X.Y.Z)"
 run = "moonx scripts/release.mbtx notes"
+
+[tasks."release:plan"]
+description = "Decide what the Release workflow does (reads GITHUB_EVENT_NAME, GITHUB_REF_TYPE, GITHUB_REF_NAME, DRY_RUN; writes GITHUB_OUTPUT)"
+run = "moonx scripts/release.mbtx plan"
+
+[tasks."release:github"]
+description = "Create the GitHub release from dist/, or upload the assets it lacks (args: X.Y.Z; needs GITHUB_SHA and RUNNER_TEMP)"
+run = "moonx scripts/release.mbtx github"
+
+[tasks."release:status"]
+description = "Check that main, the tags, the GitHub release and mooncakes.io agree"
+run = "moonx scripts/release.mbtx status"
