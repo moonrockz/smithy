@@ -296,7 +296,7 @@ test "a 2.0 file reports its set shapes once, at the first" {
     ),
   )
   @expect.expect(r.diagnostics.iter().map(d => d.code).collect()).to_equal([
-    "SM-PARSE-018",
+    "SM-PARSE-015",
   ])
   @expect.expect(r.diagnostics[0].message).to_equal(
     "set shapes cannot be used in Smithy version 2.0",

@@ -771,7 +771,7 @@ fn Parser::parse_shape(
       // `require_v2`, this reports once per file.
       if t is Set && self.claim_v1_report() {
         self.report(
-          "SM-PARSE-018",
+          "SM-PARSE-015",
           Error,
           "NEEDS SMITHY IDL 1",
           "set shapes cannot be used in Smithy version 2.0",

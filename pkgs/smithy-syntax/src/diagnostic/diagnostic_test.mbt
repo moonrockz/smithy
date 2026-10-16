@@ -74,7 +74,7 @@ test "every code has a description and the table is in order" {
   inspect(codes[7], content="SM-PARSE-001")
   inspect(codes[17], content="SM-PARSE-011")
   inspect(codes[20], content="SM-PARSE-014")
-  inspect(codes[21], content="SM-PARSE-018")
+  inspect(codes[21], content="SM-PARSE-015")
   for c in codes {
     inspect(@diagnostic.description(c) is Some(_), content="true")
   }

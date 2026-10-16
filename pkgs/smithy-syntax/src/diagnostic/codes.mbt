@@ -23,7 +23,7 @@ let table : Array[(String, String)] = [
   ("SM-PARSE-012", "Duplicate operation property"),
   ("SM-PARSE-013", "Duplicate control statement"),
   ("SM-PARSE-014", "Duplicate member name"),
-  ("SM-PARSE-018", "Syntax that needs Smithy IDL version 1"),
+  ("SM-PARSE-015", "Syntax that needs Smithy IDL version 1"),
 ]
 
 ///|
