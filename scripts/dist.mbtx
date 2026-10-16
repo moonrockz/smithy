@@ -1,11 +1,13 @@
 ///|
 /// Build the release outputs and pack them into `dist/`.
 ///
-/// `build` cross-compiles the five native binaries with zig and builds the two wasm files.
-/// `pack` writes the eight release files to `dist/`: five archives, `smithy.wasm`, `smithy-gc.wasm`
+/// `build` cross-compiles four native binaries with zig and builds the two wasm files. It does not build
+/// windows-x64: a cross-built Windows binary reads its arguments wrongly, because moon picks the `platform`
+/// setting of `core` from the host OS. `build-windows` builds that binary natively and runs on Windows only.
+/// `pack` needs all five binaries. It writes the eight release files to `dist/`: five archives, `smithy.wasm`, `smithy-gc.wasm`
 /// and `checksums.txt`. With no argument, the script runs `build` and then `pack`.
 ///
-/// Usage: `mise run build:release`, `mise run release:assets`, or `moonx scripts/dist.mbtx [build|pack]`.
+/// Usage: `mise run build:release`, `mise run release:assets`, or `moonx scripts/dist.mbtx [build|build-windows|pack]`.
 /// The script exits with a non-zero code on failure.
 import {
   "moonbitlang/async@0.22.5",
@@ -26,7 +28,7 @@ import {
 }
 
 ///|
-let usage : String = "Usage: dist.mbtx [build | pack]"
+let usage : String = "Usage: dist.mbtx [build | build-windows | pack]"
 
 ///|
 /// The MoonBit package that holds the command-line application.
@@ -44,6 +46,15 @@ let bin : String = "smithy"
 let targets : Array[String] = [
   "linux-x64", "linux-arm64", "darwin-arm64", "darwin-x64", "windows-x64",
 ]
+
+///|
+/// The targets that zig cross-builds. windows-x64 is built on a Windows host.
+let cross_targets : Array[String] = [
+  "linux-x64", "linux-arm64", "darwin-arm64", "darwin-x64",
+]
+
+///|
+let windows_target : String = "windows-x64"
 
 ///|
 let wasm_name : String = "smithy.wasm"
@@ -254,7 +265,7 @@ async fn run_step(label : String, cmd : String, args : Array[String]) -> Unit {
 ///|
 async fn build() -> Unit {
   let args = ["run", "build:cross", "--"]
-  for target in targets {
+  for target in cross_targets {
     args.push(target)
   }
   args.push("--")
@@ -265,6 +276,35 @@ async fn build() -> Unit {
       "build", package_path, "--target", wasm, "--release",
     ])
   }
+}
+
+///|
+/// Where `moon build --target native --release` writes the executable on the host.
+let native_exe_pattern : String =
+  "_build/native/release/build/**/\{exe_stem}.exe"
+
+///|
+/// True when the OS variable names Windows (Windows sets `OS=Windows_NT`).
+fn is_windows_host(os : String?) -> Bool {
+  os is Some("Windows_NT")
+}
+
+///|
+/// Build windows-x64 natively and copy the executable to the path that `pack` reads.
+async fn build_windows() -> Unit {
+  if !is_windows_host(@env.get_env_var("OS")) {
+    fail_with(
+      "I build windows-x64 on a Windows host only. Run this on Windows, or download the windows-x64-exe artifact of the Release workflow.",
+    )
+  }
+  run_step("Building the native binary for windows-x64", "moon", [
+    "build", package_path, "--target", "native", "--release",
+  ])
+  let exe = single_match(native_exe_pattern)
+  let dir = "_build/cross/\{windows_target}/native/release/build/moonrockz/\{exe_stem}"
+  @fs.mkdir(dir, recursive=true)
+  @fs.write_file("\{dir}/\{exe_stem}.exe", read_bytes(exe))
+  println("✅ Wrote \{dir}/\{exe_stem}.exe")
 }
 
 ///|
@@ -285,6 +325,11 @@ async fn pack() -> Unit {
   @fs.mkdir(dist_dir, recursive=true)
   let written : Array[(String, Bytes)] = []
   for target in targets {
+    if target == windows_target && @shell.glob(cross_pattern(target)).is_empty() {
+      fail_with(
+        "I found no binary for \{target}. Build it on Windows with `mise run build:windows`, or download the windows-x64-exe artifact of the Release workflow.",
+      )
+    }
     let exe = read_bytes(single_match(cross_pattern(target)))
     let name = binary_name(target)
     let archive = if is_windows(target) {
@@ -324,6 +369,7 @@ async fn main {
       pack()
     }
     ["build"] => build()
+    ["build-windows"] => build_windows()
     ["pack"] => pack()
     _ => fail_with(usage)
   }
@@ -333,6 +379,7 @@ async fn main {
 /// Scenario state for `features/dist.feature`.
 struct DistWorld {
   mut target : String
+  mut os : String?
   files : Array[(String, Bytes)]
   mut expected : Array[String]
   mut present : Array[String]
@@ -341,7 +388,7 @@ struct DistWorld {
 
 ///|
 fn DistWorld::new() -> DistWorld {
-  { target: "", files: [], expected: [], present: [], tar: b"" }
+  { target: "", os: None, files: [], expected: [], present: [], tar: b"" }
 }
 
 ///|
@@ -375,6 +422,17 @@ impl @moonspec.World for DistWorld with fn configure(self, setup) {
   })
   setup.then1("the checksums are:", fn(doc : @moonspec.DocString) raise {
     @expect.expect(checksums_text(self.files)).to_equal(doc.content)
+  })
+  setup.given1("the OS variable {string}", fn(os : String) {
+    self.os = if os == "" { None } else { Some(os) }
+  })
+  setup.then1("the host is Windows: {string}", fn(answer : String) raise {
+    @expect.expect(is_windows_host(self.os).to_string()).to_equal(
+      if answer == "yes" { "true" } else { "false" },
+    )
+  })
+  setup.then1("the cross-built targets are {string}", fn(names : String) raise {
+    @expect.expect(cross_targets.join(",")).to_equal(names)
   })
   setup.given1("the expected files {string}", fn(names : String) {
     self.expected = names.split(",").map(n => n.to_owned()).collect()

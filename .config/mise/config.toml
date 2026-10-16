@@ -100,8 +100,12 @@ description = "Verify that every module and version string has the version of th
 run = "moonx scripts/versions.mbtx check"
 
 [tasks."build:release"]
-description = "Build the release outputs (native binaries for 5 targets, 2 wasm files) and pack them into dist/"
+description = "Build the release outputs (4 cross-built native binaries, 2 wasm files) and pack them into dist/. Pack needs the windows-x64 binary from build:windows"
 run = "moonx scripts/dist.mbtx"
+
+[tasks."build:windows"]
+description = "Build the windows-x64 binary natively (Windows host only)"
+run = "moonx scripts/dist.mbtx build-windows"
 
 [tasks."release:assets"]
 description = "Pack the built release outputs into dist/ (archives, wasm files, checksums.txt)"

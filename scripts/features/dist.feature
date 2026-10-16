@@ -14,6 +14,19 @@ Feature: Release outputs
       | darwin-x64   | smithy-darwin-x64.tar.gz     | smithy    |
       | windows-x64  | smithy-windows-x64.zip       | smithy.exe |
 
+  Scenario: The zig cross-build leaves out windows-x64
+    Then the cross-built targets are "linux-x64,linux-arm64,darwin-arm64,darwin-x64"
+
+  Scenario Outline: Only a Windows host builds windows-x64
+    Given the OS variable "<os>"
+    Then the host is Windows: "<answer>"
+
+    Examples:
+      | os         | answer |
+      | Windows_NT | yes    |
+      | Linux      | no     |
+      |            | no     |
+
   Scenario: Checksums are sorted, in sha256sum format
     Given a file "b.wasm" with the content "b"
     And a file "a.zip" with the content "a"

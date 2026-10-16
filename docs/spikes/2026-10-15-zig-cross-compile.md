@@ -222,6 +222,15 @@ Verified on macOS arm64 (2026-10-16), during the planning of the release work an
   Release workflow runs each binary on a runner of its own OS (linux-x64, linux-arm64, darwin-arm64, darwin-x64,
   windows-x64). Its first result comes from the first Release run.
 
+### Windows binaries must be built on Windows
+
+The PR #7 Release dry run showed a defect in the cross-built windows-x64 binary. The job Smoke (windows-x64)
+ran `smithy.exe version`, and the program printed the usage text. The arguments were wrong. The cause is in
+`core/internal/os_string`, which uses `#cfg(platform="windows")`. Moon resolves this setting from the host OS,
+because `core` is prebuilt for the host. A Windows binary that is built on Linux or macOS therefore has the
+wrong `OsString` code. The release now builds windows-x64 natively on a Windows runner (job `build-windows`)
+and cross-builds the other four targets only.
+
 ### Still open
 
 - **TLS and macOS frameworks.** No smithy code uses the network, so nothing needed CoreFoundation, Security or

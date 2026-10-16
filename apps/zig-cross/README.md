@@ -42,6 +42,13 @@ target. Use `host` to compile the tests of a package with zig.
 | `windows-x64`  | `x86_64-windows-gnu`  | PE, machine 0x8664    |
 | `host`         | none (the host)       | none                  |
 
+## Do not ship a cross-built Windows binary
+
+A `windows-x64` binary that zig cross-builds is wrong for MoonBit code that uses `OsString`: arguments,
+environment variables and paths. The `core` library is prebuilt for the host. Its `#cfg(platform="windows")`
+setting is resolved from the host OS, not from the target. A Windows binary built on Linux or macOS therefore
+reads its arguments wrongly. Build Windows binaries on Windows until moon can set the target platform.
+
 ## What the wrappers change, and why
 
 Two upstream bugs make a plain `MOON_CC="zig cc -target ..."` fail.

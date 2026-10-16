@@ -42,7 +42,7 @@ Each [GitHub release](https://github.com/moonrockz/smithy/releases) has 8 assets
 | `smithy-linux-arm64.tar.gz` | `smithy` for Linux arm64 (static musl) |
 | `smithy-darwin-arm64.tar.gz` | `smithy` for macOS on Apple silicon |
 | `smithy-darwin-x64.tar.gz` | `smithy` for macOS on Intel |
-| `smithy-windows-x64.zip` | `smithy.exe` for Windows x86-64 |
+| `smithy-windows-x64.zip` | `smithy.exe` for Windows x86-64 (built on Windows) |
 | `smithy.wasm` | The CLI for the MoonBit `wasm` target |
 | `smithy-gc.wasm` | The CLI for the MoonBit `wasm-gc` target |
 | `checksums.txt` | SHA-256 of the other 7 assets |
@@ -106,7 +106,7 @@ mise run test:bdd              # moonspec acceptance features (tests/bdd, js tar
 mise run build                 # all targets
 mise run build:native          # native release build
 mise run clean
-mise run build:release         # 5 native binaries (zig), 2 wasm files, dist/
+mise run build:release         # 4 native binaries (zig), 2 wasm files, dist/ (needs the Windows exe: mise run build:windows)
 mise run test:native-zig       # native tests with zig as the C compiler
 mise run release:status        # main, tags, GitHub release and mooncakes.io agree
 mise run hooks:install         # git hooks (lefthook)

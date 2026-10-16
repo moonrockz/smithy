@@ -106,6 +106,12 @@ Fix: pin zig back, or fix the wrapper, and record the cause in the README of `ap
 
 ## smoke
 
+**The `smoke` leg for windows-x64 prints the usage text for `smithy.exe version`**
+Cause: the archive holds a cross-built Windows binary. Moon resolves the `platform` setting of `core` from the
+host OS, so a Windows binary built on Linux or macOS reads its arguments wrongly.
+Fix: build `windows-x64` on a Windows runner (job `build-windows`). Check that `build` downloaded the artifact
+`windows-x64-exe` into `_build/cross/windows-x64/native/release/build/moonrockz/smithy-cli/` before it packed.
+
 **One `smoke` leg fails, the others pass**
 Cause: the binary of that OS does not start, or `smithy version` did not print the version.
 Fix: open the leg and read the output. A crash at start-up on one OS is a build problem for that target. For
