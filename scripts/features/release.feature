@@ -194,6 +194,11 @@ Feature: Release tooling
       - `moon add moonrockz/smithy-syntax@0.3.0`
       - `moonx moonrockz/zig-cross@0.3.0 --help`
 
+      **Wasm files:**
+
+      - `smithy.wasm` needs a host that supplies the `__moonbit_fs_unstable` imports and `wasi_snapshot_preview1.fd_write`. `wasmtime` alone fails with `unknown import: __moonbit_fs_unstable::…`.
+      - `smithy-gc.wasm` needs a host with WebAssembly GC that supplies the `__moonbit_fs_unstable` imports and `spectest.print_char`. `wasmtime` alone fails with `unknown import: __moonbit_fs_unstable::…`.
+
       Highlights of 0.3.0.
 
       ### 🚀 Features
@@ -378,6 +383,14 @@ Feature: Release tooling
       | yes    | smithy.wasm               | release upload v0.0.1 dist/checksums.txt --clobber                                                      |
       | yes    |                           | release upload v0.0.1 dist/smithy.wasm dist/checksums.txt --clobber                                     |
 
+  Scenario: A draft release is published after its assets are complete
+    Given the local assets are "smithy.wasm checksums.txt" and the GitHub release has "smithy.wasm checksums.txt"
+    Then the gh steps for a draft release are "release edit v0.0.1 --draft=false"
+
+  Scenario: A draft release that lacks assets gets them first
+    Given the local assets are "smithy.wasm checksums.txt" and the GitHub release has "smithy.wasm"
+    Then the gh steps for a draft release are "release upload v0.0.1 dist/checksums.txt --clobber | release edit v0.0.1 --draft=false"
+
   Scenario Outline: Retry only the failures that a retry can fix
     Then a command that exits with <code> and prints "<output>" is transient: "<transient>"
 
@@ -506,6 +519,16 @@ Feature: Release tooling
       """
       info: Nothing released yet; moon.mod on main is 0.0.1
       info: 12 commits on main
+      """
+
+  Scenario: mooncakes.io has the version but there is no tag
+    Given moon.mod on main is "0.0.1" and the latest tag is ""
+    And the main version is tagged: "no", has a GitHub release: "no", mooncakes.io has "0.0.1"
+    And 3 unreleased commits and release pull requests ""
+    Then the status report is:
+      """
+      problem: mooncakes.io already has 0.0.1 but there is no tag and no GitHub release (mooncakes.io has 0.0.1); re-run failed jobs, or run `gh workflow run release.yml --ref main`
+      info: 3 commits on main
       """
 
   Scenario: Two open release pull requests

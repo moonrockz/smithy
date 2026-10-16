@@ -217,7 +217,8 @@ fn changelog_section(changelog : String, version : Version) -> String? {
 /// The GitHub release notes: the install lines, then the changelog section.
 fn release_notes(version : Version, section : String) -> String {
   let install = "**Install:**\n\n- `mise use github:\{module_name}@\{version}`\n- `moon add moonrockz/smithy-syntax@\{version}`\n- `moonx moonrockz/zig-cross@\{version} --help`"
-  tidy_changelog(install + "\n\n" + section)
+  let wasm = "- `smithy.wasm` needs a host that supplies the `__moonbit_fs_unstable` imports and `wasi_snapshot_preview1.fd_write`. `wasmtime` alone fails with `unknown import: __moonbit_fs_unstable::…`.\n- `smithy-gc.wasm` needs a host with WebAssembly GC that supplies the `__moonbit_fs_unstable` imports and `spectest.print_char`. `wasmtime` alone fails with `unknown import: __moonbit_fs_unstable::…`."
+  tidy_changelog(install + "\n\n**Wasm files:**\n\n" + wasm + "\n\n" + section)
 }
 
 ///|
@@ -328,7 +329,8 @@ fn plan_outputs(p : Plan) -> String {
 /// The `gh` commands that bring the GitHub release of `tag` to the state where it has every local
 /// asset. Nothing to do gives `[]`. Without a release, one `release create` makes it, with all the
 /// assets. With a release that lacks some assets, one `release upload --clobber` adds them, so a re-run
-/// after a partial upload finishes the work and never fails on "already exists".
+/// after a partial upload finishes the work and never fails on "already exists". A draft release is
+/// published (`release edit --draft=false`) after its assets are complete.
 fn github_steps(
   release_exists : Bool,
   remote_assets : Array[String],
@@ -337,6 +339,7 @@ fn github_steps(
   target~ : String,
   notes_file~ : String,
   dir~ : String = "dist",
+  is_draft~ : Bool = false,
 ) -> Array[Array[String]] {
   if !release_exists {
     let args = [
@@ -349,15 +352,20 @@ fn github_steps(
     return [args]
   }
   let missing = missing_names(local_assets, remote_assets)
-  if missing.is_empty() {
-    return []
+  let steps = []
+  if !missing.is_empty() {
+    let args = ["release", "upload", tag]
+    for name in missing {
+      args.push("\{dir}/\{name}")
+    }
+    args.push("--clobber")
+    steps.push(args)
   }
-  let args = ["release", "upload", tag]
-  for name in missing {
-    args.push("\{dir}/\{name}")
+  // A killed `gh release create` leaves a draft. It is published after the assets are complete.
+  if is_draft {
+    steps.push(["release", "edit", tag, "--draft=false"])
   }
-  args.push("--clobber")
-  [args]
+  steps
 }
 
 ///|
@@ -680,7 +688,16 @@ fn diagnose(f : Facts) -> Array[Finding] {
             "moon.mod on main is \{v} but \{tag} has no tag (\{published}); check the latest Release run (`gh run list --workflow release.yml`), fix the cause, then run `gh workflow run release.yml --ref main`",
           ),
         )
-      None => out.push(Info("Nothing released yet; moon.mod on main is \{v}"))
+      None =>
+        if f.mooncakes.any(m => m.1 is Some(x) && x == v) {
+          out.push(
+            Problem(
+              "mooncakes.io already has \{v} but there is no tag and no GitHub release (\{published}); re-run failed jobs, or run `gh workflow run release.yml --ref main`",
+            ),
+          )
+        } else {
+          out.push(Info("Nothing released yet; moon.mod on main is \{v}"))
+        }
     }
   }
   if f.unreleased > 0 {
@@ -914,21 +931,23 @@ async fn prepare(requested : String?, local_only : Bool) -> Unit {
 }
 
 ///|
-/// Whether the GitHub release of `tag` exists, and the names of its assets. A release that is not there
-/// gives `(false, [])`. Any other failure stops the script.
-async fn inspect_release(tag : String) -> (Bool, Array[String]) {
+/// Whether the GitHub release of `tag` exists, the names of its assets, and whether it is a draft. A
+/// release that is not there gives `(false, [], false)`. Any other failure stops the script.
+async fn inspect_release(tag : String) -> (Bool, Array[String], Bool) {
   let (code, out) = with_retry("gh release view", () => output_of("gh", [
-    "release", "view", tag, "--json", "assets", "--jq", ".assets[].name",
+    "release", "view", tag, "--json", "isDraft,assets", "--jq",
+    ".isDraft, (.assets[].name)",
   ]))
   if code == 0 {
-    let names = out.split("\n").filter(n => n.trim() != "").map(n => n.trim().to_owned()).collect()
-    return (true, names)
+    let lines = out.split("\n").filter(n => n.trim() != "").map(n => n.trim().to_owned()).collect()
+    let is_draft = lines.length() > 0 && lines[0] == "true"
+    return (true, lines.filter(n => n != "true" && n != "false"), is_draft)
   }
   if out.to_lower().contains("release not found") {
-    return (false, [])
+    return (false, [], false)
   }
   fail_with("`gh release view \{tag}` failed: \{out.trim()}")
-  (false, [])
+  (false, [], false)
 }
 
 ///|
@@ -974,7 +993,8 @@ async fn run_plan() -> Unit {
         false
       }
     }
-    released = inspect_release("v\{version}").0
+    let (exists, _, draft) = inspect_release("v\{version}")
+    released = exists && !draft
   }
   match
     plan(
@@ -1033,7 +1053,7 @@ async fn github(version : String) -> Unit {
   }
   let mut last = ""
   for _ in 0..<3 {
-    let (exists, remote) = inspect_release(tag)
+    let (exists, remote, draft) = inspect_release(tag)
     let steps = github_steps(
       exists,
       remote,
@@ -1041,6 +1061,7 @@ async fn github(version : String) -> Unit {
       tag~,
       target~,
       notes_file~,
+      is_draft=draft,
     )
     if steps.is_empty() {
       println("The GitHub release \{tag} has all \{release_assets.length()} assets.")
@@ -1062,7 +1083,7 @@ async fn github(version : String) -> Unit {
     }
   }
   // The last round may have finished the work: read the release once more.
-  let (exists, remote) = inspect_release(tag)
+  let (exists, remote, draft) = inspect_release(tag)
   let steps = github_steps(
     exists,
     remote,
@@ -1070,13 +1091,15 @@ async fn github(version : String) -> Unit {
     tag~,
     target~,
     notes_file~,
+    is_draft=draft,
   )
   if steps.is_empty() {
     println("The GitHub release \{tag} has all \{release_assets.length()} assets.")
     return
   }
   let detail = if exists {
-    "it lacks " + missing_names(release_assets, remote).join(", ")
+    let lacks = missing_names(release_assets, remote)
+    if lacks.is_empty() { "it is still a draft" } else { "it lacks " + lacks.join(", ") }
   } else {
     "it does not exist"
   }
@@ -1187,7 +1210,8 @@ async fn status() -> Unit {
   let latest_tag = latest_version(tag_names)
   let tag = "v\{main_version}"
   let tagged = tag_names.contains(tag)
-  let (github_release, remote_assets) = inspect_release(tag)
+  let (exists, remote_assets, draft) = inspect_release(tag)
+  let github_release = exists && !draft
   let mooncakes = []
   for entry in publish_list {
     mooncakes.push((entry.1, fetch_mooncakes(entry.1)))
@@ -1566,6 +1590,22 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
       )
     },
   )
+  setup.then1("the gh steps for a draft release are {string}", fn(
+    expected : String,
+  ) raise {
+    let steps = github_steps(
+      true,
+      self.remote_assets,
+      self.local_assets,
+      tag="v0.0.1",
+      target="abc123",
+      notes_file="notes.md",
+      is_draft=true,
+    )
+    @expect.expect(steps.map(args => args.join(" ")).join(" | ")).to_equal(
+      expected,
+    )
+  })
   setup.then3("a command that exits with {int} and prints {string} is transient: {string}", fn(
     code : Int,
     output : String,
