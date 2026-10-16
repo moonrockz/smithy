@@ -380,6 +380,24 @@ fn is_transient(exit_code : Int, output : String) -> Bool {
 }
 
 ///|
+/// Read the exit code of `git merge-base --is-ancestor HEAD origin/main`. Only code 1 means "not on
+/// main". Any other code besides 0 (a shallow clone, a missing ref) is an error.
+fn ancestor_answer(
+  exit_code : Int,
+  output : String,
+  ref_name : String,
+) -> Result[Bool, String] {
+  match exit_code {
+    0 => Ok(true)
+    1 => Ok(false)
+    _ =>
+      Err(
+        "cannot tell whether \{ref_name} is on main: `git merge-base --is-ancestor HEAD origin/main` exited with \{exit_code}: \{output.trim()}",
+      )
+  }
+}
+
+///|
 /// The output tells that the server refused the credentials.
 fn is_refusal(output : String) -> Bool {
   output.contains("401") || output.contains("403")
@@ -938,11 +956,24 @@ async fn run_plan() -> Unit {
   let mut on_main = false
   let mut released = false
   if !checks_only {
-    let (_, _) = output_of("git", ["fetch", "--quiet", "origin", "main"])
-    let (code, _) = output_of("git", [
+    let (fetch_code, fetch_out) = output_of("git", [
+      "fetch", "--quiet", "origin", "main",
+    ])
+    if fetch_code != 0 {
+      fail_with(
+        "cannot tell whether \{ref_name} is on main: `git fetch origin main` failed: \{fetch_out.trim()}",
+      )
+    }
+    let (code, out) = output_of("git", [
       "merge-base", "--is-ancestor", "HEAD", "origin/main",
     ])
-    on_main = code == 0
+    on_main = match ancestor_answer(code, out, ref_name) {
+      Ok(answer) => answer
+      Err(message) => {
+        fail_with(message)
+        false
+      }
+    }
     released = inspect_release("v\{version}").0
   }
   match
@@ -1030,7 +1061,28 @@ async fn github(version : String) -> Unit {
       println("done: gh \{args[0]} \{args[1]} \{tag}")
     }
   }
-  fail_with("the GitHub release \{tag} is still not complete: \{last}")
+  // The last round may have finished the work: read the release once more.
+  let (exists, remote) = inspect_release(tag)
+  let steps = github_steps(
+    exists,
+    remote,
+    release_assets,
+    tag~,
+    target~,
+    notes_file~,
+  )
+  if steps.is_empty() {
+    println("The GitHub release \{tag} has all \{release_assets.length()} assets.")
+    return
+  }
+  let detail = if exists {
+    "it lacks " + missing_names(release_assets, remote).join(", ")
+  } else {
+    "it does not exist"
+  }
+  fail_with(
+    "the GitHub release \{tag} is still not complete (\{detail}); last error: \{last}",
+  )
 }
 
 ///|
@@ -1520,6 +1572,18 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
     expected : String,
   ) raise {
     let actual = if is_transient(code, output) { "yes" } else { "no" }
+    @expect.expect(actual).to_equal(expected)
+  })
+  setup.then3("git merge-base exits with {int} and prints {string} gives {string}", fn(
+    code : Int,
+    output : String,
+    expected : String,
+  ) raise {
+    let actual = match ancestor_answer(code, output, "v0.0.1") {
+      Ok(true) => "on main"
+      Ok(false) => "not on main"
+      Err(message) => "error: \{message}"
+    }
     @expect.expect(actual).to_equal(expected)
   })
   setup.given2("moon.mod on main is {string} and the latest tag is {string}", fn(

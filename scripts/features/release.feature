@@ -518,3 +518,12 @@ Feature: Release tooling
       info: 2 commits on main since v0.0.2
       problem: more than one open release pull request (release/v0.0.3, release/v0.0.4); close all but one
       """
+
+  Scenario Outline: Tell from git whether the commit is on main
+    Then git merge-base exits with <code> and prints "<output>" gives "<answer>"
+
+    Examples:
+      | code | output                | answer                                                                                                                                                                 |
+      | 0    |                       | on main                                                                                                                                                                |
+      | 1    |                       | not on main                                                                                                                                                            |
+      | 128  | fatal: no merge base  | error: cannot tell whether v0.0.1 is on main: `git merge-base --is-ancestor HEAD origin/main` exited with 128: fatal: no merge base                                  |
