@@ -141,3 +141,19 @@ run = "mise tasks"
 
 [settings]
 experimental = true
+
+[tasks."release:version"]
+description = "Print the next release version, computed by git-cliff from the commits"
+run = "moonx scripts/release.mbtx version"
+
+[tasks."release:prepare"]
+description = "Open the release pull request (args: optional X.Y.Z, --local to stop before the push)"
+run = "moonx scripts/release.mbtx prepare"
+
+[tasks."release:refresh"]
+description = "Update the body of the release pull request from CHANGELOG.md and mark it ready"
+run = "moonx scripts/release.mbtx refresh"
+
+[tasks."release:notes"]
+description = "Print the GitHub release notes of a version (args: X.Y.Z)"
+run = "moonx scripts/release.mbtx notes"
