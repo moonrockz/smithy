@@ -42,3 +42,87 @@ fn all_nodes(root : @traversal.NodeRef) -> Array[@traversal.NodeRef] {
 fn maybe_root(text : String) -> @traversal.NodeRef? {
   @traversal.NodeRef::of_result(@parser.parse_text(text))
 }
+
+///|
+fn pick(rs : @splitmix.RandomState, n : Int32) -> Int32 {
+  rs.next_uint(limit=n.reinterpret_as_uint()).reinterpret_as_int()
+}
+
+///|
+/// The `Control` decision for each enter, by enter count, cycled.
+struct Policy(Array[@traversal.Control]) derive(Debug)
+
+///|
+impl @quickcheck.Arbitrary for Policy with fn arbitrary(_, rs) {
+  let n = 1 + pick(rs, 8)
+  Policy(
+    Array::makei(n, _ => {
+      match pick(rs, 10) {
+        0 => Stop
+        1 | 2 | 3 => SkipChildren
+        _ => Continue
+      }
+    }),
+  )
+}
+
+///|
+impl @quickcheck.Shrink for Policy
+
+///|
+fn decide(p : Policy, k : Int32) -> @traversal.Control {
+  let Policy(cs) = p
+  cs[k % cs.length()]
+}
+
+///|
+/// The events a walk under `p` must produce, by plain recursion (test-only;
+/// the trees here are shallow).
+fn model(root : @traversal.NodeRef, p : Policy) -> Array[String] {
+  let events = []
+  let mut k = 0
+  fn go(n : @traversal.NodeRef) -> Bool {
+    let c = decide(p, k)
+    k = k + 1
+    events.push("+" + tag(n))
+    match c {
+      Stop => return true
+      SkipChildren => ()
+      Continue =>
+        for child in n.children() {
+          if go(child) {
+            return true
+          }
+        }
+    }
+    events.push("-" + tag(n))
+    false
+  }
+
+  ignore(go(root))
+  events
+}
+
+///|
+fn walk_events(root : @traversal.NodeRef, p : Policy) -> Array[String] {
+  let events = []
+  let mut k = 0
+  @traversal.walk(
+    root,
+    n => {
+      events.push("+" + tag(n))
+      k = k + 1
+      decide(p, k - 1)
+    },
+    leave=n => events.push("-" + tag(n)),
+  )
+  events
+}
+
+///|
+/// A trait value of `depth` nested arrays on a string shape.
+fn deep_value(depth : Int32) -> String {
+  let open = "[".repeat(depth)
+  let close = "]".repeat(depth)
+  "$version: \"2\"\nnamespace a\n\n@t(\{open}\{close})\nstring S\n"
+}
