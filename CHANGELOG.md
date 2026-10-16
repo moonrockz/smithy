@@ -8,7 +8,7 @@ is 0.x, a minor release can contain breaking changes.
 
 ## [0.0.1] - 2026-10-16
 
-<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+This is the first release of moonrockz/smithy. The `moonrockz/smithy-syntax` library parses Smithy IDL 1.0 and 2.0 into a lossless syntax tree and an AST, reports diagnostics with source carets, and gives several ways to walk the AST. The `smithy` command is available for Linux, macOS and Windows: install it with `mise use github:moonrockz/smithy@0.0.1`. In this release the command only prints its version. The new `moonrockz/zig-cross` tool cross-compiles MoonBit native programs with zig: run it with `moonx moonrockz/zig-cross@0.0.1`.
 
 ### 🚀 Features
 
