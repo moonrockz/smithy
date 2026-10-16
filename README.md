@@ -57,8 +57,10 @@ to run the file.
 - `smithy-gc.wasm` needs a runtime with WebAssembly GC. It also imports `spectest.print_char`, a test host
   function, and exports `_start`.
 
-`wasmtime` rejects a module with unknown imports, so these files do not run under `wasmtime` alone. A host that
-supplies `__moonbit_fs_unstable` can run them.
+`wasmtime` cannot run them alone. We ran both files with wasmtime. Each stops at instantiation with
+`unknown import: __moonbit_fs_unstable::args_get has not been defined` (`smithy.wasm`) and
+`unknown import: __moonbit_fs_unstable::begin_read_string_array has not been defined` (`smithy-gc.wasm`).
+A host that supplies `__moonbit_fs_unstable` is needed. We did not run the files in such a host.
 
 ## Prerequisites
 

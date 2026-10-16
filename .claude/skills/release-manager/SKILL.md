@@ -52,14 +52,15 @@ Copy this checklist and tick it off:
 ## Troubleshoot
 
 1. Run `mise run release:status` and read the failed job (`gh run view <run-id> --log-failed`).
-2. Transient failure (timeout, 502, 503, 504, connection reset) in `publish` or `release`: use "Re-run failed
-   jobs" on the run, or `gh run rerun <run-id> --failed`. Do not use "Re-run all jobs": it builds again.
+2. A transient failure is a timeout, a 502, 503 or 504, or a connection reset. If it is in `publish` or
+   `release`, use "Re-run failed jobs" on the run, or `gh run rerun <run-id> --failed`. Do not use
+   "Re-run all jobs", because it builds again.
 3. Find any other symptom in [TROUBLESHOOTING.md](TROUBLESHOOTING.md) and apply its fix. Every fix is safe to
-   repeat: publish skips a published version, and the release job uploads only the missing assets.
+   repeat. The publish job skips a published version. The release job uploads only the missing assets.
 4. If the symptom is not there, find the cause before you change anything. Then add it to TROUBLESHOOTING.md.
 
-Do not delete or move a pushed tag, and do not delete a GitHub release, without the user's explicit approval.
-A mooncakes.io version cannot be replaced; release a new patch version instead.
+Do not delete or move a pushed tag without the user's explicit approval. Do not delete a GitHub release without it.
+A mooncakes.io version cannot be replaced. Release a new patch version instead.
 
 ## Improve the process
 

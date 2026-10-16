@@ -207,13 +207,15 @@ debug test builds need libbacktrace. Every wrapper still adds `-D_CRT_RAND_S` (t
 
 ### What the work confirmed
 
-- **All 5 targets build** from one machine: linux-x64, linux-arm64, darwin-arm64, darwin-x64 and windows-x64.
+Verified on macOS arm64 (2026-10-16), during the planning of the release work and in the build task:
+
+- **All 5 targets build** (`mise run build:cross`) from one machine: linux-x64, linux-arm64, darwin-arm64, darwin-x64 and windows-x64.
   linux-arm64 was untested in the spike. `zig-cross` checks the header of each binary (ELF, Mach-O, PE and the
   machine field), and a wrong architecture fails the build.
 - **musl works.** The Linux targets use `x86_64-linux-musl` and `aarch64-linux-musl`. Both build and link with
   `moonbitlang/async`. The gnu fallback was not needed. The Linux binaries are static.
 - **Native tests under zig.** `moon test --target native` with the `host` wrapper (`mise run test:native-zig`)
-  passed 299 of 299 tests.
+  passed 299 of 299 tests on the same machine.
 - **The binaries run.** On macOS arm64, `smithy version` from the darwin-arm64 binary and from the darwin-x64
   binary (under Rosetta) prints `smithy 0.1.0 (Smithy 2.0)`. The linux and windows binaries have the right
   headers. They were not run on this machine, because the Docker daemon was not running. The `smoke` job of the

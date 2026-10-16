@@ -103,10 +103,10 @@ Fix: pin zig back, or fix the wrapper, and record the cause in the README of `ap
 
 **One `smoke` leg fails, the others pass**
 Cause: the binary of that OS does not start, or `smithy version` did not print the version.
-Fix: open the leg and read the output. A crash at start-up on one OS is a build problem for that target (for
-example a missing host-only object, or a wrong header): reproduce with `moonx scripts/dist.mbtx build` and fix
-the wrapper. Do not merge or re-run `publish` while any leg is red: `publish` needs all legs.
-A runner problem (the runner did not start) is transient: use "Re-run failed jobs".
+Fix: open the leg and read the output. A crash at start-up on one OS is a build problem for that target. For
+example, a host-only object is linked, or the header is wrong. Reproduce with `moonx scripts/dist.mbtx build`
+and fix the wrapper. Do not run `publish` while any leg is red: it needs all legs.
+A runner that did not start is a transient problem. Use "Re-run failed jobs".
 If `macos-15-intel` is not available, change the `darwin-x64` leg to run on `macos-latest` with
 `arch -x86_64`.
 

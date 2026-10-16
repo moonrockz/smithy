@@ -118,9 +118,9 @@ Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every 
 - **Re-run failed jobs.** After a transient failure, use "Re-run failed jobs" on the run (or
   `gh run rerun <run-id> --failed`). GitHub runs the failed job again, and the jobs after it. The jobs that passed
   keep their outputs and the `dist` artifact (30 days), so the retry ships the bytes that `smoke` checked.
-  `publish` skips a version that is already published, and `release` uploads only the missing assets, so a retry
-  after a partial run continues where it stopped. Network calls also retry 3 times (waits of 5, 20 and 60 s), but
-  not after a 401, 403 or 409. For any other failure, run `mise run release:status` first.
+  `publish` skips a version that is already published. `release` uploads only the missing assets. A retry after a
+  partial run therefore continues where it stopped. Network calls also retry 3 times (waits of 5, 20 and 60 s).
+  They do not retry after a 401, 403 or 409. For any other failure, run `mise run release:status` first.
 - The zig cross-build is the module `apps/zig-cross` (`moonrockz/zig-cross`). The wrappers add `-D_CRT_RAND_S` and,
   for each named target, drop the host-only simdutf and libbacktrace objects. See `apps/zig-cross/README.md`.
   `mise run build:cross` builds some targets, and `mise run test:native-zig` runs the native tests with zig.
