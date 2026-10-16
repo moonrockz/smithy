@@ -64,6 +64,11 @@ pub fn ShapeId::root(self : ShapeId) -> ShapeId {
 }
 
 ///|
+pub fn ShapeId::to_string(self : ShapeId) -> String {
+  Show::to_string(self)
+}
+
+///|
 pub impl Show for ShapeId with fn output(self, logger) {
   logger.write_string(self.namespace)
   logger.write_string("#")

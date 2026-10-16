@@ -14,6 +14,7 @@ pub(all) struct SourceLocation {
 /// An assembly error. Syntax diagnostics retain their original code and span.
 pub(all) struct ModelDiagnostic {
   code : String
+  severity : @syntax.Severity
   message : String
   source : SourceLocation
   shape : ShapeId?
@@ -106,5 +107,5 @@ pub(all) struct LoadResult {
 
 ///|
 pub fn LoadResult::has_errors(self : LoadResult) -> Bool {
-  !self.diagnostics.is_empty()
+  self.diagnostics.iter().any(d => d.severity == Error)
 }

@@ -60,5 +60,5 @@ articles.
 
 The JSON AST package depends on core JSON and the IDL AST's simple-type enum.
 Its [package guide](src/json_ast/README.mbt.md) defines the codec's preservation
-and validation rules. The semantic loader and IDL-to-JSON conversion are planned
+and validation rules. The semantic loader and IDL-to-JSON conversion are available
 in `moonrockz/smithy`.

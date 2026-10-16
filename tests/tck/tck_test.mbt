@@ -54,7 +54,8 @@ let skipped : Array[(String, String)] = [
 /// invalid cases: they parse with no error at all. A syntax parser that
 /// rejected them would be doing the loader's job, and would report false
 /// errors on valid multi-file models. This list shrinks when sub-project
-/// 4's loader takes these cases over.
+/// 4's loader takes these cases over. The parser must continue to accept them;
+/// model_test.mbt now checks that model assembly rejects every invalid case.
 let semantic : Array[(String, String)] = [
   ("invalid/elision/elide-nonexistent-id.smithy", "member elision resolution"),
   (

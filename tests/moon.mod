@@ -13,6 +13,7 @@ source = "."
 warnings = "-implicit_impl_as_method"
 
 import {
+  "moonrockz/smithy@0.0.1",
   "moonrockz/smithy-syntax@0.0.1",
   "moonrockz/expect@0.6.1",
   "moonrockz/moonspec@0.11.0",

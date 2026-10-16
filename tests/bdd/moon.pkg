@@ -6,4 +6,5 @@ import {
   "moonrockz/expect",
   "moonbitlang/async",
   "moonbitlang/core/json",
+  "moonrockz/smithy",
 } for "wbtest"

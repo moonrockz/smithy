@@ -6,4 +6,5 @@ import {
   "moonrockz/smithy-syntax" @syntax,
   "moonrockz/expect",
   "moonbitlang/core/json",
+  "moonrockz/smithy",
 } for "test"
