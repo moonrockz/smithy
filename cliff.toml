@@ -1,0 +1,95 @@
+# git-cliff configuration: CHANGELOG.md sections and GitHub release notes.
+# https://git-cliff.org/docs/configuration
+#
+# `mise run release:prepare` prepends the next section to CHANGELOG.md; the
+# Release workflow publishes that section as the GitHub release notes
+# (`mise run release:notes`). See AGENTS.md > Release Process.
+
+[remote.github]
+owner = "moonrockz"
+repo = "smithy"
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to `moonrockz/smithy` are listed here, newest first.
+Versions follow [Semantic Versioning](https://semver.org); while the version
+is 0.x, a minor release can contain breaking changes.
+
+<!-- git-cliff: end of header -->
+
+"""
+# `--prepend` writes a new section after this marker.
+header_marker = "<!-- git-cliff: end of header -->"
+body = """
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [unreleased]
+{% endif %}
+<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+{% set breaking = commits | filter(attribute="breaking", value=true) -%}
+{% if breaking | length > 0 and previous.version %}
+### ⚠️ Breaking changes
+{% for commit in breaking %}
+- {% if commit.scope %}*({{ commit.scope }})* {% endif %}{{ commit.breaking_description | split(pat="\n") | first | trim | upper_first }}\
+{% if commit.remote.pr_number %} ([#{{ commit.remote.pr_number }}]({{ self::repo() }}/pull/{{ commit.remote.pr_number }})){% endif %}
+{%- endfor %}
+{% endif -%}
+{% for entry in commits | commit_groups(groups=commit_parsers_groups) %}
+### {{ entry.group | striptags | trim }}
+{% for commit in entry.commits %}
+- {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
+{% if commit.breaking and previous.version %}[**breaking**] {% endif %}\
+{{ commit.message | split(pat="\n") | first | trim | upper_first }}\
+{% if commit.remote.pr_number %} ([#{{ commit.remote.pr_number }}]({{ self::repo() }}/pull/{{ commit.remote.pr_number }})){% endif %}\
+{% if commit.remote.username %} by @{{ commit.remote.username }}{% endif %}
+{%- endfor %}
+{% endfor -%}
+{% if version and previous.version %}
+**Full changelog**: {{ self::repo() }}/compare/{{ previous.version }}...{{ version }}
+{% endif %}
+
+{% macro repo() -%}
+https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
+"""
+trim = false
+render_always = true
+postprocessors = [{ pattern = '\n{3,}', replace = "\n\n" }]
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+# Squash merges end the title with "(#NN)"; the PR link comes from the GitHub
+# remote data instead.
+commit_preprocessors = [{ pattern = '(?m)[ ]*\(#[0-9]+\)$', replace = "" }]
+protect_breaking_commits = true
+commit_parsers = [
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^chore\\(beads\\)", skip = true },
+  { message = "^feat", group = "<!-- 0 -->🚀 Features" },
+  { message = "^fix", group = "<!-- 1 -->🐛 Bug fixes" },
+  { message = "^perf", group = "<!-- 2 -->⚡ Performance" },
+  { message = "^refactor", group = "<!-- 3 -->🚜 Refactoring" },
+  { message = "^doc", group = "<!-- 4 -->📚 Documentation" },
+  { message = "^test", group = "<!-- 5 -->🧪 Testing" },
+  { message = "^(build|ci)", group = "<!-- 6 -->🏗️ Build and CI" },
+  { message = "^(chore|style)", group = "<!-- 7 -->⚙️ Maintenance" },
+  { message = "^revert", group = "<!-- 8 -->◀️ Reverts" },
+  { message = ".*", group = "<!-- 9 -->💼 Other" },
+]
+filter_commits = false
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+topo_order = false
+sort_commits = "oldest"
+
+[bump]
+# On 0.x, a feat or a breaking change bumps the minor version and anything
+# else the patch version. Go to 1.0.0 on purpose (release:prepare -- 1.0.0).
+features_always_bump_minor = true
+breaking_always_bump_major = false
+# The first version, when no tag exists yet.
+initial_tag = "v0.0.1"

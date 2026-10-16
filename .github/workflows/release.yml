@@ -1,0 +1,290 @@
+# Release: plan, validate, build-windows, build, smoke, publish, release.
+#
+# Windows is built on a Windows runner: a cross-built Windows binary reads its arguments wrongly.
+#
+# The flow:
+#   plan      decides if this run releases. It writes release, dry_run, version and tag.
+#   validate  runs the full checks and the version check.
+#   build-windows  builds the windows-x64 executable natively and uploads it.
+#   build     cross-builds the other binaries, adds the Windows one and packs dist/. It uploads dist/.
+#   smoke     runs each binary on a real runner of its OS.
+#   publish   publishes the modules to mooncakes.io. A module already published counts as done.
+#   release   creates the GitHub release from the dist artifact, or uploads the missing assets.
+#
+# A pull request that changes release files, and a manual run with dry_run, run plan, validate,
+# build-windows, build and smoke. They never run publish or release.
+#
+# Re-run failed jobs: after a transient failure, use "Re-run failed jobs" on the run. GitHub runs
+# again the failed job and the jobs after it. The jobs that passed keep their outputs and their
+# artifacts, so the retry ships the same bytes that smoke checked. publish and release are
+# idempotent, so a retry after a partial publish or a partial upload continues where it stopped.
+# Release runs never overlap: they share one concurrency group. A pull request run has its own group.
+# The dist artifact is kept 30 days, the same as the GitHub re-run window.
+# For a failure that is not transient, run `mise run release:status` first.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [moon.mod]
+    tags: ['v*']
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/release.mbtx
+      - scripts/publish.mbtx
+      - scripts/dist.mbtx
+      - scripts/versions.mbtx
+      - scripts/credentials.mbtx
+      - apps/zig-cross/**
+      - .config/mise/config.toml
+      - moon.mod
+      - CHANGELOG.md
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Run every check and the build, but do not publish or create a release
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('release-pr-{0}', github.event.number) || 'release' }}
+  cancel-in-progress: false
+
+env:
+  MISE_EXPERIMENTAL: 'true'
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      dry_run: ${{ steps.plan.outputs.dry_run }}
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Decide what this run does
+        id: plan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
+        run: mise run release:plan
+
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    needs: [plan]
+    if: needs.plan.outputs.release == 'true' || needs.plan.outputs.dry_run == 'true'
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run lint, validate, test and build
+        run: mise run check
+
+      - name: Run the task script tests
+        run: mise run test:scripts
+
+      - name: Check that every version is ${{ needs.plan.outputs.version }}
+        run: moonx scripts/versions.mbtx check ${{ needs.plan.outputs.version }}
+
+  build-windows:
+    name: Build (windows-x64)
+    needs: [plan]
+    if: needs.plan.outputs.release == 'true' || needs.plan.outputs.dry_run == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install the pinned MoonBit toolchain
+        uses: hustcer/setup-moonbit@v1
+        with:
+          version: '0.10.15+943464bfa'
+          core-version: '0.10.15+943464bfa'
+
+      - name: Update the registry
+        run: moon update
+
+      - name: Build smithy natively for Windows
+        run: moon build apps/smithy --target native --release
+
+      - name: Upload the executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-exe
+          path: _build/native/release/build/moonrockz/smithy-cli/smithy-cli.exe
+          if-no-files-found: error
+          retention-days: 30
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [plan, build-windows]
+    if: needs.plan.outputs.release == 'true' || needs.plan.outputs.dry_run == 'true'
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download the windows-x64 executable
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-x64-exe
+          path: _build/cross/windows-x64/native/release/build/moonrockz/smithy-cli
+
+      - name: Build the release outputs into dist/
+        run: mise run build:release
+
+      - name: Upload dist/
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  # These runners only run the binaries. They never build, so they need no mise.
+  smoke:
+    name: Smoke (${{ matrix.asset }})
+    runs-on: ${{ matrix.runner }}
+    needs: [plan, build]
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            asset: linux-x64
+            unpack: tar
+          - runner: ubuntu-24.04-arm
+            asset: linux-arm64
+            unpack: tar
+          - runner: macos-latest
+            asset: darwin-arm64
+            unpack: tar
+          - runner: macos-15-intel
+            asset: darwin-x64
+            unpack: tar
+          - runner: windows-latest
+            asset: windows-x64
+            unpack: zip
+    steps:
+      - name: Download dist/
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Unpack the archive (tar)
+        if: matrix.unpack == 'tar'
+        shell: bash
+        run: |
+          mkdir smoke
+          tar -xzf "dist/smithy-${{ matrix.asset }}.tar.gz" -C smoke
+
+      - name: Unpack the archive (zip)
+        if: matrix.unpack == 'zip'
+        shell: pwsh
+        run: Expand-Archive -Path "dist/smithy-${{ matrix.asset }}.zip" -DestinationPath smoke
+
+      - name: Run smithy version and check the version
+        shell: bash
+        env:
+          EXPECTED: ${{ needs.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          bin=smoke/smithy
+          if [ "${{ matrix.asset }}" = "windows-x64" ]; then bin=smoke/smithy.exe; fi
+          chmod +x "$bin" || true
+          out="$("$bin" version)"
+          echo "$out"
+          if [ -z "$EXPECTED" ]; then
+            echo "::error::the plan gave no version"; exit 1
+          fi
+          pattern="(^|[^0-9.])${EXPECTED//./\\.}([^0-9.]|$)"
+          if ! grep -Eq "$pattern" <<<"$out"; then
+            echo "::error::smithy version did not print $EXPECTED"; exit 1
+          fi
+
+  publish:
+    name: Publish to mooncakes.io
+    runs-on: ubuntu-latest
+    needs: [plan, validate, smoke]
+    if: needs.plan.outputs.release == 'true'
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write the mooncakes.io credentials
+        env:
+          MOONCAKES_USER_TOKEN: ${{ secrets.MOONCAKES_USER_TOKEN }}
+        run: mise run release:credentials
+
+      - name: Publish the modules
+        run: mise run release:publish
+
+  release:
+    name: GitHub release
+    runs-on: ubuntu-latest
+    needs: [plan, publish]
+    if: needs.plan.outputs.release == 'true'
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download dist/
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Write the release notes
+        run: mise run release:notes ${{ needs.plan.outputs.version }} > "$RUNNER_TEMP/notes.md"
+
+      - name: Create the release or upload the missing assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mise run release:github ${{ needs.plan.outputs.version }}

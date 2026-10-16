@@ -1,0 +1,260 @@
+///|
+/// Publish the public modules to mooncakes.io (CI only), in dependency order.
+///
+/// For each module of `publish_list` the script runs `moon update`, then `moon publish` in the module
+/// directory, with retries for transient network failures. A version that mooncakes.io already holds counts as
+/// published, so a second release run for the same tag succeeds. The script prints one line per module and
+/// exits with 1 when a module failed.
+///
+/// Usage: `mise run release:publish`, or `moonx scripts/publish.mbtx`. It needs the credentials that
+/// `scripts/credentials.mbtx` writes.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/x@0.5.5/sys",
+  "moonbitlang/core/env",
+  "moonrockz/moonspec@0.11.0",
+  "moonrockz/expect@0.6.1",
+}
+
+///|
+/// The packages to publish, with their module names, in dependency order. Add a line for each public
+/// module. `scripts/release.mbtx` keeps the same list, and a scenario checks that the two are equal.
+let publish_list : Array[(String, String)] = [
+  ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
+  ("apps/zig-cross", "moonrockz/zig-cross"),
+]
+
+///|
+/// The text that mooncakes.io answers when the version already exists.
+let duplicated : String = "is duplicated with an existing version"
+
+///|
+/// What a `moon publish` run means.
+enum Outcome {
+  Published
+  AlreadyPublished
+  Transient
+  Failed
+} derive(Eq, Debug)
+
+///|
+fn classify(exit_code : Int32, output : String) -> Outcome {
+  if exit_code == 0 {
+    Published
+  } else if output.contains(duplicated) {
+    AlreadyPublished
+  } else if is_transient(exit_code, output) {
+    Transient
+  } else {
+    Failed
+  }
+}
+
+///|
+/// A failed network command is worth a retry only when the failure is probably temporary. A refusal
+/// (401, 403) or a conflict (409) is not, and it wins over the transient words.
+fn is_transient(exit_code : Int32, output : String) -> Bool {
+  if exit_code == 0 {
+    return false
+  }
+  let text = output.to_lower()
+  for word in ["401", "403", "409"] {
+    if text.contains(word) {
+      return false
+    }
+  }
+  [
+    "timed out", "timeout", "connection reset", "connection refused", "temporary failure",
+    "eof", "502", "503", "504", "rate limit",
+  ].any(word => text.contains(word))
+}
+
+///|
+fn fail_with(message : String) -> Unit {
+  eprintln("❌ \{message}")
+  @sys.exit(1)
+}
+
+///|
+/// Run `action` again after a transient failure: attempts at once, then after 5, 20 and 60 seconds.
+/// It stops early on a failure that a retry does not fix.
+async fn with_retry(
+  label : String,
+  action : async () -> (Int32, String),
+) -> (Int32, String) {
+  let waits = [5000, 20000, 60000]
+  let mut result = action()
+  for i, wait in waits {
+    if !is_transient(result.0, result.1) {
+      break
+    }
+    eprintln("↻ \{label}: attempt \{i + 2}/4")
+    @async.sleep(wait)
+    result = action()
+  }
+  result
+}
+
+///|
+/// Run a command in a directory and return its exit code and its stdout and stderr together. A command
+/// that cannot start gives code 1.
+async fn output_in(
+  dir : String,
+  cmd : String,
+  args : Array[String],
+) -> (Int32, String) {
+  let (code, out, err) = @process.collect_output(cmd, args, cwd=dir) catch {
+    _ => return (1, "cannot start \{cmd}")
+  }
+  (code, out.text() + err.text())
+}
+
+///|
+/// Publish one module. Returns the outcome and the last line of output.
+async fn publish_module(dir : String, name : String) -> (Outcome, String) {
+  let (update_code, update_out) = with_retry("update \{name}", () => {
+    output_in(dir, "moon", ["update"])
+  })
+  if update_code != 0 {
+    return (Failed, "`moon update` failed: \{update_out.trim()}")
+  }
+  let (code, out) = with_retry("publish \{name}", () => {
+    output_in(dir, "moon", ["publish"])
+  })
+  let outcome = classify(code, out)
+  (outcome, out.trim().to_owned())
+}
+
+///|
+async fn main {
+  let mut failed = 0
+  for entry in publish_list {
+    let (dir, name) = entry
+    let (outcome, out) = publish_module(dir, name)
+    match outcome {
+      Published => println("✅ \{name}: published")
+      AlreadyPublished =>
+        println("✅ \{name}: already published; nothing to do")
+      Transient | Failed => {
+        failed += 1
+        eprintln("❌ \{name}: failed\n\{out}")
+      }
+    }
+  }
+  if failed > 0 {
+    fail_with("\{failed} module(s) were not published")
+  }
+}
+
+///|
+/// Scenario state for `features/publish.feature`.
+struct PublishWorld {
+  moon_work : String
+  release_source : String
+  mut exit_code : Int32
+  mut output : String
+}
+
+///|
+/// `moon_work` and `release_source` are the real texts of `moon.work` and `scripts/release.mbtx`. A step
+/// cannot read a file, so the test reads them before the run.
+fn PublishWorld::new(
+  moon_work : String,
+  release_source : String,
+) -> PublishWorld {
+  { moon_work, release_source, exit_code: 0, output: "", }
+}
+
+///|
+fn outcome_name(o : Outcome) -> String {
+  match o {
+    Published => "published"
+    AlreadyPublished => "already published"
+    Transient => "transient"
+    Failed => "failed"
+  }
+}
+
+///|
+/// The module directories that `moon.work` lists, without a leading `./`.
+fn work_members(text : String) -> Array[String] {
+  let found = []
+  for line in text.split("\n") {
+    let entry = line.trim_start(chars=" \t\r").to_owned()
+    guard entry.has_prefix("\"") else { continue }
+    let rest = entry[1:]
+    guard rest.find("\"") is Some(stop) else { continue }
+    let path = rest[:stop].to_owned()
+    found.push(if path.has_prefix("./") { path[2:].to_owned() } else { path })
+  }
+  found
+}
+
+///|
+/// The text of one entry of the list, as `scripts/release.mbtx` writes it.
+fn list_entry_text(entry : (String, String)) -> String {
+  "(\"\{entry.0}\", \"\{entry.1}\"),"
+}
+
+///|
+impl @moonspec.World for PublishWorld with fn configure(self, setup) {
+  setup.given2("moon publish exits with {int} and prints {string}", fn(
+    code : Int32,
+    output : String,
+  ) {
+    self.exit_code = code
+    self.output = output
+  })
+  setup.then1("the outcome is {string}", fn(expected : String) raise {
+    @expect.expect(outcome_name(classify(self.exit_code, self.output))).to_equal(
+      expected,
+    )
+  })
+  setup.then3(
+    "a command that exits with {int} and prints {string} is transient: {string}",
+    fn(code : Int32, output : String, expected : String) raise {
+      let actual = if is_transient(code, output) { "yes" } else { "no" }
+      @expect.expect(actual).to_equal(expected)
+    },
+  )
+  setup.then0("every module in the publish list is in moon.work", fn() raise {
+    let members = work_members(self.moon_work)
+    for entry in publish_list {
+      @expect.expect(members.contains(entry.0)).to_equal(true)
+    }
+  })
+  setup.then0("the publish list is the one in release.mbtx", fn() raise {
+    let release = self.release_source
+    guard release.find("let publish_list") is Some(start) else {
+      fail("release.mbtx has no publish_list")
+    }
+    let block = release[start:].to_owned()
+    guard block.find("]\n") is Some(stop) else {
+      fail("release.mbtx publish_list is not closed")
+    }
+    let found : Array[String] = []
+    for line in block[:stop].to_owned().split("\n") {
+      let line = line.trim().to_owned()
+      if line.has_prefix("(\"") {
+        found.push(line)
+      }
+    }
+    let expected : Array[String] = publish_list.map(list_entry_text)
+    @expect.expect(found).to_equal(expected)
+  })
+}
+
+///|
+async test "publish feature" {
+  let moon_work = @fs.read_file("../moon.work").text()
+  let release_source = @fs.read_file("release.mbtx").text()
+  @moonspec.run_or_fail(
+    () => PublishWorld::new(moon_work, release_source),
+    @moonspec.RunOptions::new([
+      @moonspec.FeatureSource::File("features/publish.feature"),
+    ]),
+  )
+  |> ignore
+}

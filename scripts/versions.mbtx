@@ -1,0 +1,435 @@
+///|
+/// Check or set one version across the workspace.
+///
+/// All modules in `moon.work` share one version. The root `moon.mod` is the source of truth.
+/// `check [X.Y.Z]` lists each place that has another version. The default for X.Y.Z is the root version.
+/// `set X.Y.Z` rewrites the places in line edits, so the formatting does not change, and prints each file it
+/// changed. The places are the `version` of each `moon.mod`, the sibling imports (`"<module>@X.Y.Z"` for a
+/// module of the workspace) and the version strings in the files of `version_files`.
+/// An import of a third-party module, or a version string in any other file, stays as it is.
+///
+/// The script reads `moon.mod` and `moon.work` with line matching. This is enough and adds no dependency.
+///
+/// Usage: `mise run validate:versions`, or `moonx scripts/versions.mbtx check [X.Y.Z]`
+/// or `moonx scripts/versions.mbtx set X.Y.Z`. The script exits with a non-zero code on failure.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+  "moonrockz/moonspec@0.11.0",
+  "moonrockz/expect@0.6.1",
+}
+
+///|
+let usage : String = "Usage: versions.mbtx check [X.Y.Z] | set X.Y.Z"
+
+///|
+/// The source files that hold a version string, with the text that comes right before the version.
+/// The text ends with the opening quote. Only a string with this text before it counts, so another
+/// version-like string in the same file (for example a specification version) is not touched.
+let version_files : Array[(String, String)] = [
+  ("pkgs/smithy/smithy.mbt", "pub fn version() -> String {\n  \""),
+  ("pkgs/smithy/smithy_test.mbt", "inspect(@smithy.version(), content=\""),
+  ("pkgs/smithy-syntax/src/lib.mbt", "pub fn version() -> String {\n  \""),
+  (
+    "pkgs/smithy-syntax/src/lib_test.mbt", "inspect(@syntax.version(), content=\"",
+  ),
+  ("apps/zig-cross/version.mbt", "pub let version : String = \""),
+  (
+    "apps/zig-cross/cli_wbtest.mbt", "inspect(version_text(), content=\"zig-cross ",
+  ),
+]
+
+///|
+fn fail_with(message : String) -> Unit {
+  eprintln("❌ \{message}")
+  @sys.exit(1)
+}
+
+///|
+/// Whether `text` is `N.N.N` with digits only.
+fn is_semver(text : String) -> Bool {
+  let parts = text.split(".").map(p => p.to_owned()).collect()
+  if parts.length() != 3 {
+    return false
+  }
+  for part in parts {
+    if part.is_empty() {
+      return false
+    }
+    for i in 0..<part.length() {
+      let c = part.code_unit_at(i).to_int()
+      if c < 48 || c > 57 {
+        return false
+      }
+    }
+  }
+  true
+}
+
+///|
+/// Each place in `text` where `head`, a semver and a closing quote follow each other.
+/// A place is `(start, end, version)`: the version lies at `start..<end` of `text`.
+fn versions_after(text : String, head : String) -> Array[(Int, Int, String)] {
+  let found = []
+  let mut from = 0
+  while from + head.length() < text.length() {
+    guard text[from:].find(head) is Some(at) else { break }
+    let start = from + at + head.length()
+    guard text[start:].find("\"") is Some(len) else { break }
+    let candidate = text[start:start + len].to_owned()
+    if is_semver(candidate) {
+      found.push((start, start + len, candidate))
+    }
+    from = start
+  }
+  found
+}
+
+///|
+/// The text with each version of `places` replaced by `version`.
+fn splice(
+  text : String,
+  places : Array[(Int, Int, String)],
+  version : String,
+) -> String {
+  let buf = StringBuilder()
+  let mut last = 0
+  for place in places {
+    buf.write_string(text[last:place.0].to_owned())
+    buf.write_string(version)
+    last = place.1
+  }
+  buf.write_string(text[last:].to_owned())
+  buf.to_string()
+}
+
+///|
+/// The version of the top-level `version = "…"` line, or `None`.
+fn mod_version(moon_mod : String) -> String? {
+  for line in moon_mod.split("\n") {
+    if line.has_prefix("version = \"") {
+      let rest = line[11:]
+      if rest.find("\"") is Some(end) {
+        return Some(rest[:end].to_owned())
+      }
+    }
+  }
+  None
+}
+
+///|
+/// The `name` of a module, or `None`.
+fn mod_name(moon_mod : String) -> String? {
+  for line in moon_mod.split("\n") {
+    if line.has_prefix("name = \"") {
+      let rest = line[8:]
+      if rest.find("\"") is Some(end) {
+        return Some(rest[:end].to_owned())
+      }
+    }
+  }
+  None
+}
+
+///|
+/// `moon_mod` with the top-level version line set to `version`, or `None` when there is no such line.
+fn set_mod_version(moon_mod : String, version : String) -> String? {
+  let lines = moon_mod.split("\n").map(l => l.to_owned()).collect()
+  let mut changed = false
+  for i in 0..<lines.length() {
+    if !changed && lines[i].has_prefix("version = \"") {
+      lines[i] = "version = \"\{version}\""
+      changed = true
+    }
+  }
+  if changed {
+    Some(lines.join("\n"))
+  } else {
+    None
+  }
+}
+
+///|
+/// The places of the sibling imports `"<name>@X.Y.Z"` of `siblings` in `text`, in text order.
+fn sibling_places(
+  text : String,
+  siblings : Array[String],
+) -> Array[(Int, Int, String)] {
+  let places = []
+  for name in siblings {
+    for place in versions_after(text, "\"\{name}@") {
+      places.push(place)
+    }
+  }
+  places.sort_by((a, b) => a.0.compare(b.0))
+  places
+}
+
+///|
+/// `text` with the version of each import of a module in `siblings` set to `version`.
+fn set_sibling_imports(
+  text : String,
+  siblings : Array[String],
+  version : String,
+) -> String {
+  splice(text, sibling_places(text, siblings), version)
+}
+
+///|
+/// `text` with each `"old"` replaced by `"new"`.
+fn replace_quoted(text : String, old : String, new : String) -> String {
+  text.replace(old="\"\{old}\"", new="\"\{new}\"")
+}
+
+///|
+/// The text that comes right before the version in a file of `version_files`.
+fn head_of(path : String) -> String {
+  for entry in version_files {
+    if entry.0 == path {
+      return entry.1
+    }
+  }
+  "\""
+}
+
+///|
+/// The text of a file of `version_files` with its version set to `version`.
+fn set_source_version(path : String, text : String, version : String) -> String {
+  splice(text, versions_after(text, head_of(path)), version)
+}
+
+///|
+/// The lines `<path>: found X, expected Y` for each version in `files` that is not `expected`.
+/// A file is `(path, text)`. A `moon.mod` file is checked for its version and its sibling imports.
+/// The sibling modules are the other `moon.mod` files in `files`. Any other file is checked for the
+/// version strings that follow the text of `version_files`.
+fn mismatches(files : Array[(String, String)], expected : String) -> Array[String] {
+  let siblings = []
+  for file in files {
+    if file.0.has_suffix("moon.mod") && mod_name(file.1) is Some(name) {
+      siblings.push(name)
+    }
+  }
+  let lines = []
+  for file in files {
+    let (path, text) = file
+    let found : Array[String] = if path.has_suffix("moon.mod") {
+      let versions = []
+      if mod_version(text) is Some(v) {
+        versions.push(v)
+      }
+      for place in sibling_places(text, siblings) {
+        versions.push(place.2)
+      }
+      versions
+    } else {
+      versions_after(text, head_of(path)).map(place => place.2)
+    }
+    for v in found {
+      if v != expected {
+        lines.push("\{path}: found \{v}, expected \{expected}")
+      }
+    }
+  }
+  lines
+}
+
+///|
+/// The paths of the module directories in `moon.work`, without a leading `./`. The root is `.`.
+fn members(work : String) -> Array[String] {
+  let found = []
+  for line in work.split("\n") {
+    let entry = line.trim_start(chars=" \t\r").to_owned()
+    guard entry.has_prefix("\"") else { continue }
+    let rest = entry[1:]
+    guard rest.find("\"") is Some(end) else { continue }
+    let path = rest[:end].to_owned()
+    let path = if path.has_prefix("./") && path.length() > 2 {
+      path[2:].to_owned()
+    } else {
+      path
+    }
+    if !path.is_empty() {
+      found.push(path)
+    }
+  }
+  found
+}
+
+///|
+fn mod_path(dir : String) -> String {
+  if dir == "." {
+    "moon.mod"
+  } else {
+    "\{dir}/moon.mod"
+  }
+}
+
+///|
+async fn read_text(path : String) -> String {
+  @fs.read_file(path).text()
+}
+
+///|
+/// Every file that holds the version, as `(path, text)`.
+async fn workspace_files() -> Array[(String, String)] {
+  let files = []
+  for dir in members(read_text("moon.work")) {
+    let path = mod_path(dir)
+    files.push((path, read_text(path)))
+  }
+  for entry in version_files {
+    files.push((entry.0, read_text(entry.0)))
+  }
+  files
+}
+
+///|
+async fn check(expected : String?) -> Unit {
+  let files = workspace_files()
+  let expected = match expected {
+    Some(v) => v
+    None =>
+      match mod_version(files[0].1) {
+        Some(v) => v
+        None => {
+          fail_with("The root moon.mod has no version line.")
+          ""
+        }
+      }
+  }
+  let bad = mismatches(files, expected)
+  if !bad.is_empty() {
+    for line in bad {
+      eprintln(line)
+    }
+    fail_with("\{bad.length()} version(s) differ from \{expected}.")
+  }
+  println("✅ All versions are \{expected}")
+}
+
+///|
+async fn set(version : String) -> Unit {
+  let files = workspace_files()
+  let siblings = []
+  for file in files {
+    if file.0.has_suffix("moon.mod") && mod_name(file.1) is Some(name) {
+      siblings.push(name)
+    }
+  }
+  for file in files {
+    let (path, text) = file
+    let updated = if path.has_suffix("moon.mod") {
+      match set_mod_version(text, version) {
+        Some(t) => set_sibling_imports(t, siblings, version)
+        None => {
+          fail_with("\{path} has no version line.")
+          text
+        }
+      }
+    } else {
+      set_source_version(path, text, version)
+    }
+    if updated != text {
+      @fs.write_file(path, updated)
+      println("✏️  \{path}")
+    }
+  }
+  println("✅ Set the version to \{version}")
+}
+
+///|
+async fn main {
+  match @env.args()[1:] {
+    ["check"] => check(None)
+    ["check", v] =>
+      if is_semver(v) {
+        check(Some(v))
+      } else {
+        fail_with("\{v} is not a version of the form X.Y.Z.")
+      }
+    ["set", v] =>
+      if is_semver(v) {
+        set(v)
+      } else {
+        fail_with("\{v} is not a version of the form X.Y.Z.")
+      }
+    _ => fail_with(usage)
+  }
+}
+
+///|
+/// Scenario state for `features/versions.feature`.
+struct VersionsWorld {
+  mut text : String
+  mut result : String
+  files : Array[(String, String)]
+  mut found : Array[String]
+}
+
+///|
+fn VersionsWorld::new() -> VersionsWorld {
+  { text: "", result: "", files: [], found: [] }
+}
+
+///|
+impl @moonspec.World for VersionsWorld with fn configure(self, setup) {
+  setup.given1("the text:", fn(doc : @moonspec.DocString) {
+    self.text = doc.content
+  })
+  setup.then1("the module version is {string}", fn(expected : String) raise {
+    @expect.expect(mod_version(self.text).unwrap_or("none")).to_equal(expected)
+  })
+  setup.then0("there is no module version", fn() raise {
+    @expect.expect((mod_version(self.text) is None)).to_equal(true)
+  })
+  setup.when1("I set the module version to {string}", fn(version : String) {
+    self.result = set_mod_version(self.text, version).unwrap_or("none")
+  })
+  setup.when2("I set the imports of {string} to {string}", fn(
+    names : String,
+    version : String,
+  ) {
+    let siblings = names.split(",").map(n => n.to_owned()).collect()
+    self.result = set_sibling_imports(self.text, siblings, version)
+  })
+  setup.when2("I replace the quoted {string} with {string}", fn(
+    old : String,
+    new : String,
+  ) {
+    self.result = replace_quoted(self.text, old, new)
+  })
+  setup.then1("the result is:", fn(doc : @moonspec.DocString) raise {
+    @expect.expect(self.result).to_equal(doc.content)
+  })
+  setup.given2("a file {string} with the text:", fn(
+    path : String,
+    doc : @moonspec.DocString,
+  ) {
+    self.files.push((path, doc.content))
+  })
+  setup.when1("I look for versions other than {string}", fn(expected : String) {
+    self.found = mismatches(self.files, expected)
+  })
+  setup.when1("I set the versions of the files to {string}", fn(version : String) {
+    self.result = self.files
+      .map(file => set_source_version(file.0, file.1, version))
+      .join("|")
+  })
+  setup.then1("the mismatches are {string}", fn(expected : String) raise {
+    @expect.expect(self.found.join("|")).to_equal(expected)
+  })
+}
+
+///|
+async test "versions feature" {
+  @moonspec.run_or_fail(
+    VersionsWorld::new,
+    @moonspec.RunOptions::new([
+      @moonspec.FeatureSource::File("features/versions.feature"),
+    ]),
+  )
+  |> ignore
+}

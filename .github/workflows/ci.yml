@@ -76,6 +76,100 @@ jobs:
       - name: Test ${{ matrix.target }}
         run: mise run test -- ${{ matrix.target }}
 
+  build-windows:
+    name: Build (windows-x64)
+    needs: [lint]
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install the pinned MoonBit toolchain
+        uses: hustcer/setup-moonbit@v1
+        with:
+          version: '0.10.15+943464bfa'
+          core-version: '0.10.15+943464bfa'
+
+      - name: Update the registry
+        run: moon update
+
+      - name: Build smithy natively for Windows
+        run: moon build apps/smithy --target native --release
+
+      - name: Upload the executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-exe
+          path: _build/native/release/build/moonrockz/smithy-cli/smithy-cli.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  cross-build:
+    name: Cross-build release outputs
+    runs-on: ubuntu-latest
+    needs: [lint, build-windows]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download the windows-x64 executable
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-x64-exe
+          path: _build/cross/windows-x64/native/release/build/moonrockz/smithy-cli
+
+      - name: Build the release outputs into dist/
+        run: mise run build:release
+
+      - name: Upload dist/
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  test-native-zig:
+    name: Test native (zig)
+    runs-on: ubuntu-latest
+    needs: [lint]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run the native tests with zig as the C compiler
+        run: mise run test:native-zig
+
+  test-scripts:
+    name: Test task scripts
+    runs-on: ubuntu-latest
+    needs: [lint]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run the task script tests
+        run: mise run test:scripts
+
   # The only check that branch protection needs. Add every new job to `needs`.
   # `if: always()` is required: without it this job is skipped when a needed job fails, and
   # GitHub counts a skipped required check as passed.
@@ -84,7 +178,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [lint, build, test]
+    needs: [lint, build, build-windows, test, cross-build, test-native-zig, test-scripts]
     steps:
       - name: Check that every job passed or was skipped
         env:

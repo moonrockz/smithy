@@ -37,6 +37,10 @@ let library_paths : Array[String] = [
 ]
 
 ///|
+/// Packages that support only the native and wasm targets (`supported_targets = "native+wasm"`).
+let native_wasm_paths : Array[String] = ["apps/zig-cross"]
+
+///|
 /// The `tests` module's packages, tested on js and native only.
 let test_paths : Array[String] = ["tests/tck", "tests/bdd"]
 
@@ -60,6 +64,13 @@ async fn main {
     if code != 0 {
       println("❌ Tests failed for \{target}")
       @sys.exit(if code > 0 { code } else { 1 })
+    }
+    if target == "wasm" || target == "native" {
+      let code = moon_test(native_wasm_paths, target)
+      if code != 0 {
+        println("❌ Tests failed for \{target}")
+        @sys.exit(if code > 0 { code } else { 1 })
+      }
     }
     if target == "js" || target == "native" {
       let code = moon_test(test_paths, target)
