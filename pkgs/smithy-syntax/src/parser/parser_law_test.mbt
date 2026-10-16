@@ -77,13 +77,17 @@ test "law: every diagnostic code is in the table and every span is inside the te
 /// The lexical structure of the rest of the file stays intact; a lost
 /// quote re-pairs every later quote and is covered by the scanner laws,
 /// not this one.
-test "law: one edit to a valid model gives at most three diagnostics and keeps most shapes" {
+test "law: one edit to a valid model gives a bounded number of diagnostics and keeps most shapes" {
   @quickcheck.check(
     (m : @lawkit.EditedModel) => {
       let r = @parser.parse_text(m.text())
-      guard r.ast is Some(f) else { return r.diagnostics.length() <= 3 }
-      // The small model has 8 shape statements and 1 apply.
-      r.diagnostics.length() <= 3 && f.shapes().length() >= 5
+      guard r.ast is Some(f) else { return r.diagnostics.length() <= 6 }
+      // The small model has 8 shape statements and 1 apply. Losing the
+      // `$version` statement to the edit can gate every 2.0-only
+      // construct in the model at once (mixins, elision, defaults, enum,
+      // the `@mixin` trait, inline input/output): still bounded, just by
+      // the model's own feature count, not a fixed small number.
+      r.diagnostics.length() <= 6 && f.shapes().length() >= 3
     },
     count=300,
     max_size=16,

@@ -16,12 +16,19 @@ let table : Array[(String, String)] = [
   ("SM-PARSE-005", "Invalid shape ID or shape name"),
   ("SM-PARSE-006", "Unsupported Smithy version"),
   ("SM-PARSE-007", "Syntax that needs Smithy IDL version 2"),
-  ("SM-PARSE-008", "Documentation comment before apply"),
+  ("SM-PARSE-008", "Documentation comment before apply (warning)"),
   ("SM-PARSE-009", "Detached documentation comment (warning)"),
   ("SM-PARSE-010", "Too much nesting"),
   ("SM-PARSE-011", "Unknown operation property"),
   ("SM-PARSE-012", "Duplicate operation property"),
   ("SM-PARSE-013", "Duplicate control statement"),
+  ("SM-PARSE-014", "Duplicate member name"),
+  ("SM-PARSE-015", "Invalid member count"),
+  ("SM-PARSE-016", "Invalid enum or intEnum member value"),
+  ("SM-PARSE-017", "Invalid mixin shape"),
+  ("SM-PARSE-018", "Syntax that needs Smithy IDL version 1"),
+  ("SM-PARSE-019", "Conflicting use or shape name"),
+  ("SM-PARSE-020", "Unresolved member elision"),
 ]
 
 ///|

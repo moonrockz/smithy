@@ -141,6 +141,23 @@ fn Parser::here(self : Parser) -> @span.Span {
 }
 
 ///|
+/// Where "I was expecting X right here" goes when X is missing at the
+/// true end of the file: right after the last real token, not the raw
+/// end-of-file offset. The two read the same when the file has no
+/// trailing line break; when it does, this is the reference's own
+/// convention for "a value/identifier is missing here" ("here" being
+/// where the last thing I read ended), as opposed to `here()`'s "the
+/// file ended while I was still reading an unclosed block", which the
+/// reference reports at the raw end-of-file offset instead.
+fn Parser::here_anchored(self : Parser) -> @span.Span {
+  guard self.peek() is None else { return self.here() }
+  match self.tokens.last() {
+    Some(t) => t.span.end().to(t.span.end())
+    None => self.text_end.to(self.text_end)
+  }
+}
+
+///|
 /// How the current token reads in a message: "`foo`", "end of file".
 fn Parser::found(self : Parser) -> String {
   match self.peek() {
@@ -442,7 +459,7 @@ fn Parser::parse_shape_id(
         "SM-PARSE-005",
         "INVALID SHAPE ID",
         "I was expecting a shape name after `#`",
-        self.here(),
+        self.here_anchored(),
         example="smithy.api#String",
       )
     }

@@ -65,6 +65,9 @@ fn Parser::require_v2(
     "elision" => "Members can only elide targets in IDL version 2 or later"
     "for" =>
       "Resource properties can only be used with Smithy version 2 or later"
+    "default" =>
+      "@default assignment is only supported in IDL version 2 or later"
+    "enum" => "enum shapes cannot be used in Smithy version 1.0"
     _ =>
       "Inlined operation inputs and outputs can only be used with Smithy version 2 or later"
   }

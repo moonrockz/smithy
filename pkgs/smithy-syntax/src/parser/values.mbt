@@ -184,7 +184,7 @@ fn Parser::parse_node_value(self : Parser) -> @ast.NodeValue raise ParseError {
         "SM-PARSE-002",
         "UNEXPECTED END OF FILE",
         "I was expecting a value but reached the end of the file",
-        self.here(),
+        self.here_anchored(),
       )
     Some(t) =>
       match t.kind {

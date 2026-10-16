@@ -265,3 +265,25 @@ pub fn Shape::kind(self : Shape) -> ShapeKind {
     Operation(..) => Operation
   }
 }
+
+///|
+/// The shape's `with [...]` mixins, if any.
+pub fn Shape::mixins(self : Shape) -> Mixins? {
+  match self {
+    Simple(mixins~, ..)
+    | Enum(mixins~, ..)
+    | Aggregate(mixins~, ..)
+    | Entity(mixins~, ..)
+    | Operation(mixins~, ..) => mixins
+  }
+}
+
+///|
+/// The shape's `for Resource` target, for an aggregate shape that has
+/// one.
+pub fn Shape::for_resource(self : Shape) -> Node[ShapeId]? {
+  match self {
+    Aggregate(for_resource~, ..) => for_resource
+    _ => None
+  }
+}

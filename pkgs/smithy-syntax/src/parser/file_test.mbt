@@ -140,6 +140,57 @@ test "namespace and use must stay on one line as their keyword" {
 }
 
 ///|
+/// A missing value, namespace segment or shape name right at the true
+/// end of a file that ends with a line break is reported right after
+/// the last real token, not on the synthetic empty line after the final
+/// break. Pins the reference's `invalid/control/control-missing-value.smithy`,
+/// `invalid/namespace/namespace-syntax-error.smithy` and
+/// `invalid/use/use-missing-after-namespace.smithy`.
+test "a missing value, namespace segment or shape name at EOF is reported right after the last token" {
+  fn ends_before_eof(text : String) -> Bool raise {
+    let r = @parser.parse_text(text)
+    let errs = r.diagnostics.iter().filter(d => d.is_error()).collect()
+    guard errs.length() > 0 else { fail("no error") }
+    errs[0].span.start == errs[0].span.end() &&
+    errs[0].span.start.0 < r.cst.to_source().length()
+  }
+
+  @expect.expect_all(e => {
+    e
+    .expect(
+      ends_before_eof(
+        (
+          #|$version:
+          #|
+        ),
+      ),
+    )
+    .to_be_true()
+    e
+    .expect(
+      ends_before_eof(
+        (
+          #|namespace com.
+          #|
+        ),
+      ),
+    )
+    .to_be_true()
+    e
+    .expect(
+      ends_before_eof(
+        (
+          #|namespace smithy.example
+          #|use smithy.api#
+          #|
+        ),
+      ),
+    )
+    .to_be_true()
+  })
+}
+
+///|
 test "an unsupported version is SM-PARSE-006" {
   @expect.expect(
     codes(

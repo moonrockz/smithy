@@ -68,17 +68,28 @@ fn Parser::parse_shape_name(
       "SM-PARSE-001",
       "MISSING SHAPE NAME",
       "I was expecting a shape name after `\{keyword}` but found \{self.found()}",
-      self.here(),
+      self.here_anchored(),
       example="\{keyword} MyShape",
     )
   }
   if kw.trivia_after.iter().any(x => x.is_newline()) ||
     t.trivia_before.iter().any(x => x.is_newline()) {
+    // Report at the line break itself (the reference's own unexpected
+    // token), not at the shape name that follows it.
+    let break_span = match
+      kw.trivia_after.iter().find_first(x => x.is_newline()) {
+      Some(piece) => piece.span()
+      None =>
+        match t.trivia_before.iter().find_first(x => x.is_newline()) {
+          Some(piece) => piece.span()
+          None => self.here()
+        }
+    }
     self.fail(
       "SM-PARSE-001",
       "MISSING SHAPE NAME",
       "I was expecting a shape name after `\{keyword}` on the same line but found a line break",
-      self.here(),
+      break_span,
       hint="Write the name right after the keyword: `\{keyword} Name`.",
     )
   }
@@ -276,7 +287,7 @@ fn Parser::expect_member_br(self : Parser) -> Unit raise ParseError {
   if !has_sep {
     self.fail(
       "SM-PARSE-003",
-      "MISSING LINE BREAK",
+      "MISSING SEPARATOR",
       "I was expecting whitespace here but found \{self.found()}",
       next.span,
       notes=["Each member must be separated from the next by whitespace."],
@@ -297,8 +308,10 @@ fn[T] Parser::parse_block_items(
   owner : String,
   parse_item : () -> Result[T, ParseError],
   needs_br? : (T) -> Bool,
+  name_of? : (T) -> @ast.Node[String],
 ) -> Array[T] raise ParseError {
   let items : Array[T] = []
+  let seen_names : Array[String] = []
   while !self.at_kind(RBrace) {
     self.check_unfinished(title, "the members of \{owner}")
     let start_pos = self.pos
@@ -309,6 +322,25 @@ fn[T] Parser::parse_block_items(
         let strict = match needs_br {
           Some(f) => f(m)
           None => false
+        }
+        match name_of {
+          Some(f) => {
+            let name = f(m)
+            if seen_names.contains(name.value) {
+              self.fail(
+                "SM-PARSE-014",
+                "DUPLICATE MEMBER",
+                "Found conflicting member name, `\{name.value}`",
+                name.span,
+                notes=[
+                  "I already saw a member named `\{name.value}` in this shape; each member name is used once.",
+                ],
+                hint="Rename one of them or remove the duplicate.",
+              )
+            }
+            seen_names.push(name.value)
+          }
+          None => ()
         }
         items.push(m)
         if !self.at_kind(RBrace) {
@@ -359,6 +391,7 @@ fn Parser::parse_members(
       }
     },
     needs_br=m => m.default is Some(_),
+    name_of=m => m.name,
   )
   ignore(self.expect_kind(RBrace, "`}`"))
   self.leave()
@@ -440,7 +473,8 @@ fn Parser::parse_member(self : Parser) -> @ast.Member raise ParseError {
     Elided => name.span.end()
   }
   let default : @ast.NodeValue? = if self.at_kind(Equal) {
-    ignore(self.advance())
+    let eq = self.expect_kind(Equal, "`=`")
+    self.require_v2("default", eq.span)
     self.expect_sp_after("the default value")
     let v = self.parse_node_value()
     end = v.span().end()
@@ -482,6 +516,7 @@ fn Parser::parse_enum_members(
       }
     },
     needs_br=m => m.value is Some(_),
+    name_of=m => m.name,
   )
   ignore(self.expect_kind(RBrace, "`}`"))
   self.leave()
@@ -592,14 +627,16 @@ fn Parser::parse_operation_body(
       _ => false
     }
     if duplicate {
-      self.fail(
+      self.report(
         "SM-PARSE-012",
+        Error,
         "DUPLICATE OPERATION PROPERTY",
         "Duplicate operation \{key.lexeme} property for \{owner}",
         key.span,
         notes=[
-          "An operation body holds `input`, `output` and `errors`, each at most once.",
+          "I already saw a `\{key.lexeme}` property for \{owner}; an operation body holds `input`, `output` and `errors`, each at most once.",
         ],
+        hint="Remove the duplicate `\{key.lexeme}` property.",
       )
     }
     match key.lexeme {
@@ -675,6 +712,90 @@ fn Parser::parse_operation_body(
 }
 
 ///|
+/// Whether `traits` applies `@mixin`.
+fn has_mixin_trait(traits : Array[@ast.Trait]) -> Bool {
+  traits.iter().any(t => t.id.value.name == "mixin")
+}
+
+///|
+/// The value of the node object key `key` in `body`, if `body` is an
+/// object and has it.
+fn object_key(body : @ast.NodeValue, key : String) -> @ast.NodeValue? {
+  guard body is Object(kvps, _) else { return None }
+  for kvp in kvps {
+    if kvp.key.value == key {
+      return Some(kvp.value)
+    }
+  }
+  None
+}
+
+///|
+/// A same-file, no-model check: an intEnum member's value must be a
+/// 32-bit integer; an enum member's value must be a string. (These are
+/// the loader's checks, not the grammar's, but both are purely local to
+/// the member being checked.)
+fn Parser::check_enum_member_value(
+  self : Parser,
+  kind : @ast.EnumType,
+  m : @ast.EnumMember,
+) -> Unit {
+  guard m.value is Some(v) else { return }
+  match kind {
+    Enum =>
+      if !(v is String(_, _)) {
+        self.report(
+          "SM-PARSE-016",
+          Error,
+          "INVALID ENUM VALUE",
+          "enum member `\{m.name.value}` must have a string value",
+          v.span(),
+          notes=["An enum member's value, if given, must be a quoted string."],
+          hint="Write a string value, like `\{m.name.value} = \"\{m.name.value}\"`.",
+        )
+      }
+    IntEnum =>
+      match v {
+        Number(lit, _) =>
+          match lit.value {
+            Integer(b) =>
+              if b < BigInt::from_int64(-2147483648L) ||
+                b > BigInt::from_int64(2147483647L) {
+                self.report(
+                  "SM-PARSE-016",
+                  Error,
+                  "INVALID ENUM VALUE",
+                  "intEnum member `\{m.name.value}` must fit in a 32-bit integer",
+                  v.span(),
+                  notes=[
+                    "An intEnum member's value must be an integer between -2147483648 and 2147483647.",
+                  ],
+                )
+              }
+            Decimal(_) =>
+              self.report(
+                "SM-PARSE-016",
+                Error,
+                "INVALID ENUM VALUE",
+                "intEnum member `\{m.name.value}` must be an integer, not a decimal",
+                v.span(),
+                notes=["An intEnum member's value must be a whole number."],
+              )
+          }
+        _ =>
+          self.report(
+            "SM-PARSE-016",
+            Error,
+            "INVALID ENUM VALUE",
+            "intEnum member `\{m.name.value}` must have a numeric value",
+            v.span(),
+            notes=["An intEnum member's value, if given, must be an integer."],
+          )
+      }
+  }
+}
+
+///|
 /// `Shape`, after the docs and traits; `start` is the statement start.
 fn Parser::parse_shape(
   self : Parser,
@@ -707,22 +828,95 @@ fn Parser::parse_shape(
   let name = self.parse_shape_name(kw)
   let owner = "the \{kw.lexeme} `\{name.value}`"
   self.push_context(owner, kw.span)
+  // `@mixin` is a Smithy 2.0 feature, on any shape kind.
+  if has_mixin_trait(traits) {
+    for t in traits {
+      if t.id.value.name == "mixin" {
+        self.require_v2("mixins", t.span)
+      }
+    }
+  }
   let shape : @ast.Shape = match kind {
     Simple(t) => Simple(kind=t, name~, mixins=self.parse_mixins())
     Enum(t) => {
+      self.require_v2("enum", kw.span)
       let mixins = self.parse_mixins()
-      Enum(kind=t, name~, mixins~, members=self.parse_enum_members(owner)[:])
+      let diags_before = self.diagnostics.length()
+      let members = self.parse_enum_members(owner)
+      // Only when the emptiness is not itself a recovery artifact (a bad
+      // member that recovery discarded already reported its own error)
+      // and there are no mixins to contribute a member instead.
+      if members.is_empty() &&
+        self.diagnostics.length() == diags_before &&
+        mixins is None {
+        self.report(
+          "SM-PARSE-015",
+          Error,
+          "INVALID MEMBER COUNT",
+          "\{owner} must have at least one member",
+          kw.span,
+          notes=["Each enum or intEnum needs at least one member."],
+        )
+      }
+      for m in members {
+        self.check_enum_member_value(t, m)
+      }
+      Enum(kind=t, name~, mixins~, members=members[:])
     }
     Aggregate(t) => {
+      // `set` parses in every version; the loader rejects it in 2.0 (lists
+      // took over, with `@uniqueItems` for the old `set` behavior).
+      if t is Set && self.version is Some(V2) {
+        self.report(
+          "SM-PARSE-018",
+          Error,
+          "NEEDS SMITHY IDL 1",
+          "set shapes cannot be used in Smithy version 2.0",
+          kw.span,
+          notes=["Use a list with the `@uniqueItems` trait in IDL 2.0 instead."],
+        )
+      }
       let for_resource = self.parse_for_resource()
       let mixins = self.parse_mixins()
-      Aggregate(
-        kind=t,
-        name~,
-        for_resource~,
-        mixins~,
-        members=self.parse_members(owner)[:],
-      )
+      let diags_before = self.diagnostics.length()
+      let members = self.parse_members(owner)
+      // Only when recovery did not already report something, and there
+      // are no mixins to contribute members instead (a textually empty
+      // `list Foo with [Mix] {}` can be perfectly valid).
+      let clean = self.diagnostics.length() == diags_before && mixins is None
+      match t {
+        List | Set =>
+          if members.length() != 1 && clean {
+            self.report(
+              "SM-PARSE-015",
+              Error,
+              "INVALID MEMBER COUNT",
+              "\{owner} needs exactly one member",
+              kw.span,
+              notes=["A list or set has exactly one member, named `member`."],
+            )
+          }
+        Map => {
+          let names = members.iter().map(m => m.name.value).collect()
+          if clean &&
+            (
+              names.length() != 2 ||
+              !names.contains("key") ||
+              !names.contains("value")
+            ) {
+            self.report(
+              "SM-PARSE-015",
+              Error,
+              "INVALID MEMBER COUNT",
+              "\{owner} needs exactly a `key` and a `value` member",
+              kw.span,
+              notes=["A map has exactly two members, named `key` and `value`."],
+            )
+          }
+        }
+        Union | Structure => ()
+      }
+      Aggregate(kind=t, name~, for_resource~, mixins~, members=members[:])
     }
     Entity(t) => {
       let mixins = self.parse_mixins()
@@ -735,11 +929,62 @@ fn Parser::parse_shape(
           example="\{kw.lexeme} \{name.value} {\n    version: \"2024-01-01\"\n}",
         )
       }
-      Entity(kind=t, name~, mixins~, body=self.parse_node_value())
+      let body = self.parse_node_value()
+      if t is Resource {
+        if object_key(body, "properties") is Some(_) &&
+          self.version != Some(V2) &&
+          !self.version_unknown {
+          self.report(
+            "SM-PARSE-007",
+            Error,
+            "NEEDS SMITHY IDL 2",
+            "Resource properties can only be used with Smithy version 2 or later",
+            body.span(),
+            notes=[
+              "This file is Smithy IDL 1.0: " +
+              (if self.version is None {
+                "it has no `$version` statement, so I read it as version 1.0."
+              } else {
+                "its `$version` says so."
+              }),
+            ],
+            hint="Add `$version: \"2\"` as the first line of the file.",
+          )
+        }
+        if has_mixin_trait(traits) &&
+          body is Object(kvps, _) &&
+          kvps.length() > 0 {
+          self.report(
+            "SM-PARSE-017",
+            Error,
+            "INVALID MIXIN",
+            "a resource with the `@mixin` trait may not define any properties",
+            body.span(),
+            notes=[
+              "A resource mixin shape `\{name.value}` defines content; resource mixins contribute no identifiers or properties of their own.",
+            ],
+          )
+        }
+      }
+      Entity(kind=t, name~, mixins~, body~)
     }
     Operation => {
       let mixins = self.parse_mixins()
-      Operation(name~, mixins~, properties=self.parse_operation_body(owner)[:])
+      let properties = self.parse_operation_body(owner)
+      if has_mixin_trait(traits) &&
+        properties.iter().any(p => p is Input(_, _) || p is Output(_, _)) {
+        self.report(
+          "SM-PARSE-017",
+          Error,
+          "INVALID MIXIN",
+          "an operation with the `@mixin` trait must target `smithy.api#Unit` for its input and output",
+          kw.span,
+          notes=[
+            "Operation mixin shape `\{name.value}` defines an `input` or `output`; operation mixins must leave both as the default `Unit`.",
+          ],
+        )
+      }
+      Operation(name~, mixins~, properties=properties[:])
     }
   }
   self.pop_context()

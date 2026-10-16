@@ -187,6 +187,16 @@ test "version 1 files reject 2.0 syntax with the reference's facts" {
     .expect(
       v1(
         (
+          #|structure S { a: String = "x" }
+          #|
+        ),
+      ),
+    )
+    .to_equal(["SM-PARSE-007"])
+    e
+    .expect(
+      v1(
+        (
           #|structure S { a: String }
           #|
         ),

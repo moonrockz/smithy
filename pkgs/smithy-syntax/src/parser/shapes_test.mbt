@@ -331,6 +331,9 @@ test "spaces inside a shape id are not a shape id" {
 }
 
 ///|
+/// Pins the reference's `invalid/parse-errors/invalid-newline-after-shape-type.smithy`:
+/// the error sits at the line break itself (right after the keyword),
+/// not at the shape name on the line after it.
 test "a shape keyword needs a name on the same line" {
   @expect.expect(
     scodes(
@@ -343,14 +346,47 @@ test "a shape keyword needs a name on the same line" {
   ).to_equal(["SM-PARSE-001"])
   let r = model(
     (
+      #|structure
+      #|Foo {}
+      #|
+    ),
+  )
+  let source = @span.SourceText::new(r.cst.to_source())
+  let p = source.position(r.errors()[0].span.start)
+  // Line 1 is `$version`, line 2 `namespace`, line 3 blank, line 4
+  // `structure`: the break right after it is still on line 4, not on
+  // line 5 where `Foo {}` is.
+  inspect(p.line.0, content="4")
+  let r2 = model(
+    (
       #|string
       #|
     ),
   )
   inspect(
-    r.errors()[0].message,
+    r2.errors()[0].message,
     content="I was expecting a shape name after `string` but found the end of the file",
   )
+}
+
+///|
+/// Pins the reference's `invalid/parse-errors/expected-shape-name-but-eof.smithy`:
+/// a missing shape name at the true end of a file that ends with a line
+/// break is reported right after the keyword, not on the synthetic
+/// empty line after the final break.
+test "a shape name missing at EOF is reported right after the keyword" {
+  let r = model(
+    (
+      #|string
+      #|
+    ),
+  )
+  let errs = r.errors()
+  guard errs.length() > 0 else { fail("no error") }
+  inspect(errs[0].span.start == errs[0].span.end(), content="true")
+  // `string` is the last real token; the span must sit right after it,
+  // not on the file's trailing blank line.
+  inspect(errs[0].span.start.0 < r.cst.to_source().length(), content="true")
 }
 
 ///|
@@ -421,6 +457,45 @@ test "a member's value assignment still needs a line break before the next membe
       ),
     ),
   ).to_equal(["SM-PARSE-003"])
+}
+
+///|
+/// Pins the reference's `invalid/enums/enum-with-duplicates.smithy`,
+/// `intEnum-with-duplicates.smithy`, and the structure-member case the
+/// same check covers.
+test "a repeated member or enum member name is SM-PARSE-014" {
+  @expect.expect(
+    scodes(
+      (
+        #|structure Foo {
+        #|    bar: String
+        #|    bar: String
+        #|}
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-014"])
+  @expect.expect(
+    scodes(
+      (
+        #|enum Foo {
+        #|    BAR = "bar"
+        #|    BAR = "bar"
+        #|}
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-014"])
+  let r = model(
+    (
+      #|enum Foo {
+      #|    BAR = "bar"
+      #|    BAR = "bar"
+      #|}
+      #|
+    ),
+  )
+  inspect(r.errors()[0].message, content="Found conflicting member name, `BAR`")
 }
 
 ///|
