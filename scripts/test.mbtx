@@ -6,8 +6,8 @@
 ///
 /// `moon test <path>` tests only the package at exactly that path, not its
 /// sub-packages, so `pkgs/smithy-syntax` is spelled out as `src` and each
-/// of its sub-packages. The `tests` module's `moonbitlang/async` dependency
-/// does not build on wasm or wasm-gc, so it runs on js and native only.
+/// of its sub-packages. `moonbitlang/async` is not supported on wasm-gc, so
+/// the tests module runs on js and native as a precaution.
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/process",
