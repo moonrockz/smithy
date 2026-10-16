@@ -95,3 +95,18 @@ test "a 95-deep value builds a Tree" {
   assert_eq(tree.ancestors(deepest).length() >= 95, true)
   assert_true(tree.node_path(deepest) is Some(_))
 }
+
+///|
+test "a node from another parse of the same text is not in the tree" {
+  let tree = tree_of(three_shapes)
+  let other = root_of(three_shapes)
+  let member = other.field("shapes")[2].field("members")[0]
+  let target = member.field("target")[0]
+  assert_eq(tree.parent(target), None)
+  assert_eq(tree.node_path(target), None)
+  assert_eq(tree.ancestors(target).length(), 0)
+  assert_eq(tree.root().field("shapes")[2].field_of(member), None)
+  // The tree's own nodes are still found.
+  let own = tree.root().field("shapes")[2].field("members")[0]
+  assert_eq(tree.root().field("shapes")[2].field_of(own), Some("members"))
+}

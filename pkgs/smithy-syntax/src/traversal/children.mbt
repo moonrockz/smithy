@@ -1,32 +1,28 @@
 ///|
-fn[T : Eq] same_value(x : T, y : T) -> Bool {
-  physical_equal(x, y) || x == y
-}
-
-///|
-/// Whether two references point to the same node: identity first, then
-/// structural equality of the AST value.
+/// Whether two references point to the same node of the same parse: the AST
+/// values are the same objects. Equal values from another parse of the same
+/// text are other nodes. No structural comparison, so this never recurses.
 fn same(a : NodeRef, b : NodeRef) -> Bool {
   match (a, b) {
-    (File(x, _), File(y, _)) => same_value(x, y)
-    (Control(x), Control(y)) => same_value(x, y)
-    (Metadata(x), Metadata(y)) => same_value(x, y)
-    (Namespace(x), Namespace(y)) => same_value(x, y)
-    (Use(x), Use(y)) => same_value(x, y)
-    (Shape(x), Shape(y)) => same_value(x, y)
-    (Apply(x), Apply(y)) => same_value(x, y)
-    (Inline(x), Inline(y)) => same_value(x, y)
-    (Mixins(x), Mixins(y)) => same_value(x, y)
-    (Member(x), Member(y)) => same_value(x, y)
-    (EnumMember(x), EnumMember(y)) => same_value(x, y)
-    (Property(x), Property(y)) => same_value(x, y)
-    (Trait(x), Trait(y)) => same_value(x, y)
-    (Value(x), Value(y)) => same_value(x, y)
-    (Entry(x), Entry(y)) => same_value(x, y)
-    (ShapeIdRef(x), ShapeIdRef(y)) => same_value(x, y)
-    (Name(x), Name(y)) => same_value(x, y)
-    (Doc(x), Doc(y)) => same_value(x, y)
-    (Comment(x), Comment(y)) => same_value(x, y)
+    (File(x, _), File(y, _)) => physical_equal(x, y)
+    (Control(x), Control(y)) => physical_equal(x, y)
+    (Metadata(x), Metadata(y)) => physical_equal(x, y)
+    (Namespace(x), Namespace(y)) => physical_equal(x, y)
+    (Use(x), Use(y)) => physical_equal(x, y)
+    (Shape(x), Shape(y)) => physical_equal(x, y)
+    (Apply(x), Apply(y)) => physical_equal(x, y)
+    (Inline(x), Inline(y)) => physical_equal(x, y)
+    (Mixins(x), Mixins(y)) => physical_equal(x, y)
+    (Member(x), Member(y)) => physical_equal(x, y)
+    (EnumMember(x), EnumMember(y)) => physical_equal(x, y)
+    (Property(x), Property(y)) => physical_equal(x, y)
+    (Trait(x), Trait(y)) => physical_equal(x, y)
+    (Value(x), Value(y)) => physical_equal(x, y)
+    (Entry(x), Entry(y)) => physical_equal(x, y)
+    (ShapeIdRef(x), ShapeIdRef(y)) => physical_equal(x, y)
+    (Name(x), Name(y)) => physical_equal(x, y)
+    (Doc(x), Doc(y)) => physical_equal(x, y)
+    (Comment(x), Comment(y)) => physical_equal(x, y)
     _ => false
   }
 }
