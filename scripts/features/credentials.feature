@@ -31,3 +31,20 @@ Feature: mooncakes.io credentials
     Given the token is ""
     When I render the credentials
     Then rendering fails with "MOONCAKES_USER_TOKEN is not set; cannot write mooncakes.io credentials"
+
+  Scenario: MOON_HOME is set
+    Given MOON_HOME is "/opt/moon"
+    And HOME is "/home/ci"
+    When I choose the credentials directory
+    Then the directory is "/opt/moon"
+
+  Scenario: MOON_HOME is empty
+    Given MOON_HOME is ""
+    And HOME is "/home/ci"
+    When I choose the credentials directory
+    Then the directory is "/home/ci/.moon"
+
+  Scenario: MOON_HOME is not set
+    Given HOME is "/home/ci"
+    When I choose the credentials directory
+    Then the directory is "/home/ci/.moon"
