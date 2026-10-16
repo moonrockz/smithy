@@ -3,6 +3,22 @@ Feature: Parsing Smithy IDL
   lossless CST. These scenarios are the acceptance contract for the shapes,
   members, traits and node values the grammar defines.
 
+  Scenario: Documentation precedes traits and trailing comments stay ordinary comments
+    Given the Smithy model:
+      """smithy
+      $version: "2"
+      namespace example.docs
+      @deprecated
+      /// ignored after a trait
+      string Name /// ignored on the shape line
+      /// kept
+      string Other
+      """
+    When I parse the model
+    Then there are no errors
+    And the shape "Name" has docs ""
+    And the shape "Other" has docs " kept"
+
   Scenario: Every statement form parses clean
     Given the Smithy model:
       """smithy

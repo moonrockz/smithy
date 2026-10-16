@@ -426,8 +426,8 @@ fn Parser::parse_member(self : Parser) -> @ast.Member raise ParseError {
   }
   let docs = self.take_docs_before(first.span.start)
   let traits = self.parse_traits()
-  // Docs between traits and the name still attach.
-  docs.append(self.take_docs_before(self.here().start))
+  // Documentation must precede the first trait, not follow its body.
+  self.take_docs_before(self.here().start) |> ignore
   // A column-1 shape keyword after a member's leading traits means those
   // traits belong to the *next* shape, not to a member here: the block
   // was left open, not a member with an odd name.
@@ -550,7 +550,7 @@ fn Parser::parse_enum_member(self : Parser) -> @ast.EnumMember raise ParseError 
   }
   let docs = self.take_docs_before(first.span.start)
   let traits = self.parse_traits()
-  docs.append(self.take_docs_before(self.here().start))
+  self.take_docs_before(self.here().start) |> ignore
   if self.at_kind(Dollar) {
     let d = self.expect_kind(Dollar, "`$`")
     self.fail(
@@ -596,7 +596,7 @@ fn Parser::parse_inline_shape(
   walrus : @scanner.Token,
 ) -> @ast.InlineShape raise ParseError {
   self.require_v2("inline", walrus.span)
-  let docs = self.take_docs_before(walrus.span.start)
+  let docs = self.take_docs_before(self.here().start)
   let traits = self.parse_traits()
   let for_resource = self.parse_for_resource()
   let mixins = self.parse_mixins(same_line=false)
@@ -625,7 +625,7 @@ fn Parser::parse_operation_body(
   let props : Array[@ast.OperationProperty] = []
   while !self.at_kind(RBrace) {
     self.check_unfinished("UNFINISHED OPERATION", owner)
-    // Docs before `input :=` belong to the inline shape; elsewhere they are detached.
+    // Inline-shape documentation follows `:=`, before its leading traits.
     guard self.peek() is Some(key) && key.kind == Identifier else {
       self.fail(
         "SM-PARSE-001",
@@ -929,7 +929,7 @@ fn Parser::parse_shape_or_apply(
     @ast.ShapeKind::of(k.lexeme) is Some(_) {
     self.keyword_index = self.pos
   }
-  docs.append(self.take_docs_before(self.here().start))
+  self.take_docs_before(self.here().start) |> ignore
   let s = self.parse_shape(docs, traits, start)
   self.expect_br()
   Shape(s)
