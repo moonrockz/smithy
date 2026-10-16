@@ -60,6 +60,8 @@ mise run hooks:install         # git hooks (lefthook)
 
 Without mise: `moonx scripts/<name>.mbtx [args]`.
 
+The cookbook in `docs/cookbook` is a workspace member; `moon test` runs its articles.
+
 ## Layout
 
 ```
