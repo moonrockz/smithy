@@ -39,6 +39,19 @@ and test. `mise run check` runs lint, validate, test and build, which is what CI
 - Run `mise run format` before you commit MoonBit code.
 - New packages go under `pkgs/` (libraries) or `apps/` (executables), and into `moon.work`.
 
+## Working documents
+
+`.dev/` is a gitignored area for AI-assisted work: specs, plans, brainstorming notes, scratch scripts and
+their output. Nothing in it is committed. This overrides the default location of every skill or tool.
+
+- Specs (superpowers `brainstorming`): `.dev/docs/superpowers/specs/YYYY-MM-DD-<topic>-design.html`.
+- Plans (superpowers `writing-plans`): `.dev/docs/superpowers/plans/YYYY-MM-DD-<topic>-plan.html`.
+- Scratch scripts and output: `.dev/scripts/`, `.dev/out/`.
+- Write these documents as standalone HTML, not Markdown: one file with inline CSS that works in light and
+  dark mode, and inline SVG for diagrams. Screenshots go next to the file.
+- Never put a spec or plan under `docs/`, and never `git add` anything under `.dev/`. When a design is
+  final and meant for readers, write it up on purpose in a committed location.
+
 ## Syntax module
 
 `pkgs/smithy-syntax` is the IDL syntax layer. Its design is
