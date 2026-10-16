@@ -172,3 +172,24 @@ fn reader_events(root : @traversal.NodeRef, p : Policy) -> Array[String] {
   }
   events
 }
+
+///|
+/// The tags a full cursor navigation enters, depth first, and whether it
+/// ends back at the start node.
+fn cursor_tour(root : @traversal.NodeRef) -> (Array[String], Bool) {
+  let c = @traversal.TreeCursor::new(root)
+  let seen = [tag(c.node())]
+  while true {
+    if c.goto_first_child() {
+      seen.push(tag(c.node()))
+      continue
+    }
+    while !c.goto_next_sibling() {
+      if !c.goto_parent() {
+        return (seen, c.depth() == 0 && c.node() == root)
+      }
+    }
+    seen.push(tag(c.node()))
+  }
+  (seen, false)
+}
