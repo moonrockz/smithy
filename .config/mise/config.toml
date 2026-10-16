@@ -169,3 +169,11 @@ run = "moonx scripts/release.mbtx github"
 [tasks."release:status"]
 description = "Check that main, the tags, the GitHub release and mooncakes.io agree"
 run = "moonx scripts/release.mbtx status"
+
+[tasks."release:credentials"]
+description = "Write the mooncakes.io credentials from MOONCAKES_USER_TOKEN to ~/.moon/credentials.json (CI only)"
+run = "moonx scripts/credentials.mbtx"
+
+[tasks."release:publish"]
+description = "Publish the public modules to mooncakes.io with retries; a version already published counts as done (CI only)"
+run = "moonx scripts/publish.mbtx"
