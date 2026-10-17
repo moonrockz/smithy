@@ -4,9 +4,11 @@
 /// Usage: `mise run hooks:install`, or `moonx scripts/hooks-install.mbtx`. Idempotent: lefthook
 /// rewrites its hook files on every run. Skipped in CI.
 ///
-/// A `core.hooksPath` setting makes git look away from `.git/hooks`, where lefthook writes, so it
-/// is unset first. A pre-push hook that the old `setup:hooks` task wrote is removed, because
-/// lefthook would otherwise keep it beside its own hook as `pre-push.old`.
+/// A repository-local `core.hooksPath` makes git look away from `.git/hooks`, where lefthook
+/// writes. The setting belongs to another hooks tool (Husky, or custom hooks), so the script does
+/// not touch it: it stops and says how to migrate deliberately. A pre-push hook that the old
+/// `setup:hooks` task wrote is removed, because lefthook would otherwise keep it beside its own
+/// hook as `pre-push.old`.
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -40,15 +42,23 @@ async fn main {
     // Not a git checkout: nothing to do.
     return
   }
+  let (rc, hooks_path, _) = @process.collect_output("git", [
+    "config", "--local", "--get", "core.hooksPath",
+  ])
+  if rc == 0 {
+    println(
+      "❌ core.hooksPath is set to \{hooks_path.text().trim()}, so another tool owns the git hooks.",
+    )
+    println("   lefthook would not be used. To move this checkout to lefthook on purpose, run:")
+    println("   git config --local --unset core.hooksPath && mise run hooks:install")
+    @sys.exit(1)
+  }
+  // Only now, with git on its default hooks directory, retire the old hook.
   let hook = "\{out.text().trim()}/pre-push"
   if @fs.exists(hook) && @fs.read_file(hook).text().contains(legacy_marker) {
     println("🧹 Removing the pre-push hook from the retired setup:hooks task...")
     @fs.remove(hook)
   }
-  // Ignore the result: the setting is usually absent, and git then exits with 5.
-  let _ = @process.collect_output("git", [
-    "config", "--local", "--unset", "core.hooksPath",
-  ])
   let code = @process.run(
     "lefthook", ["install"],
     stdout=@stdio.stdout, stderr=@stdio.stderr,
