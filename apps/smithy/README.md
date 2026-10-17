@@ -32,6 +32,11 @@ _build/native/release/build/moonrockz/smithy-cli/smithy-cli.exe version
 
 ## Commands
 
+Use `smithy --help` for the command list, and `smithy convert --help` or
+`smithy help convert` for a command's options. Every command accepts `-h` and
+`--help`. Options accept both `--to json` and `--to=json`; output also accepts
+`-o model.json` and `-omodel.json`.
+
 ```shell
 smithy ast model.smithy extra.json
 smithy validate model.smithy extra.json

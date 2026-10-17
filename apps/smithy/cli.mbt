@@ -4,30 +4,94 @@ suberror CliError {
 } derive(Debug)
 
 ///|
-let usage : String =
-  #|smithy: a Smithy toolchain for MoonBit
-  #|
-  #|Usage: smithy <command> [options] <file>...
-  #|
-  #|Commands:
-  #|  ast         Assemble IDL/JSON files and print the Smithy JSON AST
-  #|  validate    Assemble files and report model diagnostics
-  #|  format      Format one IDL or JSON file to stdout
-  #|  convert     Convert a model with --to json or --to idl
-  #|  version     Print the version
-  #|
-  #|Options:
-  #|  --from idl|json     Override input format (required for stdin '-')
-  #|  --to idl|json       Output format for convert
-  #|  -o, --output FILE   Write output to a file instead of stdout
-  #|  --output-dir DIR    Write IDL files named <namespace>.smithy
-  #|  --check             Check formatting without writing; exit 1 if changed
-  #|  --write             Format files in place
-  #|  -h, --help          Print help
-  #|  --                  End options
-  #|
-  #|Inputs may mix .smithy and .json files. Use '-' once to read stdin.
-  #|IDL conversion emits flattened Smithy 2 models; comments are not retained.
+fn version_text() -> String {
+  "smithy \{@smithy.version()} (Smithy \{@smithy.SMITHY_VERSION})"
+}
+
+///|
+fn input_command(
+  name : String,
+  about : String,
+  options~ : Array[@argparse.OptionArg] = [],
+  flags~ : Array[@argparse.FlagArg] = [],
+) -> @argparse.Command {
+  @argparse.Command(
+    name,
+    about~,
+    flags~,
+    options=[
+        @argparse.OptionArg(
+          "from",
+          about="Input format: idl or json. Required for stdin; otherwise inferred from .smithy or .json.",
+        ),
+      ] +
+      options,
+    positionals=[
+      @argparse.PositionArg(
+        "file",
+        about="Input files; use '-' once to read stdin with --from. Use '--' before paths beginning with '-'.",
+        num_args=@argparse.ValueRange(lower=1),
+      ),
+    ],
+  )
+}
+
+///|
+fn command_line() -> @argparse.Command {
+  let output = @argparse.OptionArg(
+    "output",
+    short='o',
+    about="Write output to a file instead of stdout.",
+  )
+  @argparse.Command(
+    "smithy",
+    about="A Smithy toolchain for MoonBit: assemble, validate, format and convert models.",
+    version=version_text(),
+    arg_required_else_help=true,
+    subcommand_required=true,
+    subcommands=[
+      input_command(
+        "ast",
+        "Assemble IDL/JSON files and print the Smithy JSON AST.",
+        options=[output],
+      ),
+      input_command("validate", "Assemble files and report model diagnostics."),
+      input_command(
+        "format",
+        "Format IDL/JSON files. By default, print one file to stdout.",
+        options=[output],
+        flags=[
+          @argparse.FlagArg(
+            "check",
+            about="Check formatting without writing; exit 1 if changed.",
+            conflicts_with=["write", "output"],
+          ),
+          @argparse.FlagArg("write", about="Format files in place.", conflicts_with=[
+            "output",
+          ]),
+        ],
+      ),
+      input_command(
+        "convert",
+        "Convert a model to JSON or flattened Smithy 2 IDL. IDL conversion does not retain comments.",
+        options=[
+          @argparse.OptionArg(
+            "to",
+            about="Output format: idl or json.",
+            required=true,
+          ),
+          output,
+          @argparse.OptionArg(
+            "output-dir",
+            about="Write IDL files named <namespace>.smithy; requires --to idl.",
+            conflicts_with=["output"],
+          ),
+        ],
+      ),
+      @argparse.Command("version", about="Print the version."),
+    ],
+  )
+}
 
 ///|
 struct Options {
@@ -43,74 +107,29 @@ struct Options {
 
 ///|
 fn options(args : Array[String]) -> Options raise CliError {
-  guard args.length() > 0 else {
+  let parsed = command_line().parse(argv=args) catch {
+    error => raise CliError(error.to_string(), 2)
+  }
+  guard parsed.subcommand is Some((command, matches)) else {
     raise CliError("expected a command; use --help", 2)
   }
-  let command = args[0]
-  guard ["ast", "validate", "format", "convert"].contains(command) else {
-    raise CliError("unknown command '\{command}'; use --help", 2)
-  }
-  let files = []
-  let mut from = None
-  let mut to = None
-  let mut output = None
-  let mut output_dir = None
-  let mut check = false
-  let mut write = false
-  let mut positional = false
-  let mut i = 1
-  while i < args.length() {
-    let arg = args[i]
-    if !positional && arg == "--" {
-      positional = true
-    } else if !positional &&
-      ["--from", "--to", "-o", "--output", "--output-dir"].contains(arg) {
-      i += 1
-      guard i < args.length() else {
-        raise CliError("expected a value after \{arg}", 2)
-      }
-      let value = args[i]
-      match arg {
-        "--from" | "--to" => {
-          guard value == "idl" || value == "json" else {
-            raise CliError(
-              "expected idl or json after \{arg}, found '\{value}'",
-              2,
-            )
-          }
-          if arg == "--from" {
-            from = Some(value)
-          } else {
-            to = Some(value)
-          }
-        }
-        "--output-dir" => output_dir = Some(value)
-        _ => output = Some(value)
-      }
-    } else if !positional && (arg == "--help" || arg == "-h") {
-      return {
-        command: "help",
-        files: [],
-        from: None,
-        to: None,
-        output: None,
-        output_dir: None,
-        check: false,
-        write: false,
-      }
-    } else if !positional && arg == "--check" {
-      check = true
-    } else if !positional && arg == "--write" {
-      write = true
-    } else if !positional && arg.has_prefix("-") && arg != "-" {
-      raise CliError("unknown option '\{arg}'", 2)
-    } else {
-      files.push(arg)
+  fn value(name : String) -> String? {
+    match matches.values.get(name) {
+      Some([value, ..]) => Some(value)
+      _ => None
     }
-    i += 1
   }
-  guard !files.is_empty() else {
-    raise CliError("expected at least one input file", 2)
+  let files = matches.values.get("file").unwrap_or([])
+  let from = value("from")
+  let to = value("to")
+  let output = value("output")
+  let output_dir = value("output-dir")
+  let check = matches.flags.get("check") == Some(true)
+  let write = matches.flags.get("write") == Some(true)
+  for (name, format) in [("--from", from), ("--to", to)] {
+    if format is Some(format) && format != "idl" && format != "json" {
+      raise CliError("expected idl or json after \{name}, found '\{format}'", 2)
+    }
   }
   guard files.iter().filter(f => f == "-").count() <= 1 else {
     raise CliError("stdin '-' may only be read once", 2)
@@ -118,33 +137,11 @@ fn options(args : Array[String]) -> Options raise CliError {
   if files.contains("-") && from is None {
     raise CliError("use --from idl or --from json with stdin '-'", 2)
   }
-  if command == "convert" && to is None {
-    raise CliError("convert requires --to idl or --to json", 2)
-  }
-  if command != "convert" && to is Some(_) {
-    raise CliError("--to requires convert", 2)
-  }
-  if (check || write) && command != "format" {
-    raise CliError("--check and --write require format", 2)
-  }
-  if check && write {
-    raise CliError("--check and --write cannot be combined", 2)
-  }
-  if (check || write) && output is Some(_) {
-    raise CliError("--output cannot be combined with --check or --write", 2)
-  }
   if write && files.contains("-") {
     raise CliError("--write requires file inputs", 2)
   }
-  if command == "validate" && output is Some(_) {
-    raise CliError("validate does not write output files", 2)
-  }
-  if output_dir is Some(_) &&
-    (command != "convert" || to != Some("idl") || output is Some(_)) {
-    raise CliError(
-      "--output-dir requires convert --to idl and cannot be combined with --output",
-      2,
-    )
+  if output_dir is Some(_) && to != Some("idl") {
+    raise CliError("--output-dir requires convert --to idl", 2)
   }
   if command == "format" && files.length() > 1 && !check && !write {
     raise CliError("use --check or --write when formatting multiple files", 2)
@@ -210,17 +207,9 @@ fn emit(text : String, path : String?) -> Unit raise {
 
 ///|
 fn run(args : Array[String]) -> Int32 raise {
-  if args.is_empty() || args == ["help"] || args == ["--help"] || args == ["-h"] {
-    println(usage)
-    return 0
-  }
-  if args == ["version"] || args == ["--version"] {
-    println("smithy \{@smithy.version()} (Smithy \{@smithy.SMITHY_VERSION})")
-    return 0
-  }
   let opts = options(args)
-  if opts.command == "help" {
-    println(usage)
+  if opts.command == "version" {
+    println(version_text())
     return 0
   }
   let loader = @smithy.Loader::new()
