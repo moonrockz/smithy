@@ -15,7 +15,7 @@ yamllint = "1.38.0"
 # Git hooks manager; the hooks are in lefthook.yml
 lefthook = "2.1.1"
 
-# C cross compiler for apps/zig-cross (native binaries for Linux, macOS and Windows from one machine)
+# C cross compiler for the published zig-cross tool (Linux and macOS release binaries)
 zig = "0.17.0"
 
 # Changelog generator for the release notes
@@ -65,7 +65,7 @@ run = "moonx scripts/build.mbtx native --release"
 
 [tasks."build:cross"]
 description = "Cross-compile native binaries with zig (args: build targets, then -- and package paths)"
-run = "moon run apps/zig-cross --target wasm -- build"
+run = "moonx scripts/zig-cross.mbtx build"
 
 [tasks.test]
 description = "Run tests for all workspace members (args: targets; default: wasm wasm-gc js native)"
@@ -117,7 +117,7 @@ run = "moonx scripts/vendor-tck.mbtx"
 
 [tasks."test:native-zig"]
 description = "Run the native tests with zig as the C compiler (the host wrapper of zig-cross)"
-run = "moon run apps/zig-cross --target wasm -- exec host -- moonx scripts/test.mbtx native"
+run = "moonx scripts/zig-cross.mbtx exec host -- moonx scripts/test.mbtx native"
 
 [tasks."tck:vendor:json"]
 description = "Vendor the Java reference's JSON AST corpus (args: git ref)"

@@ -13,6 +13,11 @@ the process better after every release.
 Start every session with `mise run release:status`. It prints `ok:`, `info:` and `problem:` lines, and each
 problem names its fix command. It exits 1 when there is a problem.
 
+Smithy consumes `moonrockz/zig-cross` through the exact pin in `scripts/zig-cross.mbtx`.
+The tool is built, tested and published by [moonx-tools](https://github.com/moonrockz/moonx-tools).
+Do not version or publish it with Smithy. Fix tool changes there, then update the verified package pin here.
+Keep `release:status` reading each tag's original publication list, including zig-cross in older releases.
+
 ## Release
 
 Copy this checklist and tick it off:

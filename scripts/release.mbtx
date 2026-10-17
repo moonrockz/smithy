@@ -216,7 +216,7 @@ fn changelog_section(changelog : String, version : Version) -> String? {
 ///|
 /// The GitHub release notes: the install lines, then the changelog section.
 fn release_notes(version : Version, section : String) -> String {
-  let install = "**Install:**\n\n- `mise use github:\{module_name}@\{version}`\n- `moon add moonrockz/smithy-syntax@\{version}`\n- `moonx moonrockz/zig-cross@\{version} --help`"
+  let install = "**Install:**\n\n- `mise use github:\{module_name}@\{version}`\n- `moon add moonrockz/smithy-syntax@\{version}`"
   let wasm = "- `smithy.wasm` needs a host that supplies the `__moonbit_fs_unstable` imports and `wasi_snapshot_preview1.fd_write`. `wasmtime` alone fails with `unknown import: __moonbit_fs_unstable::…`.\n- `smithy-gc.wasm` needs a host with WebAssembly GC that supplies the `__moonbit_fs_unstable` imports and `spectest.print_char`. `wasmtime` alone fails with `unknown import: __moonbit_fs_unstable::…`."
   tidy_changelog(install + "\n\n**Wasm files:**\n\n" + wasm + "\n\n" + section)
 }
@@ -228,7 +228,6 @@ let publish_list : Array[(String, String)] = [
   ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
   ("pkgs/smithy", "moonrockz/smithy"),
   ("apps/smithy", "moonrockz/smithy-cli"),
-  ("apps/zig-cross", "moonrockz/zig-cross"),
 ]
 
 ///|
@@ -614,7 +613,7 @@ struct Facts {
   github_release : Bool
   /// The assets that the GitHub release lacks. It is empty when there is no release.
   missing_assets : Array[String]
-  /// The latest version of each published module on mooncakes.io, or `None` when it cannot be read.
+  /// The release version when available on mooncakes.io, otherwise the latest version or `None`.
   mooncakes : Array[(String, Version?)]
   /// Commits on origin/main after the latest tag.
   unreleased : Int
@@ -735,11 +734,27 @@ fn diagnose(f : Facts) -> Array[Finding] {
 }
 
 ///|
-/// The `version` of a mooncakes.io module API answer.
-fn mooncakes_version(text : String) -> Version? {
+/// Prefer the requested release in the registry's version list. A tool can have a newer release
+/// after moving to another repository. The latest version is only a diagnostic fallback.
+fn mooncakes_version(text : String, requested~ : Version? = None) -> Version? {
   let json = @json.parse(text) catch { _ => return None }
   guard json is { "version": String(v), .. } else { return None }
-  parse_version(v).to_option()
+  let latest = parse_version(v).to_option()
+  match requested {
+    None => latest
+    Some(wanted) => {
+      guard json is { "versions": Array(versions), .. } else { return None }
+      if versions.any(entry => {
+        entry is { "version": String(version), "yanked": False, .. } &&
+        parse_version(version).to_option() == Some(wanted)
+      }) {
+        Some(wanted)
+      } else {
+        // A missing or yanked release cannot pass just because it is the latest version.
+        latest.filter(version => version != wanted)
+      }
+    }
+  }
 }
 
 ///|
@@ -1123,13 +1138,13 @@ async fn github(version : String) -> Unit {
 }
 
 ///|
-/// The latest version of a module on mooncakes.io, or `None` when it cannot be read.
-async fn fetch_mooncakes(name : String) -> Version? {
+/// Look for the exact release, retaining the latest version only to diagnose a missing publication.
+async fn fetch_mooncakes(name : String, version : Version) -> Version? {
   let (response, body) = @http.get("https://mooncakes.io/api/v0/modules/\{name}") catch {
     _ => return None
   }
   guard response.code == 200 else { return None }
-  mooncakes_version(body.text() catch { _ => return None })
+  mooncakes_version(body.text() catch { _ => return None }, requested=Some(version))
 }
 
 ///|
@@ -1296,7 +1311,7 @@ async fn status() -> Unit {
   }
   let mooncakes = []
   for name in modules {
-    mooncakes.push((name, fetch_mooncakes(name)))
+    mooncakes.push((name, fetch_mooncakes(name, main_version)))
   }
   let range = match latest_tag {
     Some(t) => "v\{t}..origin/main"
@@ -1453,6 +1468,16 @@ fn version_option(text : String) -> Version? raise {
 
 ///|
 impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
+  setup.then2("the mooncakes.io version for release {string} is {string}", fn(
+    requested : String,
+    expected : String,
+  ) raise {
+    let actual = match mooncakes_version(self.text, requested=Some(version_of(requested))) {
+      Some(version) => "\{version}"
+      None => "none"
+    }
+    @expect.expect(actual).to_equal(expected)
+  })
   setup.given1("the publication script is:", fn(doc : @moonspec.DocString) {
     self.text = doc.content
   })

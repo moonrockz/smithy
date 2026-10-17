@@ -192,7 +192,6 @@ Feature: Release tooling
 
       - `mise use github:moonrockz/smithy@0.3.0`
       - `moon add moonrockz/smithy-syntax@0.3.0`
-      - `moonx moonrockz/zig-cross@0.3.0 --help`
 
       **Wasm files:**
 
@@ -434,6 +433,34 @@ Feature: Release tooling
       ok: v0.0.1 is released: tag, GitHub release and mooncakes.io
       """
 
+  Scenario: An independently released tool does not hide the original publication
+    Given the text:
+      """json
+      {"version":"0.1.2","versions":[{"version":"0.1.2","yanked":false},{"version":"0.1.1","yanked":false}]}
+      """
+    Then the mooncakes.io version for release "0.1.1" is "0.1.1"
+
+  Scenario: A newer version does not prove the original release was published
+    Given the text:
+      """json
+      {"version":"0.1.2","versions":[{"version":"0.1.2","yanked":false}]}
+      """
+    Then the mooncakes.io version for release "0.1.1" is "0.1.2"
+
+  Scenario Outline: Missing or yanked publication data cannot pass status
+    Given the text:
+      """json
+      <answer>
+      """
+    Then the mooncakes.io version for release "0.1.1" is "none"
+
+    Examples:
+      | answer                                                                      |
+      | {"version":"0.1.1"}                                                         |
+      | {"version":"0.1.1","versions":[]}                                           |
+      | {"version":"0.1.1","versions":[{"version":"0.1.1","yanked":true}]}          |
+      | {"error":"not found"}                                                       |
+
   Scenario: Released, with work on main and an open release pull request
     Given moon.mod on main is "0.0.1" and the latest tag is "0.0.1"
     And the main version is tagged: "yes", has a GitHub release: "yes", mooncakes.io has "0.0.1"
@@ -577,18 +604,22 @@ Feature: Release tooling
     Then status for version "0.0.1" tagged "yes" reads "v0.0.1:scripts/publish.mbtx"
     And the publication modules are "moonrockz/smithy-syntax, moonrockz/zig-cross"
 
-  Scenario: Check an untagged main version against its new publication list
+  Scenario Outline: Releases after the tool migration exclude zig-cross
     Given the publication script is:
       """moonbit
       let publish_list : Array[(String, String)] = [
         ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
         ("pkgs/smithy", "moonrockz/smithy"),
         ("apps/smithy", "moonrockz/smithy-cli"),
-        ("apps/zig-cross", "moonrockz/zig-cross"),
       ]
       """
-    Then status for version "0.1.0" tagged "no" reads "origin/main:scripts/publish.mbtx"
-    And the publication modules are "moonrockz/smithy-syntax, moonrockz/smithy, moonrockz/smithy-cli, moonrockz/zig-cross"
+    Then status for version "0.2.0" tagged "<tagged>" reads "<source>"
+    And the publication modules are "moonrockz/smithy-syntax, moonrockz/smithy, moonrockz/smithy-cli"
+
+    Examples:
+      | tagged | source                          |
+      | no     | origin/main:scripts/publish.mbtx |
+      | yes    | v0.2.0:scripts/publish.mbtx       |
 
   Scenario: A missing publication list cannot silently pass release status
     Given the publication script is:

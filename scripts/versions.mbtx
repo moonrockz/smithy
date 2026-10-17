@@ -35,10 +35,6 @@ let version_files : Array[(String, String)] = [
   (
     "pkgs/smithy-syntax/src/lib_test.mbt", "inspect(@syntax.version(), content=\"",
   ),
-  ("apps/zig-cross/version.mbt", "pub let version : String = \""),
-  (
-    "apps/zig-cross/cli_wbtest.mbt", "inspect(version_text(), content=\"zig-cross ",
-  ),
 ]
 
 ///|

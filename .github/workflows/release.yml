@@ -37,7 +37,7 @@ on:
       - scripts/dist.mbtx
       - scripts/versions.mbtx
       - scripts/credentials.mbtx
-      - apps/zig-cross/**
+      - scripts/zig-cross.mbtx
       - apps/smithy/**
       - pkgs/smithy/**
       - .config/mise/config.toml

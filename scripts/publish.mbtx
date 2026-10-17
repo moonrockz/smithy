@@ -25,7 +25,6 @@ let publish_list : Array[(String, String)] = [
   ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
   ("pkgs/smithy", "moonrockz/smithy"),
   ("apps/smithy", "moonrockz/smithy-cli"),
-  ("apps/zig-cross", "moonrockz/zig-cross"),
 ]
 
 ///|
@@ -225,6 +224,11 @@ fn list_entry_text(entry : (String, String)) -> String {
 
 ///|
 impl @moonspec.World for PublishWorld with fn configure(self, setup) {
+  setup.then1("the published modules are {string}", fn(expected : String) raise {
+    @expect.expect(publish_list.map(entry => entry.1).join(", ")).to_equal(
+      expected,
+    )
+  })
   setup.given2("moon publish exits with {int} and prints {string}", fn(
     code : Int32,
     output : String,

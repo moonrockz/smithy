@@ -130,6 +130,13 @@ Without mise: `moonx scripts/<name>.mbtx [args]`.
 
 The cookbook in `docs/cookbook` is a workspace member; `moon test` runs its articles.
 
+Cross-builds and native tests with Zig use the published `moonrockz/zig-cross` tool from
+[moonrockz/moonx-tools](https://github.com/moonrockz/moonx-tools/tree/main/apps/zig-cross).
+The exact package version is pinned once in `scripts/zig-cross.mbtx` and is independent of Smithy's version.
+The mise tasks run that launcher with `moonx`; a separate clone of the tool is unnecessary.
+To cross-build selected targets, run `mise run build:cross -- linux-x64 darwin-arm64 -- apps/smithy`.
+Windows release binaries are built natively on Windows because MoonBit resolves OS-specific code from the host.
+
 ## Layout
 
 ```
@@ -138,7 +145,6 @@ smithy/
 ├── .github/workflows/ci.yml   # lint, build and test on every target
 ├── .github/workflows/release.yml # plan, validate, build, smoke, publish, release
 ├── .claude/skills/release-manager/ # release skill and troubleshooting
-├── apps/zig-cross/            # zig cross-build tool (moonrockz/zig-cross)
 ├── lefthook.yml               # git hooks
 ├── apps/smithy/               # CLI (moonrockz/smithy-cli)
 ├── pkgs/smithy/               # library (moonrockz/smithy)

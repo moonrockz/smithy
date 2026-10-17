@@ -81,18 +81,25 @@ Fix: check the `permissions` of the `release` job in `release.yml`.
 
 ## zig cross-build
 
+The tool is maintained in [moonx-tools](https://github.com/moonrockz/moonx-tools/tree/main/apps/zig-cross).
+Smithy's `scripts/zig-cross.mbtx` holds its exact published package pin. Tool fixes and publication happen
+in moonx-tools; verify the new registry version before updating this pin. Smithy retains its own packaging
+and native Windows build.
+
 **`build` fails with `undefined symbol: moonbit_simdutf_*` or `invalid cpu architecture`**
 Cause: moon links the prebuilt host objects `moonbit_simdutf.o`, `simdutf.o` and (on macOS) `libbacktrace.a`
 for every target. Their architecture is not the target architecture. The cc and ar wrappers of
-`apps/zig-cross` drop them for each named target.
+the published `moonrockz/zig-cross` tool drop them for each named target.
 Fix: check that the wrapper still drops `-DMOONBIT_USE_SIMDUTF` and the arguments that end in
 `/moonbit_simdutf.o`, `/simdutf.o` and `/libbacktrace.a`. Run `moonx scripts/dist.mbtx build` with the
-moon version of CI to reproduce. A new moon version can add one more host object: add it to the wrapper.
+moon version of CI to reproduce. A new moon version can add one more host object: fix the wrapper in
+moonx-tools, release it there, then update Smithy's launcher pin.
 
 **`build` fails with `call to undeclared function 'rand_s'` (windows-x64)**
 Cause: `env.c` of the MoonBit runtime includes `<stdlib.h>` before it defines `_CRT_RAND_S`. The mingw headers
 of zig then never declare `rand_s`.
-Fix: every wrapper must pass `-D_CRT_RAND_S`. See the README of `apps/zig-cross`.
+Fix: every wrapper must pass `-D_CRT_RAND_S`. See the
+[zig-cross README](https://github.com/moonrockz/moonx-tools/tree/main/apps/zig-cross).
 
 **`build` fails with a wrong-architecture message**
 Cause: the header check of `zig-cross` found a binary whose machine field does not match the target.
@@ -102,7 +109,8 @@ target, and delete `_build/cross/<target>` for a stale build.
 **`build` fails after a zig version change**
 Cause: the zig version is pinned in `.config/mise/config.toml` (0.17.0). A new zig can change the flags or the
 bundled headers.
-Fix: pin zig back, or fix the wrapper, and record the cause in the README of `apps/zig-cross`.
+Fix: pin zig back, or fix and release the wrapper in moonx-tools, then update Smithy's launcher pin.
+Record the cause in the zig-cross README there.
 
 ## smoke
 
@@ -116,7 +124,7 @@ Fix: build `windows-x64` on a Windows runner (job `build-windows`). Check that `
 Cause: the binary of that OS does not start, or `smithy version` did not print the version.
 Fix: open the leg and read the output. A crash at start-up on one OS is a build problem for that target. For
 example, a host-only object is linked, or the header is wrong. Reproduce with `moonx scripts/dist.mbtx build`
-and fix the wrapper. Do not run `publish` while any leg is red: it needs all legs.
+and fix the wrapper in moonx-tools if needed. Do not run `publish` while any leg is red: it needs all legs.
 A runner that did not start is a transient problem. Use "Re-run failed jobs".
 If `macos-15-intel` is not available, change the `darwin-x64` leg to run on `macos-latest` with
 `arch -x86_64`.
@@ -154,6 +162,12 @@ A version cannot be replaced or deleted. Fix forward: release a patch version wi
 Cause: status used the working copy's publication list to judge a tag that never published that module.
 Fix: use the updated status command, which reads `scripts/publish.mbtx` from the release tag, or
 from `origin/main` when its version is untagged. Do not republish an older version to fill this gap.
+
+**`status` reports zig-cross 0.1.2 as a problem for the Smithy 0.1.1 release**
+Cause: zig-cross now releases independently from moonx-tools. Comparing only the registry's latest version
+rejects an older release that is still published.
+Fix: use the updated status command. It reads the original tag's publication list and checks for that exact,
+unyanked version in the registry's version list. Do not rerun an old release to replace an immutable package.
 
 **`status` reports `malformed publication entry: (` after formatting a long tuple**
 Cause: an older reader required each tuple on one physical line.
