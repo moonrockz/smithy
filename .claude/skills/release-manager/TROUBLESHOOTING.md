@@ -149,3 +149,8 @@ Fix: correct `CHANGELOG.md` in a `docs(changelog)` pull request, then
 
 **A broken version is on mooncakes.io**
 A version cannot be replaced or deleted. Fix forward: release a patch version with the fix.
+
+**`status` reports a newly added module as missing from an older release**
+Cause: status used the working copy's publication list to judge a tag that never published that module.
+Fix: use the updated status command, which reads `scripts/publish.mbtx` from the release tag, or
+from `origin/main` when its version is untagged. Do not republish an older version to fill this gap.

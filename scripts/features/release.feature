@@ -565,3 +565,34 @@ Feature: Release tooling
 
   Scenario: The expected assets are the files that dist.mbtx writes
     Then the expected assets are the names that dist.mbtx writes
+
+  Scenario: Check a released version against its original publication list
+    Given the publication script is:
+      """moonbit
+      let publish_list : Array[(String, String)] = [
+        ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
+        ("apps/zig-cross", "moonrockz/zig-cross"),
+      ]
+      """
+    Then status for version "0.0.1" tagged "yes" reads "v0.0.1:scripts/publish.mbtx"
+    And the publication modules are "moonrockz/smithy-syntax, moonrockz/zig-cross"
+
+  Scenario: Check an untagged main version against its new publication list
+    Given the publication script is:
+      """moonbit
+      let publish_list : Array[(String, String)] = [
+        ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
+        ("pkgs/smithy", "moonrockz/smithy"),
+        ("apps/smithy", "moonrockz/smithy-cli"),
+        ("apps/zig-cross", "moonrockz/zig-cross"),
+      ]
+      """
+    Then status for version "0.1.0" tagged "no" reads "origin/main:scripts/publish.mbtx"
+    And the publication modules are "moonrockz/smithy-syntax, moonrockz/smithy, moonrockz/smithy-cli, moonrockz/zig-cross"
+
+  Scenario: A missing publication list cannot silently pass release status
+    Given the publication script is:
+      """moonbit
+      let renamed_list = []
+      """
+    Then the publication modules are "error: publication script has no publish_list"
