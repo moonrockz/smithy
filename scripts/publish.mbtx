@@ -69,7 +69,7 @@ fn is_transient(exit_code : Int32, output : String) -> Bool {
   }
   [
     "timed out", "timeout", "connection reset", "connection refused", "temporary failure",
-    "eof", "502", "503", "504", "rate limit",
+    "eof", "502", "503", "504", "rate limit", "prebuilt wasm asset does not exist",
   ].any(word => text.contains(word))
 }
 
@@ -130,7 +130,7 @@ async fn publish_module(dir : String, name : String) -> (Outcome, String) {
 }
 
 ///|
-async fn main {
+async fn publish_all() -> Unit {
   let mut failed = 0
   for entry in publish_list {
     let (dir, name) = entry
@@ -147,6 +147,29 @@ async fn main {
   }
   if failed > 0 {
     fail_with("\{failed} module(s) were not published")
+  }
+}
+
+///|
+/// Registry metadata can become visible before moonx can fetch the Wasm asset.
+/// Retry that exact availability error with the same bounded network backoff.
+async fn verify_cli(version : String) -> Unit {
+  let (code, out) = with_retry("verify published CLI", () => {
+    output_in(".", "moonx", ["moonrockz/smithy-cli@\{version}", "version"])
+  })
+  if code != 0 {
+    fail_with("the published CLI could not run: \{out.trim()}")
+    return
+  }
+  println(out.trim())
+}
+
+///|
+async fn main {
+  match @env.args()[1:] {
+    [] => publish_all()
+    ["verify-cli", version] => verify_cli(version)
+    _ => fail_with("Usage: publish.mbtx [verify-cli X.Y.Z]")
   }
 }
 
