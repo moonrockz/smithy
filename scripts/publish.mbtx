@@ -23,6 +23,8 @@ import {
 /// module. `scripts/release.mbtx` keeps the same list, and a scenario checks that the two are equal.
 let publish_list : Array[(String, String)] = [
   ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
+  ("pkgs/smithy", "moonrockz/smithy"),
+  ("apps/smithy", "moonrockz/smithy-cli"),
   ("apps/zig-cross", "moonrockz/zig-cross"),
 ]
 

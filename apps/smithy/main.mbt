@@ -1,16 +1,28 @@
 ///|
 fn main {
-  let args = @env.args()
-  match args {
-    [_, "version", ..] | [_, "--version", ..] =>
-      println("smithy \{@smithy.version()} (Smithy \{@smithy.SMITHY_VERSION})")
-    _ => {
-      println("smithy: a Smithy toolchain for MoonBit")
-      println("")
-      println("Usage: smithy <command>")
-      println("")
-      println("Commands:")
-      println("  version    Print the version")
+  let status = run(program_args()) catch {
+    CliError(message, code) => {
+      eprintln("smithy: \{message}")
+      code
+    }
+    error => {
+      eprintln("smithy: \{error}")
+      1
     }
   }
+  if status != 0 {
+    @sys.exit(status)
+  }
+}
+
+///|
+#cfg(target="js")
+fn program_args() -> Array[String] {
+  @env.args()[2:].to_owned()
+}
+
+///|
+#cfg(not(target="js"))
+fn program_args() -> Array[String] {
+  @env.args()[1:].to_owned()
 }

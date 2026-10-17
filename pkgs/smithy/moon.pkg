@@ -7,5 +7,6 @@ import {
 
 import {
   "moonrockz/smithy",
+  "moonrockz/smithy-syntax" @syntax,
   "moonbitlang/core/quickcheck",
 } for "test"

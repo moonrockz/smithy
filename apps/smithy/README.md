@@ -1,20 +1,84 @@
-# smithy (CLI)
+# smithy CLI
 
-The Smithy command-line application. Build it from the repository root:
+Assemble, validate, format and convert Smithy models.
+
+## Run
+
+Run the CLI module from mooncakes.io:
 
 ```shell
-moon build --target native --release
-_build/native/release/build/moonrockz/smithy-cli/smithy-cli.exe version
+moonx moonrockz/smithy-cli@latest --help
+moonx moonrockz/smithy-cli@latest version
 ```
 
-## Install
+Moonx runs the linear-memory `wasm` backend. The module declares that preferred
+backend, and the release workflow runs the published module with moonx after
+publishing its dependencies.
 
-Install a release build with mise:
+For a native release binary, install with mise:
 
 ```shell
 mise use -g github:moonrockz/smithy
 smithy version
 ```
 
-The root [README](../../README.md) lists the release assets. The Release workflow builds them with zig
-(`apps/zig-cross`).
+From a checkout, prefix the examples below with
+`moon run apps/smithy --target wasm --` in place of `smithy`, or build natively:
+
+```shell
+moon build apps/smithy --target native --release
+_build/native/release/build/moonrockz/smithy-cli/smithy-cli.exe version
+```
+
+## Commands
+
+```shell
+smithy ast model.smithy extra.json
+smithy validate model.smithy extra.json
+smithy convert --to json model.smithy -o model.json
+smithy convert --to idl model.json -o model.smithy
+smithy convert --to idl one.json two.json --output-dir generated
+smithy format model.smithy
+smithy format --check model.smithy model.json
+smithy format --write model.smithy model.json
+```
+
+`ast` and `convert --to json` assemble all inputs into a Smithy JSON AST and
+omit the standard prelude. `validate` assembles the same model and prints
+any diagnostics. Reference resolution, mixin expansion, trait application and
+metadata merging follow the model library's rules.
+
+IDL output uses Smithy 2, absolute references and flattened inherited contents.
+It preserves model semantics and exact numbers. Comments, import choices,
+source layout, resource bindings and inline-operation syntax are not retained
+by conversion. An IDL file has one namespace, so a model with multiple
+namespaces requires `--output-dir`. The output names are `<namespace>.smithy`.
+Metadata is emitted exactly once, in the first namespace. Empty models and
+metadata-only models use `model.smithy`.
+
+`format` checks syntax and normalizes indentation and spacing. IDL formatting
+retains comments, existing line breaks, commas, literal spellings and the
+contents of text blocks. JSON formatting uses the typed JSON AST codec. By
+default, formatting prints one file to stdout. `--write` formats files in place;
+all inputs must parse before any file changes. `--check` writes nothing and
+returns status 1 when any file differs.
+
+Input formats follow `.smithy` and `.json` extensions. Override with
+`--from idl` or `--from json`. Use `-` once for stdin, with an explicit format:
+
+```shell
+cat model.smithy | smithy convert --from idl --to json -
+```
+
+Output goes to stdout unless `-o FILE` or `--output-dir DIR` is supplied. Existing
+output files are replaced. Use `--` before input paths beginning with `-`.
+
+Exit statuses are 0 for success, 1 for invalid models, I/O failures or formatting
+differences, and 2 for command-line usage errors. Native, Wasm and Node.js
+builds write diagnostics to stderr. Node.js builds use the Node 24 toolchain pinned by mise.
+The `wasm-gc` artifact uses the host's `spectest.print_char` for both output
+streams and reads stdin through `/dev/stdin`; use the Wasm or native build for
+portable command-line pipelines.
+
+Run `mise run test:cli` to check the built CLI on every backend, or pass target
+names to select backends. The root [README](../../README.md) lists release assets.

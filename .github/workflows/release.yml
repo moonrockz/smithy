@@ -38,6 +38,8 @@ on:
       - scripts/versions.mbtx
       - scripts/credentials.mbtx
       - apps/zig-cross/**
+      - apps/smithy/**
+      - pkgs/smithy/**
       - .config/mise/config.toml
       - moon.mod
       - CHANGELOG.md
@@ -257,6 +259,9 @@ jobs:
 
       - name: Publish the modules
         run: mise run release:publish
+
+      - name: Run the published CLI with moonx
+        run: moonx moonrockz/smithy-cli@${{ needs.plan.outputs.version }} version
 
   release:
     name: GitHub release

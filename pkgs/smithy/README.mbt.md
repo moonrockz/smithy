@@ -116,6 +116,27 @@ each shape. The prelude is omitted unless `include_prelude=true`. Exact node
 number tokens survive export. Source locations and mixin provenance belong
 to the in-memory model and are not serialized.
 
+`Model::to_idl` exports a map from namespace to Smithy 2 IDL text. It omits
+prelude shapes, flattens inherited contents and uses absolute references.
+Metadata appears once, in the first namespace. An empty or metadata-only model
+uses the empty namespace key. Generated text is deterministic and retains exact
+node numbers; conversion does not retain comments or original source layout.
+
+```mbt check
+///|
+test {
+  let model = @smithy.Loader::new()
+  .add_idl("name.smithy", "$version: \"2\"\nnamespace example\nstring Name")
+  .assemble().model.unwrap()
+  let files = model.to_idl()
+  let again = @smithy.Loader::new()
+  for ns, text in files {
+    again.add_idl(ns + ".smithy", text) |> ignore
+  }
+  assert_true(!again.assemble().has_errors())
+}
+```
+
 The prelude is vendored from smithy-lang/smithy at `PRELUDE_SHA`, embedded in
 `prelude_data.mbt`, and distributed under Apache-2.0. Refresh it with
 `mise run prelude:vendor -- <git-ref>`.

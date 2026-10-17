@@ -45,8 +45,17 @@ test "reference IDL and JSON AST representations assemble to the same model" {
         idl.add_json("valid/__shared.json", shared) |> ignore
         json.add_json("valid/__shared.json", shared) |> ignore
       }
-      let a = assembled(idl, idl_path).to_json_ast()
+      let model = assembled(idl, idl_path)
+      let a = model.to_json_ast()
       let b = assembled(json, case.path).to_json_ast()
+      let restored = @smithy.Loader::new()
+      for ns, text in model.to_idl() {
+        restored.add_idl(ns + ".smithy", text) |> ignore
+      }
+      let c = assembled(restored, idl_path + " (generated IDL)").to_json_ast()
+      if @syntax.encode_json_ast(a) != @syntax.encode_json_ast(c) {
+        failures.push(case.path + ": generated IDL changed model semantics")
+      }
       if @syntax.encode_json_ast(a) != @syntax.encode_json_ast(b) {
         failures.push(
           case.path +
@@ -81,6 +90,17 @@ test "unflattened reference JSON mixins assemble and export reloadable models" {
     let model = assembled(
       @smithy.Loader::new().add_json(case.path, case.text),
       case.path,
+    )
+    let idl = @smithy.Loader::new()
+    for ns, text in model.to_idl() {
+      idl.add_idl(ns + ".smithy", text) |> ignore
+    }
+    assert_eq(
+      @syntax.encode_json_ast(
+        assembled(idl, case.path + " (generated IDL)").to_json_ast(),
+      ),
+      @syntax.encode_json_ast(model.to_json_ast()),
+      msg=case.path,
     )
     assembled(
       @smithy.Loader::new().add_ast("flattened.json", model.to_json_ast()),
