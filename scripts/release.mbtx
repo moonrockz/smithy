@@ -1229,9 +1229,13 @@ fn publication_modules(source : String) -> Result[Array[String], String] {
     return Err("publication script has no publish_list array")
   }
   let modules : Array[String] = []
+  let mut entry = ""
   for line in declaration[open + 3:].split("\n") {
     let line = line.trim().to_owned()
     if line == "]" {
+      if entry != "" {
+        return Err("malformed publication entry: " + entry)
+      }
       return if modules.is_empty() {
         Err("publication list is empty")
       } else {
@@ -1241,15 +1245,20 @@ fn publication_modules(source : String) -> Result[Array[String], String] {
     if line == "" || line.has_prefix("//") {
       continue
     }
-    let parts = line.split("\"").to_array()
+    entry += line
+    if !entry.has_suffix("),") {
+      continue
+    }
+    let parts = entry.split("\"").to_array()
     guard parts.length() == 5 &&
       parts[0].trim() == "(" &&
       parts[2].trim() == "," &&
-      parts[4].trim() == ")," &&
+      parts[4].trim_start(chars=",").trim() == ")," &&
       parts[3].contains("/") else {
-      return Err("malformed publication entry: " + line)
+      return Err("malformed publication entry: " + entry)
     }
     modules.push(parts[3].to_owned())
+    entry = ""
   }
   Err("publication list is not closed")
 }

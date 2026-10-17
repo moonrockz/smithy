@@ -596,3 +596,16 @@ Feature: Release tooling
       let renamed_list = []
       """
     Then the publication modules are "error: publication script has no publish_list"
+
+  Scenario: Read publication entries wrapped by moon fmt
+    Given the publication script is:
+      """moonbit
+      let publish_list : Array[(String, String)] = [
+        (
+          "pkgs/a-very-long-package-directory",
+          "moonrockz/a-very-long-module-name",
+        ),
+        ("apps/smithy", "moonrockz/smithy-cli"),
+      ]
+      """
+    Then the publication modules are "moonrockz/a-very-long-module-name, moonrockz/smithy-cli"

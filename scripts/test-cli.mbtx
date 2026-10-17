@@ -49,7 +49,11 @@ async fn Runner::command(
 }
 
 ///|
-async fn exercise(root : String, target : String) -> Unit {
+async fn exercise(
+  root : String,
+  target : String,
+  skip_stdin~ : Bool = false,
+) -> Unit {
   let (code, _, err) = @process.collect_output(
     "moon",
     ["build", "apps/smithy", "--target", target, "--release", "--deny-warn"],
@@ -57,7 +61,11 @@ async fn exercise(root : String, target : String) -> Unit {
   )
   guard code == 0 else { fail("CLI build failed: \{err.text()}") }
   let stem = "\{root}/_build/\{target}/release/build/moonrockz/smithy-cli/smithy-cli"
-  let dir = "\{root}/.dev/out/cli-tests/\{target}"
+  let suffix = if skip_stdin { "-files" } else { "" }
+  let dir = "\{root}/.dev/out/cli-tests/\{target}\{suffix}"
+  if @fs.exists(dir) {
+    @fs.rmdir(dir, recursive=true)
+  }
   @fs.mkdir(dir, recursive=true, allow_exist=true)
   let executable = if target == "native" {
     stem + ".exe"
@@ -94,40 +102,41 @@ async fn exercise(root : String, target : String) -> Unit {
   let (ast, _) = runner.command(["ast", "input.smithy"], 0)
   assert_true(ast.contains("9007199254740993"))
   // Test an actual pipe, including multiple chunks and non-ASCII UTF-8.
-  if target != "wasm-gc" || @env.get_env_var("OS") != Some("Windows_NT") {
+  if !skip_stdin &&
+    (target != "wasm-gc" || @env.get_env_var("OS") != Some("Windows_NT")) {
     let (piped, _) = runner.command(
       ["ast", "--from", "idl", "-"],
       0,
       input="// 🐟\n".repeat(2000) + input,
     )
     assert_eq(@json.parse(piped), @json.parse(ast))
-    runner.command(
-      ["convert", "--to", "json", "-o", "model.json", "input.smithy"],
-      0,
-    )
-    |> ignore
-    runner.command(
-      ["convert", "--to", "idl", "-o", "restored.smithy", "model.json"],
-      0,
-    )
-    |> ignore
-    let (roundtrip, _) = runner.command(["ast", "restored.smithy"], 0)
-    assert_eq(@json.parse(roundtrip), @json.parse(ast))
-    runner.command(["validate", "input.smithy", "model.json"], 0) |> ignore
-    runner.command(["format", "--check", "input.smithy"], 1) |> ignore
-    let (formatted, _) = runner.command(["format", "input.smithy"], 0)
-    assert_true(formatted.contains("// comment"))
-    runner.command(["format", "--write", "input.smithy"], 0) |> ignore
-    assert_eq(@fs.read_file("\{dir}/input.smithy").text(), formatted)
-    runner.command(["format", "--check", "input.smithy"], 0) |> ignore
-    runner.command(["format", "--write", "input.smithy", "syntax.smithy"], 1)
-    |> ignore
-    assert_eq(@fs.read_file("\{dir}/input.smithy").text(), formatted)
-    @fs.write_file(
-      "\{dir}/other.json",
-      "{\"smithy\":\"2\",\"shapes\":{\"other#Name\":{\"type\":\"string\"}}}",
-    )
   }
+  runner.command(
+    ["convert", "--to", "json", "-o", "model.json", "input.smithy"],
+    0,
+  )
+  |> ignore
+  runner.command(
+    ["convert", "--to", "idl", "-o", "restored.smithy", "model.json"],
+    0,
+  )
+  |> ignore
+  let (roundtrip, _) = runner.command(["ast", "restored.smithy"], 0)
+  assert_eq(@json.parse(roundtrip), @json.parse(ast))
+  runner.command(["validate", "input.smithy", "model.json"], 0) |> ignore
+  runner.command(["format", "--check", "input.smithy"], 1) |> ignore
+  let (formatted, _) = runner.command(["format", "input.smithy"], 0)
+  assert_true(formatted.contains("// comment"))
+  runner.command(["format", "--write", "input.smithy"], 0) |> ignore
+  assert_eq(@fs.read_file("\{dir}/input.smithy").text(), formatted)
+  runner.command(["format", "--check", "input.smithy"], 0) |> ignore
+  runner.command(["format", "--write", "input.smithy", "syntax.smithy"], 1)
+  |> ignore
+  assert_eq(@fs.read_file("\{dir}/input.smithy").text(), formatted)
+  @fs.write_file(
+    "\{dir}/other.json",
+    "{\"smithy\":\"2\",\"shapes\":{\"other#Name\":{\"type\":\"string\"}}}",
+  )
   runner.command(["convert", "--to", "idl", "model.json", "other.json"], 2)
   |> ignore
   runner.command(
@@ -167,4 +176,9 @@ async test "native and moonx Wasm CLI behavior" {
   let root = @fs.realpath("..")
   exercise(root, "native")
   exercise(root, "wasm")
+}
+
+///|
+async test "file checks run when stdin is skipped" {
+  exercise(@fs.realpath(".."), "wasm", skip_stdin=true)
 }
