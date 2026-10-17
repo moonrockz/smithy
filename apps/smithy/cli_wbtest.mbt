@@ -9,7 +9,13 @@ test "invalid command options fail with usage status" {
       ["format", "a.smithy", "b.smithy"],
       ["ast", "--check", "a.smithy"],
       ["ast", "--output"],
+      ["ast"],
+      ["ast", "--from=xml", "a.smithy"],
       ["ast", "-"],
+      ["ast", "--from=idl", "-", "-"],
+      ["format", "--check", "-o", "output", "a.smithy"],
+      ["format", "-o", "output", "--write", "a.smithy"],
+      ["convert", "--to=idl", "--output-dir=out", "-ooutput", "a.smithy"],
       ["convert", "--to", "json", "--output-dir", "out", "a.smithy"],
       ["validate", "-o", "output", "a.smithy"],
       ["format", "--write", "--from", "idl", "-"],
@@ -25,6 +31,18 @@ test "invalid command options fail with usage status" {
   assert_eq(opts.files, ["-h.smithy"])
   assert_eq(input_format("model.json", None), "json")
   assert_eq(input_format("model", Some("idl")), "idl")
+}
+
+///|
+test "argparse accepts standard option forms and interspersed inputs" {
+  let opts = options([
+    "convert", "one.smithy", "--from=idl", "--to=json", "-omodel.json", "two.smithy",
+  ])
+  assert_eq(opts.files, ["one.smithy", "two.smithy"])
+  assert_eq(opts.from, Some("idl"))
+  assert_eq(opts.to, Some("json"))
+  assert_eq(opts.output, Some("model.json"))
+  assert_eq(options(["ast", "--from=json", "-"]).files, ["-"])
 }
 
 ///|

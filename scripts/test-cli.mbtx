@@ -89,11 +89,33 @@ async fn exercise(
     "$version: \"2\"\nnamespace example\nstructure Broken { x: Missing }",
   )
   @fs.write_file("\{dir}/syntax.smithy", "structure {")
-  let (out, _) = runner.command(["version"], 0)
-  assert_true(out.has_prefix("smithy "))
-  runner.command(["--help"], 0) |> ignore
+  let (version, _) = runner.command(["version"], 0)
+  assert_true(version.has_prefix("smithy "))
+  let (help, _) = runner.command(["--help"], 0)
+  assert_true(help.contains("Usage: smithy") && help.contains("Commands:"))
+  for args in [[], ["help"], ["-h"]] {
+    let (out, _) = runner.command(args, 0)
+    assert_eq(out, help)
+  }
+  for command in ["ast", "validate", "format", "convert", "version"] {
+    let (help, _) = runner.command([command, "--help"], 0)
+    assert_true(help.contains("Usage: smithy \{command}"))
+    for args in [[command, "-h"], ["help", command]] {
+      let (out, _) = runner.command(args, 0)
+      assert_eq(out, help)
+    }
+    assert_eq(help.contains("--to"), command == "convert")
+    assert_eq(help.contains("--check"), command == "format")
+  }
+  let (out, _) = runner.command(["convert", "missing.smithy", "--help"], 0)
+  assert_true(out.contains("Usage: smithy convert"))
+  runner.command(["help", "unknown"], 2) |> ignore
+  runner.command(["version", "unexpected"], 2) |> ignore
+  let (flag_version, _) = runner.command(["--version"], 0)
+  assert_eq(flag_version, version)
   runner.command(["unknown"], 2) |> ignore
-  runner.command(["convert", "input.smithy"], 2) |> ignore
+  let (out, err) = runner.command(["convert", "input.smithy"], 2)
+  assert_true((out + err).contains("Usage: smithy convert"))
   runner.command(["ast", "missing.smithy"], 1) |> ignore
   let (out, stderr) = runner.command(["validate", "broken.smithy"], 1)
   let err = if target == "wasm-gc" { out + stderr } else { stderr }
@@ -112,7 +134,7 @@ async fn exercise(
     assert_eq(@json.parse(piped), @json.parse(ast))
   }
   runner.command(
-    ["convert", "--to", "json", "-o", "model.json", "input.smithy"],
+    ["convert", "--to=json", "-omodel.json", "input.smithy"],
     0,
   )
   |> ignore

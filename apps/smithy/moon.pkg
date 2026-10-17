@@ -3,6 +3,7 @@ pkgtype(kind: "executable")
 import {
   "moonrockz/smithy",
   "moonrockz/smithy-syntax" @syntax,
+  "moonbitlang/core/argparse",
   "moonbitlang/core/env",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/x/fs",
