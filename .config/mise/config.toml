@@ -197,3 +197,7 @@ run = "moonx scripts/test-cli.mbtx"
 [tasks."test:changelog"]
 description = "Check that generated changelogs preserve wrapped migration text"
 run = "moonx scripts/test-changelog.mbtx"
+
+[tasks."release:verify-cli"]
+description = "Run the published moonx CLI with bounded retries for registry asset availability (args: X.Y.Z)"
+run = "moonx scripts/publish.mbtx verify-cli"

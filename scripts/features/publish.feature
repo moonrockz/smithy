@@ -30,6 +30,7 @@ Feature: Publish to mooncakes.io
       | 1    | HTTP 403 rate limit exceeded | no        |
       | 1    | HTTP 401 Unauthorized        | no        |
       | 1    | HTTP 409 timeout             | no        |
+      | 255  | Prebuilt wasm asset does not exist | yes |
       | 1    | Check failed                 | no        |
 
   Scenario: Every module in the publish list is a workspace member

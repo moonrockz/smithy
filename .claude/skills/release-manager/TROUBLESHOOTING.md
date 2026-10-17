@@ -173,3 +173,12 @@ Cause: an older template took only the first physical line of a wrapped footer.
 Fix: use the updated template, which joins the first paragraph of the footer.
 For an already prepared release, restore the complete migration text in CHANGELOG.md,
 then run `mise run release:refresh`. `mise run test:changelog` checks the real template offline.
+
+## Published moonx CLI
+
+**The immediate moonx smoke fails with `Prebuilt wasm asset does not exist`**
+Cause: registry metadata can appear before the executable asset is available. During v0.1.0,
+all four module publications succeeded and the same pinned moonx command worked shortly afterward.
+Fix: re-run failed jobs on the original run. Published versions are skipped and the already-tested
+dist artifact is reused. `release:verify-cli` retries this exact availability error after 5, 20
+and 60 seconds; authorization errors and non-transient failures still stop at once.
