@@ -149,3 +149,19 @@ Fix: correct `CHANGELOG.md` in a `docs(changelog)` pull request, then
 
 **A broken version is on mooncakes.io**
 A version cannot be replaced or deleted. Fix forward: release a patch version with the fix.
+
+**`status` reports a newly added module as missing from an older release**
+Cause: status used the working copy's publication list to judge a tag that never published that module.
+Fix: use the updated status command, which reads `scripts/publish.mbtx` from the release tag, or
+from `origin/main` when its version is untagged. Do not republish an older version to fill this gap.
+
+**`status` reports `malformed publication entry: (` after formatting a long tuple**
+Cause: an older reader required each tuple on one physical line.
+Fix: use the updated reader, which joins formatter-wrapped tuples before parsing them.
+
+## CLI checks
+
+**`test:cli -- wasm-gc` cannot find `model.json` on Windows**
+Cause: an older stdin guard also skipped file fixtures and conversion checks.
+Fix: use the updated script. Only the stdin pipe check is skipped; file checks still run.
+The skipped-stdin regression uses fresh fixtures so old output cannot hide this failure.

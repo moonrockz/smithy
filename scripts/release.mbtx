@@ -1209,6 +1209,61 @@ async fn refresh() -> Unit {
 }
 
 ///|
+/// A tagged release owns its publication contract. An untagged main version
+/// uses the configuration that will be released from main.
+fn status_publish_file(version : Version, tagged : Bool) -> String {
+  let ref_name = if tagged { "v\{version}" } else { "origin/main" }
+  "\{ref_name}:scripts/publish.mbtx"
+}
+
+///|
+/// Read the checked-in multiline publish_list without evaluating a script from
+/// another revision. Reject missing or malformed lists instead of silently
+/// falling back to the working copy's modules.
+fn publication_modules(source : String) -> Result[Array[String], String] {
+  guard source.find("let publish_list :") is Some(start) else {
+    return Err("publication script has no publish_list")
+  }
+  let declaration = source[start:]
+  guard declaration.find("= [") is Some(open) else {
+    return Err("publication script has no publish_list array")
+  }
+  let modules : Array[String] = []
+  let mut entry = ""
+  for line in declaration[open + 3:].split("\n") {
+    let line = line.trim().to_owned()
+    if line == "]" {
+      if entry != "" {
+        return Err("malformed publication entry: " + entry)
+      }
+      return if modules.is_empty() {
+        Err("publication list is empty")
+      } else {
+        Ok(modules)
+      }
+    }
+    if line == "" || line.has_prefix("//") {
+      continue
+    }
+    entry += line
+    if !entry.has_suffix("),") {
+      continue
+    }
+    let parts = entry.split("\"").to_array()
+    guard parts.length() == 5 &&
+      parts[0].trim() == "(" &&
+      parts[2].trim() == "," &&
+      parts[4].trim_start(chars=",").trim() == ")," &&
+      parts[3].contains("/") else {
+      return Err("malformed publication entry: " + entry)
+    }
+    modules.push(parts[3].to_owned())
+    entry = ""
+  }
+  Err("publication list is not closed")
+}
+
+///|
 async fn status() -> Unit {
   run_or_fail("git", ["fetch", "--quiet", "--tags", "origin", "main"])
   let (_, moon_mod) = stdout_of("git", ["show", "origin/main:moon.mod"])
@@ -1226,9 +1281,22 @@ async fn status() -> Unit {
   let tagged = tag_names.contains(tag)
   let (exists, remote_assets, draft) = inspect_release(tag)
   let github_release = exists && !draft
+  let publication_file = status_publish_file(main_version, tagged)
+  let (code, publication_source) = stdout_of("git", ["show", publication_file])
+  if code != 0 {
+    fail_with("cannot read publication configuration at \{publication_file}")
+    return
+  }
+  let modules = match publication_modules(publication_source) {
+    Ok(names) => names
+    Err(message) => {
+      fail_with("\{publication_file}: \{message}")
+      return
+    }
+  }
   let mooncakes = []
-  for entry in publish_list {
-    mooncakes.push((entry.1, fetch_mooncakes(entry.1)))
+  for name in modules {
+    mooncakes.push((name, fetch_mooncakes(name)))
   }
   let range = match latest_tag {
     Some(t) => "v\{t}..origin/main"
@@ -1385,6 +1453,28 @@ fn version_option(text : String) -> Version? raise {
 
 ///|
 impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
+  setup.given1("the publication script is:", fn(doc : @moonspec.DocString) {
+    self.text = doc.content
+  })
+  setup.then1("the publication modules are {string}", fn(
+    expected : String,
+  ) raise {
+    let actual = match publication_modules(self.text) {
+      Ok(names) => names.join(", ")
+      Err(message) => "error: " + message
+    }
+    @expect.expect(actual).to_equal(expected)
+  })
+  setup.then3("status for version {string} tagged {string} reads {string}", fn(
+    version : String,
+    tagged : String,
+    expected : String,
+  ) raise {
+    @expect.expect(status_publish_file(version_of(version), yes(tagged))).to_equal(
+      expected,
+    )
+  })
+
   setup.given2("git-cliff exits with {int} and prints {string}", fn(
     code : Int,
     stdout : String,
