@@ -2,7 +2,7 @@
 /// The version of smithy-syntax, maintained from the root `moon.mod` by
 /// `scripts/versions.mbtx set` and checked by `validate:versions`.
 pub fn version() -> String {
-  "0.0.1"
+  "0.1.0"
 }
 
 ///|
