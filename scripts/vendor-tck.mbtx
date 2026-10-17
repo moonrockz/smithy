@@ -355,18 +355,24 @@ async fn curl_with_config(
 }
 
 ///|
-async test "curl accepts an authentication header supplied through stdin" {
-  // --version consumes the real config without making a network request.
-  let (code, out, err) = curl_with_config(
-    "--version",
-    auth_config("test-token"),
-  )
+async test "curl consumes an authentication config supplied through stdin" {
+  // Read this local file so the probe needs no network. A range supplied
+  // only through config proves curl actually consumed stdin; --version
+  // handles malformed config differently across curl versions.
+  let path = @fs.realpath("vendor-tck.mbtx")
+    .replace_all(old="\\", new="/")
+    .replace_all(old="%", new="%25")
+    .replace_all(old=" ", new="%20")
+    .replace_all(old="#", new="%23")
+    .replace_all(old="?", new="%3F")
+  let url = (if path.has_prefix("/") { "file://" } else { "file:///" }) + path
+  let config = auth_config("test-token")
+  let (code, out, err) = curl_with_config(url, config + "range = \"0-3\"\n")
   assert_eq(code, 0, msg=err.text())
-  assert_true(out.text().has_prefix("curl "))
-  let (code, _, _) = curl_with_config(
-    "--version", "invalid-curl-option = true\n",
-  )
-  assert_true(code != 0)
+  assert_eq(out.text(), "///|")
+  let (code, out, err) = curl_with_config(url, config)
+  assert_eq(code, 0, msg=err.text())
+  assert_eq(out.text(), @fs.read_file("vendor-tck.mbtx").text())
 }
 
 ///|
