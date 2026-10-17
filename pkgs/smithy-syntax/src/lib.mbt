@@ -1,5 +1,6 @@
 ///|
-/// The version of smithy-syntax, the same as `version` in `moon.mod`.
+/// The version of smithy-syntax, maintained from the root `moon.mod` by
+/// `scripts/versions.mbtx set` and checked by `validate:versions`.
 pub fn version() -> String {
   "0.0.1"
 }
@@ -67,8 +68,6 @@ pub using @scanner {
   type Trivia,
   type Comment,
   type CommentKind,
-  type Piece,
-  type Step,
 }
 
 ///|
@@ -118,8 +117,8 @@ pub using @ast {
 pub using @cst {type IdlCst, type StatementCst, type StatementKind}
 
 ///|
-/// The parser's result, version, recursion depth and error.
-pub using @parser {type ParseResult, type ParseError, type Version, type Depth}
+/// The parser's result and declared version.
+pub using @parser {type ParseResult, type Version}
 
 ///|
 /// The traversal: the node model, the cursor, the tree and the event types.
@@ -267,4 +266,27 @@ pub fn render_all(
   color~ : Bool = true,
 ) -> String {
   @report.render_all(ds, source, color~)
+}
+
+///|
+/// Every registered diagnostic code, in table order.
+pub fn codes() -> ArrayView[String] {
+  @diagnostic.codes()
+}
+
+///|
+/// Parse an existing lossless token stream, with recovery per statement.
+pub fn parse_tokens(stream : TokenStream) -> ParseResult {
+  @parser.parse_tokens(stream)
+}
+
+///|
+/// Render every diagnostic and the summary into a caller's sink.
+pub fn render_all_to(
+  ds : ArrayView[Diagnostic],
+  source : SourceText,
+  logger : &Logger,
+  color~ : Bool = true,
+) -> Unit {
+  @report.render_all_to(ds, source, logger, color~)
 }

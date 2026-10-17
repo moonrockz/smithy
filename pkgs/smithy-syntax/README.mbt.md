@@ -62,3 +62,12 @@ The JSON AST package depends on core JSON and the IDL AST's simple-type enum.
 Its [package guide](src/json_ast/README.mbt.md) defines the codec's preservation
 and validation rules. The semantic loader and IDL-to-JSON conversion are available
 in `moonrockz/smithy`.
+
+The facade also exports `parse_tokens`, `codes` and `render_all_to`. Use the
+scanner package for its pipeline records `Piece` and `Step`, and the parser
+package for `Depth` and `ParseError`. Property-test generators are internal.
+
+`ShapeKind::keyword()` and its `Show` implementation return IDL keywords.
+`NumberLiteral::as_double()` returns signed infinity on overflow. The exact
+number stays in `NumberLiteral::value`. Partial trees may contain duplicate
+member names; check `has_errors()` before relying on member uniqueness.

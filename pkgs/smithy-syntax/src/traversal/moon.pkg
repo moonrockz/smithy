@@ -13,7 +13,7 @@ import {
   "moonrockz/smithy-syntax/traversal",
   "moonrockz/smithy-syntax/parser",
   "moonrockz/smithy-syntax/span",
-  "moonrockz/smithy-syntax/lawkit",
+  "moonrockz/smithy-syntax/internal/lawkit",
   "moonrockz/smithy-syntax/ast",
   "moonbitlang/core/env",
   "moonbitlang/core/quickcheck",

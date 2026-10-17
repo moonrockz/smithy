@@ -40,7 +40,12 @@ print the file back unchanged, also when a statement did not parse:
 ```mbt check
 ///|
 test "the CST is lossless" {
-  let text = "namespace a\nstring Good\nstring 42\nstring AlsoGood\n"
+  let text =
+    #|namespace a
+    #|string Good
+    #|string 42
+    #|string AlsoGood
+    #|
   let r = @syntax.parse_idl(text)
   inspect(r.cst.to_source() == text, content="true")
   inspect(r.errors().length(), content="1")

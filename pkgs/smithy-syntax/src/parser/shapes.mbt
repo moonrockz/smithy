@@ -431,15 +431,7 @@ fn Parser::parse_member(self : Parser) -> @ast.Member raise ParseError {
   // A column-1 shape keyword after a member's leading traits means those
   // traits belong to the *next* shape, not to a member here: the block
   // was left open, not a member with an odd name.
-  if self.at_block_breaking_statement(self.pos) {
-    self.fail(
-      "SM-PARSE-001",
-      "UNFINISHED SHAPE",
-      "I was reading a member and found \{self.found()} at the start of a line; did you forget `}`?",
-      self.here(),
-      hint="Close the block with `}` before the next statement.",
-    )
-  }
+  self.check_unfinished("UNFINISHED SHAPE", "a member")
   let (name, target) : (@ast.Node[String], @ast.MemberTarget) = if self.at_kind(
       Dollar,
     ) {
@@ -603,7 +595,7 @@ fn Parser::parse_inline_shape(
   self.push_context("an inline shape", walrus.span)
   let members = self.parse_members("the inline shape")
   self.pop_context()
-  let end = self.tokens[self.pos - 1].span.end()
+  let end = self.previous_end()
   {
     docs: docs[:],
     traits: traits[:],
@@ -664,7 +656,7 @@ fn Parser::parse_operation_body(
           ignore(self.expect_kind(Colon, "`:` or `:=` after `\{key.lexeme}`"))
           Reference(self.parse_shape_id())
         }
-        let end = self.tokens[self.pos - 1].span.end()
+        let end = self.previous_end()
         let span = key.span.start.to(end)
         props.push(
           if key.lexeme == "input" {
@@ -839,7 +831,7 @@ fn Parser::parse_shape(
     }
   }
   self.pop_context()
-  let end = self.tokens[self.pos - 1].span.end()
+  let end = self.previous_end()
   { docs: docs[:], traits: traits[:], shape, span: start.to(end), }
 }
 
@@ -881,7 +873,7 @@ fn Parser::parse_apply(
     ([self.parse_trait()], false)
   }
   self.pop_context()
-  let end = self.tokens[self.pos - 1].span.end()
+  let end = self.previous_end()
   { target, traits: traits[:], block, span: start.to(end), }
 }
 

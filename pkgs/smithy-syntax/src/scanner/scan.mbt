@@ -24,7 +24,8 @@ fn scan_identifier(text : String, at : @span.Offset) -> Step {
 fn scan_whitespace(text : String, at : @span.Offset) -> Step {
   let mut end = at
   while unit_at(text, end) is Some(' ' | '\t' | '\r') {
-    if unit_at(text, end) == Some('\r') && peek(text, end, 1) == Some('\n') {
+    if unit_at(text, end) == Some('\r') &&
+      peek(text, end, @span.Length::new(1).unwrap()) == Some('\n') {
       break
     }
     end = end.next()
@@ -45,7 +46,11 @@ fn scan_newline(text : String, at : @span.Offset) -> Step {
 ///|
 /// `//` or `///` to the end of the line (the line break is not included).
 fn scan_comment(text : String, at : @span.Offset) -> Step {
-  let kind = if peek(text, at, 2) == Some('/') { Doc } else { Line }
+  let kind = if peek(text, at, @span.Length::new(2).unwrap()) == Some('/') {
+    Doc
+  } else {
+    Line
+  }
   let text_start = at.advance(
     if kind == Doc {
       @span.Length::new(3).unwrap()
@@ -55,7 +60,7 @@ fn scan_comment(text : String, at : @span.Offset) -> Step {
   )
   let mut end = text_start
   while unit_at(text, end) is Some(c) && c != '\n' {
-    if c == '\r' && peek(text, end, 1) == Some('\n') {
+    if c == '\r' && peek(text, end, @span.Length::new(1).unwrap()) == Some('\n') {
       break
     }
     end = end.next()
@@ -77,7 +82,7 @@ fn scan_single(kind : TokenKind, text : String, at : @span.Offset) -> Step {
 fn scan_unexpected(text : String, at : @span.Offset) -> Step {
   let c = text.code_unit_at(at.0).to_int()
   let is_high = c >= 0xD800 && c <= 0xDBFF
-  let low_follows = match peek(text, at, 1) {
+  let low_follows = match peek(text, at, @span.Length::new(1).unwrap()) {
     Some(l) => l.to_int() >= 0xDC00 && l.to_int() <= 0xDFFF
     None => false
   }
@@ -108,17 +113,18 @@ pub fn scan_at(text : String, at : @span.Offset) -> Step? {
     match c {
       '\n' => scan_newline(text, at)
       '\r' =>
-        if peek(text, at, 1) == Some('\n') {
+        if peek(text, at, @span.Length::new(1).unwrap()) == Some('\n') {
           scan_newline(text, at)
         } else {
           scan_whitespace(text, at)
         }
       ' ' | '\t' => scan_whitespace(text, at)
       ',' => trivia_step(Comma(at.to(at.next())), at.next())
-      '/' if peek(text, at, 1) == Some('/') => scan_comment(text, at)
+      '/' if peek(text, at, @span.Length::new(1).unwrap()) == Some('/') =>
+        scan_comment(text, at)
       '@' => scan_single(At, text, at)
       ':' =>
-        if peek(text, at, 1) == Some('=') {
+        if peek(text, at, @span.Length::new(1).unwrap()) == Some('=') {
           token_step(Walrus, text, at, at.next().next())
         } else {
           scan_single(Colon, text, at)

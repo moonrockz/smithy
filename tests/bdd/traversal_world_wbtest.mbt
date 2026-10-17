@@ -6,11 +6,13 @@ struct TraversalWorld {
 }
 
 ///|
+/// Start a scenario before any tree has been built.
 fn TraversalWorld::new() -> TraversalWorld {
   { text: "", tree: None, }
 }
 
 ///|
+/// Require the tree produced by the scenario's build step.
 fn TraversalWorld::the_tree(self : TraversalWorld) -> @syntax.Tree raise {
   guard self.tree is Some(t) else { fail("the tree was not built yet") }
   t
@@ -32,6 +34,7 @@ fn every_node(root : @syntax.NodeRef) -> Array[@syntax.NodeRef] {
 }
 
 ///|
+/// Identify an occurrence by its category, kind and source span.
 fn node_tag(n : @syntax.NodeRef) -> String {
   let s = n.span()
   "\{n.category()}/\{n.kind()}@\{s.start.0}+\{s.length.0}"

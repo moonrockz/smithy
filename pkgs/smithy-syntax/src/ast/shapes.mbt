@@ -65,8 +65,7 @@ pub(all) enum EnumType {
 } derive(Eq, Debug, Hash)
 
 ///|
-/// `Set` is Smithy 1.0 syntax; it parses in every version and the loader
-/// decides what it means.
+/// `Set` is Smithy 1.0 syntax. The parser reports it in a 2.0 file.
 pub(all) enum AggregateType {
   List
   Map
@@ -93,28 +92,20 @@ pub(all) enum ShapeKind {
 } derive(Eq, Debug, Hash)
 
 ///|
-/// `Simple(String)`, `Aggregate(Structure)`, ... for messages and CST names.
+/// The IDL keyword, for messages and CST names.
 pub impl Show for ShapeKind with fn output(self, logger) {
-  match self {
-    Simple(t) => logger.write_string("Simple(\{t.keyword()})")
-    Enum(Enum) => logger.write_string("Enum(Enum)")
-    Enum(IntEnum) => logger.write_string("Enum(IntEnum)")
-    Aggregate(t) => logger.write_string("Aggregate(\{t.keyword()})")
-    Entity(Service) => logger.write_string("Entity(Service)")
-    Entity(Resource) => logger.write_string("Entity(Resource)")
-    Operation => logger.write_string("Operation")
-  }
+  logger.write_string(self.keyword())
 }
 
 ///|
 /// The keyword that spells this aggregate type.
 pub fn AggregateType::keyword(self : AggregateType) -> String {
   match self {
-    List => "List"
-    Map => "Map"
-    Union => "Union"
-    Structure => "Structure"
-    Set => "Set"
+    List => "list"
+    Map => "map"
+    Union => "union"
+    Structure => "structure"
+    Set => "set"
   }
 }
 
@@ -216,7 +207,8 @@ pub(all) enum OperationProperty {
 
 ///|
 /// `Shape`, one case per grammar production. `name` is the identifier
-/// after the keyword.
+/// after the keyword. Member names are unique only when the parse result
+/// has no errors; duplicate members survive in a partial AST.
 pub(all) enum Shape {
   Simple(kind~ : SimpleType, name~ : Node[String], mixins~ : Mixins?)
   Enum(
@@ -263,5 +255,19 @@ pub fn Shape::kind(self : Shape) -> ShapeKind {
     Aggregate(kind~, ..) => Aggregate(kind)
     Entity(kind~, ..) => Entity(kind)
     Operation(..) => Operation
+  }
+}
+
+///|
+/// The IDL keyword for any shape kind, suitable for printing source.
+pub fn ShapeKind::keyword(self : ShapeKind) -> String {
+  match self {
+    Simple(t) => t.keyword()
+    Enum(Enum) => "enum"
+    Enum(IntEnum) => "intEnum"
+    Aggregate(t) => t.keyword()
+    Entity(Service) => "service"
+    Entity(Resource) => "resource"
+    Operation => "operation"
   }
 }

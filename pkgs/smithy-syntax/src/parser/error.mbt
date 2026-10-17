@@ -3,7 +3,7 @@
 /// statement; `parse` catches it, records it and recovers.
 pub(all) suberror ParseError {
   ParseError(@diagnostic.Diagnostic)
-} derive(Debug)
+} derive(Eq, Debug)
 
 ///|
 /// The diagnostic the error carries.
@@ -40,7 +40,7 @@ pub(all) struct ParseResult {
   cst : @cst.IdlCst
   version : Version?
   diagnostics : ArrayView[@diagnostic.Diagnostic]
-} derive(Debug)
+} derive(Eq, Debug)
 
 ///|
 /// Whether any diagnostic is an error (not just a warning).

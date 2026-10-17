@@ -139,8 +139,8 @@ fn scan_text_block(text : String, at : @span.Offset) -> Step {
   })
   let (content_start, has_break) = match unit_at(text, after_quotes) {
     Some('\n') => (after_quotes.next(), true)
-    Some('\r') if peek(text, after_quotes, 1) == Some('\n') =>
-      (after_quotes.next().next(), true)
+    Some('\r') if peek(text, after_quotes, @span.Length::new(1).unwrap()) ==
+      Some('\n') => (after_quotes.next().next(), true)
     _ => (at.advance(three), false)
   }
   let found : Array[@diagnostic.Diagnostic] = []

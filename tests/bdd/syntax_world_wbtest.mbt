@@ -6,23 +6,27 @@ struct SyntaxWorld {
 }
 
 ///|
+/// Start a scenario before parsing any source.
 fn SyntaxWorld::new() -> SyntaxWorld {
   { source: @syntax.SourceText::new(""), result: None, }
 }
 
 ///|
+/// Require the result produced by the parse step.
 fn SyntaxWorld::parsed(self : SyntaxWorld) -> @syntax.ParseResult raise {
   guard self.result is Some(r) else { fail("the model was not parsed yet") }
   r
 }
 
 ///|
+/// Require an AST from the scenario result.
 fn SyntaxWorld::file(self : SyntaxWorld) -> @syntax.IdlFile raise {
   guard self.parsed().ast is Some(f) else { fail("no AST") }
   f
 }
 
 ///|
+/// Find a declared shape by its source name.
 fn SyntaxWorld::shape(
   self : SyntaxWorld,
   name : String,
@@ -56,12 +60,15 @@ fn SyntaxWorld::member_of(
 }
 
 ///|
+/// Require the first diagnostic from the scenario result.
 fn SyntaxWorld::first(self : SyntaxWorld) -> @syntax.Diagnostic raise {
-  guard self.parsed().diagnostics.length() > 0 else { fail("no diagnostics") }
-  self.parsed().diagnostics[0]
+  let result = self.parsed()
+  guard result.diagnostics.length() > 0 else { fail("no diagnostics") }
+  result.diagnostics[0]
 }
 
 ///|
+/// The unqualified trait name used by acceptance assertions.
 fn trait_name(t : @syntax.Trait) -> String {
   t.id.value.name
 }
@@ -96,10 +103,13 @@ impl @moonspec.World for SyntaxWorld with fn configure(self, setup) {
     )
   })
   setup.then1("the version is {string}", fn(v : String) raise {
-    let expected = if v == "2" {
-      Some(@syntax.Version::V2)
+    let expected = if v == "none" {
+      None
     } else {
-      Some(@syntax.Version::V1)
+      guard @syntax.Version::of(v) is Some(version) else {
+        fail("unknown expected version \{v}")
+      }
+      Some(version)
     }
     @expect.expect(self.parsed().version).to_equal(expected)
   })

@@ -78,6 +78,11 @@ fn Parser::recover(
   while i < self.tokens.length() && !self.at_statement_start(i) {
     i += 1
   }
+  // A scanner hole with leading documentation can look like a recovery
+  // boundary. Keep it in this run before resuming at the next real token.
+  while i < self.tokens.length() && self.tokens[i].kind == Error {
+    i += 1
+  }
   out.push(
     @cst.StatementCst::new(kind=Skipped, name=None, tokens=self.tokens[from:i]),
   )
@@ -316,6 +321,7 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
         uses.push(u)
         Ok((@cst.StatementKind::Use, Some(u.id.value.to_string())))
       } else if namespace is None &&
+        !(p.at_keyword("use") && section is ShapeSection) &&
         (
           p.at_keyword("use") ||
           p.at_keyword("apply") ||
@@ -436,8 +442,16 @@ fn order_diagnostics(
 ) -> Array[@diagnostic.Diagnostic] {
   let all = scanner.to_owned()
   all.append(parser.to_owned())
-  all.sort_by((a, b) => a.span.start.compare(b.span.start))
-  all
+  let indexed = all.mapi((i, d) => (i, d))
+  indexed.sort_by((a, b) => {
+    let order = a.1.span.start.compare(b.1.span.start)
+    if order == 0 {
+      a.0.compare(b.0)
+    } else {
+      order
+    }
+  })
+  indexed.map(e => e.1)
 }
 
 ///|

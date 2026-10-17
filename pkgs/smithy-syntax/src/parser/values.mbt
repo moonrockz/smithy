@@ -191,6 +191,9 @@ fn Parser::parse_object_kvps(
     ignore(self.advance())
     let value = self.parse_node_value()
     kvps.push({ key, value, span: key.span.join(value.span()), })
+    if !self.at_kind(close) && !self.at_end() {
+      self.expect_member_br()
+    }
   }
   kvps
 }

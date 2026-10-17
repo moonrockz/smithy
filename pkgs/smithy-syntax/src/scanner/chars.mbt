@@ -11,9 +11,9 @@ fn unit_at(text : String, at : @span.Offset) -> Char? {
 }
 
 ///|
-/// The unit `k` places after `at`.
-fn peek(text : String, at : @span.Offset, k : Int32) -> Char? {
-  unit_at(text, @span.Offset::new(at.0 + k).unwrap_or(at))
+/// The unit `step` UTF-16 units after `at`.
+fn peek(text : String, at : @span.Offset, step : @span.Length) -> Char? {
+  unit_at(text, at.advance(step))
 }
 
 ///|

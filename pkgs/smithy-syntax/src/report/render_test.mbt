@@ -250,8 +250,7 @@ test "long notes reflow at 80 columns" {
       #|2 | metadata x = "y"
       #|  | ^^^^^^^^ I was expecting `use`, a shape statement, or `apply` but found `metadata`
       #|  |
-      #|  = Control statements (`$...`) come first, then `metadata`, then
-      #|    `namespace`.
+      #|  = Control statements (`$...`) come first, then `metadata`, then `namespace`.
       #|
     ),
   )
@@ -293,4 +292,65 @@ test "reflow hard-breaks a word wider than 80 columns" {
     guard !line.contains("|") && line.length() > 0 else { continue }
     @expect.expect(line.length() <= 80).because(line.to_owned()).to_be_true()
   }
+}
+
+///|
+test "lone carriage returns render as spaces without shifting columns" {
+  let (d, source) = first_error("namespace a\nstructure S { a\r String }")
+  let out = @report.render_plain(d, source)
+  assert_false(out.contains("\r"))
+  assert_true(out.contains("structure S { a  String }"))
+  assert_true(out.contains("                ^^^^^^"))
+  assert_eq(
+    source.line_text(@span.Line::new(2).unwrap()),
+    Some("structure S { a\r String }"),
+  )
+  assert_eq(
+    @span.SourceText::new("a\r").line_text(@span.Line::first()),
+    Some("a\r"),
+  )
+}
+
+///|
+test "labels on the same line retain primary then caller order" {
+  let source = @span.SourceText::new("x")
+  let span = @span.Offset::zero().to(source.end())
+  let labels = Array::makei(64, i => @diagnostic.Label::{
+    span,
+    text: "label-\{i}",
+  })
+  let d = @diagnostic.Diagnostic::new(
+    code="SM-PARSE-001",
+    severity=Error,
+    title="ORDER",
+    message="primary",
+    span~,
+    labels~,
+  )
+  let out = @report.render_plain(d, source)
+  let mut last = out.find("^ primary").unwrap()
+  for i in 0..<64 {
+    let at = out.find("- label-\{i}\n").unwrap()
+    assert_true(at > last)
+    last = at
+  }
+}
+
+///|
+test "hint wrapping uses the available 80 columns" {
+  let source = @span.SourceText::new("x")
+  let span = @span.Offset::zero().to(source.end())
+  let d = @diagnostic.Diagnostic::new(
+    code="SM-PARSE-001",
+    severity=Error,
+    title="WRAP",
+    message="primary",
+    span~,
+    hint="a ".repeat(100),
+  )
+  let out = @report.render_plain(d, source)
+  for line in out.split("\n") {
+    assert_true(line.length() <= 80)
+  }
+  assert_true(out.split("\n").any(line => line.length() >= 78))
 }

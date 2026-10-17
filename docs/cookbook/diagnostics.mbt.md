@@ -8,7 +8,13 @@ for an editor.
 ///|
 test "render for a terminal and for an editor" {
   let source = @syntax.SourceText::new(
-    "namespace a\nstructure S {\n    a String\n}\n",
+    (
+      #|namespace a
+      #|structure S {
+      #|    a String
+      #|}
+      #|
+    ),
     name="s.smithy",
   )
   let r = @syntax.parse(source)

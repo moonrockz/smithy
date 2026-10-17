@@ -8,7 +8,7 @@ import {
   "moonrockz/smithy-syntax/span",
   "moonrockz/smithy-syntax/diagnostic",
   "moonrockz/smithy-syntax/parser",
-  "moonrockz/smithy-syntax/lawkit",
+  "moonrockz/smithy-syntax/internal/lawkit",
   "moonrockz/expect",
   "moonbitlang/core/quickcheck",
   "moonbitlang/core/buffer",
