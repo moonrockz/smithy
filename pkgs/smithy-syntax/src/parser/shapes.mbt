@@ -283,13 +283,17 @@ fn Parser::recover_member(self : Parser, start_pos : Int32) -> Bool {
 }
 
 ///|
-/// The `WS` between two members: the grammar is `ShapeMembers = "{" [WS]
+/// The `WS` between members or object/trait entries. `construct` gives
+/// entries their own diagnostic wording. For members, the grammar is `ShapeMembers = "{" [WS]
 /// *(ShapeMember [WS]) "}"`, and `WS = 1*(SP / NL / Comment / Comma)`, so
 /// any whitespace at all separates members (unlike a statement's `BR`,
 /// members do not need a line break, a comment or a comma specifically:
 /// `enum A { FOO BAR BAZ }` and `map H { key: String value: String }` are
 /// both valid, with members separated only by a space).
-fn Parser::expect_member_br(self : Parser) -> Unit raise ParseError {
+fn Parser::expect_separator(
+  self : Parser,
+  construct? : String,
+) -> Unit raise ParseError {
   guard self.pos > 0 else { return }
   guard self.peek() is Some(next) else { return }
   let prev = self.tokens[self.pos - 1]
@@ -299,9 +303,18 @@ fn Parser::expect_member_br(self : Parser) -> Unit raise ParseError {
     self.fail(
       "SM-PARSE-003",
       "MISSING SEPARATOR",
-      "I was expecting whitespace here but found \{self.found()}",
+      match construct {
+        Some(what) =>
+          "I was expecting whitespace between entries in \{what} but found \{self.found()}"
+        None => "I was expecting whitespace here but found \{self.found()}"
+      },
       next.span,
-      notes=["Each member must be separated from the next by whitespace."],
+      notes=[
+        match construct {
+          Some(what) => "I separate entries in \{what} with whitespace."
+          None => "Each member must be separated from the next by whitespace."
+        },
+      ],
       hint="Put a space before `\{next.lexeme}`.",
     )
   }
@@ -364,7 +377,7 @@ fn[T] Parser::parse_block_items(
           if strict {
             self.expect_br()
           } else {
-            self.expect_member_br()
+            self.expect_separator()
           }
         }
       }
@@ -708,7 +721,7 @@ fn Parser::parse_operation_body(
         )
     }
     if !self.at_kind(RBrace) {
-      self.expect_member_br()
+      self.expect_separator()
     }
   }
   self.detach_docs_before(self.here().start)

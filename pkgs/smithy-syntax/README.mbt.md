@@ -55,7 +55,7 @@ moon add moonrockz/smithy-syntax
 
 Dependencies point one way: `span` ← `diagnostic` ← `scanner` ← `ast` ← `cst` ← `parser` ← `traversal` and `report` ← root (`traversal` and `report` do not import each other).
 Each package has a `README.mbt.md` with checked examples. See the design in
-`docs/superpowers/specs/2026-10-15-idl-syntax-design.md`, and the cookbook in `docs/cookbook` for task
+[DESIGN.md](DESIGN.md), and the cookbook in `docs/cookbook` for task
 articles.
 
 The JSON AST package depends on core JSON and the IDL AST's simple-type enum.

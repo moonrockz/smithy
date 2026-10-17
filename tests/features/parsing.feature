@@ -136,3 +136,15 @@ Feature: Parsing Smithy IDL
     When I parse the model
     Then the diagnostics are "SM-PARSE-003"
     And the first title is "MISSING SEPARATOR"
+    And the first message is "I was expecting whitespace between entries in an object but found `b`"
+
+  Scenario: Trait entries need whitespace
+    Given the Smithy model:
+      """smithy
+      namespace a
+      @t(a:"x"b:"y")
+      string S
+      """
+    When I parse the model
+    Then the diagnostics are "SM-PARSE-003"
+    And the first message is "I was expecting whitespace between entries in a trait body but found `b`"

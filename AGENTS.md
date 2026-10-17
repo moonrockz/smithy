@@ -55,7 +55,7 @@ their output. Nothing in it is committed. This overrides the default location of
 ## Syntax module
 
 `pkgs/smithy-syntax` is the IDL syntax layer. Its design is
-`docs/superpowers/specs/2026-10-15-idl-syntax-design.md`; keep it current when
+`pkgs/smithy-syntax/DESIGN.md`; keep it current when
 the API changes. Rules that tests enforce:
 
 - The scanner and the CST are lossless: `to_source()` is the input text.

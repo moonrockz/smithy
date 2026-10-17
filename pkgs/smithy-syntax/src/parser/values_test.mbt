@@ -248,3 +248,27 @@ test "huge exact numbers convert to signed infinity, not zero" {
     )
   }
 }
+
+///|
+test "object and trait separator messages name the construct and offending key" {
+  for
+    (text, construct) in [
+      ("metadata x = {a:\"x\"b:\"y\"}", "an object"),
+      ("namespace a\n@t(a:\"x\"b:\"y\")\nstring S", "a trait body"),
+    ] {
+    let result = @parser.parse_text(text)
+    assert_eq(result.errors().length(), 1)
+    let diagnostic = result.errors()[0]
+    assert_eq(diagnostic.code, "SM-PARSE-003")
+    assert_eq(
+      diagnostic.message,
+      "I was expecting whitespace between entries in \{construct} but found `b`",
+    )
+    assert_true(
+      diagnostic.notes.contains(
+        "I separate entries in \{construct} with whitespace.",
+      ),
+    )
+    assert_true(diagnostic.notes.iter().all(note => !note.contains("member")))
+  }
+}

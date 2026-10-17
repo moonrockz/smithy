@@ -2,6 +2,8 @@
 /// The reference corpus covers syntax errors; these inputs exercise editor
 /// warnings, bounded parsing and unfinished constructs outside that corpus.
 let message_inputs : Array[String] = [
+  "metadata x = {a:\"x\"b:\"y\"}",
+  "namespace a\n@t(a:\"x\"b:\"y\")\nstring S",
   "namespace a\n/// orphan",
   "namespace a\n/// docs\napply S @required",
   "namespace a\n@t\n",
@@ -180,6 +182,7 @@ test "every diagnostic title and message has a snapshot" {
       #|  "SM-PARSE-007 | NEEDS SMITHY IDL 2 | Resource properties can only be used with Smithy version 2 or later",
       #|  "SM-PARSE-001 | UNEXPECTED TOKEN | I was expecting a key (an identifier or a quoted string) but found `{`",
       #|  "SM-PARSE-002 | UNFINISHED ENUM | I reached the end of the file while reading the members of the enum `E`",
+      #|  "SM-PARSE-003 | MISSING SEPARATOR | I was expecting whitespace between entries in an object but found `b`",
       #|  "SM-PARSE-004 | EXPECTED A SHAPE | I was expecting a shape after the traits but found the end of the file",
       #|  "SM-PARSE-004 | EXPECTED A STATEMENT | I was expecting `use`, a shape statement, or `apply` but found `$`",
       #|  "SM-PARSE-004 | EXPECTED A STATEMENT | I was expecting a shape statement or `apply` but found `namespace`",
@@ -188,6 +191,7 @@ test "every diagnostic title and message has a snapshot" {
       #|  "SM-PARSE-005 | INVALID USE TARGET | a `use` statement needs an absolute shape ID like `smithy.api#String`",
       #|  "SM-PARSE-001 | UNEXPECTED TOKEN | I was expecting a trait or `{` after the apply target but found `string`",
       #|  "SM-SCAN-004 | TEXT BLOCK MUST START WITH A LINE BREAK | the opening `\"\"\"` must be followed by a line break",
+      #|  "SM-PARSE-003 | MISSING SEPARATOR | I was expecting whitespace between entries in a trait body but found `b`",
       #|  "SM-PARSE-004 | EXPECTED A STATEMENT | I was expecting a shape statement or `apply` but found `structureFoo`",
       #|  "SM-PARSE-012 | DUPLICATE OPERATION PROPERTY | Duplicate operation input property for the operation `GetFoo`",
       #|  "SM-PARSE-002 | UNEXPECTED TOKEN | I was expecting `:` after the key `MyString` but found the end of the file",
