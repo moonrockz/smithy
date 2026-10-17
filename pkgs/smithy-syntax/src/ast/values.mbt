@@ -30,9 +30,14 @@ pub fn NumberLiteral::as_int64(self : NumberLiteral) -> Int64? {
 ///|
 /// The value as a `Double` (lossy for large integers and long decimals).
 pub fn NumberLiteral::as_double(self : NumberLiteral) -> Double {
-  match self.value {
-    Integer(b) => @decimal.Decimal::from_bigint(b).to_double()
-    Decimal(d) => d.to_double()
+  let text = match self.value {
+    Integer(b) => b.to_string()
+    Decimal(d) => d.to_string()
+  }
+  // core reports floating-point overflow as a parse error. Our exact value
+  // has valid numeric syntax, so overflow converts to signed infinity.
+  @string.parse_double(text[:]) catch {
+    _ => if text.has_prefix("-") { -1.0 / 0.0 } else { 1.0 / 0.0 }
   }
 }
 

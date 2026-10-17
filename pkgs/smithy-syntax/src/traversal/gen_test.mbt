@@ -49,30 +49,42 @@ fn pick(rs : @splitmix.RandomState, n : Int32) -> Int32 {
 }
 
 ///|
-/// The `Control` decision for each enter, by enter count, cycled.
-struct Policy(Array[@traversal.Control]) derive(Debug)
+/// Repeated Continue/SkipChildren decisions and a separate Stop draw.
+/// `policy_for` binds the stop to the actual tree's node count.
+struct Policy(Array[@traversal.Control], Int32?) derive(Debug)
 
 ///|
 impl @quickcheck.Arbitrary for Policy with fn arbitrary(_, rs) {
   let n = 1 + pick(rs, 8)
-  Policy(
-    Array::makei(n, _ => {
-      match pick(rs, 10) {
-        0 => Stop
-        1 | 2 | 3 => SkipChildren
-        _ => Continue
-      }
-    }),
-  )
+  let decisions = Array::makei(n, _ => {
+    if pick(rs, 4) == 0 {
+      @traversal.SkipChildren
+    } else {
+      @traversal.Continue
+    }
+  })
+  let stop = if pick(rs, 2) == 0 { None } else { Some(pick(rs, 2147483647)) }
+  Policy(decisions, stop)
 }
 
 ///|
 impl @quickcheck.Shrink for Policy
 
 ///|
+fn policy_for(root : @traversal.NodeRef, p : Policy) -> Policy {
+  let Policy(cs, stop) = p
+  let count = all_nodes(root).length()
+  Policy(cs, stop.map(draw => draw % count))
+}
+
+///|
 fn decide(p : Policy, k : Int32) -> @traversal.Control {
-  let Policy(cs) = p
-  cs[k % cs.length()]
+  let Policy(cs, stop) = p
+  if stop == Some(k) {
+    Stop
+  } else {
+    cs[k % cs.length()]
+  }
 }
 
 ///|
@@ -186,10 +198,37 @@ fn cursor_tour(root : @traversal.NodeRef) -> (Array[String], Bool) {
     }
     while !c.goto_next_sibling() {
       if !c.goto_parent() {
-        return (seen, c.depth() == 0 && c.node() == root)
+        return (seen, c.depth() == 0 && same_node(c.node(), root))
       }
     }
     seen.push(tag(c.node()))
   }
   (seen, false)
+}
+
+///|
+/// Compare the AST objects inside references, not newly built enum wrappers.
+fn same_node(a : @traversal.NodeRef, b : @traversal.NodeRef) -> Bool {
+  match (a, b) {
+    (File(x, _), File(y, _)) => physical_equal(x, y)
+    (Control(x), Control(y)) => physical_equal(x, y)
+    (Metadata(x), Metadata(y)) => physical_equal(x, y)
+    (Namespace(x), Namespace(y)) => physical_equal(x, y)
+    (Use(x), Use(y)) => physical_equal(x, y)
+    (Shape(x), Shape(y)) => physical_equal(x, y)
+    (Apply(x), Apply(y)) => physical_equal(x, y)
+    (Inline(x), Inline(y)) => physical_equal(x, y)
+    (Mixins(x), Mixins(y)) => physical_equal(x, y)
+    (Member(x), Member(y)) => physical_equal(x, y)
+    (EnumMember(x), EnumMember(y)) => physical_equal(x, y)
+    (Property(x), Property(y)) => physical_equal(x, y)
+    (Trait(x), Trait(y)) => physical_equal(x, y)
+    (Value(x), Value(y)) => physical_equal(x, y)
+    (Entry(x), Entry(y)) => physical_equal(x, y)
+    (ShapeIdRef(x), ShapeIdRef(y)) => physical_equal(x, y)
+    (Name(x), Name(y)) => physical_equal(x, y)
+    (Doc(x), Doc(y)) => physical_equal(x, y)
+    (Comment(x), Comment(y)) => physical_equal(x, y)
+    _ => false
+  }
 }

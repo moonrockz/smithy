@@ -529,3 +529,17 @@ fn Parser::parse_shape_id(
   }
   @ast.Node::new({ namespace, name, member, }, start.to(end))
 }
+
+///|
+/// End of the last consumed syntax token. `advance` can also skip scanner
+/// holes, whose spans must not become part of the construct just parsed.
+fn Parser::previous_end(self : Parser) -> @span.Offset {
+  let mut i = self.pos - 1
+  while i >= 0 {
+    if self.tokens[i].kind != Error {
+      return self.tokens[i].span.end()
+    }
+    i -= 1
+  }
+  @span.Offset::zero()
+}

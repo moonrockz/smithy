@@ -282,7 +282,7 @@ test "two statements on one line is MISSING LINE BREAK, also with CRLF files" {
 }
 
 ///|
-test "statements out of order are EXPECTED A STATEMENT with a note" {
+test "metadata after the namespace is EXPECTED A STATEMENT with an ordering note" {
   let r = @parser.parse_text(
     (
       #|namespace a
@@ -465,4 +465,37 @@ test "a scanner error is a hole the parser steps over" {
   ).to_equal(["SM-SCAN-001"])
   guard r.ast is Some(f) else { fail("no ast") }
   inspect(f.uses.length(), content="1")
+}
+
+///|
+test "use after a shape is reported even without a namespace" {
+  let r = @parser.parse_text("string S\nuse a#B\n")
+  inspect(r.errors().length(), content="2")
+  inspect(r.errors()[1].title, content="EXPECTED A STATEMENT")
+}
+
+///|
+test "a trailing scanner error does not widen a shape or apply span" {
+  for
+    body in [
+      "string S", "structure S {}", "apply S @required", "operation O {input := {}}",
+    ] {
+    let prefix = "$version: \"2\"\nnamespace a\n"
+    let text = prefix + body + " %\n"
+    let r = @parser.parse_text(text)
+    guard r.ast is Some(f) else { fail("no ast") }
+    assert_eq(f.statements[0].span().end().0, prefix.length() + body.length())
+    assert_eq(r.cst.to_source(), text)
+  }
+}
+
+///|
+test "recovery keeps scanner holes at a documentation statement boundary" {
+  let text = "@\nnamespace a\nuse a#B\n/// orphan\n😀"
+  let r = @parser.parse_text(text)
+  let joined = r.cst.statements
+    .iter()
+    .map(s => s.to_source())
+    .fold(init="", (a, b) => a + b)
+  assert_eq(joined, text)
 }

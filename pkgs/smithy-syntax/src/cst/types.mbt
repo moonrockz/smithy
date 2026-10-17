@@ -12,7 +12,7 @@ pub(all) enum StatementKind {
 } derive(Eq, Debug)
 
 ///|
-/// `Control`, `Shape(Aggregate(Structure))`, ... for tests and tools.
+/// `Control`, `Shape(structure)`, ... for tests and tools.
 pub impl Show for StatementKind with fn output(self, logger) {
   match self {
     Control => logger.write_string("Control")

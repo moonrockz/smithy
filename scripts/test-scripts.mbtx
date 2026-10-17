@@ -1,7 +1,7 @@
 ///|
 /// Run the tests of the task scripts.
 ///
-/// A script is tested when `scripts/features/<stem>.feature` exists, where `<stem>` is the script name
+/// A script is tested when it declares tests or `scripts/features/<stem>.feature` exists, where `<stem>` is the script name
 /// without `.mbtx` and with `-` replaced by `_`. `moon test` of a package does not include `.mbtx` files,
 /// so this script is their only test runner. It uses the wasm backend, as `moonx` does for a standalone
 /// `.mbtx` file. It stops at the first failure.
@@ -32,7 +32,16 @@ async fn main {
   let mut tested = 0
   for file in files {
     guard feature_name(file) is Some(feature) else { continue }
-    guard @fs.exists("\{scripts_dir}/features/\{feature}") else { continue }
+    let source = @fs.read_file("\{scripts_dir}/\{file}").text()
+    let declares_tests = source
+      .split("\n")
+      .any(line => {
+        let line = line.trim_start()
+        line.has_prefix("test \"") || line.has_prefix("async test \"")
+      })
+    guard declares_tests || @fs.exists("\{scripts_dir}/features/\{feature}") else {
+      continue
+    }
     println("🧪 Testing \{scripts_dir}/\{file}")
     let code = @process.run(
       "moon",

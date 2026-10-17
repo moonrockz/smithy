@@ -34,17 +34,22 @@ test "law: CST statements tile the token array in order" {
 }
 
 ///|
-test "law: every AST statement span lies inside the file span and statements are in order" {
+test "law: every AST descendant lies inside its parent and siblings are in order" {
   @quickcheck.check(
     (t : @lawkit.SmithyText) => {
       let r = @parser.parse_text(t.text())
-      guard r.ast is Some(f) else { return true }
-      let mut last = @span.Offset::zero()
+      guard r.ast is Some(_) else { return true }
+      let stack = [@traversal.NodeRef::of_result(r).unwrap()]
       let mut ok = true
-      for s in f.statements {
-        let sp = s.span()
-        ok = ok && sp.start >= last && sp.end() <= f.span.end()
-        last = sp.start
+      while stack.pop() is Some(parent) {
+        let children = parent.children()
+        let mut last = parent.span().start
+        for child in children {
+          let span = child.span()
+          ok = ok && span.start >= last && span.end() <= parent.span().end()
+          last = span.start
+          stack.push(child)
+        }
       }
       ok
     },
@@ -92,14 +97,15 @@ test "law: one edit to a valid model gives at most three diagnostics and keeps m
 }
 
 ///|
-test "law: a valid model parses the same from its CST source" {
+test "law: any text parses the same from its CST source" {
   @quickcheck.check(
-    (_u : Unit) => {
-      let r1 = @parser.parse_text(@lawkit.small_model())
+    (t : @lawkit.SmithyText) => {
+      let r1 = @parser.parse_text(t.text())
       let r2 = @parser.parse_text(r1.cst.to_source())
-      r1.ast == r2.ast && r1.diagnostics.length() == 0
+      r1 == r2
     },
-    count=1,
+    count=400,
+    max_size=16,
     seed=3036,
   )
 }

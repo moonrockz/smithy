@@ -54,6 +54,12 @@ pub impl @quickcheck.Arbitrary for EditedModel with fn arbitrary(_size, rs) {
 ///|
 /// No shrinking: the edit is already a single code unit, as small as it
 /// gets.
-pub impl @quickcheck.Shrink for EditedModel with fn shrink(_self) {
+pub impl @quickcheck.Shrink for EditedModel with fn shrink(_) {
   Iter::empty()
+}
+
+///|
+/// The offset at which the single edit was applied.
+pub fn EditedModel::edit_offset(self : EditedModel) -> @span.Offset {
+  self.edit_offset
 }

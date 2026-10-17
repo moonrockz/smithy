@@ -33,8 +33,10 @@ let every_form : String =
   #|    input := {
   #|        a: String
   #|    }
+  #|    output: Foo
   #|    errors: [E]
   #|}
+  #|/// detached
   #|apply Foo @sensitive
   #|
 
@@ -213,21 +215,16 @@ fn every_node(root : @traversal.NodeRef) -> Array[@traversal.NodeRef] {
 ///|
 test "category and kind follow the kind table" {
   let seen = Map([])
-  for n in every_node(root_of(every_form)) {
-    seen["\{n.category()}/\{n.kind()}"] = true
+  for root in kind_roots() {
+    for n in every_node(root) {
+      seen["\{n.category()}/\{n.kind()}"] = true
+    }
   }
-  for
-    want in [
-      "file/file", "control/control", "metadata/metadata", "namespace/namespace",
-      "use/use", "shape/structure", "shape/string", "shape/bigDecimal", "shape/enum",
-      "shape/intEnum", "shape/service", "shape/operation", "shape/apply", "shape/inline",
-      "mixins/mixins", "member/member", "member/enumMember", "operation_property/input",
-      "operation_property/errors", "trait/trait", "value/array", "value/object",
-      "value/number", "value/boolean", "value/null", "value/string", "value/textBlock",
-      "value/shapeId", "entry/entry", "shape_id/shape_id", "name/name", "doc/doc",
-      "comment/line",
-    ] {
-    assert_true(seen.contains(want), msg="missing \{want}")
+  assert_true(seen.contains("comment/doc"))
+  assert_true(seen.contains("operation_property/output"))
+  for row in @traversal.kind_table() {
+    let key = "\{row.0}/\{row.1}"
+    assert_true(seen.contains(key), msg="missing \{key}")
   }
 }
 
@@ -359,4 +356,37 @@ test "of_result is None when the parser gives no AST" {
 test "an empty text gives a file node with no comments" {
   guard root_of("") is File(_, comments) else { fail("not a file") }
   assert_eq(comments.length(), 0)
+}
+
+///|
+/// Valid models together exercising every row of the traversal kind table.
+fn kind_roots() -> Array[@traversal.NodeRef] raise {
+  let extras =
+    #|$version: "2"
+    #|namespace kinds
+    #|blob Blob
+    #|boolean Boolean
+    #|document Document
+    #|byte Byte
+    #|short Short
+    #|integer Integer
+    #|long Long
+    #|float Float
+    #|double Double
+    #|bigInteger BigInteger
+    #|timestamp Timestamp
+    #|list List { member: String }
+    #|map Map { key: String value: String }
+    #|union Union { choice: String }
+    #|resource Resource {}
+  let models = [
+    every_form, extras, "namespace kinds\nset Set { member: String }",
+  ]
+  let roots = []
+  for text in models {
+    let result = @parser.parse_text(text)
+    assert_false(result.has_errors())
+    roots.push(@traversal.NodeRef::of_result(result).unwrap())
+  }
+  roots
 }

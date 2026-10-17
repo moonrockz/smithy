@@ -215,3 +215,60 @@ test "150 nested arrays is TOO MUCH NESTING, not a crash" {
   }
   @expect.expect(vcodes(ok.to_string())).to_equal([])
 }
+
+///|
+test "object pairs and trait structure pairs require whitespace" {
+  for
+    text in [
+      "metadata x = {a:\"x\"b:\"y\"}", "namespace a\n@t(a:\"x\"b:\"y\")\nstring S",
+    ] {
+    let r = @parser.parse_text(text)
+    assert_true(r.has_errors(), msg=text)
+  }
+  for sep in [" ", ",", "\n", "// comment\n"] {
+    let r = @parser.parse_text("metadata x = {a:\"x\"" + sep + "b:\"y\"}")
+    assert_false(r.has_errors(), msg=sep)
+  }
+}
+
+///|
+test "huge exact numbers convert to signed infinity, not zero" {
+  for text in ["1e4096", "-1e4096"] {
+    let r = @parser.parse_text("metadata x = " + text)
+    assert_false(r.has_errors())
+    guard r.ast is Some(f) && f.metadata[0].value is Number(n, _) else {
+      fail("no number")
+    }
+    assert_true(
+      if text.has_prefix("-") {
+        n.as_double().is_neg_inf()
+      } else {
+        n.as_double().is_pos_inf()
+      },
+    )
+  }
+}
+
+///|
+test "object and trait separator messages name the construct and offending key" {
+  for
+    (text, construct) in [
+      ("metadata x = {a:\"x\"b:\"y\"}", "an object"),
+      ("namespace a\n@t(a:\"x\"b:\"y\")\nstring S", "a trait body"),
+    ] {
+    let result = @parser.parse_text(text)
+    assert_eq(result.errors().length(), 1)
+    let diagnostic = result.errors()[0]
+    assert_eq(diagnostic.code, "SM-PARSE-003")
+    assert_eq(
+      diagnostic.message,
+      "I was expecting whitespace between entries in \{construct} but found `b`",
+    )
+    assert_true(
+      diagnostic.notes.contains(
+        "I separate entries in \{construct} with whitespace.",
+      ),
+    )
+    assert_true(diagnostic.notes.iter().all(note => !note.contains("member")))
+  }
+}

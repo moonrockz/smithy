@@ -180,3 +180,20 @@ test "law: slice of a line span is the line text and never panics on any span" {
     seed=1010,
   )
 }
+
+///|
+test "law: slice clamps arbitrary endpoints to the text length" {
+  @quickcheck.check(
+    (p : (TextAndOffset, AnyOffset, AnyOffset)) => {
+      let (TextAndOffset(text, _), AnyOffset(a), AnyOffset(b)) = p
+      let span = a.to(b)
+      let n = text.length()
+      let lo = if span.start.0 > n { n } else { span.start.0 }
+      let hi = if span.end().0 > n { n } else { span.end().0 }
+      @span.SourceText::new(text).slice(span) ==
+      text.unsafe_substring(start=lo, end=hi)
+    },
+    count=400,
+    seed=1012,
+  )
+}

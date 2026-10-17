@@ -21,7 +21,7 @@ fn Out::code(self : Out, code : String) -> Unit {
 
 ///|
 fn Out::header(self : Out) -> Unit {
-  self.code(if self.severity is Error { "1;91" } else { "1;93" })
+  self.primary()
 }
 
 ///|
@@ -184,7 +184,16 @@ pub fn render_terminal_to(
   for l in d.labels {
     labels.push(label_for(source, l.span, l.text, false))
   }
-  labels.sort_by(fn(a, b) { a.line.compare(b.line) })
+  let indexed = labels.mapi((i, l) => (i, l))
+  indexed.sort_by((a, b) => {
+    let order = a.1.line.compare(b.1.line)
+    if order == 0 {
+      a.0.compare(b.0)
+    } else {
+      order
+    }
+  })
+  let labels = indexed.map(e => e.1)
   let max_line = labels
     .iter()
     .map(l => l.line.0)
@@ -222,7 +231,9 @@ pub fn render_terminal_to(
       out.border()
       out.write("\{num_pad}\{number} | ")
       out.reset()
-      out.write(source.line_text(l.line).unwrap_or(""))
+      out.write(
+        source.line_text(l.line).unwrap_or("").replace_all(old="\r", new=" "),
+      )
       out.write(
         (
           #|
@@ -260,7 +271,7 @@ pub fn render_terminal_to(
     ),
   )
   out.reset()
-  let body_width = width - gutter - 6
+  let body_width = width - gutter - 3
   for note in d.notes {
     for i, line in reflow(note, body_width) {
       out.border()

@@ -5,6 +5,6 @@ import {
 }
 
 import {
-  "moonrockz/smithy-syntax/lawkit",
+  "moonrockz/smithy-syntax/internal/lawkit",
   "moonbitlang/core/quickcheck",
 } for "test"

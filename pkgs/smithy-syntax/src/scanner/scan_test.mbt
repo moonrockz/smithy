@@ -182,3 +182,15 @@ test "the pipeline stages compose" {
   inspect(s.tokens.length(), content="2")
   inspect(s == stream(text), content="true")
 }
+
+///|
+test "a comma is trivia even without surrounding spaces" {
+  let stream = @scanner.tokenize_text("a,b")
+  assert_eq(stream.tokens.map(t => t.lexeme), ["a", "b"])
+  assert_true(stream.tokens[0].trivia_after[0] is Comma(_))
+  assert_eq(stream.to_source(), "a,b")
+  let only = @scanner.tokenize_text(",")
+  assert_true(only.tokens.is_empty())
+  assert_true(only.trivia[0] is Comma(_))
+  assert_eq(only.to_source(), ",")
+}

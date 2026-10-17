@@ -117,3 +117,34 @@ Feature: Parsing Smithy IDL
     When I parse the model
     Then the diagnostics are "SM-PARSE-007"
     And the first message is "Mixins can only be used with Smithy version 2 or later"
+
+  Scenario: An absent version remains absent
+    Given the Smithy model:
+      """smithy
+      namespace a
+      string S
+      """
+    When I parse the model
+    Then there are no diagnostics
+    And the version is "none"
+
+  Scenario: Object pairs need whitespace
+    Given the Smithy model:
+      """smithy
+      metadata x = {a:"x"b:"y"}
+      """
+    When I parse the model
+    Then the diagnostics are "SM-PARSE-003"
+    And the first title is "MISSING SEPARATOR"
+    And the first message is "I was expecting whitespace between entries in an object but found `b`"
+
+  Scenario: Trait entries need whitespace
+    Given the Smithy model:
+      """smithy
+      namespace a
+      @t(a:"x"b:"y")
+      string S
+      """
+    When I parse the model
+    Then the diagnostics are "SM-PARSE-003"
+    And the first message is "I was expecting whitespace between entries in a trait body but found `b`"

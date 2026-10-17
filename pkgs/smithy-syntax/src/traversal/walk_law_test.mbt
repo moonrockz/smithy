@@ -1,6 +1,7 @@
 ///|
 fn walk_agrees(text : String, p : Policy) -> Bool {
   guard maybe_root(text) is Some(root) else { return true }
+  let p = policy_for(root, p)
   walk_events(root, p) == model(root, p)
 }
 

@@ -47,10 +47,10 @@ test "an unclosed brace still lets the next statement parse" {
   )
   guard r.ast is Some(f) else { fail("no ast") }
   let names = f.shapes().map(s => s.shape.name().value)
-  // `string Foo` is read as a bad member of Bad; recovery resumes at `@deprecated`.
+  // Recovery resumes at the column-1 `string Foo`, then keeps Bar too.
   @expect.expect_all(e => {
     e.expect(r.errors().length()).to_equal(1)
-    e.expect(names.contains("Bar")).to_be_true()
+    e.expect(names).to_equal(["Foo", "Bar"])
     e.expect(r.cst.skipped().length()).to_equal(1)
     e
     .expect(r.cst.to_source().length())
@@ -75,7 +75,7 @@ test "every statement form appears in the CST with its name" {
   @expect.expect(kinds[1]).to_equal("Metadata=foo")
   @expect.expect(kinds[2]).to_equal("Namespace=smithy.example")
   @expect.expect(kinds[3]).to_equal("Use=smithy.api#String")
-  @expect.expect(kinds[4]).to_equal("Shape(Aggregate(Structure))=Foo")
+  @expect.expect(kinds[4]).to_equal("Shape(structure)=Foo")
   @expect.expect(kinds[kinds.length() - 1]).to_equal("Apply=Foo")
 }
 

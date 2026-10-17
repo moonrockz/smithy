@@ -40,6 +40,7 @@ fn walk_leaves(root : @traversal.NodeRef, p : Policy) -> (Array[String], Bool) {
 fn fold_laws(text : String, p : Policy) -> Bool {
   guard maybe_root(text) is Some(root) else { return true }
   // fold's enter and leave order is walk's.
+  let p = policy_for(root, p)
   let same_order = fold_events(root, p) == walk_events(root, p)
   // reduce calls f once per node, in walk's leave order.
   let calls = []
@@ -47,7 +48,7 @@ fn fold_laws(text : String, p : Policy) -> Bool {
     calls.push(tag(n))
     1 + rs.iter().fold(init=0, (a, b) => a + b)
   })
-  let (all_leaves, _) = walk_leaves(root, Policy([Continue]))
+  let (all_leaves, _) = walk_leaves(root, Policy([Continue], None))
   let reduce_order = calls == all_leaves
   // a counting reduce equals a counting fold.
   let counts = count == @traversal.fold(root, 0, (a, _) => (a + 1, Continue))

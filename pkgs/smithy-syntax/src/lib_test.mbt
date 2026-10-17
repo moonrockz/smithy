@@ -36,3 +36,18 @@ test "the root re-exports the traversal" {
   inspect(@syntax.kind_table().length(), content="51")
   inspect(@syntax.NodePath::root().child("shapes", 0), content="shapes[0]")
 }
+
+///|
+test "the facade exposes token parsing, codes and streaming all diagnostics" {
+  let source = @syntax.SourceText::new("namespace a use b#C")
+  let result = @syntax.parse_tokens(@syntax.tokenize(source))
+  assert_eq(result, @syntax.parse(source))
+  assert_true(@syntax.codes().contains(result.diagnostics[0].code))
+  let sink = StringBuilder()
+  @syntax.render_all_to(result.diagnostics, source, sink, color=false)
+  assert_eq(
+    sink.to_string(),
+    @syntax.render_all(result.diagnostics, source, color=false),
+  )
+  assert_eq(source, @syntax.SourceText::new(source.text()))
+}

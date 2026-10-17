@@ -6,7 +6,7 @@ pub struct SourceText {
   priv name : String?
   /// The offset of the first unit of each line; `line_starts[0] == 0`.
   priv line_starts : Array[Int32]
-}
+} derive(Eq, Debug)
 
 ///|
 /// LF and CRLF end a line; a lone CR does not.
@@ -85,9 +85,9 @@ pub fn SourceText::line_span(self : SourceText, line : Line) -> Span? {
   }
   if end > start && self.text.code_unit_at(end - 1).to_int() == '\n'.to_int() {
     end -= 1
-  }
-  if end > start && self.text.code_unit_at(end - 1).to_int() == '\r'.to_int() {
-    end -= 1
+    if end > start && self.text.code_unit_at(end - 1).to_int() == '\r'.to_int() {
+      end -= 1
+    }
   }
   Some(Offset(start).to(Offset(end)))
 }

@@ -77,6 +77,7 @@ fn Parser::claim_v1_report(self : Parser) -> Bool {
 /// control statement might have been `$version: "2"`, so gating on 1.0
 /// would be reporting an error we can't actually back up. Reports once per
 /// file: after the first, later 2.0-only constructs pass silently.
+/// Resource properties use the same gate but report without raising.
 fn Parser::require_v2(
   self : Parser,
   feature : String,

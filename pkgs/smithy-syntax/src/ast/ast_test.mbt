@@ -31,10 +31,8 @@ test "keywords map to shape kinds" {
     e.expect(@ast.SimpleType::Timestamp.keyword()).to_equal("timestamp")
     e
     .expect(@ast.ShapeKind::Aggregate(Structure).to_string())
-    .to_equal("Aggregate(Structure)")
-    e
-    .expect(@ast.ShapeKind::Simple(String).to_string())
-    .to_equal("Simple(string)")
+    .to_equal("structure")
+    e.expect(@ast.ShapeKind::Simple(String).to_string()).to_equal("string")
   })
 }
 
@@ -76,4 +74,18 @@ test "a shape reports its name and kind" {
   )
   inspect(s.name().value, content="Foo")
   debug_inspect(s.kind(), content="Simple(String)")
+}
+
+///|
+test "every shape keyword round trips through ShapeKind" {
+  for
+    keyword in [
+      "blob", "boolean", "document", "string", "byte", "short", "integer", "long",
+      "float", "double", "bigInteger", "bigDecimal", "timestamp", "enum", "intEnum",
+      "list", "map", "union", "structure", "set", "service", "resource", "operation",
+    ] {
+    let kind = @ast.ShapeKind::of(keyword).unwrap()
+    assert_eq(kind.keyword(), keyword)
+    assert_eq(kind.to_string(), keyword)
+  }
 }

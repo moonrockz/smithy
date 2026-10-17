@@ -283,13 +283,17 @@ fn Parser::recover_member(self : Parser, start_pos : Int32) -> Bool {
 }
 
 ///|
-/// The `WS` between two members: the grammar is `ShapeMembers = "{" [WS]
+/// The `WS` between members or object/trait entries. `construct` gives
+/// entries their own diagnostic wording. For members, the grammar is `ShapeMembers = "{" [WS]
 /// *(ShapeMember [WS]) "}"`, and `WS = 1*(SP / NL / Comment / Comma)`, so
 /// any whitespace at all separates members (unlike a statement's `BR`,
 /// members do not need a line break, a comment or a comma specifically:
 /// `enum A { FOO BAR BAZ }` and `map H { key: String value: String }` are
 /// both valid, with members separated only by a space).
-fn Parser::expect_member_br(self : Parser) -> Unit raise ParseError {
+fn Parser::expect_separator(
+  self : Parser,
+  construct? : String,
+) -> Unit raise ParseError {
   guard self.pos > 0 else { return }
   guard self.peek() is Some(next) else { return }
   let prev = self.tokens[self.pos - 1]
@@ -299,9 +303,18 @@ fn Parser::expect_member_br(self : Parser) -> Unit raise ParseError {
     self.fail(
       "SM-PARSE-003",
       "MISSING SEPARATOR",
-      "I was expecting whitespace here but found \{self.found()}",
+      match construct {
+        Some(what) =>
+          "I was expecting whitespace between entries in \{what} but found \{self.found()}"
+        None => "I was expecting whitespace here but found \{self.found()}"
+      },
       next.span,
-      notes=["Each member must be separated from the next by whitespace."],
+      notes=[
+        match construct {
+          Some(what) => "I separate entries in \{what} with whitespace."
+          None => "Each member must be separated from the next by whitespace."
+        },
+      ],
       hint="Put a space before `\{next.lexeme}`.",
     )
   }
@@ -364,7 +377,7 @@ fn[T] Parser::parse_block_items(
           if strict {
             self.expect_br()
           } else {
-            self.expect_member_br()
+            self.expect_separator()
           }
         }
       }
@@ -431,15 +444,7 @@ fn Parser::parse_member(self : Parser) -> @ast.Member raise ParseError {
   // A column-1 shape keyword after a member's leading traits means those
   // traits belong to the *next* shape, not to a member here: the block
   // was left open, not a member with an odd name.
-  if self.at_block_breaking_statement(self.pos) {
-    self.fail(
-      "SM-PARSE-001",
-      "UNFINISHED SHAPE",
-      "I was reading a member and found \{self.found()} at the start of a line; did you forget `}`?",
-      self.here(),
-      hint="Close the block with `}` before the next statement.",
-    )
-  }
+  self.check_unfinished("UNFINISHED SHAPE", "a member")
   let (name, target) : (@ast.Node[String], @ast.MemberTarget) = if self.at_kind(
       Dollar,
     ) {
@@ -603,7 +608,7 @@ fn Parser::parse_inline_shape(
   self.push_context("an inline shape", walrus.span)
   let members = self.parse_members("the inline shape")
   self.pop_context()
-  let end = self.tokens[self.pos - 1].span.end()
+  let end = self.previous_end()
   {
     docs: docs[:],
     traits: traits[:],
@@ -664,7 +669,7 @@ fn Parser::parse_operation_body(
           ignore(self.expect_kind(Colon, "`:` or `:=` after `\{key.lexeme}`"))
           Reference(self.parse_shape_id())
         }
-        let end = self.tokens[self.pos - 1].span.end()
+        let end = self.previous_end()
         let span = key.span.start.to(end)
         props.push(
           if key.lexeme == "input" {
@@ -716,7 +721,7 @@ fn Parser::parse_operation_body(
         )
     }
     if !self.at_kind(RBrace) {
-      self.expect_member_br()
+      self.expect_separator()
     }
   }
   self.detach_docs_before(self.here().start)
@@ -839,7 +844,7 @@ fn Parser::parse_shape(
     }
   }
   self.pop_context()
-  let end = self.tokens[self.pos - 1].span.end()
+  let end = self.previous_end()
   { docs: docs[:], traits: traits[:], shape, span: start.to(end), }
 }
 
@@ -881,7 +886,7 @@ fn Parser::parse_apply(
     ([self.parse_trait()], false)
   }
   self.pop_context()
-  let end = self.tokens[self.pos - 1].span.end()
+  let end = self.previous_end()
   { target, traits: traits[:], block, span: start.to(end), }
 }
 
