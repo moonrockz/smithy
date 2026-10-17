@@ -38,3 +38,6 @@ Feature: Publish to mooncakes.io
 
   Scenario: The two copies of the publish list agree
     Then the publish list is the one in release.mbtx
+
+  Scenario: Smithy publishes its own modules after the tool migration
+    Then the published modules are "moonrockz/smithy-syntax, moonrockz/smithy, moonrockz/smithy-cli"

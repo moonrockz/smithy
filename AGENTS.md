@@ -114,7 +114,7 @@ Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every 
     (`mise run release:assets`). It needs `build-windows`.
   - `smoke` runs `smithy version` from each archive on a runner of its own OS.
   - `publish` (`release:credentials`, `release:publish`) publishes the modules in `scripts/publish.mbtx`:
-    `pkgs/smithy-syntax`, `pkgs/smithy`, `apps/smithy` and `apps/zig-cross`. It needs the `MOONCAKES_USER_TOKEN` org secret. It runs after
+    `pkgs/smithy-syntax`, `pkgs/smithy` and `apps/smithy`. It needs the `MOONCAKES_USER_TOKEN` org secret. It runs after
     `smoke`, because a mooncakes.io version is permanent.
   - `release` (`release:notes`, `release:github`) creates the tag and the GitHub release with the 8 assets.
 - A pull request that changes a release file, and a manual run with `dry_run`, run `plan`, `validate`, `build-windows`,
@@ -125,9 +125,14 @@ Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every 
   `publish` skips a version that is already published. `release` uploads only the missing assets. A retry after a
   partial run therefore continues where it stopped. Network calls also retry 3 times (waits of 5, 20 and 60 s).
   They do not retry after a 401, 403 or 409. For any other failure, run `mise run release:status` first.
-- The zig cross-build is the module `apps/zig-cross` (`moonrockz/zig-cross`). The wrappers add `-D_CRT_RAND_S` and,
-  for each named target, drop the host-only simdutf and libbacktrace objects. See `apps/zig-cross/README.md`.
+- The zig cross-build uses the published `moonrockz/zig-cross` tool, maintained in
+  [moonrockz/moonx-tools](https://github.com/moonrockz/moonx-tools/tree/main/apps/zig-cross).
+  `scripts/zig-cross.mbtx` owns the exact package pin, independently of Smithy's release version.
   `mise run build:cross` builds some targets, and `mise run test:native-zig` runs the native tests with zig.
+  The wrappers add `-D_CRT_RAND_S` and drop host-only simdutf and libbacktrace objects for named targets.
+  Fix and release tool changes in moonx-tools, verify the published version, then update the launcher pin here.
+  Smithy publishes only its own modules. Release status reads each tag's original publication list, including
+  zig-cross for older releases that published it.
 - Write commit and pull request titles for the changelog: the squash-merge title is the changelog line.
 
 ## Work tracking

@@ -1,0 +1,31 @@
+///|
+/// Run the published zig-cross tool at one pinned version, independent of Smithy's version.
+///
+/// Usage: `moonx scripts/zig-cross.mbtx <zig-cross args...>`.
+/// The mise tasks `build:cross` and `test:native-zig` share this launcher.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let zig_cross_package : String = "moonrockz/zig-cross@0.1.2"
+
+///|
+async fn main {
+  let args = [zig_cross_package]
+  args.append(@env.args()[1:].to_owned())
+  let code = @process.run(
+    "moonx",
+    args,
+    stdin=@stdio.stdin,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  if code != 0 {
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+}

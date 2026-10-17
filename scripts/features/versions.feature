@@ -107,12 +107,12 @@ Feature: One version across the workspace
     Then the mismatches are "b/moon.mod: found 0.1.0, expected 0.0.1"
 
   Scenario: A version string in a source file
-    Given a file "apps/zig-cross/cli_wbtest.mbt" with the text:
+    Given a file "pkgs/smithy/smithy_test.mbt" with the text:
       """
-      inspect(version_text(), content="zig-cross 0.1.0")
+      inspect(@smithy.version(), content="0.1.0")
       """
     When I look for versions other than "0.0.1"
-    Then the mismatches are "apps/zig-cross/cli_wbtest.mbt: found 0.1.0, expected 0.0.1"
+    Then the mismatches are "pkgs/smithy/smithy_test.mbt: found 0.1.0, expected 0.0.1"
 
   Scenario: An unrelated version-like string in a version file is left alone
     Given a file "pkgs/smithy-syntax/src/lib.mbt" with the text:
