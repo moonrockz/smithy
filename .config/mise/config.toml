@@ -193,3 +193,7 @@ run = "moonx scripts/publish.mbtx"
 [tasks."test:cli"]
 description = "Exercise CLI file I/O, pipes, diagnostics, formatting and conversion (args: targets)"
 run = "moonx scripts/test-cli.mbtx"
+
+[tasks."test:changelog"]
+description = "Check that generated changelogs preserve wrapped migration text"
+run = "moonx scripts/test-changelog.mbtx"

@@ -33,7 +33,7 @@ body = """
 {% if breaking | length > 0 and previous.version %}
 ### ⚠️ Breaking changes
 {% for commit in breaking %}
-- {% if commit.scope %}*({{ commit.scope }})* {% endif %}{{ commit.breaking_description | split(pat="\n") | first | trim | upper_first }}\
+- {% if commit.scope %}*({{ commit.scope }})* {% endif %}{{ commit.breaking_description | split(pat="\n\n") | first | replace(from="\n", to=" ") | trim | upper_first }}\
 {% if commit.remote.pr_number %} ([#{{ commit.remote.pr_number }}]({{ self::repo() }}/pull/{{ commit.remote.pr_number }})){% endif %}
 {%- endfor %}
 {% endif -%}

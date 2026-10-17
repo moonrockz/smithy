@@ -165,3 +165,11 @@ Fix: use the updated reader, which joins formatter-wrapped tuples before parsing
 Cause: an older stdin guard also skipped file fixtures and conversion checks.
 Fix: use the updated script. Only the stdin pipe check is skipped; file checks still run.
 The skipped-stdin regression uses fresh fixtures so old output cannot hide this failure.
+
+## Changelog generation
+
+**The breaking-change line stops halfway through a migration sentence**
+Cause: an older template took only the first physical line of a wrapped footer.
+Fix: use the updated template, which joins the first paragraph of the footer.
+For an already prepared release, restore the complete migration text in CHANGELOG.md,
+then run `mise run release:refresh`. `mise run test:changelog` checks the real template offline.

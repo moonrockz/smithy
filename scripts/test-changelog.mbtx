@@ -1,0 +1,83 @@
+///|
+/// Render a synthetic wrapped breaking-change footer through the real template.
+/// Run from the repository root: mise run test:changelog.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+}
+
+///|
+async fn verify(root : String) -> Unit {
+  let description = "Move Piece and Step to scanner, and Depth and\nParseError to parser.\n\nRefs fixture-1"
+  let identity : Json = {
+    "name": "Test",
+    "email": "test@example.com",
+    "timestamp": 0,
+  }
+  let commit : Map[String, Json] = {
+    "id": "0123456789012345678901234567890123456789",
+    "message": "move syntax helpers",
+    "raw_message": Json::string(
+      "fix(syntax)!: move syntax helpers\n\nBREAKING CHANGE: " + description,
+    ),
+    "group": "Bug fixes",
+    "breaking_description": Json::string(description),
+    "breaking": true,
+    "conventional": true,
+    "merge_commit": false,
+    "links": [],
+    "author": identity,
+    "committer": identity,
+  }
+  let previous : Map[String, Json] = {
+    "version": "v0.0.1",
+    "commits": [],
+    "submodule_commits": {},
+  }
+  let release : Map[String, Json] = {
+    "version": "v0.1.0",
+    "timestamp": 0,
+    "commits": Json::array([Json::object(commit)]),
+    "previous": Json::object(previous),
+    "submodule_commits": {},
+  }
+  for provider in ["github", "gitlab", "gitea", "bitbucket", "azure_devops"] {
+    commit[provider] = {
+      "pr_numbers": [],
+      "pr_labels": [],
+      "is_first_time": false,
+    }
+    previous[provider] = { "contributors": [] }
+    release[provider] = { "contributors": [] }
+  }
+  let dir = "\{root}/.dev/out/changelog-tests"
+  @fs.mkdir(dir, recursive=true, allow_exist=true)
+  let context = "\{dir}/context.json"
+  @fs.write_file(context, Json::array([Json::object(release)]).stringify())
+  let (code, out, err) = @process.collect_output(
+    "git-cliff",
+    ["--offline", "--config", "\{root}/cliff.toml", "--from-context", context],
+    cwd=root,
+  )
+  assert_eq(code, 0, msg=err.text())
+  let notes = out.text()
+  assert_true(
+    notes.contains(
+      "Move Piece and Step to scanner, and Depth and ParseError to parser.",
+    ),
+    msg=notes,
+  )
+  assert_false(notes.contains("Refs fixture-1"), msg=notes)
+}
+
+///|
+async fn main {
+  verify(@fs.realpath("."))
+  println("Changelog template checks passed")
+}
+
+///|
+async test "wrapped breaking-change footer retains its migration text" {
+  verify(@fs.realpath(".."))
+}
