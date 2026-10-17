@@ -94,11 +94,11 @@ impl @moonspec.World for TraversalWorld with fn configure(self, setup) {
       }
     }
   })
-  setup.then0("every child's parent is the node it came from", fn() raise {
+  setup.then0("every child's parent is the identical node it came from", fn() raise {
     let tree = self.the_tree()
     for n in every_node(tree.root()) {
       for c in n.children() {
-        if tree.parent(c) != Some(n) {
+        if tree.parent(c).map(parent => same_node(parent, n)) != Some(true) {
           fail("wrong parent for \{node_tag(c)}")
         }
       }
@@ -128,7 +128,8 @@ impl @moonspec.World for TraversalWorld with fn configure(self, setup) {
         guard tree.node_at(n.span().start) is Some(m) else {
           fail("nothing at \{node_tag(n)}")
         }
-        if m != n && !tree.ancestors(m).contains(n) {
+        if !same_node(m, n) &&
+          !tree.ancestors(m).iter().any(parent => same_node(parent, n)) {
           fail("node_at(\{node_tag(n)}) gives \{node_tag(m)}")
         }
       }
@@ -229,4 +230,31 @@ async test "traversal feature" {
     ]),
   )
   |> ignore
+}
+
+///|
+/// Compare AST object identity even when child enumeration rebuilds wrappers.
+fn same_node(a : @syntax.NodeRef, b : @syntax.NodeRef) -> Bool {
+  match (a, b) {
+    (File(x, _), File(y, _)) => physical_equal(x, y)
+    (Control(x), Control(y)) => physical_equal(x, y)
+    (Metadata(x), Metadata(y)) => physical_equal(x, y)
+    (Namespace(x), Namespace(y)) => physical_equal(x, y)
+    (Use(x), Use(y)) => physical_equal(x, y)
+    (Shape(x), Shape(y)) => physical_equal(x, y)
+    (Apply(x), Apply(y)) => physical_equal(x, y)
+    (Inline(x), Inline(y)) => physical_equal(x, y)
+    (Mixins(x), Mixins(y)) => physical_equal(x, y)
+    (Member(x), Member(y)) => physical_equal(x, y)
+    (EnumMember(x), EnumMember(y)) => physical_equal(x, y)
+    (Property(x), Property(y)) => physical_equal(x, y)
+    (Trait(x), Trait(y)) => physical_equal(x, y)
+    (Value(x), Value(y)) => physical_equal(x, y)
+    (Entry(x), Entry(y)) => physical_equal(x, y)
+    (ShapeIdRef(x), ShapeIdRef(y)) => physical_equal(x, y)
+    (Name(x), Name(y)) => physical_equal(x, y)
+    (Doc(x), Doc(y)) => physical_equal(x, y)
+    (Comment(x), Comment(y)) => physical_equal(x, y)
+    _ => false
+  }
 }

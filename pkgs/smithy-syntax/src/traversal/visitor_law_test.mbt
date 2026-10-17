@@ -4,7 +4,7 @@
 struct Recorder {
   policy : Policy
   events : Array[String]
-  methods : Array[(String, String)]
+  methods : Array[(String, String, String)]
   mut k : Int32
 }
 
@@ -15,7 +15,7 @@ fn Recorder::visit(
   n : @traversal.NodeRef,
 ) -> @traversal.Control {
   self.events.push("+" + tag(n))
-  self.methods.push((n.category(), method))
+  self.methods.push((n.category(), n.kind(), method))
   self.k = self.k + 1
   decide(self.policy, self.k - 1)
 }
@@ -83,10 +83,11 @@ fn method_of(category : String) -> String {
 ///|
 fn accept_agrees(text : String, p : Policy) -> Bool {
   guard maybe_root(text) is Some(root) else { return true }
+  let p = policy_for(root, p)
   let r = { policy: p, events: [], methods: [], k: 0, }
   @traversal.accept(root, r)
   r.events == walk_events(root, p) &&
-  r.methods.iter().all(m => m.1 == method_of(m.0))
+  r.methods.iter().all(m => m.2 == method_of(m.0))
 }
 
 ///|
@@ -110,16 +111,21 @@ test "law: accept agrees with walk and calls the method of each category" {
 }
 
 ///|
-test "every category of the kind table has a method" {
-  let r = { policy: Policy([Continue]), events: [], methods: [], k: 0, }
-  @traversal.accept(root_of(every_form), r)
-  let seen : Set[String] = Set([])
-  for m in r.methods {
-    seen.add(m.0)
+test "every kind table row reaches its visitor method" {
+  let seen : Map[String, String] = Map([])
+  for root in kind_roots() {
+    let r = { policy: Policy([Continue], None), events: [], methods: [], k: 0, }
+    @traversal.accept(root, r)
+    for (category, kind, method) in r.methods {
+      assert_eq(method, method_of(category), msg="\{category}/\{kind}")
+      seen["\{category}/\{kind}"] = method
+    }
   }
   for row in @traversal.kind_table() {
-    if row.0 != "comment" || row.1 == "line" {
-      assert_true(seen.contains(row.0), msg="no node of \{row.0} reached")
-    }
+    assert_eq(
+      seen.get("\{row.0}/\{row.1}"),
+      Some(method_of(row.0)),
+      msg="\{row.0}/\{row.1}",
+    )
   }
 }

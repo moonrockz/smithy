@@ -21,6 +21,7 @@ impl @traversal.Handler for Steered with fn on_leave(self, e) {
 ///|
 fn events_agree(text : String, p : Policy) -> Bool {
   guard maybe_root(text) is Some(root) else { return true }
+  let p = policy_for(root, p)
   let expected = walk_projection(root, p)
   let h = { policy: p, events: [], k: 0, }
   @traversal.push_events(@traversal.EventReader::new(root), h)
@@ -71,7 +72,7 @@ fn events_locate(text : String) -> Bool {
         if o.path != e.path || o.depth != e.depth {
           return false
         }
-        guard e.path.resolve(root) is Some(n) && n == e.node else {
+        guard e.path.resolve(root) is Some(n) && same_node(n, e.node) else {
           return false
         }
       }

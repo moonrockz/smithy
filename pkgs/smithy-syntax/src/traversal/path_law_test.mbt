@@ -106,7 +106,7 @@ fn paths_resolve(text : String) -> Bool {
   // Every node's path, built by an explicit stack, resolves back to it.
   let stack = [(root, @traversal.NodePath::root())]
   while stack.pop() is Some((n, path)) {
-    guard path.resolve(root) is Some(m) && m == n else { return false }
+    guard path.resolve(root) is Some(m) && same_node(m, n) else { return false }
     for x in n.children_with_fields() {
       stack.push((x.1, path.child(x.0.field, x.0.index)))
     }

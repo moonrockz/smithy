@@ -5,7 +5,7 @@ fn at_or_below(
   a : @traversal.NodeRef,
   b : @traversal.NodeRef,
 ) -> Bool {
-  a == b || tree.ancestors(a).iter().any(x => x == b)
+  same_node(a, b) || tree.ancestors(a).iter().any(x => same_node(x, b))
 }
 
 ///|
@@ -21,9 +21,16 @@ fn tree_laws(text : String) -> Bool {
     let kids = n.children_with_fields()
     let parents = kids
       .iter()
-      .all(x => tree.parent(x.1) == Some(n) && tree.step(x.1) == Some(x.0))
+      .all(x => {
+        tree.parent(x.1).map(parent => same_node(parent, n)) == Some(true) &&
+        tree.step(x.1) == Some(x.0)
+      })
     // node_path resolves to the node.
-    let path = tree.node_path(n).bind(p => p.resolve(root)) == Some(n)
+    let path = tree
+      .node_path(n)
+      .bind(p => p.resolve(root))
+      .map(resolved => same_node(resolved, n)) ==
+      Some(true)
     // node_at at the start finds the node or a descendant.
     let at = n.span().is_empty() ||
       (tree.node_at(n.span().start) is Some(m) && at_or_below(tree, m, n))

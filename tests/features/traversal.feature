@@ -8,7 +8,7 @@ Feature: Traversing the Smithy IDL syntax tree
     Given the TCK case "<case>"
     When I build the syntax tree
     Then every child lies inside its parent, in source order
-    And every child's parent is the node it came from
+    And every child's parent is the identical node it came from
     And every node's fields match the kind table
     And node_at at the start of every node finds that node or a descendant
     And walk, fold, reduce, the event reader and the cursor enter the same nodes

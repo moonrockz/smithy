@@ -110,3 +110,15 @@ test "a node from another parse of the same text is not in the tree" {
   let own = tree.root().field("shapes")[2].field("members")[0]
   assert_eq(tree.root().field("shapes")[2].field_of(own), Some("members"))
 }
+
+///|
+test "identity checks reject equal nodes from another parse for every node variant" {
+  let own = all_nodes(root_of(every_form))
+  let other = all_nodes(root_of(every_form))
+  assert_eq(own.length(), other.length())
+  for i, node in own {
+    assert_eq(node, other[i])
+    assert_true(same_node(node, node))
+    assert_false(same_node(node, other[i]), msg=tag(node))
+  }
+}
