@@ -45,6 +45,24 @@ fn strings(value : @smithy.NodeValue) -> String raise {
 
 ///|
 impl @moonspec.World for ModelWorld with fn configure(self, setup) {
+  setup.then0("converting the model to IDL and back preserves the JSON AST", fn() raise {
+    let model = self.model()
+    let loader = @smithy.Loader::new()
+    for ns, text in model.to_idl() {
+      loader.add_idl(ns + ".smithy", text) |> ignore
+    }
+    let result = loader.assemble()
+    assert_false(result.has_errors())
+    assert_eq(
+      @syntax.encode_json_ast(result.model.unwrap().to_json_ast()),
+      @syntax.encode_json_ast(model.to_json_ast()),
+    )
+  })
+  setup.then1("IDL conversion emits {int} namespace files", fn(
+    count : Int32,
+  ) raise {
+    assert_eq(self.model().to_idl().length(), count)
+  })
   setup.given2("the IDL model file {string}:", fn(
     name : String,
     doc : @moonspec.DocString,

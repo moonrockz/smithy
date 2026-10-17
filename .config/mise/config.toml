@@ -189,3 +189,7 @@ run = "moonx scripts/credentials.mbtx"
 [tasks."release:publish"]
 description = "Publish the public modules to mooncakes.io with retries; a version already published counts as done (CI only)"
 run = "moonx scripts/publish.mbtx"
+
+[tasks."test:cli"]
+description = "Exercise CLI file I/O, pipes, diagnostics, formatting and conversion (args: targets)"
+run = "moonx scripts/test-cli.mbtx"

@@ -1,0 +1,170 @@
+///|
+/// Exercise the built CLI, including real stdin pipes, diagnostics, file writes
+/// and conversions. Scratch inputs stay under .dev/out/cli-tests/.
+/// Usage: mise run test:cli -- [native wasm js wasm-gc]
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+struct Runner {
+  target : String
+  executable : String
+  prefix : Array[String]
+  dir : String
+}
+
+///|
+async fn Runner::command(
+  self : Runner,
+  args : Array[String],
+  expected : Int32,
+  input? : String,
+) -> (String, String) {
+  let all = self.prefix.copy()
+  all.append(args)
+  let (code, out, err) = match input {
+    None => @process.collect_output(self.executable, all, cwd=self.dir)
+    Some(text) =>
+      @async.with_task_group(group => {
+        let (stdin, writer) = @process.write_to_process()
+        group.spawn_bg(() => {
+          defer writer.close()
+          writer.write(text)
+        })
+        @process.collect_output(self.executable, all, cwd=self.dir, stdin~)
+      })
+  }
+  assert_eq(
+    code,
+    expected,
+    msg="\{self.target}: \{args.join(" ")}\n\{err.text()}",
+  )
+  (out.text().replace_all(old="\r\n", new="\n"), err.text())
+}
+
+///|
+async fn exercise(root : String, target : String) -> Unit {
+  let (code, _, err) = @process.collect_output(
+    "moon",
+    ["build", "apps/smithy", "--target", target, "--release", "--deny-warn"],
+    cwd=root,
+  )
+  guard code == 0 else { fail("CLI build failed: \{err.text()}") }
+  let stem = "\{root}/_build/\{target}/release/build/moonrockz/smithy-cli/smithy-cli"
+  let dir = "\{root}/.dev/out/cli-tests/\{target}"
+  @fs.mkdir(dir, recursive=true, allow_exist=true)
+  let executable = if target == "native" {
+    stem + ".exe"
+  } else if target == "js" {
+    "node"
+  } else {
+    "moonrun"
+  }
+  let prefix = if target == "native" {
+    []
+  } else if target == "js" {
+    [stem + ".js"]
+  } else {
+    [stem + ".wasm", "--"]
+  }
+  let runner : Runner = { target, executable, prefix, dir, }
+  let input = "$version: \"2\"\nmetadata values = [9007199254740993]\nnamespace example\n// comment\nstructure  Example {\nname : String\n}\n"
+  @fs.write_file("\{dir}/input.smithy", input)
+  @fs.write_file(
+    "\{dir}/broken.smithy",
+    "$version: \"2\"\nnamespace example\nstructure Broken { x: Missing }",
+  )
+  @fs.write_file("\{dir}/syntax.smithy", "structure {")
+  let (out, _) = runner.command(["version"], 0)
+  assert_true(out.has_prefix("smithy "))
+  runner.command(["--help"], 0) |> ignore
+  runner.command(["unknown"], 2) |> ignore
+  runner.command(["convert", "input.smithy"], 2) |> ignore
+  runner.command(["ast", "missing.smithy"], 1) |> ignore
+  let (out, stderr) = runner.command(["validate", "broken.smithy"], 1)
+  let err = if target == "wasm-gc" { out + stderr } else { stderr }
+  assert_true(err.contains("SM-MODEL-004") && err.contains("broken.smithy:3:"))
+  runner.command(["validate", "syntax.smithy"], 1) |> ignore
+  let (ast, _) = runner.command(["ast", "input.smithy"], 0)
+  assert_true(ast.contains("9007199254740993"))
+  // Test an actual pipe, including multiple chunks and non-ASCII UTF-8.
+  if target != "wasm-gc" || @env.get_env_var("OS") != Some("Windows_NT") {
+    let (piped, _) = runner.command(
+      ["ast", "--from", "idl", "-"],
+      0,
+      input="// 🐟\n".repeat(2000) + input,
+    )
+    assert_eq(@json.parse(piped), @json.parse(ast))
+    runner.command(
+      ["convert", "--to", "json", "-o", "model.json", "input.smithy"],
+      0,
+    )
+    |> ignore
+    runner.command(
+      ["convert", "--to", "idl", "-o", "restored.smithy", "model.json"],
+      0,
+    )
+    |> ignore
+    let (roundtrip, _) = runner.command(["ast", "restored.smithy"], 0)
+    assert_eq(@json.parse(roundtrip), @json.parse(ast))
+    runner.command(["validate", "input.smithy", "model.json"], 0) |> ignore
+    runner.command(["format", "--check", "input.smithy"], 1) |> ignore
+    let (formatted, _) = runner.command(["format", "input.smithy"], 0)
+    assert_true(formatted.contains("// comment"))
+    runner.command(["format", "--write", "input.smithy"], 0) |> ignore
+    assert_eq(@fs.read_file("\{dir}/input.smithy").text(), formatted)
+    runner.command(["format", "--check", "input.smithy"], 0) |> ignore
+    runner.command(["format", "--write", "input.smithy", "syntax.smithy"], 1)
+    |> ignore
+    assert_eq(@fs.read_file("\{dir}/input.smithy").text(), formatted)
+    @fs.write_file(
+      "\{dir}/other.json",
+      "{\"smithy\":\"2\",\"shapes\":{\"other#Name\":{\"type\":\"string\"}}}",
+    )
+  }
+  runner.command(["convert", "--to", "idl", "model.json", "other.json"], 2)
+  |> ignore
+  runner.command(
+    [
+      "convert", "--to", "idl", "--output-dir", "idl", "model.json", "other.json",
+    ],
+    0,
+  )
+  |> ignore
+  assert_true(@fs.exists("\{dir}/idl/example.smithy"))
+  assert_true(@fs.exists("\{dir}/idl/other.smithy"))
+  runner.command(["validate", "idl/example.smithy", "idl/other.smithy"], 0)
+  |> ignore
+  println("CLI checks passed: \{target}")
+}
+
+///|
+async fn main {
+  let targets = @env.args()[1:].to_owned()
+  let targets = if targets.is_empty() {
+    ["native", "wasm", "js", "wasm-gc"]
+  } else {
+    targets
+  }
+  let root = @fs.realpath(".")
+  for target in targets {
+    guard ["native", "wasm", "js", "wasm-gc"].contains(target) else {
+      eprintln("Unknown target: \{target}")
+      @sys.exit(2)
+    }
+    exercise(root, target)
+  }
+}
+
+///|
+async test "native and moonx Wasm CLI behavior" {
+  let root = @fs.realpath("..")
+  exercise(root, "native")
+  exercise(root, "wasm")
+}

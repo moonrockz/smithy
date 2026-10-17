@@ -8,7 +8,8 @@ The Smithy IDL 2.0 syntax layer (scanner, AST, CST, parser with recovery, diagno
 and the typed JSON AST codec are implemented in `pkgs/smithy-syntax` and checked
 against the Java reference's loader corpus. `pkgs/smithy` assembles IDL and JSON
 files into a semantic model with the prelude, reference resolution, mixins,
-trait applications and metadata merging. CLI commands are the next sub-project.
+trait applications and metadata merging. The CLI assembles, validates, formats and
+converts IDL and JSON models. See [CLI usage](apps/smithy/README.md).
 
 ## Packages
 
@@ -51,13 +52,19 @@ Each [GitHub release](https://github.com/moonrockz/smithy/releases) has 8 assets
 | `smithy-gc.wasm` | The CLI for the MoonBit `wasm-gc` target |
 | `checksums.txt` | SHA-256 of the other 7 assets |
 
+Run the CLI module from mooncakes.io without installing a native binary:
+
+```shell
+moonx moonrockz/smithy-cli@latest --help
+```
+
 The binary is at the root of each archive. Check a download with `sha256sum -c checksums.txt`.
 
 The two wasm files are not WASI programs. They import MoonBit host functions from the module
 `__moonbit_fs_unstable` (`args_get`, `begin_read_string` and others). A runtime must provide these functions
 to run the file.
 
-- `smithy.wasm` also imports `wasi_snapshot_preview1.fd_write`. It exports `memory` and `_start`.
+- `smithy.wasm` also imports `wasi_snapshot_preview1.fd_write` and `fd_read`. It exports `memory` and `_start`.
 - `smithy-gc.wasm` needs a runtime with WebAssembly GC. It also imports `spectest.print_char`, a test host
   function, and exports `_start`.
 
@@ -106,6 +113,7 @@ mise run format                # moon fmt
 mise run validate              # package structure against moon.work
 mise run test                  # all targets; the tests module runs on js and native only
 mise run test -- js native     # some targets
+mise run test:cli              # built CLI behavior on native, wasm, js and wasm-gc
 mise run test:bdd              # moonspec acceptance features (tests/bdd, js target)
 mise run tck:vendor:json -- REF # refresh the vendored JSON AST reference corpus
 mise run prelude:vendor -- REF # refresh the embedded standard prelude

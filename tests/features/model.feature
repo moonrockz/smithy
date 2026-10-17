@@ -124,3 +124,22 @@ Feature: Semantic model assembly
     When I assemble the semantic model
     Then the model diagnostics include "SM-MODEL-006"
     And no semantic model is returned
+
+  Scenario: Convert mixed IDL and JSON inputs back to IDL without changing the model
+    Given the IDL model file "example.smithy":
+      """smithy
+      $version: "2"
+      metadata numbers = [9007199254740993]
+      namespace example
+      @mixin
+      structure Base { @required name: String }
+      structure Request with [Base] { result: other#Result }
+      """
+    And the JSON model file "other.json":
+      """json
+      {"smithy":"2","shapes":{"other#Result":{"type":"structure","members":{"value":{"target":"smithy.api#String"}}}}}
+      """
+    When I assemble the semantic model
+    Then the model has no errors
+    And converting the model to IDL and back preserves the JSON AST
+    And IDL conversion emits 2 namespace files

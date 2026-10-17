@@ -2,5 +2,19 @@ pkgtype(kind: "executable")
 
 import {
   "moonrockz/smithy",
+  "moonrockz/smithy-syntax" @syntax,
   "moonbitlang/core/env",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x/fs",
+  "moonbitlang/x/sys",
 }
+
+options(
+  "native-stub": [ "stdin_native.c" ],
+  targets: {
+    "stdin_native.mbt": [ "native" ],
+    "stdin_js.mbt": [ "js" ],
+    "stdin_wasm.mbt": [ "wasm" ],
+    "stdin_wasm_gc.mbt": [ "wasm-gc" ],
+  },
+)

@@ -226,6 +226,8 @@ fn release_notes(version : Version, section : String) -> String {
 /// `scripts/publish.mbtx` keeps the same list.
 let publish_list : Array[(String, String)] = [
   ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
+  ("pkgs/smithy", "moonrockz/smithy"),
+  ("apps/smithy", "moonrockz/smithy-cli"),
   ("apps/zig-cross", "moonrockz/zig-cross"),
 ]
 

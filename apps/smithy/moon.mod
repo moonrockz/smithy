@@ -10,6 +10,12 @@ license = "Apache-2.0"
 
 readme = "README.md"
 
+preferred_target = "wasm"
+
+keywords = [ "smithy", "command-line", "moonx", "idl", "json" ]
+
 import {
   "moonrockz/smithy@0.0.1",
+  "moonrockz/smithy-syntax@0.0.1",
+  "moonbitlang/x@0.5.5",
 }
