@@ -8,11 +8,11 @@ is 0.x, a minor release can contain breaking changes.
 
 ## [0.1.0] - 2026-10-17
 
-<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+Smithy now assembles mixed IDL and JSON files into a semantic model and converts models in either direction. The CLI adds `ast`, `validate`, `format` and `convert`, and runs through `moonx moonrockz/smithy-cli@0.1.0`. Formatting preserves IDL comments; conversion emits flattened Smithy 2 models with exact numbers and one file per namespace. Parsing now rejects adjacent object and trait entries and reports corrected recovery locations. When upgrading from 0.0.1, import `Piece` and `Step` from `scanner`, and `Depth` and `ParseError` from `parser`; `ShapeKind` display now uses IDL keywords, and test helpers moved from `lawkit` to `internal/lawkit`.
 
 ### ⚠️ Breaking changes
 
-- *(syntax)* Import Piece and Step from scanner, and Depth and ([#11](https://github.com/moonrockz/smithy/pull/11))
+- *(syntax)* Import `Piece` and `Step` from `scanner`, and `Depth` and `ParseError` from `parser`. `ShapeKind` display uses IDL keywords. Test helpers moved from `lawkit` to `internal/lawkit`. ([#11](https://github.com/moonrockz/smithy/pull/11))
 
 ### 🚀 Features
 
