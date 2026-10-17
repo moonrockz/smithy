@@ -1,6 +1,6 @@
 ///|
-/// Cases whose line does not match yet, with the reason. `is_skipped`
-/// excuses only the line comparison (and, for a recovery case, the
+/// Cases whose position does not match yet, with the reason. `is_skipped`
+/// excuses only the position comparison (and, for a recovery case, the
 /// "still yields shapes" clause) - never the "produces at least one
 /// error" check, which every invalid and recovery case must pass
 /// regardless. Shrink this list; never grow it without a note on beads
@@ -108,6 +108,65 @@ fn is_skipped(path : String) -> Bool {
 }
 
 ///|
+/// Column conventions that differ from Java. Lines and message facts still
+/// apply. Each exception names the construct we underline instead.
+let column_differences : Array[(String, String)] = [
+  (
+    "invalid/control/control-version-defined-twice.smithy", "duplicate key span instead of end of value",
+  ),
+  (
+    "invalid/version/version-set-more-than-once.smithy", "duplicate key span instead of end of value",
+  ),
+  (
+    "invalid/version/unsupported-version.smithy", "whole version string instead of closing quote",
+  ),
+  (
+    "invalid/mixins/with-but-no-ids.smithy", "whole empty mixin clause instead of closing bracket",
+  ),
+  (
+    "invalid/parse-errors/absolute-shape-name.smithy", "whole invalid name instead of its dot",
+  ),
+  (
+    "invalid/parse-errors/shape-name-syntax.smithy", "whole invalid name instead of its dot",
+  ),
+  (
+    "invalid/parse-errors/shape-name-syntax3.smithy", "invalid underscore instead of following space",
+  ),
+  (
+    "invalid/use/use-invalid-namespace.smithy", "missing member after dollar instead of dollar",
+  ),
+  (
+    "invalid/use/use-missing-namespace.smithy", "whole namespace instead of following newline",
+  ),
+  (
+    "invalid/strings/invalid-escape-apostrophe.smithy", "escape span instead of opening quote",
+  ),
+  (
+    "invalid/strings/invalid-escape-space.smithy", "escape span instead of opening quote",
+  ),
+  (
+    "invalid/strings/invalid-unicode-escape.smithy", "escape span instead of opening quote",
+  ),
+  (
+    "invalid/strings/invalid-unicode-escape2.smithy", "escape span instead of opening quote",
+  ),
+  (
+    "invalid/strings/invalid-unicode-escape3.smithy", "escape span instead of opening quote",
+  ),
+  (
+    "invalid/strings/invalid-unicode-escape4.smithy", "escape span instead of opening quote",
+  ),
+  (
+    "invalid/strings/invalid-unicode-escape5.smithy", "escape span instead of opening quote",
+  ),
+]
+
+///|
+fn column_differs(path : String) -> Bool {
+  column_differences.iter().any(e => e.0 == path)
+}
+
+///|
 test "every valid case parses with no error" {
   let failures : Array[String] = []
   for c in @tck.cases() {
@@ -122,7 +181,101 @@ test "every valid case parses with no error" {
 }
 
 ///|
-test "every invalid case produces an error on the reference's line" {
+/// Facts shared by Java's token-oriented messages and our construct-oriented
+/// prose. Every recognized fact must occur, even when positions are excused.
+fn message_facts(path : String, reference : String) -> Array[Array[String]] {
+  // These inputs fail at different grammar checks. Compare the shared
+  // offending construct rather than the reference's later expectation.
+  match path {
+    "invalid/parse-errors/absolute-shape-name.smithy" =>
+      return [["com.foo#Bam"], ["name"]]
+    "invalid/parse-errors/shape-name-syntax.smithy" =>
+      return [["Not...Valid"], ["dot"]]
+    "invalid/parse-errors/shape-name-syntax3.smithy" =>
+      return [["`_`"], ["character"]]
+    "invalid/parse-errors/syntax-error-token.smithy" =>
+      return [["`!`"], ["character"]]
+    "invalid/traits/annotation-unclosed-object1.smithy" =>
+      return [["MyString"], ["trait"]]
+    "invalid/strings/text-block-invalid-unicode.smithy" =>
+      return [["\\u"], ["four hex digits"]]
+    "invalid/metadata/invalid-unquoted-shape-id.smithy" =>
+      return [["member name"], ["`$`"]]
+    "invalid/parse-errors/expected-shape-name-but-eof.smithy" =>
+      return [["shape name"], ["end of the file"]]
+    _ => ()
+  }
+  let facts : Array[Array[String]] = []
+  for
+    (needle, alternatives) in [
+      ("line break", ["line break", "same line", "newline"]),
+      ("whitespace", ["whitespace", "space"]),
+      ("Invalid number", ["number"]),
+      ("unicode", ["\\u", "unicode"]),
+      ("Invalid escape", ["escape"]),
+      ("text block", ["text block", "opening `\"\"\"`"]),
+      ("Duplicate control", ["control"]),
+      ("Duplicate control", ["Duplicate", "duplicate"]),
+      ("statement `version`", ["version"]),
+      ("Duplicate operation", ["operation"]),
+      ("Duplicate operation", ["Duplicate", "duplicate"]),
+      ("operation input", ["input"]),
+      ("conflicting member", ["member"]),
+      ("conflicting member", ["conflicting", "duplicate"]),
+      ("`BAR`", ["`BAR`"]),
+      ("Unsupported Smithy version", ["version"]),
+      ("number: 999", ["999"]),
+      ("version 2 or later", ["version 2", "IDL 2"]),
+      ("namespace definition", ["namespace"]),
+      ("Traits applied to apply", ["shape", "apply"]),
+      ("EOF", ["end of the file", "closing", "unterminated"]),
+      ("Expected COLON", ["`:`"]),
+      ("Expected LBRACE", ["`{`", "{..."]),
+      ("Expected RBRACE", ["`}`"]),
+      ("Expected LBRACKET", ["`[`", "[..."]),
+      ("Expected RPAREN", ["`)`"]),
+      ("Expected EQUAL", ["`=`"]),
+      ("Expected IDENTIFIER", ["identifier", "name", "mixin", "statement"]),
+      ("Expected SPACE", ["whitespace", "same line", "line break"]),
+      ("Expected POUND", ["`#`", "member name after `$`"]),
+      ("found NEWLINE", ["line break", "same line", "namespace", "shape name"]),
+      ("found COMMENT", ["line break", "same line", "comment"]),
+      ("found LPAREN", ["`(`"]),
+      ("found POUND", ["`#`"]),
+      ("found DOLLAR", ["`$`"]),
+      ("found COLON", ["`:`"]),
+      ("found EQUAL", ["`=`"]),
+      ("found WALRUS", ["`:=`"]),
+      ("found DOT", ["`.`", "dot", "namespace"]),
+      ("Unexpected character", ["character"]),
+      ("one of STRING", ["value", "array"]),
+      ("one of LBRACE", ["value"]),
+      ("one of RBRACE", ["key"]),
+      ("one of IDENTIFIER", ["key"]),
+    ] {
+    if reference.contains(needle) {
+      facts.push(alternatives)
+    }
+  }
+  // The invalid numeric lexeme and unknown character are concrete facts.
+  if reference.find("Invalid number '") is Some(i) {
+    facts.push([reference[i + 16:].split("':").next().unwrap().to_owned()])
+  }
+  if reference.find("Unexpected character: '") is Some(i) {
+    facts.push([reference[i + 23:i + 24].to_owned()])
+  }
+  // Unknown type names and found identifier lexemes are facts too.
+  if reference.find("Unknown shape type: ") is Some(i) {
+    facts.push([reference[i + 20:].split(" | ").next().unwrap().to_owned()])
+  }
+  if reference.find("found IDENTIFIER('") is Some(i) {
+    facts.push([reference[i + 18:].split("')").next().unwrap().to_owned()])
+  }
+  facts
+}
+
+///|
+test "every invalid case matches reference positions and message facts" {
   let failures : Array[String] = []
   for c in @tck.cases() {
     guard c.kind is Invalid(line~, column~, message~) else { continue }
@@ -148,14 +301,36 @@ test "every invalid case produces an error on the reference's line" {
       )
       continue
     }
+    if !message.is_empty() {
+      let d = errs[0]
+      let prose = d.message +
+        " " +
+        d.notes.join(" ") +
+        " " +
+        d.hint.unwrap_or("") +
+        " " +
+        d.example.unwrap_or("")
+      let facts = message_facts(c.path, message)
+      if facts.is_empty() {
+        failures.push("\{c.path}: no reference facts extracted from \{message}")
+      }
+      for alternatives in facts {
+        if !alternatives.iter().any(fact => prose.contains(fact)) {
+          failures.push(
+            "\{c.path}: reference fact \{alternatives.join(" or ")} absent from \{prose}",
+          )
+        }
+      }
+    }
     // Semantic cases (line 0) only need some error; syntax cases must match
-    // the line, unless skipped (a known position-reporting difference).
+    // the line and column, unless skipped (a known position-reporting difference).
     if line > 0 && !is_skipped(c.path) {
       let p = source.position(errs[0].span.start)
-      if p.line.0 != line {
+      if p.line.0 != line ||
+        (column > 0 && !column_differs(c.path) && p.column.0 != column) {
         let rendered = @syntax.render_short(errs[0], source)
         failures.push(
-          "\{c.path}: expected line \{line} (\{message}) but got \{rendered}",
+          "\{c.path}: expected position \{line}:\{column} (\{message}) but got \{rendered}",
         )
       }
     }
