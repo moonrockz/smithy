@@ -6,6 +6,18 @@ is 0.x, a minor release can contain breaking changes.
 
 <!-- git-cliff: end of header -->
 
+## [0.1.1] - 2026-10-17
+
+The Smithy CLI now uses `moonbitlang/core/argparse` for command-specific help and standard option syntax. Use `smithy help convert`, `smithy convert --help` or `-h` to see a command's options; inline forms such as `--to=json` and `-omodel.json` are supported. Release publishing now retries temporary moonx asset availability failures, and generated migration notes preserve wrapped text.
+
+### 🐛 Bug fixes
+
+- *(release)* Preserve wrapped migration notes ([#15](https://github.com/moonrockz/smithy/pull/15)) by @DamianReeves
+- *(release)* Retry moonx asset availability ([#16](https://github.com/moonrockz/smithy/pull/16)) by @DamianReeves
+- *(cli)* Use argparse for command help ([#17](https://github.com/moonrockz/smithy/pull/17)) by @DamianReeves
+
+**Full changelog**: https://github.com/moonrockz/smithy/compare/v0.1.0...v0.1.1
+
 ## [0.1.0] - 2026-10-17
 
 Smithy now assembles mixed IDL and JSON files into a semantic model and converts models in either direction. The CLI adds `ast`, `validate`, `format` and `convert`, and runs through `moonx moonrockz/smithy-cli@0.1.0`. Formatting preserves IDL comments; conversion emits flattened Smithy 2 models with exact numbers and one file per namespace. Parsing now rejects adjacent object and trait entries and reports corrected recovery locations. When upgrading from 0.0.1, import `Piece` and `Step` from `scanner`, and `Depth` and `ParseError` from `parser`; `ShapeKind` display now uses IDL keywords, and test helpers moved from `lawkit` to `internal/lawkit`.
