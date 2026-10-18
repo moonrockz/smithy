@@ -1,5 +1,6 @@
 members = [
   ".",
+  "./pkgs/jmespath",
   "./pkgs/smithy",
   "./pkgs/smithy-syntax",
   "./apps/smithy",

@@ -9,14 +9,16 @@ and the typed JSON AST codec are implemented in `pkgs/smithy-syntax` and checked
 against the Java reference's loader corpus. `pkgs/smithy` assembles IDL and JSON
 files into a semantic model with the prelude, reference resolution, mixins,
 trait applications and metadata merging. It includes the `smithy.contracts#conditions`
-schema and validates its targets, names and required fields. JMESPath analysis is
-planned as a separate public package that Smithy will use. The CLI assembles, validates, formats and
+schema and validates its targets, names and required fields. `pkgs/jmespath`
+provides a standalone JMESPath parser and evaluator; Smithy-specific static
+analysis is planned separately. The CLI assembles, validates, formats and
 converts IDL and JSON models. See [CLI usage](apps/smithy/README.md).
 
 ## Packages
 
 | Path | Module | Purpose |
 |------|--------|---------|
+| `pkgs/jmespath` | `moonrockz/jmespath` | JMESPath parser, inspectable AST and JSON evaluator |
 | `pkgs/smithy` | `moonrockz/smithy` | Semantic model and multi-file IDL/JSON loader |
 | `pkgs/smithy-syntax` | `moonrockz/smithy-syntax` | Smithy IDL scanner, AST, CST, parser and diagnostics |
 | `docs/cookbook` | `moonrockz/smithy_cookbook` | Tested cookbook articles for the syntax module |
@@ -119,6 +121,7 @@ mise run test:cli              # built CLI behavior on native, wasm, js and wasm
 mise run test:bdd              # moonspec acceptance features (tests/bdd, js target)
 mise run tck:vendor:json -- REF # refresh the vendored JSON AST reference corpus
 mise run prelude:vendor -- REF # refresh the embedded prelude and contract traits
+mise run jmespath:vendor -- REF # refresh the embedded JMESPath compliance suite
 mise run build                 # all targets
 mise run build:native          # native release build
 mise run clean
@@ -150,6 +153,7 @@ smithy/
 ├── lefthook.yml               # git hooks
 ├── apps/smithy/               # CLI (moonrockz/smithy-cli)
 ├── pkgs/smithy/               # library (moonrockz/smithy)
+├── pkgs/jmespath/             # JMESPath parser and evaluator (moonrockz/jmespath)
 ├── pkgs/smithy-syntax/        # IDL syntax (moonrockz/smithy-syntax)
 ├── docs/cookbook/             # tested cookbook articles (moonrockz/smithy_cookbook)
 ├── tests/                     # compatibility kit and acceptance features (moonrockz/smithy_tests)

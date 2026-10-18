@@ -120,10 +120,10 @@ applied to a data shape or member. Services, operations and resources are invali
 targets. Empty condition maps are valid. Expressions and CommonMark documentation
 survive mixin inheritance, external `apply` and IDL/JSON conversion unchanged.
 
-Expressions are currently opaque strings. JMESPath syntax checking, static type
-analysis and evaluation are not implemented. A public `moonrockz/jmespath` package
-is planned, with Smithy contract analysis built on it. Serialization does not
-evaluate contracts.
+Expressions are currently opaque strings to Smithy. The public
+[`moonrockz/jmespath`](../jmespath/README.mbt.md) package provides standalone
+parsing and evaluation; Smithy contract syntax checking and static type analysis
+will build on it in a separate change. Serialization does not evaluate contracts.
 
 ## Diagnostics
 

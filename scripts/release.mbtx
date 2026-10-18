@@ -225,6 +225,7 @@ fn release_notes(version : Version, section : String) -> String {
 /// The packages that the Release workflow publishes to mooncakes.io, with their module names.
 /// `scripts/publish.mbtx` keeps the same list.
 let publish_list : Array[(String, String)] = [
+  ("pkgs/jmespath", "moonrockz/jmespath"),
   ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
   ("pkgs/smithy", "moonrockz/smithy"),
   ("apps/smithy", "moonrockz/smithy-cli"),
