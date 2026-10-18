@@ -54,8 +54,10 @@ any diagnostics. Reference resolution, mixin expansion, trait application and
 metadata merging follow the model library's rules.
 
 The `smithy.contracts#conditions` trait is included. Validation checks its
-targets, condition names and required string fields. JMESPath syntax and static
-analysis are planned separately. Conversion preserves expressions and
+targets, condition names and required string fields, then analyzes JMESPath
+syntax, modeled member references, function arguments and boolean result types.
+Diagnostics identify the condition and its expression-relative location.
+Conversion preserves expressions and
 documentation without evaluating contracts.
 
 IDL output uses Smithy 2, absolute references and flattened inherited contents.
