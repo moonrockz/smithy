@@ -240,7 +240,7 @@ test "condition names follow the upstream ASCII pattern" {
   }
   loaded(
     @smithy.Loader::new().add_idl(
-      "names.smithy", "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n@conditions({A: {expression: \"@\", documentation: \"\"}, ABC123def: {expression: \"@\", documentation: \"\"}})\nstring S",
+      "names.smithy", "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n@conditions({A: {expression: \"`true`\", documentation: \"\"}, ABC123def: {expression: \"`true`\", documentation: \"\"}})\nstring S",
     ),
   )
   |> ignore

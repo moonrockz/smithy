@@ -218,3 +218,41 @@ Feature: Semantic model assembly
       | Check       | {expression: "@", documentation: false}       |
       | "lowercase" | {expression: "@", documentation: "ok"}        |
       | "Has-dash"  | {expression: "@", documentation: "ok"}        |
+
+  Scenario Outline: Reject invalid JMESPath contract expressions during assembly
+    Given the IDL model file "analysis.smithy":
+      """smithy
+      $version: "2"
+      namespace example
+      use smithy.contracts#conditions
+      @conditions(Check: {expression: "<expression>", documentation: "A contract."})
+      structure Request { name: String, count: Integer }
+      """
+    When I assemble the semantic model
+    Then the model diagnostics include "<code>"
+    And no semantic model is returned
+    And the model errors name source "analysis.smithy"
+
+    Examples:
+      | expression                      | code         |
+      | name[                          | SM-MODEL-015 |
+      | missing == `null`              | SM-MODEL-016 |
+      | length(count) > `0`            | SM-MODEL-016 |
+      | starts_with(name)              | SM-MODEL-016 |
+      | unknown(name) == `true`        | SM-MODEL-016 |
+      | name                          | SM-MODEL-017 |
+
+  Scenario: Analyze contracts without enforcing their truth during conversion
+    Given the IDL model file "false.smithy":
+      """smithy
+      $version: "2"
+      namespace example
+      use smithy.contracts#conditions
+      @conditions(Never: {expression: "`false`", documentation: "A runtime condition."})
+      boolean Flag
+      structure Request { flag: Flag = true }
+      """
+    When I assemble the semantic model
+    Then the model has no errors
+    And the assembled model exports and reloads unchanged
+    And converting the model to IDL and back preserves the JSON AST

@@ -16,5 +16,8 @@ pub fn diagnostic_codes() -> Array[(String, String)] {
     ("SM-MODEL-012", "Unresolved elided member"),
     ("SM-MODEL-013", "Unresolved apply target"),
     ("SM-MODEL-014", "Built-in model redefinition"),
+    ("SM-MODEL-015", "Invalid JMESPath condition syntax"),
+    ("SM-MODEL-016", "Invalid JMESPath condition operation"),
+    ("SM-MODEL-017", "Non-boolean condition expression"),
   ]
 }
