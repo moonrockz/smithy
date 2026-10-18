@@ -6,6 +6,22 @@ is 0.x, a minor release can contain breaking changes.
 
 <!-- git-cliff: end of header -->
 
+## [0.2.0] - 2026-10-18
+
+<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+
+### 🚀 Features
+
+- Support Smithy contract traits ([#21](https://github.com/moonrockz/smithy/pull/21)) by @DamianReeves
+- Add public JMESPath parser and evaluator ([#22](https://github.com/moonrockz/smithy/pull/22)) by @DamianReeves
+- Analyze JMESPath contract conditions ([#23](https://github.com/moonrockz/smithy/pull/23)) by @DamianReeves
+
+### 🏗️ Build and CI
+
+- Consume zig-cross from moonx-tools ([#20](https://github.com/moonrockz/smithy/pull/20)) by @DamianReeves
+
+**Full changelog**: https://github.com/moonrockz/smithy/compare/v0.1.1...v0.2.0
+
 ## [0.1.1] - 2026-10-17
 
 The Smithy CLI now uses `moonbitlang/core/argparse` for command-specific help and standard option syntax. Use `smithy help convert`, `smithy convert --help` or `-h` to see a command's options; inline forms such as `--to=json` and `-omodel.json` are supported. Release publishing now retries temporary moonx asset availability failures, and generated migration notes preserve wrapped text.
