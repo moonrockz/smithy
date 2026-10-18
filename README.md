@@ -10,8 +10,9 @@ against the Java reference's loader corpus. `pkgs/smithy` assembles IDL and JSON
 files into a semantic model with the prelude, reference resolution, mixins,
 trait applications and metadata merging. It includes the `smithy.contracts#conditions`
 schema and validates its targets, names and required fields. `pkgs/jmespath`
-provides a standalone JMESPath parser and evaluator; Smithy-specific static
-analysis is planned separately. The CLI assembles, validates, formats and
+provides a standalone JMESPath parser and evaluator. Smithy checks contract
+expression syntax, member references, function arguments and boolean result
+types during assembly. The CLI assembles, validates, formats and
 converts IDL and JSON models. See [CLI usage](apps/smithy/README.md).
 
 ## Packages

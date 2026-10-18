@@ -1,6 +1,7 @@
 warnings = "-reserved_keyword"
 
 import {
+  "moonrockz/jmespath",
   "moonrockz/smithy-syntax" @syntax,
   "moonbitlang/core/json",
 }

@@ -120,10 +120,34 @@ applied to a data shape or member. Services, operations and resources are invali
 targets. Empty condition maps are valid. Expressions and CommonMark documentation
 survive mixin inheritance, external `apply` and IDL/JSON conversion unchanged.
 
-Expressions are currently opaque strings to Smithy. The public
-[`moonrockz/jmespath`](../jmespath/README.mbt.md) package provides standalone
-parsing and evaluation; Smithy contract syntax checking and static type analysis
-will build on it in a separate change. Serialization does not evaluate contracts.
+Assembly parses expressions with the public
+[`moonrockz/jmespath`](../jmespath/README.mbt.md) package. Static analysis checks
+member references, collection operations, function names, arity and argument
+types, including expression references such as `sort_by(items, &name)`. A
+condition must have a boolean result type. Both logical branches are checked.
+`ends_with(name, 'suffix')` has a boolean type even when it would return false.
+
+Types follow the [Smithy JMESPath data model](https://smithy.io/2.0/additional-specs/waiters.html#jmespath-data-model).
+Timestamps are numbers, blobs and enums are strings, and members use their
+Smithy names rather than `jsonName` wire names. Map keys and document contents
+are dynamic. Recursive shapes expand only when a field or collection operation
+needs their type; analysis uses an explicit stack. Mixed element or branch
+types can become unknown. Unknown data permits operations that cannot be
+disproved, but an unknown final result does not establish a boolean contract.
+This analysis does not prove that a condition will hold for runtime values.
+
+Syntax errors use `SM-MODEL-015`, invalid operations and function calls use
+`SM-MODEL-016`, and non-boolean results use `SM-MODEL-017`. Invalid ordering
+comparisons produce a warning because JMESPath evaluates them to null; a null
+final result also produces `SM-MODEL-017`. Other static failures prevent
+assembly. These errors cover upstream `ConditionsTraitValidator` errors and
+danger events using this library's existing Error/Warning severities.
+
+Diagnostics retain the owning shape's source location and add a JSON Pointer
+to the condition's expression. The message contains the condition name,
+expression-relative line and column, and UTF-16 offsets. Expression offsets
+are never treated as offsets into the enclosing IDL or JSON file.
+Serialization and default-value validation do not evaluate contracts.
 
 ## Diagnostics
 

@@ -15,5 +15,6 @@ readme = "README.mbt.md"
 warnings = "-implicit_impl_as_method"
 
 import {
+  "moonrockz/jmespath@0.1.1",
   "moonrockz/smithy-syntax@0.1.1",
 }

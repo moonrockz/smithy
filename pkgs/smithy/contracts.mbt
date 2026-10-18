@@ -17,9 +17,9 @@ fn valid_condition_name(name : String) -> Bool {
 
 ///|
 /// Check the contract-specific rules that are not covered by schema validation.
-/// Expressions remain opaque strings until a JMESPath analyzer is available.
 fn Assembly::validate_conditions(
   self : Assembly,
+  model : Model,
   owner : Shape,
   value : NodeValue,
 ) -> Unit {
@@ -32,9 +32,10 @@ fn Assembly::validate_conditions(
       owner.source,
       shape=owner.id.to_string(),
     )
+    return
   }
   guard value is Object(conditions) else { return }
-  for name, _ in conditions {
+  for name, condition in conditions {
     if !valid_condition_name(name) {
       self.problem(
         "SM-MODEL-011",
@@ -42,6 +43,10 @@ fn Assembly::validate_conditions(
         owner.source,
         shape=owner.id.to_string(),
       )
+    }
+    if condition is Object(fields) &&
+      fields.get("expression") is Some(String(expression)) {
+      self.analyze_condition(model, owner, name, expression)
     }
   }
 }

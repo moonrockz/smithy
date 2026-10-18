@@ -234,7 +234,7 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
       } else {
         self.validate_value(model, trait_id, value, shape, trait_id.to_string())
         if trait_id.to_string() == "smithy.contracts#conditions" {
-          self.validate_conditions(shape, value)
+          self.validate_conditions(model, shape, value)
         }
       }
     }
