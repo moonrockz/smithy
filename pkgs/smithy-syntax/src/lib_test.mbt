@@ -1,6 +1,6 @@
 ///|
 test "the module reports its version" {
-  inspect(@syntax.version(), content="0.1.1")
+  inspect(@syntax.version(), content="0.2.0")
 }
 
 ///|
