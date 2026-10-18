@@ -8,7 +8,7 @@ is 0.x, a minor release can contain breaking changes.
 
 ## [0.2.0] - 2026-10-18
 
-<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+Smithy now loads `smithy.contracts#conditions` and validates JMESPath syntax, modeled member references, function arguments, and boolean results during assembly. The new `moonrockz/jmespath` package exposes standalone parsing, an inspectable AST with source spans, JSON evaluation, and diagnostics with source locations. IDL/JSON conversion preserves contract expressions and documentation. Serialization does not evaluate contracts. Existing models without contract traits need no changes.
 
 ### 🚀 Features
 
