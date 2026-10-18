@@ -40,7 +40,8 @@ fn Model::export_member(self : Model, id : ShapeId) -> Json raise BuildError {
 ///|
 /// Serialize the assembled graph to a flattened JSON AST. Mixins remain
 /// available as shape provenance in memory; their inherited contents are
-/// explicit in this representation. The standard prelude is omitted by default.
+/// explicit in this representation. Built-in prelude and contract definitions
+/// are omitted unless include_prelude is true.
 pub fn Model::to_json_ast(
   self : Model,
   include_prelude~ : Bool = false,
@@ -48,7 +49,7 @@ pub fn Model::to_json_ast(
   let shapes : Map[String, Json] = Map([])
   for id, shape in self.shapes {
     if id.member is Some(_) ||
-      (!include_prelude && shape.source.file == "<prelude>") {
+      (!include_prelude && is_builtin_source(shape.source.file)) {
       continue
     }
     let fields : Map[String, Json] = {

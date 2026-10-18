@@ -98,6 +98,11 @@ fn location(
 }
 
 ///|
+fn is_builtin_source(name : String) -> Bool {
+  name == "<prelude>" || name == "<contracts>"
+}
+
+///|
 fn pointer(text : String) -> String {
   text.replace_all(old="~", new="~0").replace_all(old="/", new="~1")
 }
@@ -250,8 +255,8 @@ fn Assembly::add_shape(self : Assembly, raw : RawShape) -> Unit {
     return
   }
   if self.raw.get(raw.id) is Some(old) {
-    if old.source.file == "<prelude>" && raw.source.file != "<prelude>" {
-      // An exported document can include the standard prelude. Compare its
+    if is_builtin_source(old.source.file) && !is_builtin_source(raw.source.file) {
+      // An exported document can include built-in definitions. Compare their
       // assembled contents below without merging user changes into it.
       self.duplicates.push((old, raw))
       return
@@ -383,15 +388,18 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
   let assembly = Assembly::new()
   let idls : Array[(String, @syntax.IdlFile)] = []
   let jsons : Array[(String, @syntax.JsonAst)] = []
-  let inputs = [ModelInput::Idl(name="<prelude>", text=prelude_text())]
+  let inputs = [
+    ModelInput::Idl(name="<prelude>", text=prelude_text()),
+    ModelInput::Idl(name="<contracts>", text=contracts_text()),
+  ]
   for input in self.inputs {
     let name = match input {
       Idl(name~, ..) | Json(name~, ..) | Ast(name~, ..) => name
     }
-    if name == "<prelude>" {
+    if is_builtin_source(name) {
       assembly.problem(
         "SM-MODEL-001",
-        "I reserve the source name <prelude> for the standard prelude.",
+        "I reserve the source name \{name} for built-in definitions.",
         location(name),
       )
     } else {

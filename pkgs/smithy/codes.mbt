@@ -15,6 +15,6 @@ pub fn diagnostic_codes() -> Array[(String, String)] {
     ("SM-MODEL-011", "Invalid trait application"),
     ("SM-MODEL-012", "Unresolved elided member"),
     ("SM-MODEL-013", "Unresolved apply target"),
-    ("SM-MODEL-014", "Prelude redefinition"),
+    ("SM-MODEL-014", "Built-in model redefinition"),
   ]
 }

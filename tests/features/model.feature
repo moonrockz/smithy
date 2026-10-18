@@ -143,3 +143,78 @@ Feature: Semantic model assembly
     Then the model has no errors
     And converting the model to IDL and back preserves the JSON AST
     And IDL conversion emits 2 namespace files
+
+  Scenario: Load contract conditions and preserve them across model conversion
+    Given the IDL model file "contracts.smithy":
+      """smithy
+      $version: "2"
+      namespace example.logs
+      use smithy.contracts#conditions
+      @conditions({
+          StartBeforeEnd: {
+              expression: "start < end"
+              documentation: "The start time must be **strictly less** than the end time."
+          }
+      })
+      structure FetchLogsInput {
+          @required
+          start: Timestamp
+          @required
+          end: Timestamp
+      }
+      """
+    And the JSON model file "name.json":
+      """json
+      {"smithy":"2.0","shapes":{"example.logs#Name":{"type":"string","traits":{"smithy.contracts#conditions":{"NoKeywords":{"expression":"!contains(@, 'id') && !contains(@, 'name')","documentation":"No reserved keywords."}}}}}}
+      """
+    When I assemble the semantic model
+    Then the model has no errors
+    And the semantic shape "example.logs#FetchLogsInput" has trait "smithy.contracts#conditions"
+    And the semantic shape "example.logs#Name" has trait "smithy.contracts#conditions"
+    And the assembled model exports and reloads unchanged
+    And converting the model to IDL and back preserves the JSON AST
+    And IDL conversion emits 1 namespace files
+
+  Scenario Outline: Reject conditions on service shape kinds
+    Given the IDL model file "target.smithy":
+      """smithy
+      $version: "2"
+      namespace example
+      use smithy.contracts#conditions
+      @conditions
+      <declaration>
+      """
+    When I assemble the semantic model
+    Then the model diagnostics include "SM-MODEL-011"
+    And no semantic model is returned
+    And the model errors name source "target.smithy"
+
+    Examples:
+      | declaration                  |
+      | service S { version: "1" }   |
+      | operation S {}               |
+      | resource S {}                |
+
+  Scenario Outline: Reject malformed condition definitions
+    Given the IDL model file "condition.smithy":
+      """smithy
+      $version: "2"
+      namespace example
+      use smithy.contracts#conditions
+      @conditions({<name>: <value>})
+      string S
+      """
+    When I assemble the semantic model
+    Then the model diagnostics include "SM-MODEL-011"
+    And no semantic model is returned
+    And the model errors name source "condition.smithy"
+
+    Examples:
+      | name        | value                                         |
+      | Check       | {}                                            |
+      | Check       | {expression: "@"}                             |
+      | Check       | {documentation: "description"}                |
+      | Check       | {expression: 1, documentation: "description"} |
+      | Check       | {expression: "@", documentation: false}       |
+      | "lowercase" | {expression: "@", documentation: "ok"}        |
+      | "Has-dash"  | {expression: "@", documentation: "ok"}        |

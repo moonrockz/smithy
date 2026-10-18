@@ -1,4 +1,5 @@
-prelude.smithy and prelude_data.mbt contain the Smithy prelude from
+prelude.smithy, prelude_data.mbt, contracts.smithy and contracts_data.mbt
+contain the Smithy prelude and contract traits from
 https://github.com/smithy-lang/smithy, distributed under Apache-2.0.
 PRELUDE_SHA records the upstream revision.
 

@@ -89,10 +89,15 @@ fn Assembly::apply_roots(self : Assembly) -> Unit {
       )
       continue
     }
-    if id.namespace == "smithy.api" && application.source.file != "<prelude>" {
+    let builtin = self.raw
+      .get(id.root().to_string())
+      .map(r => is_builtin_source(r.source.file))
+      .unwrap_or(false)
+    if (id.namespace == "smithy.api" || builtin) &&
+      !is_builtin_source(application.source.file) {
       self.problem(
         "SM-MODEL-014",
-        "I cannot apply traits to the prelude shape \{id}.",
+        "I cannot apply traits to the built-in shape \{id}.",
         application.source,
         shape=application.target,
       )
@@ -272,7 +277,8 @@ fn Assembly::flatten_one(
       id.member is Some(name) else {
       continue
     }
-    if raw.source.file == "<prelude>" && application.source.file != "<prelude>" {
+    if is_builtin_source(raw.source.file) &&
+      !is_builtin_source(application.source.file) {
       continue
     }
     guard members.get(name) is Some(Object(member_)) else {

@@ -81,8 +81,8 @@ pub fn ShapeBody::keyword(self : ShapeBody) -> String {
 }
 
 ///|
-/// A graph of semantic shapes and metadata. Assembly includes the prelude;
-/// serialization omits it unless explicitly requested.
+/// A graph of semantic shapes and metadata. Assembly includes built-in prelude
+/// and contract definitions; serialization omits them unless explicitly requested.
 pub(all) struct Model {
   shapes : Map[ShapeId, Shape]
   metadata : Map[String, NodeValue]
