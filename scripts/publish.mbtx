@@ -22,6 +22,7 @@ import {
 /// The packages to publish, with their module names, in dependency order. Add a line for each public
 /// module. `scripts/release.mbtx` keeps the same list, and a scenario checks that the two are equal.
 let publish_list : Array[(String, String)] = [
+  ("pkgs/jmespath", "moonrockz/jmespath"),
   ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
   ("pkgs/smithy", "moonrockz/smithy"),
   ("apps/smithy", "moonrockz/smithy-cli"),

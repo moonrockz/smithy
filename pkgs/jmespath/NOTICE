@@ -1,0 +1,4 @@
+compliance/*.json and compliance_data_test.mbt contain the official JMESPath
+compliance suite from https://github.com/jmespath/jmespath.test.
+The upstream README invites implementations to use these tests to verify
+conformance. COMPLIANCE_SHA records the upstream revision.
