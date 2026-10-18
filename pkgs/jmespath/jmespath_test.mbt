@@ -10,6 +10,50 @@ fn error_of(source : String, input : Json) -> @jmespath.Diagnostic raise {
 }
 
 ///|
+test "raw strings reject every C0 control with or without a preceding backslash" {
+  for code in 0..<32 {
+    let control = String::from_array([code.to_char().unwrap()])
+    for escape in ["", "\\"] {
+      let source = "'𝄞" + escape + control + "tail'"
+      let diagnostic = try {
+        @jmespath.parse(source) |> ignore
+        fail("expected a syntax error for " + Json::string(source).stringify())
+      } catch {
+        @jmespath.JmespathError(diagnostic) => diagnostic
+        error => raise error
+      }
+      assert_eq(diagnostic.code, @jmespath.Syntax)
+      let start = 3 + escape.length()
+      assert_eq(diagnostic.span, { start, end: start + 1, })
+      assert_true(diagnostic.message.contains("raw string"))
+    }
+  }
+}
+
+///|
+test "raw string boundaries and textual escapes remain literal" {
+  for
+    value in [
+      "", " ", "\u007f", "\u0085", "\u2028", "𝄞", "line\\nbreak", "\\t", "\\u000a",
+    ] {
+    assert_eq(
+      @jmespath.search("'" + value + "'", Json::null()),
+      Json::string(value),
+    )
+  }
+  assert_eq(@jmespath.search("'it\\'s'", Json::null()), Json::string("it's"))
+  assert_eq(
+    @jmespath.search("`\"line\\nbreak\"`", Json::null()),
+    Json::string("line\nbreak"),
+  )
+  assert_eq(@jmespath.search("`\n123\n`", Json::null()), Json::number(123))
+  assert_eq(
+    @jmespath.search("\"line\\nbreak\"", @json.parse("{\"line\\nbreak\":true}")),
+    Json::boolean(true),
+  )
+}
+
+///|
 test "public AST retains source spans and expression reference arguments" {
   let source = "sort_by(items, &name)"
   let expression = @jmespath.parse(source)
@@ -43,10 +87,6 @@ test "parse errors and evaluation errors identify the failing construct" {
   assert_eq(astral.span, { start: 0, end: 2, })
   assert_true(astral.message.contains("𝄞"))
   assert_eq(error_of("\"foo\"(@)", Json::null()).span, { start: 0, end: 5, })
-  assert_eq(
-    @jmespath.search("'line\nbreak'", Json::null()),
-    Json::string("line\nbreak"),
-  )
   let diagnostic = error_of("length('𝄞') | unknown(@)", Json::null())
   assert_eq(diagnostic.code, @jmespath.UnknownFunction)
   assert_eq(diagnostic.span, { start: 15, end: 25, })

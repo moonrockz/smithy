@@ -1,6 +1,7 @@
 ///|
 test "official JMESPath compliance corpus" {
   let failures : Array[String] = []
+  let grammar_overrides : Set[String] = Set([])
   let mut count = 0
   for (file, text) in compliance_corpus() {
     guard @json.parse(text) is Array(suites) else {
@@ -17,6 +18,25 @@ test "official JMESPath compliance corpus" {
         // Benchmarks have no correctness oracle and are not compliance cases.
         if case_ is { "bench": _, .. } {
           continue
+        }
+        // These two upstream fixtures accept raw newlines, contradicting the
+        // raw-string ABNF's U+0020 lower bound. Exercise them as syntax errors
+        // without modifying the vendored data. See README.mbt.md, Conformance.
+        let case_ = if file == "literal.json" &&
+          (
+            (
+              expression == "'newline\n'" &&
+              case_ is { "result": String("newline\n"), .. }
+            ) ||
+            (expression == "'\n'" && case_ is { "result": String("\n"), .. })
+          ) {
+          grammar_overrides.add(expression)
+          Json::object({
+            "expression": Json::string(expression),
+            "error": "syntax",
+          })
+        } else {
+          case_
         }
         count += 1
         try {
@@ -50,6 +70,7 @@ test "official JMESPath compliance corpus" {
     }
   }
   assert_true(count > 800)
+  assert_eq(grammar_overrides.length(), 2)
   if !failures.is_empty() {
     fail(
       "\{failures.length()} of \{count} compliance cases failed:\n" +

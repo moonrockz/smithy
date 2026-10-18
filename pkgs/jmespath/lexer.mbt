@@ -62,6 +62,13 @@ fn lex(source : String) -> Array[Token] raise JmespathError {
         let at = i
         let current = source.code_unit_at(i)
         i += 1
+        if c == 39 && current < 32 {
+          problem(
+            Syntax,
+            { start: at, end: i, },
+            "I found control character \{Json::string(source[at:i].to_owned()).stringify()} in a JMESPath raw string.",
+          )
+        }
         if current == c {
           contents.write_stringview(source[segment:at])
           closed = true
@@ -70,6 +77,13 @@ fn lex(source : String) -> Array[Token] raise JmespathError {
         if current == 92 && i < source.length() {
           let escaped = source.code_unit_at(i)
           i += 1
+          if c == 39 && escaped < 32 {
+            problem(
+              Syntax,
+              { start: i - 1, end: i, },
+              "I found control character \{Json::string(source[i - 1:i].to_owned()).stringify()} in a JMESPath raw string escape.",
+            )
+          }
           if (c == 39 && escaped == 39) || (c == 96 && escaped == 96) {
             contents.write_stringview(source[segment:at])
             contents.write_stringview(source[i - 1:i])

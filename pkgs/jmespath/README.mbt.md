@@ -73,6 +73,8 @@ limits expression visits to 1,000,000 by default; `max_steps` overrides that lim
 on `search` or `evaluate`. Exceeding an evaluation limit raises `invalid-value`.
 Exceeding the parser nesting limit raises `syntax`. JSON literals must be valid
 JSON; use single quotes for raw string literals.
+Raw strings reject U+0000 through U+001F, including controls after a backslash.
+Textual escapes such as `\n` remain literal backslash-plus-letter sequences.
 
 ## Conformance
 
@@ -80,6 +82,11 @@ The module implements the [JMESPath specification](https://jmespath.org/specific
 and its standard functions. Tests run the vendored
 [official compliance suite](https://github.com/jmespath/jmespath.test) on every
 supported target. Benchmark-only cases are excluded from correctness checks.
+Two `literal.json` cases, `'newline\n'` and `'\n'` with actual newline characters,
+contradict the specification's raw-string ABNF. The runner explicitly expects
+`syntax` for those cases and checks that exactly two overrides are applied.
+All 892 cases still run; the other 890 retain their upstream expectations.
+The vendored JSON and generated embedded corpus remain unchanged.
 `COMPLIANCE_SHA` records the revision; `mise run jmespath:vendor -- <git-ref>`
 refreshes the JSON corpus and its embedded test data for offline test runs.
 
