@@ -48,7 +48,7 @@ fn ContractAnalysis::elements(
   match type_.resolve(self.model) {
     Unknown => [Unknown]
     Array(types, ..) if !object => types
-    Object(fields, additional~) if object => {
+    Object(fields, additional~, ..) if object => {
       let types = fields.values().to_array()
       if additional is Some(type_) {
         types.push(type_)
@@ -69,7 +69,7 @@ fn ContractAnalysis::elements(
 priv enum ContractTask {
   Analyze(@jmespath.Node, ContractType)
   Then(@jmespath.Node)
-  Finish(@jmespath.Node, Int32)
+  Finish(@jmespath.Node, Int32, ContractType)
   Project(@jmespath.Node)
   ProjectionResult(Bool)
   CallbackResult(@jmespath.Node, String, ContractType)
@@ -114,7 +114,12 @@ fn ContractAnalysis::function_result(
   }
   match name {
     "contains" | "starts_with" | "ends_with" => Boolean
-    "abs" | "avg" | "ceil" | "floor" | "length" | "sum" | "to_number" => Number
+    "abs" | "ceil" | "floor" | "length" | "sum" | "to_number" => Number
+    "avg" =>
+      match first {
+        Array(types, ..) if types.is_empty() => Null
+        _ => Number
+      }
     "join" | "to_string" | "type" => String
     "reverse" =>
       match first {
@@ -157,9 +162,16 @@ fn ContractAnalysis::function_result(
     "merge" => {
       let fields : Map[String, ContractType] = Map([])
       let mut additional : ContractType? = None
+      let mut truth : Bool? = Some(false)
       for arg in args {
+        let arg_truth = arg.truth(self.model)
+        if arg_truth == Some(true) {
+          truth = Some(true)
+        } else if arg_truth is None && truth != Some(true) {
+          truth = None
+        }
         match arg.resolve(self.model) {
-          Object(entries, additional=rest) => {
+          Object(entries, additional=rest, ..) => {
             if rest is Some(type_) {
               for key, old in fields {
                 fields[key] = contract_join([old, type_], self.model)
@@ -182,7 +194,7 @@ fn ContractAnalysis::function_result(
           _ => ()
         }
       }
-      Object(fields, additional~)
+      Object(fields, additional~, truth~)
     }
     "map" => Array([Unknown], exact=false)
     _ => Unknown
@@ -206,7 +218,7 @@ fn ContractAnalysis::analyze(
           Literal(value) => values.push(Constant(value))
           Field(name) => {
             let type_ = match input.resolve(self.model) {
-              Object(fields, additional~) =>
+              Object(fields, additional~, ..) =>
                 match fields.get(name) {
                   Some(type_) => type_
                   None =>
@@ -244,22 +256,22 @@ fn ContractAnalysis::analyze(
             tasks.push(Analyze(left, input))
           }
           Index(left, _) | Slice(left, _, _, _) | Flatten(left) | Not(left) => {
-            tasks.push(Finish(node, 1))
+            tasks.push(Finish(node, 1, input))
             tasks.push(Analyze(left, input))
           }
           Binary(_, left, right) => {
-            tasks.push(Finish(node, 2))
+            tasks.push(Finish(node, 2, input))
             tasks.push(Analyze(right, input))
             tasks.push(Analyze(left, input))
           }
           MultiList(nodes) | Function(_, nodes) => {
-            tasks.push(Finish(node, nodes.length()))
+            tasks.push(Finish(node, nodes.length(), input))
             for child in nodes.rev_iter() {
               tasks.push(Analyze(child, input))
             }
           }
           MultiHash(entries) => {
-            tasks.push(Finish(node, entries.length()))
+            tasks.push(Finish(node, entries.length(), input))
             for entry in entries.rev_iter() {
               tasks.push(Analyze(entry.1, input))
             }
@@ -323,7 +335,7 @@ fn ContractAnalysis::analyze(
           values.push(result)
         }
       }
-      Finish(node, count) => {
+      Finish(node, count, input) => {
         let reversed = []
         for _ in 0..<count {
           reversed.push(values.pop().unwrap())
@@ -413,13 +425,23 @@ fn ContractAnalysis::analyze(
             }
             Array(types, exact=false)
           }
-          MultiList(_) => Array(args, exact=true)
+          MultiList(_) =>
+            match input.resolve(self.model) {
+              Null => Null
+              Unknown => Array(args, exact=false)
+              _ => Array(args, exact=true)
+            }
           MultiHash(entries) => {
             let fields : Map[String, ContractType] = Map([])
             for i, entry in entries {
               fields[entry.0] = args[i]
             }
-            Object(fields, additional=None)
+            match input.resolve(self.model) {
+              Null => Null
+              Unknown => Object(fields, additional=None, truth=None)
+              _ =>
+                Object(fields, additional=None, truth=Some(!entries.is_empty()))
+            }
           }
           Function(name, _) => {
             let result = self.function_result(node, name, args)

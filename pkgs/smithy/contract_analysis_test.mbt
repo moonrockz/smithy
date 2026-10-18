@@ -25,6 +25,38 @@ fn contract_ok(result : @smithy.LoadResult) -> Unit raise {
 }
 
 ///|
+test "conditions preserve null aggregates and constructed object truthiness" {
+  for
+    (expression, boolean_result) in [
+      ("avg(`[]`) > `0`", false),
+      ("avg(`[]`) == `null`", true),
+      ("avg(`[1, 2]`) > `0`", true),
+      ("{x: @} && `true`", true),
+      ("{x: @} || `false`", false),
+      ("{x: `null`} && `false`", true),
+      ("merge({x: @}, `{}`) && `true`", true),
+      ("`null` | ([@] || `true`)", true),
+      ("`null` | ({x: @} || `true`)", true),
+    ] {
+    let evaluated = @jmespath.search(expression, Json::string("value"))
+    assert_eq(evaluated is (True | False), boolean_result)
+    let result = contract_case(expression, "string S")
+    if boolean_result {
+      contract_ok(result)
+    } else {
+      assert_true(result.model is None)
+      assert_true(result.diagnostics.iter().any(d => d.code == "SM-MODEL-017"))
+    }
+  }
+  let empty_avg = contract_case("avg(`[]`) > `0`", "string S")
+  assert_true(
+    empty_avg.diagnostics
+    .iter()
+    .any(d => d.code == "SM-MODEL-016" && d.severity == Warning),
+  )
+}
+
+///|
 test "conditions use the Smithy JMESPath data model for all shape kinds" {
   for
     (declaration, expression) in [

@@ -8,7 +8,7 @@ priv enum ContractType {
   Number
   String
   Array(Array[ContractType], exact~ : Bool)
-  Object(Map[String, ContractType], additional~ : ContractType?)
+  Object(Map[String, ContractType], additional~ : ContractType?, truth~ : Bool?)
   Modeled(ShapeId)
   Constant(Json)
   Reference(@jmespath.Node)
@@ -34,7 +34,7 @@ fn ContractType::resolve(self : ContractType, model : Model) -> ContractType {
           Simple(_) | IntEnum(_) => return Number
           List(member_) => return Array([Modeled(member_)], exact=false)
           Map(value~, ..) =>
-            return Object(Map([]), additional=Some(Modeled(value)))
+            return Object(Map([]), additional=Some(Modeled(value)), truth=None)
           Structure(members) | Union(members) => {
             let fields : Map[String, ContractType] = Map([])
             for member_ in members {
@@ -42,7 +42,7 @@ fn ContractType::resolve(self : ContractType, model : Model) -> ContractType {
                 fields[name] = Modeled(member_)
               }
             }
-            return Object(fields, additional=None)
+            return Object(fields, additional=None, truth=None)
           }
           _ => return Unknown
         }
@@ -59,7 +59,7 @@ fn ContractType::resolve(self : ContractType, model : Model) -> ContractType {
             for name, value in values {
               fields[name] = Constant(value)
             }
-            Object(fields, additional=None)
+            Object(fields, additional=None, truth=Some(!fields.is_empty()))
           }
         }
       _ => return current
@@ -124,6 +124,7 @@ fn ContractType::truth(self : ContractType, model : Model) -> Bool? {
     Null => Some(false)
     Number => Some(true)
     Array(types, exact=true) => Some(!types.is_empty())
+    Object(_, truth~, ..) => truth
     _ => None
   }
 }

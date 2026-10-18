@@ -7,6 +7,7 @@ import {
 }
 
 import {
+  "moonrockz/jmespath",
   "moonrockz/smithy",
   "moonrockz/smithy-syntax" @syntax,
   "moonbitlang/core/quickcheck",
