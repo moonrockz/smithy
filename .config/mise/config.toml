@@ -124,7 +124,7 @@ description = "Vendor the Java reference's JSON AST corpus (args: git ref)"
 run = "moonx scripts/vendor-tck.mbtx --json"
 
 [tasks."prelude:vendor"]
-description = "Vendor and embed the official Smithy prelude (args: git ref)"
+description = "Vendor and embed the official Smithy prelude and contract traits (args: git ref)"
 run = "moonx scripts/vendor-prelude.mbtx"
 
 [tasks."test:scripts"]

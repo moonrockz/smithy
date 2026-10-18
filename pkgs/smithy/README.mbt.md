@@ -1,7 +1,8 @@
 # moonrockz/smithy
 
 An in-memory Smithy semantic model and multi-file loader for MoonBit. IDL
-and JSON AST inputs assemble together with the official Smithy prelude.
+and JSON AST inputs assemble together with the official Smithy prelude and
+contract trait definitions.
 
 ## Load a model
 
@@ -32,7 +33,7 @@ test {
 
 Use `add_json(name, text)` for JSON text, `add_ast(name, document)` for a
 typed `@syntax.JsonAst`, or `add(ModelInput)` for an input chosen at runtime.
-Names identify sources in diagnostics; `<prelude>` is reserved.
+Names identify sources in diagnostics; `<prelude>` and `<contracts>` are reserved.
 The loader does no file-system or network I/O. Repeated calls to `assemble`
 build fresh state without changing caller-owned AST documents.
 
@@ -74,7 +75,8 @@ External `apply` entries merge onto shapes and members after their targets
 are known. List-valued traits concatenate; equal values are accepted; other
 collisions fail. Metadata arrays concatenate, equal metadata values are
 accepted, and other metadata collisions fail. Conflicting duplicate shape
-definitions are errors. The prelude cannot be redefined or modified.
+definitions are errors. Built-in prelude and contract definitions cannot be
+redefined or modified.
 
 Inline operation structures receive the `input` or `output` trait, with names
 controlled by `$operationInputSuffix` and `$operationOutputSuffix`. Missing
@@ -86,6 +88,42 @@ Assembly checks reference existence and target kinds, member-name collisions,
 required collection members, enum values, resource cycles and the structure
 of applied trait values. This is model assembly, not a selector engine or a
 runner for configurable Smithy validation plugins.
+
+## Contract traits
+
+The loader includes [`smithy.contracts#conditions`](https://smithy.io/2.0/additional-specs/contract-traits.html).
+Import it with `use smithy.contracts#conditions`, or use its absolute ID.
+It is not an implicitly imported prelude name.
+
+```smithy
+$version: "2"
+namespace example.logs
+use smithy.contracts#conditions
+
+@conditions({
+    StartBeforeEnd: {
+        expression: "start < end"
+        documentation: "The start time must be strictly less than the end time."
+    }
+})
+structure FetchLogsInput {
+    @required
+    start: Timestamp
+    @required
+    end: Timestamp
+}
+```
+
+Assembly checks that each condition has string `expression` and `documentation`
+fields, that condition names match `^[A-Z]+[A-Za-z0-9]*$`, and that the trait is
+applied to a data shape or member. Services, operations and resources are invalid
+targets. Empty condition maps are valid. Expressions and CommonMark documentation
+survive mixin inheritance, external `apply` and IDL/JSON conversion unchanged.
+
+Expressions are currently opaque strings. JMESPath syntax checking, static type
+analysis and evaluation are not implemented. A public `moonrockz/jmespath` package
+is planned, with Smithy contract analysis built on it. Serialization does not
+evaluate contracts.
 
 ## Diagnostics
 
@@ -112,12 +150,13 @@ test {
 ```
 
 `Model::to_json_ast` exports Smithy 2.0 with inherited contents flattened into
-each shape. The prelude is omitted unless `include_prelude=true`. Exact node
+each shape. Built-in prelude and contract definitions are omitted unless
+`include_prelude=true`. Exact node
 number tokens survive export. Source locations and mixin provenance belong
 to the in-memory model and are not serialized.
 
 `Model::to_idl` exports a map from namespace to Smithy 2 IDL text. It omits
-prelude shapes, flattens inherited contents and uses absolute references.
+built-in definitions, flattens inherited contents and uses absolute references.
 Metadata appears once, in the first namespace. An empty or metadata-only model
 uses the empty namespace key. Generated text is deterministic and retains exact
 node numbers; conversion does not retain comments or original source layout.
@@ -137,8 +176,9 @@ test {
 }
 ```
 
-The prelude is vendored from smithy-lang/smithy at `PRELUDE_SHA`, embedded in
-`prelude_data.mbt`, and distributed under Apache-2.0. Refresh it with
+The prelude and contract definitions are vendored from smithy-lang/smithy at
+`PRELUDE_SHA`, embedded in `prelude_data.mbt` and `contracts_data.mbt`, and
+distributed under Apache-2.0. Refresh both with
 `mise run prelude:vendor -- <git-ref>`.
 
 The acceptance contract is `tests/features/model.feature`. Compatibility tests

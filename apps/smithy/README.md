@@ -49,9 +49,14 @@ smithy format --write model.smithy model.json
 ```
 
 `ast` and `convert --to json` assemble all inputs into a Smithy JSON AST and
-omit the standard prelude. `validate` assembles the same model and prints
+omit built-in prelude and contract definitions. `validate` assembles the same model and prints
 any diagnostics. Reference resolution, mixin expansion, trait application and
 metadata merging follow the model library's rules.
+
+The `smithy.contracts#conditions` trait is included. Validation checks its
+targets, condition names and required string fields. JMESPath syntax and static
+analysis are planned separately. Conversion preserves expressions and
+documentation without evaluating contracts.
 
 IDL output uses Smithy 2, absolute references and flattened inherited contents.
 It preserves model semantics and exact numbers. Comments, import choices,

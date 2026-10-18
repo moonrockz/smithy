@@ -160,8 +160,8 @@ fn Model::idl_shape(self : Model, shape : Shape) -> String raise BuildError {
 }
 
 ///|
-/// Serialize an assembled model to Smithy 2 IDL, keyed by namespace. Prelude
-/// shapes are omitted and inherited contents are flattened, as in to_json_ast.
+/// Serialize an assembled model to Smithy 2 IDL, keyed by namespace. Built-in
+/// definitions are omitted and inherited contents are flattened, as in to_json_ast.
 /// Metadata appears exactly once, in the first namespace. A metadata-only or
 /// empty model uses the empty namespace key. References are absolute, so names
 /// cannot collide with local definitions or implicit prelude names.
@@ -169,7 +169,7 @@ pub fn Model::to_idl(self : Model) -> Map[String, String] raise {
   let groups : Map[String, Array[Shape]] = Map([])
   for id in sorted_keys(self.shapes) {
     let shape = self.shapes.get(id).unwrap()
-    if id.member is Some(_) || shape.source.file == "<prelude>" {
+    if id.member is Some(_) || is_builtin_source(shape.source.file) {
       continue
     }
     let group = groups.get_or_init(id.namespace, () => [])

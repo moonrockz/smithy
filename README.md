@@ -8,7 +8,9 @@ The Smithy IDL 2.0 syntax layer (scanner, AST, CST, parser with recovery, diagno
 and the typed JSON AST codec are implemented in `pkgs/smithy-syntax` and checked
 against the Java reference's loader corpus. `pkgs/smithy` assembles IDL and JSON
 files into a semantic model with the prelude, reference resolution, mixins,
-trait applications and metadata merging. The CLI assembles, validates, formats and
+trait applications and metadata merging. It includes the `smithy.contracts#conditions`
+schema and validates its targets, names and required fields. JMESPath analysis is
+planned as a separate public package that Smithy will use. The CLI assembles, validates, formats and
 converts IDL and JSON models. See [CLI usage](apps/smithy/README.md).
 
 ## Packages
@@ -116,7 +118,7 @@ mise run test -- js native     # some targets
 mise run test:cli              # built CLI behavior on native, wasm, js and wasm-gc
 mise run test:bdd              # moonspec acceptance features (tests/bdd, js target)
 mise run tck:vendor:json -- REF # refresh the vendored JSON AST reference corpus
-mise run prelude:vendor -- REF # refresh the embedded standard prelude
+mise run prelude:vendor -- REF # refresh the embedded prelude and contract traits
 mise run build                 # all targets
 mise run build:native          # native release build
 mise run clean
