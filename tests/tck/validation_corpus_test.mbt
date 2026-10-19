@@ -65,3 +65,72 @@ test "vendored UnreferencedShape identifies disconnected shapes" {
   ids.sort()
   assert_eq(ids, ["smithy.example#Bam", "smithy.example#Baz"])
 }
+
+///|
+test "vendored trait target emits incompatible applications" {
+  let source = @fs.read_file_to_string(
+    "tck/validation/trait-target/trait-target.json",
+  )
+  let result = @smithy.Loader::new()
+    .add_json("trait-target.json", source)
+    .assemble()
+  guard result.model is Some(model) else {
+    fail(result.diagnostics.map(d => d.message).join("\n"))
+  }
+  let events = model.validation_events()
+  assert_eq(events.filter(e => e.id == "TraitTarget").length(), 2)
+  assert_true(
+    events
+    .iter()
+    .any(e => {
+      e.id == "TraitTarget" &&
+      e.severity == "ERROR" &&
+      e.shape.map(id => id.to_string()) == Some("ns.foo#Invalid$baz")
+    }),
+  )
+  assert_true(
+    events
+    .iter()
+    .any(e => {
+      e.id == "TraitTarget" &&
+      e.severity == "ERROR" &&
+      e.shape.map(id => id.to_string()) == Some("ns.foo#String")
+    }),
+  )
+}
+
+///|
+test "vendored trait validators emit scoped compatibility errors" {
+  let source = @fs.read_file_to_string(
+    "tck/validation/traitValidators/find-incompatible-shapes.smithy",
+  )
+  let result = @smithy.Loader::new()
+    .add_idl("trait-validators.smithy", source)
+    .assemble()
+  guard result.model is Some(model) else {
+    fail(result.diagnostics.map(d => d.message).join("\n"))
+  }
+  let events = model.validation_events()
+  for
+    (id, shape) in [
+      (
+        "com.amazonaws.simple.myProtocol.NoDocuments", "com.amazonaws.simple#GetFooInput$document",
+      ),
+      (
+        "com.amazonaws.simple.myProtocol.NoEventStreams", "com.amazonaws.simple#GetFooOutput",
+      ),
+      (
+        "com.amazonaws.simple.myProtocol.NoErrors", "com.amazonaws.simple#GetFoo",
+      ),
+    ] {
+    assert_true(
+      events
+      .iter()
+      .any(e => {
+        e.id == id &&
+        e.severity == "ERROR" &&
+        e.shape.map(s => s.to_string()) == Some(shape)
+      }),
+    )
+  }
+}

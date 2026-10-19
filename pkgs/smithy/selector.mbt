@@ -661,3 +661,26 @@ pub fn Selector::select_ids(self : Selector, model : Model) -> Array[String] {
   ids.sort()
   ids
 }
+
+///|
+/// Evaluate a selector with one shape as its starting context.
+pub fn Selector::select_ids_from(
+  self : Selector,
+  model : Model,
+  start_id : String,
+) -> Array[String] {
+  guard ShapeId::parse(start_id) is Some(start) &&
+    model.shapes.get(start) is Some(_) else {
+    return []
+  }
+  let vars : Map[String, Array[ShapeId]] = Map([])
+  let ids = selector_eval(
+    self.steps,
+    [start],
+    model,
+    selector_edges(model),
+    vars,
+  ).map(id => id.to_string())
+  ids.sort()
+  ids
+}

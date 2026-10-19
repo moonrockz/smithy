@@ -258,9 +258,111 @@ fn Model::configured_validation_events(
 }
 
 ///|
+fn Model::trait_target_events(self : Model) -> Array[ValidationEvent] {
+  let events : Array[ValidationEvent] = []
+  for _, shape in self.shapes {
+    if shape.source.file == "<contracts>" || shape.id.namespace == "smithy.api" {
+      continue
+    }
+    for trait_id, _ in shape.traits {
+      guard self.shapes.get(trait_id) is Some(definition) else { continue }
+      let trait_name = if trait_id.namespace == "smithy.api" {
+        trait_id.name
+      } else {
+        trait_id.to_string()
+      }
+      if definition.trait_value("smithy.api#mixin") is Some(_) {
+        events.push(
+          validation_event(
+            "TraitTarget",
+            "ERROR",
+            Some(shape),
+            "Trait `" +
+            trait_name +
+            "` is a mixin and cannot be applied to `" +
+            shape.id.to_string() +
+            "`.",
+          ),
+        )
+      }
+      guard definition.trait_value("smithy.api#trait") is Some(config) &&
+        validation_string(config, "selector") is Some(expression) &&
+        expression != "*" else {
+        continue
+      }
+      let selector = Selector::parse(expression) catch { _ => continue }
+      if !selector.select_ids(self).contains(shape.id.to_string()) {
+        events.push(
+          validation_event(
+            "TraitTarget",
+            "ERROR",
+            Some(shape),
+            "Trait `" +
+            trait_name +
+            "` cannot be applied to `" +
+            shape.id.to_string() +
+            "`. This trait may only be applied to shapes that match the following selector: " +
+            expression,
+          ),
+        )
+      }
+    }
+  }
+  events
+}
+
+///|
+fn Model::trait_validator_events(self : Model) -> Array[ValidationEvent] {
+  let events : Array[ValidationEvent] = []
+  for trait_id, trait_shape in self.shapes {
+    guard trait_shape.trait_value("smithy.api#traitValidators")
+      is Some(Object(validators)) else {
+      continue
+    }
+    for _, applied in self.shapes {
+      if applied.traits.get(trait_id) is None {
+        continue
+      }
+      for event_id, definition in validators {
+        guard validation_string(definition, "selector") is Some(expression) else {
+          continue
+        }
+        let selector = Selector::parse(expression) catch { _ => continue }
+        for shape_id in selector.select_ids_from(self, applied.id.to_string()) {
+          guard self.get(shape_id) is Some(shape) else { continue }
+          let suffix = match validation_string(definition, "message") {
+            Some(message) => ": " + message
+            None => ""
+          }
+          let severity = validation_string(definition, "severity").unwrap_or(
+            "ERROR",
+          )
+          events.push(
+            validation_event(
+              event_id,
+              severity,
+              Some(shape),
+              "Found an incompatible shape when validating the constraints of the `" +
+              trait_id.to_string() +
+              "` trait attached to `" +
+              applied.id.to_string() +
+              "`" +
+              suffix,
+            ),
+          )
+        }
+      }
+    }
+  }
+  events
+}
+
+///|
 /// Run validators configured in model metadata and apply event decoration.
 pub fn Model::validation_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
+  events.append(self.trait_target_events())
+  events.append(self.trait_validator_events())
   for definition in validation_array(self.metadata.get("validators")) {
     events.append(self.configured_validation_events(definition))
   }
