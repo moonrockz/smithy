@@ -1,6 +1,6 @@
 name = "moonrockz/smithy-jsonschema"
 
-version = "0.2.0"
+version = "0.3.0"
 
 description = "Convert assembled Smithy models to JSON Schema"
 
@@ -15,7 +15,7 @@ readme = "README.mbt.md"
 warnings = "-implicit_impl_as_method"
 
 import {
-  "moonrockz/smithy@0.2.0",
-  "moonrockz/smithy-syntax@0.2.0",
+  "moonrockz/smithy@0.3.0",
+  "moonrockz/smithy-syntax@0.3.0",
   "moonbitlang/x@0.5.5",
 }

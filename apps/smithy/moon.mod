@@ -1,6 +1,6 @@
 name = "moonrockz/smithy-cli"
 
-version = "0.2.0"
+version = "0.3.0"
 
 description = "Smithy command-line application"
 
@@ -15,10 +15,10 @@ preferred_target = "wasm"
 keywords = [ "smithy", "command-line", "moonx", "idl", "json" ]
 
 import {
-  "moonrockz/smithy@0.2.0",
-  "moonrockz/smithy-build@0.2.0",
-  "moonrockz/smithy-jsonschema@0.2.0",
-  "moonrockz/smithy-syntax@0.2.0",
+  "moonrockz/smithy@0.3.0",
+  "moonrockz/smithy-build@0.3.0",
+  "moonrockz/smithy-jsonschema@0.3.0",
+  "moonrockz/smithy-syntax@0.3.0",
   "moonbitlang/x@0.5.5",
   "moonbit-community/zipc@0.2.2",
 }
