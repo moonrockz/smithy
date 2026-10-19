@@ -8,7 +8,7 @@ is 0.x, a minor release can contain breaking changes.
 
 ## [0.3.0] - 2026-10-19
 
-<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+Smithy now converts assembled models to JSON Schema through the new `moonrockz/smithy-jsonschema` package and the `jsonSchema` build plugin. The new `moonrockz/smithy-build` package and `smithy build` and `smithy clean` commands support projections, all 28 built-in transforms, local JAR imports and environment substitutions. `smithy select` evaluates selectors, and validation now runs configured and default validators with reference event IDs, severities, shape IDs and suppressions. Build outputs require a dedicated directory separate from sources and imports, with an ownership marker protecting existing files. Code that constructs `Shape`, `ModelDiagnostic` or `LoadResult` records directly must supply the added `provenance`, `event_id` and `validation_findings` fields respectively; loader callers need no record changes.
 
 ### 🚀 Features
 
