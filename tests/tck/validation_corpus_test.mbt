@@ -134,3 +134,25 @@ test "vendored trait validators emit scoped compatibility errors" {
     )
   }
 }
+
+///|
+test "vendored missing selector produces a model configuration error" {
+  let source = @fs.read_file_to_string(
+    "tck/validation/linters/emit-each-selector-requires-selectors.json",
+  )
+  let result = @smithy.Loader::new()
+    .add_json("missing-selector.json", source)
+    .assemble()
+  guard result.model is Some(model) else { fail("model did not assemble") }
+  assert_true(
+    model
+    .validation_events()
+    .iter()
+    .any(e => {
+      e.id == "Model" &&
+      e.severity == "ERROR" &&
+      e.shape is None &&
+      e.message.contains("selector is required")
+    }),
+  )
+}

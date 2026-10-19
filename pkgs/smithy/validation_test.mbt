@@ -58,3 +58,51 @@ test "suppression IDs require dot segment boundaries" {
   assert_true(@smithy.suppression_matches("Example", "Example"))
   assert_false(@smithy.suppression_matches("Example", "ExampleChild"))
 }
+
+///|
+test "EmitEachSelector expands shape, trait and captured variable templates" {
+  let source =
+    #|$version: "2"
+    #|metadata validators = [{name: "EmitEachSelector", id: "Template", configuration: {selector: "[id|namespace=example] $foo(*)", messageTemplate: "Trait @{trait|documentation}. ID @{id}. Name @{id|name}. Var @{var|foo|id}. Escape @@."}}]
+    #|namespace example
+    #|@documentation("hello")
+    #|string Baz
+  let result = @smithy.Loader::new()
+    .add_idl("example.smithy", source)
+    .assemble()
+  guard result.model is Some(model) else { fail("model did not assemble") }
+  let events = model.validation_events()
+  assert_true(
+    events
+    .iter()
+    .any(e => {
+      e.id == "Template" &&
+      e.shape.map(id => id.to_string()) == Some("example#Baz") &&
+      e.message ==
+      "Trait \"hello\". ID example#Baz. Name Baz. Var [example#Baz]. Escape @."
+    }),
+  )
+}
+
+///|
+test "EmitEachSelector rejects malformed message template paths" {
+  for template in ["@{", "@{}", "@{var|}", "@invalid"] {
+    let source = "$version: \"2\"\nmetadata validators = [{name: \"EmitEachSelector\", configuration: {selector: \"structure\", messageTemplate: \"" +
+      template +
+      "\"}}]\nnamespace example\nstructure Thing {}"
+    let result = @smithy.Loader::new()
+      .add_idl("template.smithy", source)
+      .assemble()
+    guard result.model is Some(model) else { fail("model did not assemble") }
+    assert_true(
+      model
+      .validation_events()
+      .iter()
+      .any(e => {
+        e.id == "Model" &&
+        e.severity == "ERROR" &&
+        e.message.contains("message template")
+      }),
+    )
+  }
+}

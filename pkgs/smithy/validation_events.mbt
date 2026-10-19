@@ -57,6 +57,16 @@ fn validation_event(
 }
 
 ///|
+fn validator_config_error(name : String, detail : String) -> ValidationEvent {
+  validation_event(
+    "Model",
+    "ERROR",
+    None,
+    "Error creating `" + name + "` validator: " + detail,
+  )
+}
+
+///|
 fn validation_namespace_matches(rule : String, event : ValidationEvent) -> Bool {
   rule == "*" ||
   (match event.shape {
@@ -73,6 +83,100 @@ fn validation_severity_rank(severity : String) -> Int32 {
     "ERROR" => 4
     _ => 1
   }
+}
+
+///|
+priv enum ValidationTemplatePart {
+  TemplateText(String)
+  TemplateAttribute(Array[String])
+}
+
+///|
+fn validation_template_parts(
+  template : String,
+) -> Array[ValidationTemplatePart] raise SelectorError {
+  let parser : SelectorParser = {
+    chars: template.to_array(),
+    pos: 0,
+    depth: 0,
+  }
+  let parts : Array[ValidationTemplatePart] = []
+  let mut literal = ""
+  while parser.peek() != '\u{0}' {
+    if parser.peek() != '@' {
+      literal += parser.take().to_string()
+    } else if parser.pos + 1 < parser.chars.length() &&
+      parser.chars[parser.pos + 1] == '@' {
+      parser.pos += 2
+      literal += "@"
+    } else {
+      if !literal.is_empty() {
+        parts.push(TemplateText(literal))
+        literal = ""
+      }
+      guard parser.scoped_value() is Path(path) else {
+        raise InvalidSelector("I expected a message template attribute.")
+      }
+      parts.push(TemplateAttribute(path))
+    }
+  }
+  if !literal.is_empty() {
+    parts.push(TemplateText(literal))
+  }
+  parts
+}
+
+///|
+fn validation_template_value(
+  path : Array[String],
+  shape : Shape,
+  variables : Map[String, Array[String]],
+  model : Model,
+) -> String {
+  if path[0] == "var" && path.length() >= 2 {
+    let values : Array[String] = []
+    for id in variables.get(path[1]).unwrap_or([]) {
+      if path.length() == 2 {
+        values.push(id)
+      } else if model.get(id) is Some(captured) {
+        values.append(selector_attribute(captured, path[2:].to_owned()))
+      }
+    }
+    return "[" + values.join(", ") + "]"
+  }
+  if path[0] == "trait" &&
+    path.length() >= 2 &&
+    selector_trait(shape, path[1]) is Some(initial) {
+    let values = selector_node_path([initial], path, 2).map(v => {
+      @json.to_json(v).stringify()
+    })
+    return if values.length() == 1 {
+      values[0]
+    } else {
+      "[" + values.join(", ") + "]"
+    }
+  }
+  selector_attribute(shape, path).join(", ")
+}
+
+///|
+fn validation_template(
+  parts : Array[ValidationTemplatePart],
+  shape : Shape,
+  variables : Map[String, Array[String]],
+  model : Model,
+) -> String {
+  let out = StringBuilder()
+  for part in parts {
+    match part {
+      TemplateText(text) => out.write_string(text)
+      TemplateAttribute(path) =>
+        out.write_string(
+          validation_template_value(path, shape, variables, model),
+        )
+    }
+  }
+  out.to_string()
 }
 
 ///|
@@ -137,7 +241,14 @@ fn Model::configured_validation_events(
     let expression = validation_string(configuration, "rootShapeSelector").unwrap_or(
       "service",
     )
-    let selector = Selector::parse(expression) catch { _ => return events }
+    let selector = Selector::parse(expression) catch {
+      _ => {
+        events.push(
+          validator_config_error(name, "Error parsing rootShapeSelector"),
+        )
+        return events
+      }
+    }
     let reachable : Map[String, Bool] = Map([])
     let pending = selector.select_ids(self)
     for shape_id, shape in self.shapes {
@@ -177,8 +288,16 @@ fn Model::configured_validation_events(
       }
     }
   } else if name == "EmitEachSelector" || name == "EmitNoneSelector" {
-    guard selector_text is Some(expression) else { return events }
-    let selector = Selector::parse(expression) catch { _ => return events }
+    guard selector_text is Some(expression) else {
+      events.push(validator_config_error(name, "selector is required"))
+      return events
+    }
+    let selector = Selector::parse(expression) catch {
+      _ => {
+        events.push(validator_config_error(name, "Error parsing selector"))
+        return events
+      }
+    }
     let mut matches = selector.select_ids(self)
     // The reference ignores prelude matches when deciding whether EmitNone fires.
     if name == "EmitNoneSelector" {
@@ -195,15 +314,49 @@ fn Model::configured_validation_events(
       }
     } else {
       let bound = validation_string(configuration, "bindToTrait")
-      for shape_id in matches {
-        guard self.get(shape_id) is Some(shape) else { continue }
-        if bound is Some(trait_id) && shape.trait_value(trait_id) is None {
-          continue
+      match validation_string(configuration, "messageTemplate") {
+        Some(template) => {
+          let parts = validation_template_parts(template) catch {
+            InvalidSelector(message) => {
+              events.push(
+                validator_config_error(
+                  name,
+                  "Invalid message template: " + message,
+                ),
+              )
+              return events
+            }
+          }
+          for selection in selector.select_matches(self) {
+            guard self.get(selection.id) is Some(shape) else { continue }
+            if bound is Some(trait_id) && shape.trait_value(trait_id) is None {
+              continue
+            }
+            events.push(
+              validation_event(
+                name,
+                "DANGER",
+                Some(shape),
+                validation_template(parts, shape, selection.variables, self),
+              ),
+            )
+          }
         }
-        let message = validation_string(configuration, "messageTemplate").unwrap_or(
-          "Selector capture matched selector: " + expression,
-        )
-        events.push(validation_event(name, "DANGER", Some(shape), message))
+        None =>
+          for shape_id in matches {
+            guard self.get(shape_id) is Some(shape) else { continue }
+            if bound is Some(trait_id) && shape.trait_value(trait_id) is None {
+              continue
+            }
+            events.push(
+              validation_event(
+                name,
+                "DANGER",
+                Some(shape),
+                "Selector capture matched selector: " + expression,
+              ),
+            )
+          }
       }
     }
   } else {

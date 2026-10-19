@@ -684,3 +684,33 @@ pub fn Selector::select_ids_from(
   ids.sort()
   ids
 }
+
+///|
+pub(all) struct SelectorMatch {
+  id : String
+  variables : Map[String, Array[String]]
+} derive(Debug)
+
+///|
+/// Retain variable captures for each selector match.
+pub fn Selector::select_matches(
+  self : Selector,
+  model : Model,
+) -> Array[SelectorMatch] {
+  let matches : Array[SelectorMatch] = []
+  let edges = selector_edges(model)
+  for start, shape in model.shapes {
+    if shape.source.file == "<contracts>" {
+      continue
+    }
+    let vars : Map[String, Array[ShapeId]] = Map([])
+    for id in selector_eval(self.steps, [start], model, edges, vars) {
+      let variables : Map[String, Array[String]] = Map([])
+      for name, captured in vars {
+        variables[name] = captured.map(value => value.to_string())
+      }
+      matches.push({ id: id.to_string(), variables, })
+    }
+  }
+  matches
+}
