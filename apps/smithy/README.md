@@ -1,6 +1,6 @@
 # smithy CLI
 
-Assemble, validate, format and convert Smithy models.
+Assemble, validate, select, format and convert Smithy models.
 
 ## Run
 
@@ -40,6 +40,7 @@ Use `smithy --help` for the command list, and `smithy convert --help` or
 ```shell
 smithy ast model.smithy extra.json
 smithy validate model.smithy extra.json
+smithy select --selector 'structure > member > string' model.smithy
 smithy convert --to json model.smithy -o model.json
 smithy convert --to idl model.json -o model.smithy
 smithy convert --to idl one.json two.json --output-dir generated

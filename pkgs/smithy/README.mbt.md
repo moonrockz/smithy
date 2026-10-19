@@ -86,8 +86,32 @@ lists with `uniqueItems`; set syntax in a Smithy 2.0 input is an error.
 
 Assembly checks reference existence and target kinds, member-name collisions,
 required collection members, enum values, resource cycles and the structure
-of applied trait values. This is model assembly, not a selector engine or a
-runner for configurable Smithy validation plugins.
+of applied trait values. Configurable validation plugins run after assembly.
+
+## Select shapes
+
+`Selector::parse(expression)` parses Smithy selectors. `select_ids(model)`
+returns matching absolute shape IDs in lexical order. The selector engine
+supports shape types, attributes, directed and recursive neighbors, functions,
+scoped comparisons and variables. Unknown function names are valid syntax and
+act as identity steps, as in the reference implementation. Internal contract
+definitions are omitted from selection; public prelude shapes remain available.
+
+```mbt check
+///|
+test {
+  let result = @smithy.Loader::new()
+    .add_idl(
+      "one.smithy", "$version: \"2\"\nnamespace example\nstructure One {}",
+    )
+    .assemble()
+  let model = result.model.unwrap()
+  let ids = @smithy.Selector::parse("structure[id|namespace=example]").select_ids(
+    model,
+  )
+  assert_eq(ids, ["example#One"])
+}
+```
 
 ## Contract traits
 

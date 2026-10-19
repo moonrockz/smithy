@@ -45,7 +45,7 @@ fn command_line() -> @argparse.Command {
   )
   @argparse.Command(
     "smithy",
-    about="A Smithy toolchain for MoonBit: assemble, validate, format and convert models.",
+    about="A Smithy toolchain for MoonBit: assemble, validate, select, format and convert models.",
     version=version_text(),
     arg_required_else_help=true,
     subcommand_required=true,
@@ -56,6 +56,17 @@ fn command_line() -> @argparse.Command {
         options=[output],
       ),
       input_command("validate", "Assemble files and report model diagnostics."),
+      input_command(
+        "select",
+        "Print matching absolute shape IDs, one per line.",
+        options=[
+          @argparse.OptionArg(
+            "selector",
+            about="Smithy selector expression.",
+            required=true,
+          ),
+        ],
+      ),
       input_command(
         "format",
         "Format IDL/JSON files. By default, print one file to stdout.",
@@ -99,6 +110,7 @@ struct Options {
   files : Array[String]
   from : String?
   to : String?
+  selector : String?
   output : String?
   output_dir : String?
   check : Bool
@@ -122,6 +134,7 @@ fn options(args : Array[String]) -> Options raise CliError {
   let files = matches.values.get("file").unwrap_or([])
   let from = value("from")
   let to = value("to")
+  let selector = value("selector")
   let output = value("output")
   let output_dir = value("output-dir")
   let check = matches.flags.get("check") == Some(true)
@@ -146,7 +159,7 @@ fn options(args : Array[String]) -> Options raise CliError {
   if command == "format" && files.length() > 1 && !check && !write {
     raise CliError("use --check or --write when formatting multiple files", 2)
   }
-  { command, files, from, to, output, output_dir, check, write, }
+  { command, files, from, to, selector, output, output_dir, check, write, }
 }
 
 ///|
@@ -264,6 +277,17 @@ fn run(args : Array[String]) -> Int32 raise {
   }
   guard result.model is Some(model) else { return 1 }
   if opts.command == "validate" {
+    return 0
+  }
+  if opts.command == "select" {
+    guard opts.selector is Some(expression) else {
+      raise CliError("select requires --selector", 2)
+    }
+    let selector = @smithy.Selector::parse(expression) catch {
+      @smithy.InvalidSelector(message) => raise CliError(message, 2)
+    }
+    let ids = selector.select_ids(model)
+    emit(if ids.is_empty() { "" } else { ids.join("\n") + "\n" }, None)
     return 0
   }
   if opts.to != Some("idl") {

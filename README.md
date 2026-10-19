@@ -12,7 +12,7 @@ trait applications and metadata merging. It includes the `smithy.contracts#condi
 schema and validates its targets, names and required fields. `pkgs/jmespath`
 provides a standalone JMESPath parser and evaluator. Smithy checks contract
 expression syntax, member references, function arguments and boolean result
-types during assembly. The CLI assembles, validates, formats and
+types during assembly. Smithy selectors can query the assembled model. The CLI assembles, validates, selects, formats and
 converts IDL and JSON models. See [CLI usage](apps/smithy/README.md).
 
 ## Packages
@@ -21,6 +21,7 @@ converts IDL and JSON models. See [CLI usage](apps/smithy/README.md).
 |------|--------|---------|
 | `pkgs/jmespath` | `moonrockz/jmespath` | JMESPath parser, inspectable AST and JSON evaluator |
 | `pkgs/smithy` | `moonrockz/smithy` | Semantic model and multi-file IDL/JSON loader |
+| `pkgs/smithy-jsonschema` | `moonrockz/smithy-jsonschema` | Convert assembled value shapes to JSON Schema |
 | `pkgs/smithy-syntax` | `moonrockz/smithy-syntax` | Smithy IDL scanner, AST, CST, parser and diagnostics |
 | `docs/cookbook` | `moonrockz/smithy_cookbook` | Tested cookbook articles for the syntax module |
 | `tests` | `moonrockz/smithy_tests` | Compatibility kit (vendored reference corpus) and moonspec acceptance features; not published |
@@ -154,6 +155,7 @@ smithy/
 ├── lefthook.yml               # git hooks
 ├── apps/smithy/               # CLI (moonrockz/smithy-cli)
 ├── pkgs/smithy/               # library (moonrockz/smithy)
+├── pkgs/smithy-jsonschema/    # JSON Schema converter
 ├── pkgs/jmespath/             # JMESPath parser and evaluator (moonrockz/jmespath)
 ├── pkgs/smithy-syntax/        # IDL syntax (moonrockz/smithy-syntax)
 ├── docs/cookbook/             # tested cookbook articles (moonrockz/smithy_cookbook)

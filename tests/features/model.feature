@@ -2,6 +2,16 @@ Feature: Semantic model assembly
   IDL and JSON files assemble together with the standard prelude. References,
   mixins and trait applications resolve before a model is returned.
 
+  Scenario: Select shapes through members
+    Given the IDL model file "person.smithy":
+      """smithy
+      $version: "2"
+      namespace example.weather
+      structure Person { name: String }
+      """
+    When I assemble the semantic model
+    Then the selector "structure[id|namespace=example.weather] > member > string" yields "smithy.api#String"
+
   Scenario: Resolve references across JSON and IDL files
     Given the IDL model file "city.smithy":
       """smithy
