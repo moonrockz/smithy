@@ -172,7 +172,7 @@ async fn exercise(
   runner.command(["validate", "input.smithy", "model.json"], 0) |> ignore
   @fs.write_file(
     "\{dir}/smithy-build.json",
-    "{\"version\":\"1.0\",\"sources\":[\"input.smithy\"],\"outputDirectory\":\"build-output\",\"plugins\":{\"jsonSchema\":{}},\"projections\":{\"filtered\":{\"transforms\":[{\"name\":\"excludeTraits\",\"args\":{\"traits\":[\"documentation\"]}}]}}}",
+    "{\"version\":\"1.0\",\"sources\":[\"input.smithy\"],\"outputDirectory\":\"build-output\",\"plugins\":{\"jsonSchema\":{\"jsonSchemaVersion\":\"draft2020-12\"}},\"projections\":{\"filtered\":{\"transforms\":[{\"name\":\"excludeTraits\",\"args\":{\"traits\":[\"documentation\"]}}]}}}",
   )
   runner.command(["build"], 0) |> ignore
   assert_true(@fs.exists("\{dir}/build-output/source/model/model.json"))
@@ -182,6 +182,8 @@ async fn exercise(
   assert_true(@fs.exists("\{dir}/build-output/source/jsonSchema/schema.json"))
   assert_true(@fs.read_file("\{dir}/build-output/source/jsonSchema/schema.json")
     .text().contains("Example"))
+  assert_true(@fs.read_file("\{dir}/build-output/source/jsonSchema/schema.json")
+    .text().contains("\"$defs\""))
   runner.command(["clean"], 0) |> ignore
   assert_false(@fs.exists("\{dir}/build-output"))
   assert_true(@fs.exists("\{dir}/input.smithy"))

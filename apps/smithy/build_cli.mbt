@@ -144,6 +144,19 @@ fn json_schema_plugin(
       "schemaDocumentExtensions must be an object",
     )
   }
+  let schema_version = build_setting_string(
+    settings, "jsonSchemaVersion", "draft07",
+  )
+  if schema_version != "draft07" && schema_version != "draft2020-12" {
+    raise @build.InvalidBuildConfig(
+      "Unsupported JSON Schema version `" + schema_version + "`",
+    )
+  }
+  let default_pointer = if schema_version == "draft2020-12" {
+    "#/$defs"
+  } else {
+    "#/definitions"
+  }
   let config = @jsonschema.Config::new(
     map_strategy~,
     union_strategy~,
@@ -157,7 +170,7 @@ fn json_schema_plugin(
     ),
     schema_document_extensions=extensions,
     definition_pointer=build_setting_string(
-      settings, "definitionPointer", "#/definitions",
+      settings, "definitionPointer", default_pointer,
     ),
     add_reference_descriptions=build_setting_bool(
       settings, "addReferenceDescriptions",

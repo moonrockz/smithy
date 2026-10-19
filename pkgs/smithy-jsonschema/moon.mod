@@ -12,6 +12,8 @@ keywords = [ "smithy", "json-schema", "moonbit" ]
 
 readme = "README.mbt.md"
 
+warnings = "-implicit_impl_as_method"
+
 import {
   "moonrockz/smithy@0.2.0",
   "moonrockz/smithy-syntax@0.2.0",

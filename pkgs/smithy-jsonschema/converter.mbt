@@ -1,4 +1,9 @@
 ///|
+pub(all) suberror JsonSchemaError {
+  ConflictingShapeName(String)
+} derive(Debug)
+
+///|
 fn member_target(entry : Json) -> String? {
   guard entry is Object(fields) && fields.get("target") is Some(String(id)) else {
     return None
@@ -474,6 +479,93 @@ fn schema_names(
 }
 
 ///|
+fn is_definition_shape(shape : Json, config : Config) -> Bool {
+  guard shape is Object(body) && body.get("type") is Some(String(kind)) else {
+    return false
+  }
+  if body.get("traits") is Some(Object(traits)) &&
+    traits.get("smithy.api#mixin") is Some(_) {
+    return false
+  }
+  !(kind == "service" ||
+  kind == "resource" ||
+  kind == "operation" ||
+  kind == "list" ||
+  (kind == "string" && !has_enum_trait(shape)) ||
+  [
+    "blob", "boolean", "byte", "short", "integer", "long", "float", "double", "bigInteger",
+    "bigDecimal", "timestamp", "document",
+  ].contains(kind) ||
+  (kind == "intEnum" && config.disable_int_enums))
+}
+
+///|
+fn namespace_suffix(id : String) -> String {
+  let parts = id.split("#").to_array()
+  let mut suffix = ""
+  for part in parts[0].split(".") {
+    let word = part.to_owned()
+    if !word.is_empty() {
+      suffix += word[:1].to_owned().to_upper() + word[1:].to_owned()
+    }
+  }
+  suffix
+}
+
+///|
+fn deconflict_names(
+  shapes : Map[String, Json],
+  connected : Map[String, Bool],
+  names : Map[String, String],
+  service : String,
+  config : Config,
+) -> Unit raise JsonSchemaError {
+  let claimed : Map[String, String] = Map([])
+  let ids = shapes.keys().to_array()
+  ids.sort()
+  for id in ids {
+    if service != "" && connected.get(id) is None {
+      continue
+    }
+    guard shapes.get(id) is Some(shape) &&
+      is_definition_shape(shape, config) &&
+      names.get(id) is Some(name) else {
+      continue
+    }
+    let mut resolved = name
+    if claimed.get(name) is Some(other) {
+      let kind = match shape {
+        Object(body) => body.get("type")
+        _ => None
+      }
+      if kind != Some(Json::string("map")) {
+        raise ConflictingShapeName(
+          "Shape " +
+          id +
+          " conflicts with " +
+          other +
+          " using JSON Schema name " +
+          name,
+        )
+      }
+      resolved = name + namespace_suffix(id)
+      if claimed.get(resolved) is Some(other) {
+        raise ConflictingShapeName(
+          "Shape " +
+          id +
+          " conflicts with " +
+          other +
+          " using JSON Schema name " +
+          resolved,
+        )
+      }
+      names[id] = resolved
+    }
+    claimed[resolved] = id
+  }
+}
+
+///|
 /// Convert value shapes in an assembled model to a JSON Schema document.
 pub fn convert(
   model : @smithy.Model,
@@ -488,6 +580,7 @@ pub fn convert(
   let mut unit_targeted = false
   let connected = connected_shapes(service, shapes)
   let names = schema_names(shapes, service)
+  deconflict_names(shapes, connected, names, service, config)
   for id, shape in shapes {
     if service != "" && connected.get(id) is None {
       continue

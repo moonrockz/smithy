@@ -192,3 +192,56 @@ test "vendored service rename is used in definitions and references" {
     Some(Json::object({ "$ref": Json::string("#/definitions/FooWidget") })),
   )
 }
+
+///|
+test "conflicting exported shape names fail instead of overwriting a schema" {
+  let source = fixture("multiple-closures-with-conflicting-shapes.json")
+  let result = @smithy.Loader::new()
+    .add_json("conflicting.json", source)
+    .assemble()
+  guard result.model is Some(model) else { fail("model did not assemble") }
+  let failed = try @jsonschema.convert(model) catch {
+    @jsonschema.ConflictingShapeName(_) => true
+    _ => false
+  } noraise {
+    _ => false
+  }
+  assert_true(failed)
+}
+
+///|
+test "service closure excludes conflicting names in other services" {
+  let source = fixture("multiple-closures-with-conflicting-shapes.json")
+  let result = @smithy.Loader::new()
+    .add_json("conflicting.json", source)
+    .assemble()
+  guard result.model is Some(model) else { fail("model did not assemble") }
+  let schema = @jsonschema.convert(model, service="com.foo#ServiceA")
+  guard schema is Object(root) &&
+    root.get("definitions") is Some(Object(definitions)) else {
+    fail("definitions missing")
+  }
+  assert_true(definitions.get("ConflictString") is Some(_))
+  assert_false(definitions.get("StructureB") is Some(_))
+}
+
+///|
+test "colliding map names receive a namespace suffix used by references" {
+  let source =
+    #|{"smithy":"2.0","shapes":{"a#Foo":{"type":"map","key":{"target":"smithy.api#String"},"value":{"target":"smithy.api#String"}},"b#Foo":{"type":"map","key":{"target":"smithy.api#String"},"value":{"target":"smithy.api#String"}},"b#Holder":{"type":"structure","members":{"foo":{"target":"b#Foo"}}}}}
+  let result = @smithy.Loader::new().add_json("maps.json", source).assemble()
+  guard result.model is Some(model) else { fail("model did not assemble") }
+  let schema = @jsonschema.convert(model)
+  guard schema is Object(root) &&
+    root.get("definitions") is Some(Object(definitions)) &&
+    definitions.get("Holder") is Some(Object(holder)) &&
+    holder.get("properties") is Some(Object(properties)) else {
+    fail("definitions missing")
+  }
+  assert_true(definitions.get("Foo") is Some(_))
+  assert_true(definitions.get("FooB") is Some(_))
+  assert_eq(
+    properties.get("foo"),
+    Some(Json::object({ "$ref": Json::string("#/definitions/FooB") })),
+  )
+}
