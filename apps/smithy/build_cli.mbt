@@ -337,9 +337,10 @@ fn run_build(config_path : String, clean : Bool) -> Int32 raise {
     protected_paths.append(projection.imports)
   }
   for path in protected_paths {
-    if build_path_contains(output, build_path(base, path)) {
+    let input = build_path(base, path)
+    if build_path_contains(output, input) || build_path_contains(input, output) {
       raise CliError(
-        "build output directory must not contain model sources or imports", 2,
+        "build output directory must not overlap model sources or imports", 2,
       )
     }
   }

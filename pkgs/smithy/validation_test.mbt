@@ -165,3 +165,20 @@ test "assembly failures retain reference validation event identities" {
     }),
   )
 }
+
+///|
+test "resource diamond retains the pinned Java ResourceCycle event" {
+  // Java Smithy 1.74.1 treats a repeated descendant as a resource cycle.
+  // Preserve its assembly event and critical-validator short circuit.
+  let loaded = @smithy.Loader::new()
+    .add_idl(
+      "diamond.smithy", "$version: \"2\"\nnamespace diamond\nservice S { version: \"1\", resources: [Root] }\nresource Root { resources: [A, B] }\nresource A { resources: [Shared] }\nresource B { resources: [Shared] }\nresource Shared {}",
+    )
+    .assemble()
+  assert_true(loaded.model is None)
+  let events = loaded.validation_events()
+  assert_eq(events.length(), 1)
+  assert_eq(events[0].id, "ResourceCycle")
+  assert_eq(events[0].severity, "ERROR")
+  assert_eq(events[0].shape.map(id => id.to_string()), Some("diamond#Shared"))
+}

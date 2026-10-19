@@ -224,6 +224,20 @@ async fn exercise(
   @fs.write_file("\{dir}/nested/smithy-build.json", "{\"version\":\"1.0\",\"outputDirectory\":\".\"}")
   runner.command(["clean", "--config", "nested/smithy-build.json"], 2) |> ignore
   assert_true(@fs.exists("\{dir}/nested/keep.smithy"))
+  @fs.mkdir("\{dir}/overlap-models", allow_exist=true)
+  @fs.write_file("\{dir}/overlap-models/input.smithy", input)
+  for (name, inputs) in [
+    ("sources", "\"sources\":[\"overlap-models\"]"),
+    ("imports", "\"imports\":[\"overlap-models\"]"),
+    ("projection", "\"projections\":{\"scoped\":{\"imports\":[\"overlap-models\"]}}"),
+  ] {
+    let filename = "overlap-\{name}.json"
+    @fs.write_file("\{dir}/\{filename}", "{\"version\":\"2.0\",\"outputDirectory\":\"overlap-models/build\",\{inputs}}")
+    runner.command(["build", "--config", filename], 2) |> ignore
+    runner.command(["clean", "--config", filename], 2) |> ignore
+    assert_false(@fs.exists("\{dir}/overlap-models/build"))
+    assert_eq(@fs.read_file("\{dir}/overlap-models/input.smithy").text(), input)
+  }
   @fs.write_file("\{dir}/protect-sources.json", "{\"version\":\"1.0\",\"sources\":[\"nested\"],\"outputDirectory\":\"nested\"}")
   runner.command(["clean", "--config", "protect-sources.json"], 2) |> ignore
   assert_true(@fs.exists("\{dir}/nested/keep.smithy"))

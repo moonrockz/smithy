@@ -70,7 +70,8 @@ Use a dedicated output directory. Builds replace their previous artifacts,
 including artifacts from projections that become abstract. An ownership file
 ties the output to its configuration; an existing nonempty directory must
 have that configuration's ownership marker. All files in an owned output
-directory are replaced. Source and import directories cannot be output directories.
+directory are replaced. Keep the output directory separate from source and
+import directories; neither may contain the other.
 
 The `smithy.contracts#conditions` trait is included. Validation checks its
 targets, condition names and required string fields, then analyzes JMESPath
