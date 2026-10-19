@@ -97,7 +97,7 @@ async fn exercise(
     let (out, _) = runner.command(args, 0)
     assert_eq(out, help)
   }
-  for command in ["ast", "validate", "format", "convert", "version"] {
+  for command in ["ast", "validate", "select", "format", "convert", "version"] {
     let (help, _) = runner.command([command, "--help"], 0)
     assert_true(help.contains("Usage: smithy \{command}"))
     for args in [[command, "-h"], ["help", command]] {
@@ -105,6 +105,7 @@ async fn exercise(
       assert_eq(out, help)
     }
     assert_eq(help.contains("--to"), command == "convert")
+    assert_eq(help.contains("--selector"), command == "select")
     assert_eq(help.contains("--check"), command == "format")
   }
   let (out, _) = runner.command(["convert", "missing.smithy", "--help"], 0)
@@ -121,6 +122,20 @@ async fn exercise(
   let err = if target == "wasm-gc" { out + stderr } else { stderr }
   assert_true(err.contains("SM-MODEL-004") && err.contains("broken.smithy:3:"))
   runner.command(["validate", "syntax.smithy"], 1) |> ignore
+  runner.command(["select", "input.smithy"], 2) |> ignore
+  let (selected, _) = runner.command(
+    ["select", "--selector", "[id|namespace=example]", "input.smithy"],
+    0,
+  )
+  assert_eq(selected, "example#Example\nexample#Example$name\n")
+  let (selected, _) = runner.command(
+    [
+      "select", "--selector",
+      "structure[id|namespace=example]:futureFunction(*)", "input.smithy",
+    ],
+    0,
+  )
+  assert_eq(selected, "example#Example\n")
   let (ast, _) = runner.command(["ast", "input.smithy"], 0)
   assert_true(ast.contains("9007199254740993"))
   // Test an actual pipe, including multiple chunks and non-ASCII UTF-8.
