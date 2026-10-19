@@ -1,0 +1,1 @@
+[ERROR] smithy.example#InvalidStruct: Trait `sparse` cannot be applied to `smithy.example#InvalidStruct` | TraitTarget

@@ -1,0 +1,1 @@
+[ERROR] ns.foo#MyStructure: `references` trait reference targets a string shape not a resource: Reference{"resource":"smithy.api#String"} | ReferencesTrait

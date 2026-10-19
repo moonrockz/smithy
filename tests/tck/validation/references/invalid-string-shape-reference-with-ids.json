@@ -1,0 +1,18 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#MyString": {
+            "type": "string",
+            "traits": {
+                "smithy.api#references": [
+                    {
+                        "resource": "ns.foo#NotFound",
+                        "ids": {
+                            "foo": "baz"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}

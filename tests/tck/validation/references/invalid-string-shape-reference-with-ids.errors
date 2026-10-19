@@ -1,0 +1,1 @@
+[ERROR] ns.foo#MyString: References applied to string shapes cannot contain 'ids': Reference{"resource":"ns.foo#NotFound","ids":{"foo":"baz"}} | ReferencesTrait

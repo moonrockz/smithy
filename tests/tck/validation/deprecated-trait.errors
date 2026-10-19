@@ -1,0 +1,2 @@
+[ERROR] ns.foo#Invalid2: Error creating trait `deprecated`: Expected object, but found string. | Model
+[ERROR] ns.foo#Invalid3: Error creating trait `deprecated`: Expected object, but found string. | Model

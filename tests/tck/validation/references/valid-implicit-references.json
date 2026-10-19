@@ -1,0 +1,85 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#MyStructure": {
+            "type": "structure",
+            "members": {
+                "abc": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "def": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#references": [
+                    {
+                        "resource": "ns.foo#MyResource"
+                    },
+                    {
+                        "resource": "ns.foo#MyResource2"
+                    }
+                ]
+            }
+        },
+        "ns.foo#AnotherStructure": {
+            "type": "structure",
+            "members": {
+                "abc": {
+                    "target": "smithy.api#String"
+                },
+                "def": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#references": [
+                    {
+                        "resource": "ns.foo#MyResource"
+                    },
+                    {
+                        "resource": "ns.foo#MyResource2"
+                    }
+                ]
+            }
+        },
+        "ns.foo#MyString": {
+            "type": "string",
+            "traits": {
+                "smithy.api#references": [
+                    {
+                        "resource": "ns.foo#MyResource2"
+                    }
+                ]
+            }
+        },
+        "ns.foo#MyResource": {
+            "type": "resource",
+            "identifiers": {
+                "abc": {
+                    "target": "smithy.api#String"
+                },
+                "def": {
+                    "target": "smithy.api#String"
+                }
+            }
+        },
+        "ns.foo#MyResource2": {
+            "type": "resource",
+            "identifiers": {
+                "abc": {
+                    "target": "smithy.api#String"
+                }
+            }
+        }
+    }
+}

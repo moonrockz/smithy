@@ -1,0 +1,37 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#MyStructure": {
+            "type": "structure",
+            "members": {
+                "abc": {
+                    "target": "smithy.api#String"
+                }
+            },
+            "traits": {
+                "smithy.api#references": [
+                    {
+                        "resource": "ns.foo#MyResource",
+                        "ids": {
+                            "abc": "abc"
+                        }
+                    },
+                    {
+                        "resource": "ns.foo#MyResource"
+                    }
+                ]
+            }
+        },
+        "ns.foo#MyResource": {
+            "type": "resource",
+            "identifiers": {
+                "abc": {
+                    "target": "smithy.api#String"
+                },
+                "def": {
+                    "target": "smithy.api#String"
+                }
+            }
+        }
+    }
+}

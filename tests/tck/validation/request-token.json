@@ -1,0 +1,75 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#Valid": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#ValidInput"
+            },
+            "output": {
+                "target": "ns.foo#ValidOutput"
+            }
+        },
+        "ns.foo#ValidInput": {
+            "type": "structure",
+            "members": {
+                "token": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#idempotencyToken": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#ValidOutput": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#output": {}
+            }
+        },
+        "ns.foo#String": {
+            "type": "string"
+        },
+        "ns.foo#Invalid": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#InvalidInput"
+            },
+            "output": {
+                "target": "ns.foo#InvalidOutput"
+            },
+            "traits": {
+                "smithy.api#readonly": {}
+            }
+        },
+        "ns.foo#InvalidInput": {
+            "type": "structure",
+            "members": {
+                "token": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#idempotencyToken": {}
+                    }
+                },
+                "anotherToken": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#idempotencyToken": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#InvalidOutput": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#output": {}
+            }
+        }
+    }
+}

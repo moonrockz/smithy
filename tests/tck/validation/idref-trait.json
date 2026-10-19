@@ -1,0 +1,109 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#Invalid1": {
+            "type": "string",
+            "traits": {
+                "ns.foo#usesIdRef": "invalidshapeid"
+            }
+        },
+        "ns.foo#Invalid2": {
+            "type": "string",
+            "traits": {
+                "ns.foo#usesIdRef": "ns.foo#SomeNumber"
+            }
+        },
+        "ns.foo#Invalid3": {
+            "type": "string",
+            "traits": {
+                "ns.foo#usesIdRef": "ns.foo#NotFound"
+            }
+        },
+        "ns.foo#Invalid4": {
+            "type": "string",
+            "traits": {
+                "ns.foo#grammarOnly": "ns.foo#invalid-shape-id!"
+            }
+        },
+        "ns.foo#ValidGrammarOnly1": {
+            "type": "string",
+            "traits": {
+                "ns.foo#grammarOnly": "ns.foo#NotFound"
+            }
+        },
+        "ns.foo#ValidGrammarOnly2": {
+            "type": "string",
+            "traits": {
+                "ns.foo#grammarOnly": "ns.foo#OtherString"
+            }
+        },
+        "ns.foo#InvalidAllowsMissing1": {
+            "type": "string",
+            "traits": {
+                "ns.foo#allowsMissing": "ns.foo#OtherString"
+            }
+        },
+        "ns.foo#ValidAllowsMissing1": {
+            "type": "string",
+            "traits": {
+                "ns.foo#allowsMissing": "ns.foo#NotFound"
+            }
+        },
+        "ns.foo#InvalidCustomErrorMessage1": {
+            "type": "string",
+            "traits": {
+                "ns.foo#customErrorMessage": "ns.foo#OtherString"
+            }
+        },
+        "ns.foo#OtherString": {
+            "type": "string"
+        },
+        "ns.foo#SomeNumber": {
+            "type": "integer"
+        },
+        "ns.foo#usesIdRef": {
+            "type": "string",
+            "traits": {
+                "smithy.api#idRef": {
+                    "selector": "string",
+                    "failWhenMissing": true
+                },
+                "smithy.api#trait": {
+                    "selector": "string"
+                }
+            }
+        },
+        "ns.foo#grammarOnly": {
+            "type": "string",
+            "traits": {
+                "smithy.api#idRef": {},
+                "smithy.api#trait": {
+                    "selector": "string"
+                }
+            }
+        },
+        "ns.foo#allowsMissing": {
+            "type": "string",
+            "traits": {
+                "smithy.api#idRef": {
+                    "selector": "number"
+                },
+                "smithy.api#trait": {
+                    "selector": "string"
+                }
+            }
+        },
+        "ns.foo#customErrorMessage": {
+            "type": "string",
+            "traits": {
+                "smithy.api#idRef": {
+                    "selector": "number",
+                    "errorMessage": "Custom error message"
+                },
+                "smithy.api#trait": {
+                    "selector": "string"
+                }
+            }
+        }
+    }
+}

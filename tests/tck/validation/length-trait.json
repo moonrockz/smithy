@@ -1,0 +1,85 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#Valid1": {
+            "type": "list", 
+            "member": {
+                "target": "smithy.api#String"
+            }, 
+            "traits": {
+                "smithy.api#length": {
+                    "min": 0
+                }
+            }
+        }, 
+        "ns.foo#Valid2": {
+            "type": "list", 
+            "member": {
+                "target": "smithy.api#String"
+            }, 
+            "traits": {
+                "smithy.api#length": {
+                    "max": 1
+                }
+            }
+        }, 
+        "ns.foo#Valid3": {
+            "type": "list", 
+            "member": {
+                "target": "smithy.api#String"
+            }, 
+            "traits": {
+                "smithy.api#length": {
+                    "min": 0, 
+                    "max": 1
+                }
+            }
+        }, 
+        "ns.foo#Valid4": {
+            "type": "list", 
+            "member": {
+                "target": "smithy.api#String"
+            }, 
+            "traits": {
+                "smithy.api#length": {
+                    "min": 4, 
+                    "max": 4
+                }
+            }
+        }, 
+        "ns.foo#Invalid1": {
+            "type": "list", 
+            "member": {
+                "target": "smithy.api#String"
+            }, 
+            "traits": {
+                "smithy.api#length": {
+                    "max": -1
+                }
+            }
+        }, 
+        "ns.foo#Invalid2": {
+            "type": "list", 
+            "member": {
+                "target": "smithy.api#String"
+            }, 
+            "traits": {
+                "smithy.api#length": {
+                    "min": -1
+                }
+            }
+        }, 
+        "ns.foo#Invalid3": {
+            "type": "list", 
+            "member": {
+                "target": "smithy.api#String"
+            }, 
+            "traits": {
+                "smithy.api#length": {
+                    "min": 5, 
+                    "max": 4
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,1 @@
+[ERROR] smithy.example#MyService: Service attempts to rename a operation shape from `smithy.example#SayHello` to "SayHello2"; operations cannot be renamed | Service

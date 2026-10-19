@@ -1,0 +1,84 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#Resource": {
+            "type": "resource",
+            "identifiers": {
+                "id": {
+                    "target": "smithy.api#String"
+                }
+            },
+            "put": {
+                "target": "ns.foo#PutResource"
+            },
+            "create": {
+                "target": "ns.foo#CreateResource"
+            },
+            "read": {
+                "target": "ns.foo#GetResource"
+            },
+            "update": {
+                "target": "ns.foo#UpdateResource"
+            },
+            "delete": {
+                "target": "ns.foo#DeleteResource"
+            },
+            "list": {
+                "target": "ns.foo#ListResource"
+            }
+        },
+        "ns.foo#PutResource": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#ResourceInput"
+            },
+            "traits": {
+                "smithy.api#readonly": {}
+            }
+        },
+        "ns.foo#CreateResource": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#readonly": {}
+            }
+        },
+        "ns.foo#GetResource": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#ResourceInput"
+            }
+        },
+        "ns.foo#UpdateResource": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#ResourceInput"
+            },
+            "traits": {
+                "smithy.api#readonly": {}
+            }
+        },
+        "ns.foo#DeleteResource": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#ResourceInput"
+            },
+            "traits": {
+                "smithy.api#readonly": {}
+            }
+        },
+        "ns.foo#ListResource": {
+            "type": "operation"
+        },
+        "ns.foo#ResourceInput": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        }
+    }
+}

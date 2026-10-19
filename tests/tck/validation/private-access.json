@@ -1,0 +1,188 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "smithy.example#InvalidService": {
+            "type": "service",
+            "version": "2018-04-08",
+            "operations": [
+                {
+                    "target": "smithy.private#PrivateOperation"
+                },
+                {
+                    "target": "smithy.example#InvalidOperation"
+                }
+            ]
+        },
+        "smithy.example#InvalidList": {
+            "type": "list",
+            "member": {
+                "target": "smithy.private#PrivateString"
+            }
+        },
+        "smithy.example#InvalidStructure": {
+            "type": "structure",
+            "members": {
+                "invalid": {
+                    "target": "smithy.private#PrivateString"
+                }
+            }
+        },
+        "smithy.example#InvalidMap": {
+            "type": "map",
+            "key": {
+                "target": "smithy.private#PrivateString"
+            },
+            "value": {
+                "target": "smithy.private#PrivateString"
+            }
+        },
+        "smithy.example#InvalidOperation": {
+            "type": "operation",
+            "input": {
+                "target": "smithy.private#InvalidOperationInput"
+            },
+            "output": {
+                "target": "smithy.private#InvalidOperationOutput"
+            },
+            "errors": [
+                {
+                    "target": "smithy.private#PrivateError"
+                }
+            ]
+        },
+        "smithy.example#InvalidTraitApplication": {
+            "type": "structure",
+            "members": {},
+            "traits": {
+                "smithy.private#privateTrait": {}
+            }
+        },
+        "smithy.private#privateTrait": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#trait": {},
+                "smithy.api#private": {}
+            }
+        },
+        "smithy.private#InvalidOperationInput": {
+            "type": "structure",
+            "members": {
+                "valid": {
+                    "target": "smithy.private#PrivateString"
+                },
+                "list": {
+                    "target": "smithy.example#InvalidList"
+                },
+                "struct": {
+                    "target": "smithy.example#InvalidStructure"
+                },
+                "map": {
+                    "target": "smithy.example#InvalidMap"
+                },
+                "traitApplication": {
+                    "target": "smithy.example#InvalidTraitApplication"
+                }
+            },
+            "traits": {
+                "smithy.api#private": {},
+                "smithy.api#input": {}
+            }
+        },
+        "smithy.private#InvalidOperationOutput": {
+            "type": "structure",
+            "members": {
+                "valid": {
+                    "target": "smithy.private#PrivateString"
+                },
+                "list": {
+                    "target": "smithy.example#InvalidList"
+                },
+                "struct": {
+                    "target": "smithy.example#InvalidStructure"
+                },
+                "map": {
+                    "target": "smithy.example#InvalidMap"
+                },
+                "traitApplication": {
+                    "target": "smithy.example#InvalidTraitApplication"
+                }
+            },
+            "traits": {
+                "smithy.api#private": {},
+                "smithy.api#output": {}
+            }
+        },
+        "smithy.private#PrivateError": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#private": {},
+                "smithy.api#error": "client"
+            }
+        },
+        "smithy.private#PrivateString": {
+            "type": "string",
+            "traits": {
+                "smithy.api#private": {}
+            }
+        },
+        "smithy.private#PrivateOperation": {
+            "type": "operation",
+            "input": {
+                "target": "smithy.private#PrivateOperationInput"
+            },
+            "output": {
+                "target": "smithy.private#PrivateOperationOutput"
+            },
+            "errors": [
+                {
+                    "target": "smithy.private#PrivateError"
+                }
+            ],
+            "traits": {
+                "smithy.api#private": {}
+            }
+        },
+        "smithy.private#PrivateOperationInput": {
+            "type": "structure",
+            "members": {
+                "valid": {
+                    "target": "smithy.private#PrivateString"
+                },
+                "list": {
+                    "target": "smithy.example#InvalidList"
+                },
+                "struct": {
+                    "target": "smithy.example#InvalidStructure"
+                },
+                "map": {
+                    "target": "smithy.example#InvalidMap"
+                }
+            },
+            "traits": {
+                "smithy.api#private": {},
+                "smithy.api#input": {}
+            }
+        },
+        "smithy.private#PrivateOperationOutput": {
+            "type": "structure",
+            "members": {
+                "valid": {
+                    "target": "smithy.private#PrivateString"
+                },
+                "list": {
+                    "target": "smithy.example#InvalidList"
+                },
+                "struct": {
+                    "target": "smithy.example#InvalidStructure"
+                },
+                "map": {
+                    "target": "smithy.example#InvalidMap"
+                }
+            },
+            "traits": {
+                "smithy.api#private": {},
+                "smithy.api#output": {}
+            }
+        }
+    }
+}

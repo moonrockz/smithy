@@ -1,0 +1,61 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#Service2": {
+            "type": "service",
+            "version": "2019-06-27",
+            "operations": [
+                {
+                    "target": "ns.foo#MapTokens"
+                }
+            ]
+        },
+        "ns.foo#MapTokens": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#MapTokensInput"
+            },
+            "output": {
+                "target": "ns.foo#MapTokensOutput"
+            },
+            "traits": {
+                "smithy.api#readonly": {},
+                "smithy.api#paginated": {
+                    "inputToken": "nextToken",
+                    "outputToken": "nextToken"
+                }
+            }
+        },
+        "ns.foo#MapTokensInput": {
+            "type": "structure",
+            "members": {
+                "nextToken": {
+                    "target": "ns.foo#StringMap"
+                }
+            },
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#MapTokensOutput": {
+            "type": "structure",
+            "members": {
+                "nextToken": {
+                    "target": "ns.foo#StringMap"
+                }
+            },
+            "traits": {
+                "smithy.api#output": {}
+            }
+        },
+        "ns.foo#StringMap": {
+            "type": "map",
+            "key": {
+                "target": "smithy.api#String"
+            },
+            "value": {
+                "target": "smithy.api#String"
+            }
+        }
+    }
+}

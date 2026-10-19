@@ -1,0 +1,29 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#ValidClient": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#error": "client"
+            }
+        },
+        "ns.foo#ValidServer": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#error": "server"
+            }
+        },
+        "ns.foo#ValidServerWithTag": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#error": "server"
+            }
+        },
+        "ns.foo#InvalidDoesNotStartWithClientOrServer": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#error": "notFound"
+            }
+        }
+    }
+}

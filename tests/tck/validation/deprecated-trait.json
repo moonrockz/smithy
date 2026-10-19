@@ -1,0 +1,47 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#Valid": {
+            "type": "structure",
+            "members": {
+                "abc": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#deprecated": {}
+                    }
+                },
+                "def": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#deprecated": {
+                            "message": "Another message"
+                        }
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#deprecated": {
+                    "message": "Message"
+                }
+            }
+        },
+        "ns.foo#Invalid1": {
+            "type": "integer"
+        },
+        "ns.foo#Invalid2": {
+            "type": "integer",
+            "traits": {
+                "smithy.api#deprecated": "Foo"
+            }
+        },
+        "ns.foo#Invalid3": {
+            "type": "integer",
+            "traits": {
+                "smithy.api#deprecated": "Foo"
+            }
+        },
+        "ns.foo#String": {
+            "type": "string"
+        }
+    }
+}

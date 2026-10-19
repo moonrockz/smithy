@@ -1,5 +1,5 @@
 The files under tests/tck/cases/, tests/tck/json-cases/,
-tests/tck/jsonschema/, and tests/tck/selectors/ are copied from
+tests/tck/jsonschema/, tests/tck/selectors/, and tests/tck/validation/ are copied from
 https://github.com/smithy-lang/smithy (Apache-2.0). Their contents are embedded
 in tests/tck/cases.mbt and tests/tck/json_cases.mbt for offline tests.
 

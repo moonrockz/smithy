@@ -1,0 +1,1 @@
+[ERROR] ns.foo#Invalid2: Error validating trait `externalDocumentation`: Value provided for `smithy.api#externalDocumentation` must have at least 1 entries, but the provided value only has 0 entries | TraitValue

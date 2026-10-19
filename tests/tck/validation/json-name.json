@@ -1,0 +1,31 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#A": {
+            "type": "structure",
+            "members": {
+                "a": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#jsonName": "A"
+                    }
+                },
+                "b": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#jsonName": "B"
+                    }
+                }
+            }
+        },
+        "ns.foo#B": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#jsonName": "Foo"
+            }
+        },
+        "ns.foo#String": {
+            "type": "string"
+        }
+    }
+}
