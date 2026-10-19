@@ -122,6 +122,13 @@ async fn exercise(
   let err = if target == "wasm-gc" { out + stderr } else { stderr }
   assert_true(err.contains("SM-MODEL-004") && err.contains("broken.smithy:3:"))
   runner.command(["validate", "syntax.smithy"], 1) |> ignore
+  @fs.write_file(
+    "\{dir}/configured.smithy",
+    "$version: \"2\"\nmetadata validators = [{name: \"EmitEachSelector\", id: \"Selected\", configuration: {selector: \"structure\"}}]\nnamespace example\nstructure Found {}\n",
+  )
+  let (out, stderr) = runner.command(["validate", "configured.smithy"], 1)
+  let events = out + stderr
+  assert_true(events.contains("[DANGER] example#Found: Selector capture matched selector: structure | Selected"))
   runner.command(["select", "input.smithy"], 2) |> ignore
   let (selected, _) = runner.command(
     ["select", "--selector", "[id|namespace=example]", "input.smithy"],

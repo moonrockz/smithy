@@ -197,6 +197,15 @@ fn diagnostic(
 }
 
 ///|
+fn validation_event_text(event : @smithy.ValidationEvent) -> String {
+  let shape = match event.shape {
+    Some(id) => id.to_string()
+    None => "-"
+  }
+  "[\{event.severity}] \{shape}: \{event.message} | \{event.id}"
+}
+
+///|
 fn json_output(model : @smithy.Model) -> String raise {
   @syntax.encode_json_ast(model.to_json_ast()).stringify(indent=4) + "\n"
 }
@@ -277,7 +286,18 @@ fn run(args : Array[String]) -> Int32 raise {
   }
   guard result.model is Some(model) else { return 1 }
   if opts.command == "validate" {
-    return 0
+    let mut failed = false
+    for event in model.validation_events() {
+      if event.severity == "DANGER" || event.severity == "ERROR" {
+        failed = true
+      }
+      if event.severity == "WARNING" ||
+        event.severity == "DANGER" ||
+        event.severity == "ERROR" {
+        eprintln(validation_event_text(event))
+      }
+    }
+    return if failed { 1 } else { 0 }
   }
   if opts.command == "select" {
     guard opts.selector is Some(expression) else {
