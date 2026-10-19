@@ -6,6 +6,16 @@ is 0.x, a minor release can contain breaking changes.
 
 <!-- git-cliff: end of header -->
 
+## [0.3.0] - 2026-10-19
+
+Smithy now converts assembled models to JSON Schema through the new `moonrockz/smithy-jsonschema` package and the `jsonSchema` build plugin. The new `moonrockz/smithy-build` package and `smithy build` and `smithy clean` commands support projections, all 28 built-in transforms, local JAR imports and environment substitutions. `smithy select` evaluates selectors, and validation now runs configured and default validators with reference event IDs, severities, shape IDs and suppressions. Build outputs require a dedicated directory separate from sources and imports, with an ownership marker protecting existing files. Code that constructs `Shape`, `ModelDiagnostic` or `LoadResult` records directly must supply the added `provenance`, `event_id` and `validation_findings` fields respectively; loader callers need no record changes.
+
+### 🚀 Features
+
+- Add JSON Schema conversion and build toolchain ([#25](https://github.com/moonrockz/smithy/pull/25)) by @DamianReeves
+
+**Full changelog**: https://github.com/moonrockz/smithy/compare/v0.2.0...v0.3.0
+
 ## [0.2.0] - 2026-10-18
 
 Smithy now loads `smithy.contracts#conditions` and validates JMESPath syntax, modeled member references, function arguments, and boolean results during assembly. The new `moonrockz/jmespath` package exposes standalone parsing, an inspectable AST with source spans, JSON evaluation, and diagnostics with source locations. IDL/JSON conversion preserves contract expressions and documentation. Serialization does not evaluate contracts. Existing models without contract traits need no changes.
