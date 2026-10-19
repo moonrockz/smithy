@@ -97,7 +97,9 @@ async fn exercise(
     let (out, _) = runner.command(args, 0)
     assert_eq(out, help)
   }
-  for command in ["ast", "validate", "select", "format", "convert", "version"] {
+  for command in [
+    "ast", "validate", "select", "format", "convert", "build", "clean", "version",
+  ] {
     let (help, _) = runner.command([command, "--help"], 0)
     assert_true(help.contains("Usage: smithy \{command}"))
     for args in [[command, "-h"], ["help", command]] {
@@ -168,6 +170,21 @@ async fn exercise(
   let (roundtrip, _) = runner.command(["ast", "restored.smithy"], 0)
   assert_eq(@json.parse(roundtrip), @json.parse(ast))
   runner.command(["validate", "input.smithy", "model.json"], 0) |> ignore
+  @fs.write_file(
+    "\{dir}/smithy-build.json",
+    "{\"version\":\"1.0\",\"sources\":[\"input.smithy\"],\"outputDirectory\":\"build-output\",\"plugins\":{\"jsonSchema\":{}},\"projections\":{\"filtered\":{\"transforms\":[{\"name\":\"excludeTraits\",\"args\":{\"traits\":[\"documentation\"]}}]}}}",
+  )
+  runner.command(["build"], 0) |> ignore
+  assert_true(@fs.exists("\{dir}/build-output/source/model/model.json"))
+  assert_true(@fs.exists("\{dir}/build-output/filtered/model/model.json"))
+  assert_true(@fs.exists("\{dir}/build-output/source/build-info/smithy-build-info.json"))
+  assert_true(@fs.exists("\{dir}/build-output/source/sources/input.smithy"))
+  assert_true(@fs.exists("\{dir}/build-output/source/jsonSchema/schema.json"))
+  assert_true(@fs.read_file("\{dir}/build-output/source/jsonSchema/schema.json")
+    .text().contains("Example"))
+  runner.command(["clean"], 0) |> ignore
+  assert_false(@fs.exists("\{dir}/build-output"))
+  assert_true(@fs.exists("\{dir}/input.smithy"))
   runner.command(["format", "--check", "input.smithy"], 1) |> ignore
   let (formatted, _) = runner.command(["format", "input.smithy"], 0)
   assert_true(formatted.contains("// comment"))

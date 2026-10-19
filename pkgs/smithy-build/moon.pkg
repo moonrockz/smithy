@@ -1,0 +1,11 @@
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-syntax" @syntax,
+  "moonbitlang/core/json",
+}
+
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-build" @build,
+  "moonbitlang/x/fs",
+} for "test"

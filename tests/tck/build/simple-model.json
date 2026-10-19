@@ -1,0 +1,31 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+                "smithy.api#documentation": "docs",
+                "smithy.api#tags": [
+                    "foo"
+                ]
+            }
+        },
+        "ns.foo#String2": {
+            "type": "string"
+        },
+        "ns.foo#String3": {
+            "type": "string",
+            "traits": {
+                "smithy.api#tags": [
+                    "baz"
+                ],
+                "smithy.api#mediaType": "application/json",
+                "smithy.api#length": {
+                    "min": 0,
+                    "max": 10
+                },
+                "smithy.api#documentation": "docs"
+            }
+        }
+    }
+}

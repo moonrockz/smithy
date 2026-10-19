@@ -1,0 +1,31 @@
+{
+  "version": "2.0",
+  "projections": {
+    "valid": {
+      "transforms": [
+        {
+          "name": "includeTraits",
+          "args": {
+            "traits": [
+              "sensitive",
+              "required",
+              "readonly"
+            ]
+          }
+        }
+      ]
+    },
+    "invalid": {
+      "transforms": [
+        {
+          "name": "excludeTraits",
+          "args": {
+            "traits": [
+              "required"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

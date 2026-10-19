@@ -16,6 +16,8 @@ keywords = [ "smithy", "command-line", "moonx", "idl", "json" ]
 
 import {
   "moonrockz/smithy@0.2.0",
+  "moonrockz/smithy-build@0.2.0",
+  "moonrockz/smithy-jsonschema@0.2.0",
   "moonrockz/smithy-syntax@0.2.0",
   "moonbitlang/x@0.5.5",
 }

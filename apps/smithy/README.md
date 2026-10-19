@@ -1,6 +1,6 @@
 # smithy CLI
 
-Assemble, validate, select, format and convert Smithy models.
+Assemble, validate, select, format, convert and build Smithy models.
 
 ## Run
 
@@ -40,6 +40,8 @@ Use `smithy --help` for the command list, and `smithy convert --help` or
 ```shell
 smithy ast model.smithy extra.json
 smithy validate model.smithy extra.json
+smithy build --config smithy-build.json
+smithy clean --config smithy-build.json
 smithy select --selector 'structure > member > string' model.smithy
 smithy convert --to json model.smithy -o model.json
 smithy convert --to idl model.json -o model.smithy
@@ -53,6 +55,11 @@ smithy format --write model.smithy model.json
 omit built-in prelude and contract definitions. `validate` assembles the same model and prints
 any diagnostics. Reference resolution, mixin expansion, trait application and
 metadata merging follow the model library's rules.
+
+`build` reads the configured local sources and imports, runs each concrete
+projection, and writes model, sources and build-info artifacts under its output
+directory. A `jsonSchema` plugin setting writes `schema.json` for each
+projection. `clean` removes that configured output directory.
 
 The `smithy.contracts#conditions` trait is included. Validation checks its
 targets, condition names and required string fields, then analyzes JMESPath

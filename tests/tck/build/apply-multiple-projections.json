@@ -1,0 +1,77 @@
+{
+  "version": "2.0",
+  "projections": {
+    "a": {
+      "transforms": [
+        {
+          "name": "includeShapesByTag",
+          "args": {
+            "projections": [
+              "foo",
+              "baz"
+            ]
+          }
+        },
+        {
+          "name": "apply",
+          "args": {
+            "projections": [
+              "excludeLength"
+            ]
+          }
+        },
+        {
+          "name": "excludeTraits",
+          "args": {
+            "projections": [
+              "documentation"
+            ]
+          }
+        },
+        // No issue with applying it multiple times.
+        {
+          "name": "apply",
+          "args": {
+            "projections": [
+              "excludeLength"
+            ]
+          }
+        }
+      ]
+    },
+    "excludeLength": {
+      "abstract": true,
+      "transforms": [
+        {
+          "name": "excludeTraits",
+          "args": {
+            "projections": [
+              "length"
+            ]
+          }
+        },
+        {
+          "name": "apply",
+          "args": {
+            "projections": [
+              "excludeTags"
+            ]
+          }
+        }
+      ]
+    },
+    "excludeTags": {
+      "abstract": true,
+      "transforms": [
+        {
+          "name": "excludeTraits",
+          "args": {
+            "traits": [
+              "tags"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
