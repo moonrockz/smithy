@@ -1,0 +1,61 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#MyStructure": {
+            "type": "structure",
+            "members": {
+                "abc": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "def": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "hij": {
+                    "target": "smithy.api#Float"
+                }
+            },
+            "traits": {
+                "smithy.api#references": [
+                    {
+                        "resource": "ns.foo#MyResource",
+                        "ids": {
+                            "notId": "abc",
+                            "def": "def"
+                        }
+                    },
+                    {
+                        "resource": "ns.foo#MyResource",
+                        "ids": {
+                            "abc": "notMember",
+                            "def": "def"
+                        }
+                    },
+                    {
+                        "resource": "ns.foo#MyResource",
+                        "ids": {
+                            "abc": "abc",
+                            "def": "hij"
+                        }
+                    }
+                ]
+            }
+        },
+        "ns.foo#MyResource": {
+            "type": "resource",
+            "identifiers": {
+                "abc": {
+                    "target": "smithy.api#String"
+                },
+                "def": {
+                    "target": "smithy.api#String"
+                }
+            }
+        }
+    }
+}

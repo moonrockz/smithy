@@ -1,0 +1,75 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#DeeplyNested": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#DeeplyNestedInput"
+            },
+            "output": {
+                "target": "ns.foo#DeeplyNestedOutput"
+            },
+            "traits": {
+                "smithy.api#readonly": {},
+                "smithy.api#paginated": {
+                    "inputToken": "nextToken",
+                    "outputToken": "output.result.nextToken",
+                    "items": "output.result.items"
+                }
+            }
+        },
+        "ns.foo#DeeplyNestedInput": {
+            "type": "structure",
+            "members": {
+                "nextToken": {
+                    "target": "smithy.api#String"
+                },
+                "pageSize": {
+                    "target": "smithy.api#Integer"
+                }
+            },
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#DeeplyNestedOutput": {
+            "type": "structure",
+            "members": {
+                "output": {
+                    "target": "ns.foo#WrappedOutput"
+                }
+            },
+            "traits": {
+                "smithy.api#output": {}
+            }
+        },
+        "ns.foo#WrappedOutput": {
+            "type": "structure",
+            "members": {
+                "result": {
+                    "target": "ns.foo#InnerOutput"
+                }
+            }
+        },
+        "ns.foo#InnerOutput": {
+            "type": "structure",
+            "members": {
+                "nextToken": {
+                    "target": "smithy.api#String"
+                },
+                "items": {
+                    "target": "ns.foo#StringList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "ns.foo#StringList": {
+            "type": "list",
+            "member": {
+                "target": "smithy.api#String"
+            }
+        }
+    }
+}

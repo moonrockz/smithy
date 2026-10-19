@@ -1,0 +1,84 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+                "ns.foo#foo": {}
+            }
+        },
+        "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+                "ns.foo#foo": {},
+                "ns.foo#baz": {}
+            }
+        },
+        "ns.foo#String3": {
+            "type": "string",
+            "traits": {
+                "ns.foo#foo": {},
+                "ns.foo#baz": {},
+                "ns.foo#qux": {}
+            }
+        },
+        "ns.foo#String4": {
+            "type": "string",
+            "traits": {
+                "ns.foo#bam": {},
+                "ns.foo#qux": {}
+            }
+        },
+        "ns.foo#String5": {
+            "type": "string",
+            "traits": {
+                "ns.foo#bam": {}
+            }
+        },
+        "ns.foo#String6": {
+            "type": "string",
+            "traits": {
+                "ns.foo#qux": {}
+            }
+        },
+        "ns.foo#foo": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#trait": {
+                    "selector": "*",
+                    "conflicts": [
+                        "ns.foo#baz",
+                        "ns.foo#qux"
+                    ]
+                }
+            }
+        },
+        "ns.foo#baz": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#trait": {
+                    "selector": "*"
+                }
+            }
+        },
+        "ns.foo#qux": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#trait": {
+                    "selector": "*",
+                    "conflicts": [
+                        "ns.foo#bam"
+                    ]
+                }
+            }
+        },
+        "ns.foo#bam": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#trait": {
+                    "selector": "*"
+                }
+            }
+        }
+    }
+}

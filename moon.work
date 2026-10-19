@@ -2,6 +2,8 @@ members = [
   ".",
   "./pkgs/jmespath",
   "./pkgs/smithy",
+  "./pkgs/smithy-build",
+  "./pkgs/smithy-jsonschema",
   "./pkgs/smithy-syntax",
   "./apps/smithy",
   "./docs/cookbook",

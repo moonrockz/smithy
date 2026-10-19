@@ -1,0 +1,222 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#A": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#readonly": {},
+                "smithy.api#http": {
+                    "method": "Get",
+                    "uri": "/A"
+                }
+            }
+        },
+        "ns.foo#B": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#readonly": {},
+                "smithy.api#http": {
+                    "method": "HEAD",
+                    "uri": "/B"
+                }
+            }
+        },
+        "ns.foo#C": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#idempotent": {},
+                "smithy.api#http": {
+                    "method": "DELETE",
+                    "uri": "/C"
+                }
+            }
+        },
+        "ns.foo#D": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#idempotent": {},
+                "smithy.api#http": {
+                    "method": "PUT",
+                    "uri": "/D"
+                }
+            }
+        },
+        "ns.foo#E": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "method": "PATCH",
+                    "uri": "/E"
+                }
+            }
+        },
+        "ns.foo#F": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/F"
+                }
+            }
+        },
+        "ns.foo#G": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#readonly": {},
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/G"
+                }
+            }
+        },
+        "ns.foo#H": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "method": "DELETE",
+                    "uri": "/H"
+                }
+            }
+        },
+        "ns.foo#I": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/I"
+                }
+            }
+        },
+        "ns.foo#J": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#idempotent": {},
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/J"
+                }
+            }
+        },
+        "ns.foo#K": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#KInput"
+            },
+            "traits": {
+                "smithy.api#readonly": {},
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/K"
+                }
+            }
+        },
+        "ns.foo#KInput": {
+            "type": "structure",
+            "members": {
+                "payload": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {},
+                        "smithy.api#httpPayload": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#L": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#LInput"
+            },
+            "traits": {
+                "smithy.api#readonly": {},
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/L"
+                }
+            }
+        },
+        "ns.foo#LInput": {
+            "type": "structure",
+            "members": {
+                "foo": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "X-Foo"
+                    }
+                },
+                "payload": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "morePayload": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#M": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#MInput"
+            },
+            "traits": {
+                "smithy.api#http": {
+                    "method": "DELETE",
+                    "uri": "/M"
+                },
+                "smithy.api#idempotent": {}
+            }
+        },
+        "ns.foo#MInput": {
+            "type": "structure",
+            "members": {
+                "payload": {
+                    "target": "smithy.api#String"
+                }
+            },
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#N": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "method": "PATCH",
+                    "uri": "/E"
+                },
+                "smithy.api#idempotent": {}
+            }
+        },
+        "ns.foo#Options": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "method": "OPTIONS",
+                    "uri": "/options"
+                },
+                "smithy.api#readonly": {}
+            },
+            "input": {
+                "target": "ns.foo#OptionsInput"
+            }
+        },
+        "ns.foo#OptionsInput": {
+            "type": "structure",
+            "members": {},
+            "traits": {
+                "smithy.api#input": {}
+            }
+        }
+    }
+}

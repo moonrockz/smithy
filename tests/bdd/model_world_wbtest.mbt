@@ -82,6 +82,13 @@ impl @moonspec.World for ModelWorld with fn configure(self, setup) {
     assert_true(!self.assembled().has_errors())
     self.model() |> ignore
   })
+  setup.then2("the selector {string} yields {string}", fn(
+    expression : String,
+    expected : String,
+  ) raise {
+    let actual = @smithy.Selector::parse(expression).select_ids(self.model())
+    assert_eq(actual, expected.split(", ").map(s => s.to_owned()).to_array())
+  })
   setup.then2("the semantic member {string} targets {string}", fn(
     id : String,
     target : String,

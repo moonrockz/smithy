@@ -1,0 +1,71 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#Invalid1": {
+            "type": "structure",
+            "members": {
+                "foo": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#eventPayload": {}
+                    }
+                },
+                "baz": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#eventPayload": {}
+                    }
+                },
+                "bar": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#eventHeader": {}
+                    }
+                }
+            }
+        },
+        "ns.foo#Invalid2": {
+            "type": "structure",
+            "members": {
+                "foo": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#idempotencyToken": {}
+                    }
+                },
+                "baz": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#idempotencyToken": {}
+                    }
+                },
+                "bar": {
+                    "target": "ns.foo#String"
+                }
+            }
+        },
+        "ns.foo#Invalid3": {
+            "type": "structure",
+            "members": {
+                "foo": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#httpPayload": {}
+                    }
+                },
+                "baz": {
+                    "target": "ns.foo#String",
+                    "traits": {
+                        "smithy.api#httpPayload": {}
+                    }
+                },
+                "bar": {
+                    "target": "ns.foo#String"
+                }
+            }
+        },
+        "ns.foo#String": {
+            "type": "string"
+        }
+    }
+}

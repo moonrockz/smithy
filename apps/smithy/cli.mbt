@@ -45,7 +45,7 @@ fn command_line() -> @argparse.Command {
   )
   @argparse.Command(
     "smithy",
-    about="A Smithy toolchain for MoonBit: assemble, validate, format and convert models.",
+    about="A Smithy toolchain for MoonBit: assemble, validate, select, format and convert models.",
     version=version_text(),
     arg_required_else_help=true,
     subcommand_required=true,
@@ -56,6 +56,39 @@ fn command_line() -> @argparse.Command {
         options=[output],
       ),
       input_command("validate", "Assemble files and report model diagnostics."),
+      @argparse.Command(
+        "build",
+        about="Run projections from smithy-build.json.",
+        options=[
+          @argparse.OptionArg(
+            "config",
+            short='c',
+            about="Build configuration file.",
+          ),
+        ],
+      ),
+      @argparse.Command(
+        "clean",
+        about="Remove the configured build output directory.",
+        options=[
+          @argparse.OptionArg(
+            "config",
+            short='c',
+            about="Build configuration file.",
+          ),
+        ],
+      ),
+      input_command(
+        "select",
+        "Print matching absolute shape IDs, one per line.",
+        options=[
+          @argparse.OptionArg(
+            "selector",
+            about="Smithy selector expression.",
+            required=true,
+          ),
+        ],
+      ),
       input_command(
         "format",
         "Format IDL/JSON files. By default, print one file to stdout.",
@@ -99,6 +132,8 @@ struct Options {
   files : Array[String]
   from : String?
   to : String?
+  selector : String?
+  config : String?
   output : String?
   output_dir : String?
   check : Bool
@@ -122,6 +157,8 @@ fn options(args : Array[String]) -> Options raise CliError {
   let files = matches.values.get("file").unwrap_or([])
   let from = value("from")
   let to = value("to")
+  let selector = value("selector")
+  let config = value("config")
   let output = value("output")
   let output_dir = value("output-dir")
   let check = matches.flags.get("check") == Some(true)
@@ -146,7 +183,18 @@ fn options(args : Array[String]) -> Options raise CliError {
   if command == "format" && files.length() > 1 && !check && !write {
     raise CliError("use --check or --write when formatting multiple files", 2)
   }
-  { command, files, from, to, output, output_dir, check, write, }
+  {
+    command,
+    files,
+    from,
+    to,
+    selector,
+    config,
+    output,
+    output_dir,
+    check,
+    write,
+  }
 }
 
 ///|
@@ -184,6 +232,15 @@ fn diagnostic(
 }
 
 ///|
+fn validation_event_text(event : @smithy.ValidationEvent) -> String {
+  let shape = match event.shape {
+    Some(id) => id.to_string()
+    None => "-"
+  }
+  "[\{event.severity}] \{shape}: \{event.message} | \{event.id}"
+}
+
+///|
 fn json_output(model : @smithy.Model) -> String raise {
   @syntax.encode_json_ast(model.to_json_ast()).stringify(indent=4) + "\n"
 }
@@ -211,6 +268,12 @@ fn run(args : Array[String]) -> Int32 raise {
   if opts.command == "version" {
     println(version_text())
     return 0
+  }
+  if opts.command == "build" || opts.command == "clean" {
+    return run_build(
+      opts.config.unwrap_or("smithy-build.json"),
+      opts.command == "clean",
+    )
   }
   let loader = @smithy.Loader::new()
   let inputs : Map[String, String] = Map([])
@@ -259,11 +322,33 @@ fn run(args : Array[String]) -> Int32 raise {
     return if failed { 1 } else { 0 }
   }
   let result = loader.assemble()
+  if opts.command == "validate" {
+    let mut failed = result.model is None
+    for event in result.validation_events() {
+      if event.severity == "DANGER" || event.severity == "ERROR" {
+        failed = true
+      }
+      if event.severity == "WARNING" ||
+        event.severity == "DANGER" ||
+        event.severity == "ERROR" {
+        eprintln(validation_event_text(event))
+      }
+    }
+    return if failed { 1 } else { 0 }
+  }
   for d in result.diagnostics {
     eprintln(diagnostic(d, inputs))
   }
   guard result.model is Some(model) else { return 1 }
-  if opts.command == "validate" {
+  if opts.command == "select" {
+    guard opts.selector is Some(expression) else {
+      raise CliError("select requires --selector", 2)
+    }
+    let selector = @smithy.Selector::parse(expression) catch {
+      @smithy.InvalidSelector(message) => raise CliError(message, 2)
+    }
+    let ids = selector.select_ids(model)
+    emit(if ids.is_empty() { "" } else { ids.join("\n") + "\n" }, None)
     return 0
   }
   if opts.to != Some("idl") {

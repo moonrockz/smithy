@@ -115,6 +115,10 @@ run = "moonx scripts/dist.mbtx pack"
 description = "Vendor the Java reference's loader test corpus into tests/tck, the compatibility kit (args: git ref)"
 run = "moonx scripts/vendor-tck.mbtx"
 
+[tasks."tck:reference"]
+description = "Regenerate Java reference build and validation expectations"
+run = "moonx scripts/reference-build.mbtx"
+
 [tasks."test:native-zig"]
 description = "Run the native tests with zig as the C compiler (the host wrapper of zig-cross)"
 run = "moonx scripts/zig-cross.mbtx exec host -- moonx scripts/test.mbtx native"

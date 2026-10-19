@@ -1,0 +1,58 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#StringList": {
+            "type": "list",
+            "member": {
+                "target": "smithy.api#String"
+            }
+        },
+        "ns.foo#StringMap": {
+            "type": "map",
+            "key": {
+                "target": "smithy.api#String"
+            },
+            "value": {
+                "target": "smithy.api#String"
+            }
+        },
+        "ns.foo#InvalidStringList": {
+            "type": "list",
+            "member": {
+                "target": "smithy.api#String"
+            },
+            "traits": {
+                "smithy.api#xmlFlattened": {}
+            }
+        },
+        "ns.foo#InvalidStringMap": {
+            "type": "map",
+            "key": {
+                "target": "smithy.api#String"
+            },
+            "value": {
+                "target": "smithy.api#String"
+            },
+            "traits": {
+                "smithy.api#xmlFlattened": {}
+            }
+        },
+        "ns.foo#ValidStructure": {
+            "type": "structure",
+            "members": {
+                "flatList": {
+                    "target": "ns.foo#StringList",
+                    "traits": {
+                        "smithy.api#xmlFlattened": {}
+                    }
+                },
+                "flatMap": {
+                    "target": "ns.foo#StringMap",
+                    "traits": {
+                        "smithy.api#xmlFlattened": {}
+                    }
+                }
+            }
+        }
+    }
+}

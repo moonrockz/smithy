@@ -18,6 +18,7 @@ test "invalid command options fail with usage status" {
       ["convert", "--to=idl", "--output-dir=out", "-ooutput", "a.smithy"],
       ["convert", "--to", "json", "--output-dir", "out", "a.smithy"],
       ["validate", "-o", "output", "a.smithy"],
+      ["select", "a.smithy"],
       ["format", "--write", "--from", "idl", "-"],
     ] {
     let code = try options(args) catch {

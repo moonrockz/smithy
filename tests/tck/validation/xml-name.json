@@ -1,0 +1,38 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#ValidName1": {
+            "type": "structure",
+            "members": {
+                "a": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#xmlName": "customname"
+                    }
+                }
+            }
+        },
+        "ns.foo#ValidName2": {
+            "type": "structure",
+            "members": {
+                "a": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#xmlName": "customprefix:customname"
+                    }
+                }
+            }
+        },
+        "ns.foo#InvalidName": {
+            "type": "structure",
+            "members": {
+                "a": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#xmlName": "too:many:colons"
+                    }
+                }
+            }
+        }
+    }
+}

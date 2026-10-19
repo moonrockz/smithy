@@ -1,0 +1,40 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#Service": {
+            "type": "service",
+            "version": "X",
+            "operations": [
+                {"target":  "ns.foo#ValidOperation"},
+                {"target":  "ns.foo#InvalidOperation"}
+            ],
+            "traits": {
+                "smithy.api#httpBasicAuth": {},
+                "smithy.api#httpDigestAuth": {},
+                "smithy.api#auth": [
+                    "smithy.api#httpDigestAuth",
+                    "smithy.api#httpBasicAuth"
+                ]
+            }
+        },
+        "ns.foo#ValidOperation": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#auth": [
+                    "smithy.api#httpBasicAuth",
+                    "smithy.api#httpDigestAuth"
+                ]
+            }
+        },
+        "ns.foo#InvalidOperation": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#auth": [
+                    "smithy.api#httpBasicAuth",
+                    "smithy.api#httpBearerAuth",
+                    "smithy.api#httpApiKeyAuth"
+                ]
+            }
+        }
+    }
+}

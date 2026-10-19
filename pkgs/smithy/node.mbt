@@ -15,6 +15,58 @@ pub impl Eq for NodeNumber with fn equal(self, other) {
 }
 
 ///|
+fn NodeNumber::numeric_compare(self : NodeNumber, other : NodeNumber) -> Int32 {
+  if self == other {
+    return 0
+  }
+  let zero = BigInt::from_int(0)
+  let left_negative = self.coefficient < zero
+  let right_negative = other.coefficient < zero
+  if left_negative != right_negative {
+    return if left_negative { -1 } else { 1 }
+  }
+  if self.coefficient == zero {
+    return if right_negative { 1 } else { -1 }
+  }
+  if other.coefficient == zero {
+    return if left_negative { -1 } else { 1 }
+  }
+  let left = (if left_negative { -self.coefficient } else { self.coefficient }).to_string()
+  let right = (if right_negative {
+    -other.coefficient
+  } else {
+    other.coefficient
+  }).to_string()
+  let left_scale = self.exponent + BigInt::from_int(left.length())
+  let right_scale = other.exponent + BigInt::from_int(right.length())
+  let order = if left_scale < right_scale {
+    -1
+  } else if left_scale > right_scale {
+    1
+  } else {
+    let width = if left.length() > right.length() {
+      left.length()
+    } else {
+      right.length()
+    }
+    let a = BigInt::from_string(left + "0".repeat(width - left.length()))
+    let b = BigInt::from_string(right + "0".repeat(width - right.length()))
+    if a < b {
+      -1
+    } else if a > b {
+      1
+    } else {
+      0
+    }
+  }
+  if left_negative {
+    -order
+  } else {
+    order
+  }
+}
+
+///|
 pub fn NodeNumber::parse(text : String) -> NodeNumber? {
   let value = @json.parse(text) catch { _ => return None }
   guard value is Number(approximate, ..) else { return None }

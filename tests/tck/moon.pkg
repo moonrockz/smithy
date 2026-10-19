@@ -7,4 +7,6 @@ import {
   "moonrockz/expect",
   "moonbitlang/core/json",
   "moonrockz/smithy",
+  "moonrockz/smithy-build" @build,
+  "moonbitlang/x/fs",
 } for "test"

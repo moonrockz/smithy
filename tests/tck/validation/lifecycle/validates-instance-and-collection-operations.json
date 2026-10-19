@@ -1,0 +1,97 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#ResourceA": {
+            "type": "resource",
+            "identifiers": {
+                "id": {
+                    "target": "smithy.api#String"
+                }
+            },
+            "put": {
+                "target": "ns.foo#PutValidA"
+            },
+            "create": {
+                "target": "ns.foo#CreateValidA"
+            },
+            "read": {
+                "target": "ns.foo#GetValidA"
+            },
+            "update": {
+                "target": "ns.foo#UpdateValidA"
+            },
+            "delete": {
+                "target": "ns.foo#DeleteValidA"
+            },
+            "list": {
+                "target": "ns.foo#ListValidA"
+            },
+            "operations": [
+                {
+                    "target": "ns.foo#GenericInstanceOperation"
+                }
+            ],
+            "collectionOperations": [
+                {
+                    "target": "ns.foo#GenericCollectionOperation"
+                }
+            ]
+        },
+        "ns.foo#PutValidA": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#idempotent": {}
+            }
+        },
+        "ns.foo#CreateValidA": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#ResourceAInput"
+            }
+        },
+        "ns.foo#GetValidA": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#readonly": {}
+            }
+        },
+        "ns.foo#DeleteValidA": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#idempotent": {}
+            }
+        },
+        "ns.foo#UpdateValidA": {
+            "type": "operation"
+        },
+        "ns.foo#ListValidA": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#ResourceAInput"
+            },
+            "traits": {
+                "smithy.api#readonly": {}
+            }
+        },
+        "ns.foo#GenericInstanceOperation": {
+            "type": "operation"
+        },
+        "ns.foo#GenericCollectionOperation": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#ResourceAInput"
+            }
+        },
+        "ns.foo#ResourceAInput": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        }
+    }
+}

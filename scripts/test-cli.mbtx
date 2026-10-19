@@ -25,11 +25,12 @@ async fn Runner::command(
   args : Array[String],
   expected : Int32,
   input? : String,
+  extra_env~ : Map[String, String] = Map([]),
 ) -> (String, String) {
   let all = self.prefix.copy()
   all.append(args)
   let (code, out, err) = match input {
-    None => @process.collect_output(self.executable, all, cwd=self.dir)
+    None => @process.collect_output(self.executable, all, cwd=self.dir, extra_env~)
     Some(text) =>
       @async.with_task_group(group => {
         let (stdin, writer) = @process.write_to_process()
@@ -37,7 +38,7 @@ async fn Runner::command(
           defer writer.close()
           writer.write(text)
         })
-        @process.collect_output(self.executable, all, cwd=self.dir, stdin~)
+        @process.collect_output(self.executable, all, cwd=self.dir, stdin~, extra_env~)
       })
   }
   assert_eq(
@@ -97,7 +98,9 @@ async fn exercise(
     let (out, _) = runner.command(args, 0)
     assert_eq(out, help)
   }
-  for command in ["ast", "validate", "format", "convert", "version"] {
+  for command in [
+    "ast", "validate", "select", "format", "convert", "build", "clean", "version",
+  ] {
     let (help, _) = runner.command([command, "--help"], 0)
     assert_true(help.contains("Usage: smithy \{command}"))
     for args in [[command, "-h"], ["help", command]] {
@@ -105,6 +108,7 @@ async fn exercise(
       assert_eq(out, help)
     }
     assert_eq(help.contains("--to"), command == "convert")
+    assert_eq(help.contains("--selector"), command == "select")
     assert_eq(help.contains("--check"), command == "format")
   }
   let (out, _) = runner.command(["convert", "missing.smithy", "--help"], 0)
@@ -119,8 +123,32 @@ async fn exercise(
   runner.command(["ast", "missing.smithy"], 1) |> ignore
   let (out, stderr) = runner.command(["validate", "broken.smithy"], 1)
   let err = if target == "wasm-gc" { out + stderr } else { stderr }
+  assert_true(err.contains("[ERROR] example#Broken$x:") && err.contains(" | Target.UnresolvedShape"))
+  let (out, stderr) = runner.command(["ast", "broken.smithy"], 1)
+  let err = if target == "wasm-gc" { out + stderr } else { stderr }
   assert_true(err.contains("SM-MODEL-004") && err.contains("broken.smithy:3:"))
   runner.command(["validate", "syntax.smithy"], 1) |> ignore
+  @fs.write_file(
+    "\{dir}/configured.smithy",
+    "$version: \"2\"\nmetadata validators = [{name: \"EmitEachSelector\", id: \"Selected\", configuration: {selector: \"structure\"}}]\nnamespace example\nstructure Found {}\n",
+  )
+  let (out, stderr) = runner.command(["validate", "configured.smithy"], 1)
+  let events = out + stderr
+  assert_true(events.contains("[DANGER] example#Found: Selector capture matched selector: structure | Selected"))
+  runner.command(["select", "input.smithy"], 2) |> ignore
+  let (selected, _) = runner.command(
+    ["select", "--selector", "[id|namespace=example]", "input.smithy"],
+    0,
+  )
+  assert_eq(selected, "example#Example\nexample#Example$name\n")
+  let (selected, _) = runner.command(
+    [
+      "select", "--selector",
+      "structure[id|namespace=example]:futureFunction(*)", "input.smithy",
+    ],
+    0,
+  )
+  assert_eq(selected, "")
   let (ast, _) = runner.command(["ast", "input.smithy"], 0)
   assert_true(ast.contains("9007199254740993"))
   // Test an actual pipe, including multiple chunks and non-ASCII UTF-8.
@@ -146,6 +174,96 @@ async fn exercise(
   let (roundtrip, _) = runner.command(["ast", "restored.smithy"], 0)
   assert_eq(@json.parse(roundtrip), @json.parse(ast))
   runner.command(["validate", "input.smithy", "model.json"], 0) |> ignore
+  @fs.write_file(
+    "\{dir}/smithy-build.json",
+    "{\"version\":\"1.0\",\"sources\":[\"input.smithy\"],\"outputDirectory\":\"build-output\",\"plugins\":{\"jsonSchema\":{\"jsonSchemaVersion\":\"draft2020-12\"}},\"projections\":{\"filtered\":{\"transforms\":[{\"name\":\"excludeTraits\",\"args\":{\"traits\":[\"documentation\"]}}]}}}",
+  )
+  runner.command(["build"], 0) |> ignore
+  assert_true(@fs.exists("\{dir}/build-output/source/model/model.json"))
+  assert_true(@fs.exists("\{dir}/build-output/filtered/model/model.json"))
+  assert_true(@fs.exists("\{dir}/build-output/source/build-info/smithy-build-info.json"))
+  assert_true(@fs.exists("\{dir}/build-output/source/sources/input.smithy"))
+  assert_true(@fs.exists("\{dir}/build-output/source/jsonSchema/schema.json"))
+  assert_true(@fs.read_file("\{dir}/build-output/source/jsonSchema/schema.json")
+    .text().contains("Example"))
+  assert_true(@fs.read_file("\{dir}/build-output/source/jsonSchema/schema.json")
+    .text().contains("\"$defs\""))
+  @fs.write_file("\{dir}/smithy-build.json", "{\"version\":\"1.0\",\"sources\":[\"input.smithy\"],\"outputDirectory\":\"build-output\",\"projections\":{\"filtered\":{\"abstract\":true}}}")
+  runner.command(["build"], 0) |> ignore
+  assert_false(@fs.exists("\{dir}/build-output/filtered/model/model.json"))
+  runner.command(["clean"], 0) |> ignore
+  assert_false(@fs.exists("\{dir}/build-output"))
+  @fs.write_file("\{dir}/env-build.json", "{\"version\":\"2.0\",\"sources\":[\"${SMITHY_ROOT_DIR}/input.smithy\"],\"outputDirectory\":\"${SMITHY_TEST_OUTPUT}\"}")
+  runner.command(["build", "--config", "env-build.json"], 0, extra_env={ "SMITHY_TEST_OUTPUT": "env-output", "SMITHY_ROOT_DIR": "invalid-override" }) |> ignore
+  assert_true(@fs.exists("\{dir}/env-output/source/model/model.json"))
+  @fs.write_file("\{dir}/jar-import.jar", @fs.read_file("\{root}/tests/tck/build/plugins/sources/jar-import.jar"))
+  @fs.write_file("\{dir}/jar-build.json", "{\"version\":\"2.0\",\"sources\":[\"jar-import.jar\"],\"imports\":[\"input.smithy\"],\"outputDirectory\":\"jar-output\"}")
+  runner.command(["build", "--config", "jar-build.json"], 0) |> ignore
+  let jar_manifest = @fs.read_file("\{dir}/jar-output/source/sources/manifest").text()
+  assert_eq(jar_manifest, "jar-import/a.smithy\njar-import/b/b.smithy\njar-import/b/c/c.json\n")
+  for name in ["jar-import/a.smithy", "jar-import/b/b.smithy", "jar-import/b/c/c.json"] {
+    assert_true(@fs.exists("\{dir}/jar-output/source/sources/\{name}"))
+  }
+  let jar_model = @fs.read_file("\{dir}/jar-output/source/model/model.json").text()
+  for name in ["foo.baz#A", "foo.baz#B", "foo.baz#C", "example#Example"] {
+    assert_true(jar_model.contains(name))
+  }
+  assert_false(@fs.exists("\{dir}/jar-output/source/sources/input.smithy"))
+  @fs.mkdir("\{dir}/jar-models/nested", recursive=true, allow_exist=true)
+  @fs.write_file("\{dir}/jar-models/nested/jar-import.jar", @fs.read_file("\{dir}/jar-import.jar"))
+  @fs.write_file("\{dir}/jar-directory.json", "{\"version\":\"2.0\",\"sources\":[\"jar-models\"],\"outputDirectory\":\"jar-directory-output\"}")
+  runner.command(["build", "--config", "jar-directory.json"], 0) |> ignore
+  assert_eq(@fs.read_file("\{dir}/jar-directory-output/source/sources/manifest").text(), "nested/jar-import.jar/jar-import/a.smithy\nnested/jar-import.jar/jar-import/b/b.smithy\nnested/jar-import.jar/jar-import/b/c/c.json\n")
+  @fs.write_file("\{dir}/jar-projection.json", "{\"version\":\"2.0\",\"sources\":[\"input.smithy\"],\"outputDirectory\":\"jar-projection-output\",\"projections\":{\"withJar\":{\"imports\":[\"jar-import.jar\"]}}}")
+  runner.command(["build", "--config", "jar-projection.json"], 0) |> ignore
+  assert_false(@fs.read_file("\{dir}/jar-projection-output/source/model/model.json").text().contains("foo.baz#A"))
+  assert_true(@fs.read_file("\{dir}/jar-projection-output/withJar/model/model.json").text().contains("foo.baz#A"))
+  assert_true(@fs.exists("\{dir}/input.smithy"))
+  @fs.mkdir("\{dir}/nested", allow_exist=true)
+  @fs.write_file("\{dir}/nested/keep.smithy", input)
+  @fs.write_file("\{dir}/nested/smithy-build.json", "{\"version\":\"1.0\",\"outputDirectory\":\".\"}")
+  runner.command(["clean", "--config", "nested/smithy-build.json"], 2) |> ignore
+  assert_true(@fs.exists("\{dir}/nested/keep.smithy"))
+  @fs.mkdir("\{dir}/overlap-models", allow_exist=true)
+  @fs.write_file("\{dir}/overlap-models/input.smithy", input)
+  for (name, inputs) in [
+    ("sources", "\"sources\":[\"overlap-models\"]"),
+    ("imports", "\"imports\":[\"overlap-models\"]"),
+    ("projection", "\"projections\":{\"scoped\":{\"imports\":[\"overlap-models\"]}}"),
+  ] {
+    let filename = "overlap-\{name}.json"
+    @fs.write_file("\{dir}/\{filename}", "{\"version\":\"2.0\",\"outputDirectory\":\"overlap-models/build\",\{inputs}}")
+    runner.command(["build", "--config", filename], 2) |> ignore
+    runner.command(["clean", "--config", filename], 2) |> ignore
+    assert_false(@fs.exists("\{dir}/overlap-models/build"))
+    assert_eq(@fs.read_file("\{dir}/overlap-models/input.smithy").text(), input)
+  }
+  @fs.write_file("\{dir}/protect-sources.json", "{\"version\":\"1.0\",\"sources\":[\"nested\"],\"outputDirectory\":\"nested\"}")
+  runner.command(["clean", "--config", "protect-sources.json"], 2) |> ignore
+  assert_true(@fs.exists("\{dir}/nested/keep.smithy"))
+  if @env.get_env_var("OS") != Some("Windows_NT") {
+    runner.command(["build"], 0) |> ignore
+    @fs.symlink(target="\{dir}/nested", "\{dir}/build-output/linked")
+    runner.command(["clean"], 0) |> ignore
+    assert_true(@fs.exists("\{dir}/nested/keep.smithy"))
+    runner.command(["build"], 0) |> ignore
+    @fs.remove("\{dir}/build-output/source/model/model.json")
+    @fs.symlink(target="\{dir}/nested/keep.smithy", "\{dir}/build-output/source/model/model.json")
+    runner.command(["build"], 0) |> ignore
+    assert_eq(@fs.read_file("\{dir}/nested/keep.smithy").text(), input)
+    runner.command(["clean"], 0) |> ignore
+    @fs.symlink(target=dir, "\{dir}/alias")
+    @fs.mkdir("\{dir}/alias-source", allow_exist=true)
+    @fs.write_file("\{dir}/alias-source/input.smithy", input)
+    @fs.write_file("\{dir}/protect-alias.json", "{\"version\":\"1.0\",\"sources\":[\"alias-source\"],\"outputDirectory\":\"alias/alias-source\"}")
+    runner.command(["clean", "--config", "protect-alias.json"], 2) |> ignore
+    runner.command(["build", "--config", "protect-alias.json"], 2) |> ignore
+    assert_eq(@fs.read_file("\{dir}/alias-source/input.smithy").text(), input)
+  }
+  runner.command(["build"], 0) |> ignore
+  @fs.write_file("\{dir}/smithy-build.json", "{\"version\":\"1.0\",\"sources\":[\"input.smithy\"],\"outputDirectory\":\"build-output\",\"projections\":{\"source\":{\"abstract\":true},\"filtered\":{\"abstract\":true}}}")
+  runner.command(["build"], 0) |> ignore
+  assert_false(@fs.exists("\{dir}/build-output"))
   runner.command(["format", "--check", "input.smithy"], 1) |> ignore
   let (formatted, _) = runner.command(["format", "input.smithy"], 0)
   assert_true(formatted.contains("// comment"))

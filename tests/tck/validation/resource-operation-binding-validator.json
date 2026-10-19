@@ -1,0 +1,202 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#MyService": {
+            "type": "service",
+            "version": "XYZ",
+            "resources": [
+                {
+                    "target": "ns.foo#ValidResource"
+                },
+                {
+                    "target": "ns.foo#InvalidResource"
+                }
+            ]
+        },
+        "ns.foo#ValidResource": {
+            "type": "resource",
+            "identifiers": {
+                "foo": {
+                    "target": "smithy.api#String"
+                }
+            },
+            "operations": [
+                {
+                    "target": "ns.foo#ValidResourceOperation1"
+                },
+                {
+                    "target": "ns.foo#ValidResourceOperation2"
+                }
+            ],
+            "collectionOperations": [
+                {
+                    "target": "ns.foo#ValidResourceOperation3"
+                },
+                {
+                    "target": "ns.foo#ValidResourceOperation4"
+                }
+            ]
+        },
+        "ns.foo#ValidResourceOperation1": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#ValidResourceOperation1Input"
+            },
+            "output": {
+                "target": "ns.foo#ValidResourceOperation1Output"
+            }
+        },
+        "ns.foo#ValidResourceOperation1Input": {
+            "type": "structure",
+            "members": {
+                "foo": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#ValidResourceOperation1Output": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#output": {}
+            }
+        },
+        "ns.foo#ValidResourceOperation2": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#ValidResourceOperation2Input"
+            },
+            "output": {
+                "target": "ns.foo#ValidResourceOperation2Output"
+            }
+        },
+        "ns.foo#ValidResourceOperation2Input": {
+            "type": "structure",
+            "members": {},
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#ValidResourceOperation2Output": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#output": {}
+            }
+        },
+        "ns.foo#ValidResourceOperation3": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#ValidResourceOperation3Input"
+            }
+        },
+        "ns.foo#ValidResourceOperation3Input": {
+            "type": "structure",
+            "members": {
+                "foo": {
+                    "target": "ns.foo#OtherString",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#ValidResourceOperation4": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#ValidResourceOperation4Input"
+            }
+        },
+        "ns.foo#ValidResourceOperation4Input": {
+            "type": "structure",
+            "members": {
+                "foo": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {},
+                        "smithy.api#suppress": ["MemberShouldReferenceResource"]
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#InvalidResource": {
+            "type": "resource",
+            "identifiers": {
+                "bar": {
+                    "target": "smithy.api#String"
+                }
+            },
+            "operations": [
+                {
+                    "target": "ns.foo#InvalidResourceOperation1"
+                },
+                {
+                    "target": "ns.foo#InvalidResourceOperation2"
+                }
+            ]
+        },
+        "ns.foo#InvalidResourceOperation1": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#InvalidResourceOperation1Input"
+            },
+            "output": {
+                "target": "ns.foo#InvalidResourceOperation1Output"
+            }
+        },
+        "ns.foo#InvalidResourceOperation1Input": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#InvalidResourceOperation1Output": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#output": {}
+            }
+        },
+        "ns.foo#InvalidResourceOperation2": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#InvalidResourceOperation2Input"
+            },
+            "output": {
+                "target": "ns.foo#InvalidResourceOperation2Output"
+            }
+        },
+        "ns.foo#InvalidResourceOperation2Input": {
+            "type": "structure",
+            "members": {
+                "bar": {
+                    "target": "ns.foo#OtherString",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#InvalidResourceOperation2Output": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#output": {}
+            }
+        },
+        "ns.foo#OtherString": {
+            "type": "string"
+        }
+    }
+}

@@ -1,0 +1,55 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#A": {
+            "type": "resource",
+            "identifiers": {
+                "a": {
+                    "target": "smithy.api#String"
+                }
+            },
+            "resources": [
+                {
+                    "target": "ns.foo#B"
+                }
+            ]
+        },
+        "ns.foo#B": {
+            "type": "resource",
+            "identifiers": {
+                "a": {
+                    "target": "smithy.api#String"
+                },
+                "b": {
+                    "target": "smithy.api#String"
+                }
+            },
+            "collectionOperations": [
+                {
+                    "target": "ns.foo#InvokeB"
+                }
+            ]
+        },
+        "ns.foo#InvokeB": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#InvokeBInput"
+            },
+            "output": {
+                "target": "ns.foo#InvokeBOutput"
+            }
+        },
+        "ns.foo#InvokeBInput": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#input": {}
+            }
+        },
+        "ns.foo#InvokeBOutput": {
+            "type": "structure",
+            "traits": {
+                "smithy.api#output": {}
+            }
+        }
+    }
+}

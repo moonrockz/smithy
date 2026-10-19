@@ -1,0 +1,18 @@
+{
+  "version": "2.0",
+  "projections": {
+    "foo": {
+      "transforms": [
+        // Does not exist.
+        {
+          "name": "apply",
+          "args": {
+            "projections": [
+              "bar"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

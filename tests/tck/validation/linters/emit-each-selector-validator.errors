@@ -1,0 +1,90 @@
+[DANGER] ns.foo#String: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#String: Selector capture matched selector: [id='ns.foo#String'] | shapeId
+[DANGER] ns.foo#String: Selector capture matched selector: [id=ns.foo#String] | shapeId
+[DANGER] ns.foo#String: Selector capture matched selector: [id|name="String"] | shapeName
+[DANGER] ns.foo#String: Selector capture matched selector: [id|name='String'] | shapeName
+[DANGER] ns.foo#String: Selector capture matched selector: simpleType | simpleType
+[DANGER] ns.foo#Integer: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#Integer: Selector capture matched selector: integer | integer
+[DANGER] ns.foo#Integer: Selector capture matched selector: number | number
+[DANGER] ns.foo#Integer: Selector capture matched selector: simpleType | simpleType
+[DANGER] ns.foo#Long: Selector capture matched selector: :is(long, float, boolean) | any
+[DANGER] ns.foo#Long: Selector capture matched selector: long | long
+[DANGER] ns.foo#Long: Selector capture matched selector: number | number
+[DANGER] ns.foo#Long: Selector capture matched selector: simpleType | simpleType
+[DANGER] ns.foo#Float: Selector capture matched selector: :is(long, float, boolean) | any
+[DANGER] ns.foo#Float: Selector capture matched selector: float | float
+[DANGER] ns.foo#Float: Selector capture matched selector: number | number
+[DANGER] ns.foo#Float: Selector capture matched selector: simpleType | simpleType
+[DANGER] ns.foo#Boolean: Selector capture matched selector: :is(long, float, boolean) | any
+[DANGER] ns.foo#Boolean: Selector capture matched selector: boolean | boolean
+[DANGER] ns.foo#Boolean: Selector capture matched selector: simpleType | simpleType
+[DANGER] ns.foo#Blob: Selector capture matched selector: [trait|mediaType$='plain'] | traitEndsWith
+[DANGER] ns.foo#Blob: Selector capture matched selector: [trait|mediaType*='PLAIN' i] | traitContainsCaseInsensitive
+[DANGER] ns.foo#Blob: Selector capture matched selector: [trait|mediaType*='plain'] | traitContains
+[DANGER] ns.foo#Blob: Selector capture matched selector: [trait|mediaType='TEXT/PLAIN' i] | traitEqualToCaseInsensitive
+[DANGER] ns.foo#Blob: Selector capture matched selector: [trait|mediaType='text/plain'] | traitEqualTo
+[DANGER] ns.foo#Blob: Selector capture matched selector: [trait|mediaType] | traitExists
+[DANGER] ns.foo#Blob: Selector capture matched selector: [trait|mediaType^='text'] | traitStartsWith
+[DANGER] ns.foo#Blob: Selector capture matched selector: [trait|mediaType^=TEXT  i] | traitEqualToCaseInsensitiveNoQuotes
+[DANGER] ns.foo#Blob: Selector capture matched selector: [trait|smithy.api#mediaType*=plain] | traitContains
+[DANGER] ns.foo#Blob: Selector capture matched selector: blob | blob
+[DANGER] ns.foo#Blob: Selector capture matched selector: simpleType | simpleType
+[DANGER] ns.foo#List: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#List: Selector capture matched selector: list | list
+[DANGER] ns.foo#List$member: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#List$member: Selector capture matched selector: :test(member > [id='ns.foo#String']) | memberTargetsString
+[DANGER] ns.foo#List$member: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#List$member: Selector capture matched selector: member | member
+[DANGER] ns.foo#Map: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#Map: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#Map: Selector capture matched selector: map | map
+[DANGER] ns.foo#Map$key: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#Map$key: Selector capture matched selector: :test(member > [id='ns.foo#String']) | memberTargetsString
+[DANGER] ns.foo#Map$key: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#Map$key: Selector capture matched selector: member | member
+[DANGER] ns.foo#Map$value: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#Map$value: Selector capture matched selector: :test(member > [id='ns.foo#String']) | memberTargetsString
+[DANGER] ns.foo#Map$value: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#Map$value: Selector capture matched selector: member | member
+[DANGER] ns.foo#MyService: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#MyService: Selector capture matched selector: [service|version^=2017] | serviceVersion
+[DANGER] ns.foo#MyResource: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#MyResource: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#MyResource: Selector capture matched selector: resource | resource
+[DANGER] ns.foo#MyResource: Selector capture matched selector: service -[resource]-> resource | serviceChild
+[DANGER] ns.foo#MyResourceIdentifier: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#MyResourceIdentifier: Selector capture matched selector: resource -[identifier]-> string | identifier
+[DANGER] ns.foo#MyResourceIdentifier: Selector capture matched selector: simpleType | simpleType
+[DANGER] ns.foo#OperationA: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#OperationA: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#OperationA: Selector capture matched selector: operation | operation
+[DANGER] ns.foo#OperationAInput: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#OperationAInput: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#OperationAInput$memberName: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#OperationAInput$memberName: Selector capture matched selector: :test(member > [id='ns.foo#String']) | memberTargetsString
+[DANGER] ns.foo#OperationAInput$memberName: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#OperationAInput$memberName: Selector capture matched selector: [id|member=memberName] | shapeMember
+[DANGER] ns.foo#OperationAInput$memberName: Selector capture matched selector: member | member
+[DANGER] ns.foo#OperationAInput$otherMemberName: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#OperationAInput$otherMemberName: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#OperationAInput$otherMemberName: Selector capture matched selector: member | member
+[DANGER] ns.foo#OperationAOutput: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#OperationAOutput: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#OperationAOutput$b: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#OperationAOutput$b: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#OperationAOutput$b: Selector capture matched selector: member | member
+[DANGER] ns.foo#OperationErrorA: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#OperationErrorB: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#OperationB: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#OperationB: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#OperationB: Selector capture matched selector: operation | operation
+[DANGER] ns.foo#OperationBInput: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#OperationBInput: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#OperationBInput$id: Selector capture matched selector: :not(:is([trait|error], simpleType)) | not
+[DANGER] ns.foo#OperationBInput$id: Selector capture matched selector: > | valid-neighbor-only
+[DANGER] ns.foo#OperationBInput$id: Selector capture matched selector: member | member
+[DANGER] ns.foo#UtcTimestamp: Selector capture matched selector: simpleType | simpleType
+[DANGER] other.ns#String: Selector capture matched selector: [id|name="String"] | shapeName
+[DANGER] other.ns#String: Selector capture matched selector: [id|name='String'] | shapeName
+[DANGER] other.ns#String: Selector capture matched selector: simpleType | simpleType

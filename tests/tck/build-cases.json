@@ -1,0 +1,2178 @@
+{
+  "referenceSha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef",
+  "transforms": [
+    "apply",
+    "changeStringEnumsToEnumShapes",
+    "changeTypes",
+    "excludeMetadata",
+    "excludeShapesBySelector",
+    "excludeShapesByTag",
+    "excludeShapesByTrait",
+    "excludeTags",
+    "excludeTraits",
+    "excludeTraitsByTag",
+    "filterSuppressions",
+    "flattenAndRemoveMixins",
+    "flattenClosureNamespaces",
+    "flattenNamespaces",
+    "includeClosures",
+    "includeMetadata",
+    "includeNamespaces",
+    "includeServices",
+    "includeShapesBySelector",
+    "includeShapesByTag",
+    "includeTags",
+    "includeTraits",
+    "includeTraitsByTag",
+    "makeIdempotencyTokensClientOptional",
+    "removeDeprecatedShapes",
+    "removeTraitDefinitions",
+    "removeUnusedShapes",
+    "renameShapes"
+  ],
+  "cases": [
+    {
+      "id": "jar-imports-and-source-scope",
+      "mode": "build",
+      "models": ["plugins/sources/jar-import.jar", "plugins/notsources/d.smithy"],
+      "config": {"version": "2.0", "projections": {"copy": {}}}
+    },
+    {
+      "id": "jar-source-and-imported-model-scope",
+      "mode": "build",
+      "models": ["plugins/notsources/d.smithy"],
+      "sources": ["plugins/sources/jar-import.jar"],
+      "config": {"version": "2.0", "projections": {"copy": {}}}
+    },
+    {
+      "id": "config-environment-substitution",
+      "mode": "build",
+      "configs": ["config-with-env.json"],
+      "environment": {"FOO": "Hi", "BAR": "TagFromEnv", "NAME_KEY": "name"},
+      "models": [],
+      "model": {
+        "smithy": "2.0",
+        "shapes": {
+          "example#Included": {"type": "string", "traits": {"smithy.api#tags": ["Hi"]}},
+          "example#Compound": {"type": "string", "traits": {"smithy.api#tags": ["compoundTagFromEnv"]}},
+          "example#Combined": {"type": "string", "traits": {"smithy.api#tags": ["HiAndTagFromEnv"]}},
+          "example#Escaped": {"type": "string", "traits": {"smithy.api#tags": ["${BAZ}"]}},
+          "example#Excluded": {"type": "string"}
+        }
+      }
+    },
+    {
+      "id": "config-undefined-environment-variable",
+      "mode": "build",
+      "configs": ["config-with-invalid-env.json"],
+      "models": [],
+      "failedProjections": ["$config"]
+    },
+    {
+      "id": "config-sources-and-imports",
+      "mode": "build",
+      "configs": [
+        "model/config-with-sources-and-imports.json"
+      ],
+      "models": []
+    },
+    {
+      "id": "config-registers-source-models",
+      "mode": "build",
+      "configs": [
+        "plugins/sources/copiesModelsDefinedInConfigAsSources.json"
+      ],
+      "models": []
+    },
+    {
+      "id": "mixin-inherited-member-overrides",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "includeTags",
+          "args": {
+            "tags": []
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "shapes": {
+          "example#Base": {
+            "type": "structure",
+            "traits": {
+              "smithy.api#mixin": {},
+              "smithy.api#documentation": "Inherited documentation"
+            },
+            "members": {
+              "value": {
+                "target": "smithy.api#String",
+                "traits": {
+                  "smithy.api#documentation": "Original member documentation"
+                }
+              }
+            }
+          },
+          "example#Thing": {
+            "type": "structure",
+            "mixins": [
+              {
+                "target": "example#Base"
+              }
+            ],
+            "members": {
+              "local": {
+                "target": "smithy.api#String"
+              }
+            }
+          },
+          "example#Thing$value": {
+            "type": "apply",
+            "traits": {
+              "smithy.api#documentation": "Local member override"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "source-filtering-renamed-import",
+      "mode": "build",
+      "models": [
+        "plugins/sources/a.smithy",
+        "plugins/sources/b.smithy",
+        "plugins/notsources/d.smithy"
+      ],
+      "sources": [
+        "plugins/sources/a.smithy",
+        "plugins/sources/b.smithy"
+      ],
+      "config": {
+        "version": "2.0",
+        "projections": {
+          "copy": {
+            "transforms": [
+              {
+                "name": "renameShapes",
+                "args": {
+                  "renamed": {
+                    "smithy.example#DString": "smithy.example#RenamedImport"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "rename-shapes",
+      "mode": "transform",
+      "models": [
+        "transforms/rename-shapes.json"
+      ],
+      "transforms": [
+        {
+          "name": "renameShapes",
+          "args": {
+            "renamed": {
+              "ns.foo#Bar": "ns.foo#Baz",
+              "ns.foo#Qux": "ns.foo#Corge"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "flatten-namespaces-plain",
+      "mode": "transform",
+      "models": [
+        "transforms/flatten-namespaces.json"
+      ],
+      "transforms": [
+        {
+          "name": "flattenNamespaces",
+          "args": {
+            "namespace": "ns.qux",
+            "service": "ns.foo#MyService"
+          }
+        }
+      ]
+    },
+    {
+      "id": "flatten-namespaces-tagged",
+      "mode": "transform",
+      "models": [
+        "transforms/flatten-namespaces.json"
+      ],
+      "transforms": [
+        {
+          "name": "flattenNamespaces",
+          "args": {
+            "namespace": "ns.qux",
+            "service": "ns.foo#MyService",
+            "includeTagged": [
+              "included"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "flatten-namespaces-conflicting-tag",
+      "mode": "transform",
+      "models": [
+        "transforms/flatten-namespaces.json"
+      ],
+      "transforms": [
+        {
+          "name": "flattenNamespaces",
+          "args": {
+            "namespace": "ns.qux",
+            "service": "ns.foo#MyService",
+            "includeTagged": [
+              "conflicting"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "flatten-namespaces-renames",
+      "mode": "transform",
+      "models": [
+        "transforms/flatten-namespaces-with-renames.json"
+      ],
+      "transforms": [
+        {
+          "name": "flattenNamespaces",
+          "args": {
+            "namespace": "ns.qux",
+            "service": "ns.foo#MyService"
+          }
+        }
+      ]
+    },
+    {
+      "id": "flatten-closure-namespaces",
+      "mode": "transform",
+      "models": [
+        "transforms/flatten-closure-namespaces.smithy",
+        "transforms/flatten-closure-namespaces-unrelated.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "flattenClosureNamespaces",
+          "args": {
+            "namespace": "com.flat",
+            "closure": "com.example#Shapes"
+          }
+        }
+      ]
+    },
+    {
+      "id": "include-closures",
+      "mode": "transform",
+      "models": [
+        "transforms/include-closures.smithy",
+        "transforms/include-closures-unrelated.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "includeClosures",
+          "args": {
+            "closures": [
+              "com.example#Shapes"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "flatten-and-remove-mixins",
+      "mode": "transform",
+      "models": [
+        "transforms/flatten-and-remove-mixins.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "flattenAndRemoveMixins",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "remove-deprecated",
+      "mode": "transform",
+      "models": [
+        "transforms/remove-deprecated.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "removeDeprecatedShapes",
+          "args": {
+            "relativeDate": "2024-10-10",
+            "relativeVersion": "1.1.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "remove-trait-definitions",
+      "mode": "transform",
+      "models": [
+        "transforms/remove-trait-definitions.json"
+      ],
+      "transforms": [
+        {
+          "name": "removeTraitDefinitions",
+          "args": {
+            "exportTagged": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "retain-tagged-trait-definitions",
+      "mode": "transform",
+      "models": [
+        "transforms/retain-tagged-trait-definitions.json"
+      ],
+      "transforms": [
+        {
+          "name": "removeTraitDefinitions",
+          "args": {
+            "exportTagged": [
+              "export"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "remove-unused-exported",
+      "mode": "transform",
+      "models": [
+        "transforms/tree-shaker.json"
+      ],
+      "transforms": [
+        {
+          "name": "removeUnusedShapes",
+          "args": {
+            "exportTagged": [
+              "export"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "remove-unused-traits",
+      "mode": "transform",
+      "models": [
+        "transforms/tree-shaking-traits.json"
+      ],
+      "transforms": [
+        {
+          "name": "removeUnusedShapes",
+          "args": {
+            "exportTagged": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "remove-unused-legacy-args",
+      "mode": "transform",
+      "models": [
+        "transforms/tree-shaking-traits.json"
+      ],
+      "transforms": [
+        {
+          "name": "removeUnusedShapes",
+          "args": []
+        }
+      ]
+    },
+    {
+      "id": "remove-unused-no-service",
+      "mode": "transform",
+      "models": [
+        "transforms/no-service.json"
+      ],
+      "transforms": [
+        {
+          "name": "removeUnusedShapes",
+          "args": {
+            "exportTagged": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "exclude-internal-relative",
+      "mode": "transform",
+      "models": [
+        "transforms/internal-shapes.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "excludeShapesByTrait",
+          "args": {
+            "traits": [
+              "internal"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "exclude-internal-absolute",
+      "mode": "transform",
+      "models": [
+        "transforms/internal-shapes.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "excludeShapesByTrait",
+          "args": {
+            "traits": [
+              "smithy.api#internal"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "include-tagged-members",
+      "mode": "transform",
+      "models": [
+        "transforms/filter-by-tags.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "includeShapesByTag",
+          "args": {
+            "tags": [
+              "filter"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "exclude-tagged-members",
+      "mode": "transform",
+      "models": [
+        "transforms/filter-by-tags.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "excludeShapesByTag",
+          "args": {
+            "tags": [
+              "filter"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "exclude-tagged-mixin-shapes",
+      "mode": "transform",
+      "models": [
+        "transforms/mixin-cycle-test.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "excludeShapesByTag",
+          "args": {
+            "tags": [
+              "filter"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "exclude-tagged-mixin-traits",
+      "mode": "transform",
+      "models": [
+        "transforms/mixin-cycle-test.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "excludeTraitsByTag",
+          "args": {
+            "tags": [
+              "filter"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "exclude-tagged-traits",
+      "mode": "transform",
+      "models": [
+        "transforms/tree-shaking-traits.json"
+      ],
+      "transforms": [
+        {
+          "name": "excludeTraitsByTag",
+          "args": {
+            "tags": [
+              "qux"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "include-tagged-traits",
+      "mode": "transform",
+      "models": [
+        "transforms/tree-shaking-traits.json"
+      ],
+      "transforms": [
+        {
+          "name": "includeTraitsByTag",
+          "args": {
+            "tags": [
+              "baz"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "include-service-foo",
+      "mode": "transform",
+      "models": [
+        "transforms/transform-by-selector.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "includeShapesBySelector",
+          "args": {
+            "selector": "[id=smithy.example#FooService] :is(*, ~> *)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "include-service-bar",
+      "mode": "transform",
+      "models": [
+        "transforms/transform-by-selector.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "includeShapesBySelector",
+          "args": {
+            "selector": "[id=smithy.example#BarService] :is(*, ~> *)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "include-not-service-bar",
+      "mode": "transform",
+      "models": [
+        "transforms/transform-by-selector.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "includeShapesBySelector",
+          "args": {
+            "selector": ":not([id=smithy.example#BarService] ~> *)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "include-tagged-enum-members",
+      "mode": "transform",
+      "models": [
+        "transforms/transform-by-selector.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "includeShapesBySelector",
+          "args": {
+            "selector": ":is(enum, enum > member:test([trait|tags|(values) = \"alpha\",\"beta\"]))"
+          }
+        }
+      ]
+    },
+    {
+      "id": "include-enums",
+      "mode": "transform",
+      "models": [
+        "transforms/transform-by-selector.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "includeShapesBySelector",
+          "args": {
+            "selector": ":is(enum, enum > member)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "include-structure-neighbors",
+      "mode": "transform",
+      "models": [
+        "transforms/transform-by-selector.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "includeShapesBySelector",
+          "args": {
+            "selector": ":is(structure, structure ~> *)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "exclude-event-stream-operations",
+      "mode": "transform",
+      "models": [
+        "transforms/transform-by-selector.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "excludeShapesBySelector",
+          "args": {
+            "selector": "[trait|streaming] :test(<) :is(< member < structure <-[input, output]- operation)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "exclude-service-foo",
+      "mode": "transform",
+      "models": [
+        "transforms/transform-by-selector.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "excludeShapesBySelector",
+          "args": {
+            "selector": "[id=smithy.example#FooService] :is(*, ~> *)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "exclude-service-bar",
+      "mode": "transform",
+      "models": [
+        "transforms/transform-by-selector.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "excludeShapesBySelector",
+          "args": {
+            "selector": "[id=smithy.example#BarService] :is(*, ~> *)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "exclude-not-service-bar",
+      "mode": "transform",
+      "models": [
+        "transforms/transform-by-selector.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "excludeShapesBySelector",
+          "args": {
+            "selector": ":not([id=smithy.example#BarService] ~> *)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "exclude-tagged-enum-members",
+      "mode": "transform",
+      "models": [
+        "transforms/transform-by-selector.smithy"
+      ],
+      "transforms": [
+        {
+          "name": "excludeShapesBySelector",
+          "args": {
+            "selector": ":is(enum > member:test([trait|tags|(values) = \"alpha\",\"beta\"]))"
+          }
+        }
+      ]
+    },
+    {
+      "id": "include-tags",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "includeTags",
+          "args": {
+            "tags": [
+              "foo"
+            ]
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "exclude-tags",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "excludeTags",
+          "args": {
+            "tags": [
+              "bar"
+            ]
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "include-tags-legacy",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "includeTags",
+          "args": [
+            "foo"
+          ]
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "exclude-tags-legacy",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "excludeTags",
+          "args": [
+            "bar"
+          ]
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "include-traits",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "includeTraits",
+          "args": {
+            "traits": [
+              "documentation"
+            ]
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "exclude-traits",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "excludeTraits",
+          "args": {
+            "traits": [
+              "documentation"
+            ]
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "include-prelude-traits",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "includeTraits",
+          "args": {
+            "traits": [
+              "smithy.api#"
+            ]
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "exclude-namespace-traits",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "excludeTraits",
+          "args": {
+            "traits": [
+              "smithy.api#"
+            ]
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "include-metadata",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "includeMetadata",
+          "args": {
+            "keys": [
+              "first"
+            ]
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "exclude-metadata",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "excludeMetadata",
+          "args": {
+            "keys": [
+              "first"
+            ]
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "include-metadata-legacy",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "includeMetadata",
+          "args": [
+            "first"
+          ]
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "exclude-metadata-legacy",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "excludeMetadata",
+          "args": [
+            "first"
+          ]
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "include-namespaces",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "includeNamespaces",
+          "args": {
+            "namespaces": [
+              "ns.foo"
+            ]
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "include-services",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": [
+              "ns.foo#Service1"
+            ]
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "metadata": {
+          "first": true,
+          "second": false
+        },
+        "shapes": {
+          "ns.foo#String1": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "foo",
+                "bar"
+              ],
+              "smithy.api#documentation": "docs"
+            }
+          },
+          "ns.foo#String2": {
+            "type": "string",
+            "traits": {
+              "smithy.api#tags": [
+                "bar"
+              ]
+            }
+          },
+          "ns.bar#String3": {
+            "type": "string"
+          },
+          "ns.foo#Service1": {
+            "type": "service",
+            "version": "1"
+          },
+          "ns.foo#Service2": {
+            "type": "service",
+            "version": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "change-string-enums",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "changeStringEnumsToEnumShapes",
+          "args": {}
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "shapes": {
+          "ns.foo#CompatibleString": {
+            "type": "string",
+            "traits": {
+              "smithy.api#enum": [
+                {
+                  "name": "foo",
+                  "value": "bar"
+                }
+              ]
+            }
+          },
+          "ns.foo#IncompatibleString": {
+            "type": "string",
+            "traits": {
+              "smithy.api#enum": [
+                {
+                  "value": "bar"
+                }
+              ]
+            }
+          },
+          "ns.foo#ConvertableShape": {
+            "type": "string",
+            "traits": {
+              "smithy.api#enum": [
+                {
+                  "value": "foo:bar"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "change-string-enums-synthesize",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "changeStringEnumsToEnumShapes",
+          "args": {
+            "synthesizeNames": true
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "shapes": {
+          "ns.foo#CompatibleString": {
+            "type": "string",
+            "traits": {
+              "smithy.api#enum": [
+                {
+                  "name": "foo",
+                  "value": "bar"
+                }
+              ]
+            }
+          },
+          "ns.foo#IncompatibleString": {
+            "type": "string",
+            "traits": {
+              "smithy.api#enum": [
+                {
+                  "value": "bar"
+                }
+              ]
+            }
+          },
+          "ns.foo#ConvertableShape": {
+            "type": "string",
+            "traits": {
+              "smithy.api#enum": [
+                {
+                  "value": "foo:bar"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "change-types",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "changeTypes",
+          "args": {
+            "shapeTypes": {
+              "ns.foo#a": "boolean",
+              "ns.foo#b": "union"
+            }
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "shapes": {
+          "ns.foo#a": {
+            "type": "string"
+          },
+          "ns.foo#b": {
+            "type": "structure",
+            "members": {}
+          }
+        }
+      }
+    },
+    {
+      "id": "change-types-synthesize-enum",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "changeTypes",
+          "args": {
+            "shapeTypes": {
+              "ns.foo#ConvertableShape": "enum"
+            },
+            "synthesizeEnumNames": true
+          }
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "shapes": {
+          "ns.foo#CompatibleString": {
+            "type": "string",
+            "traits": {
+              "smithy.api#enum": [
+                {
+                  "name": "foo",
+                  "value": "bar"
+                }
+              ]
+            }
+          },
+          "ns.foo#IncompatibleString": {
+            "type": "string",
+            "traits": {
+              "smithy.api#enum": [
+                {
+                  "value": "bar"
+                }
+              ]
+            }
+          },
+          "ns.foo#ConvertableShape": {
+            "type": "string",
+            "traits": {
+              "smithy.api#enum": [
+                {
+                  "value": "foo:bar"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "idempotency-tokens-client-optional",
+      "mode": "transform",
+      "models": [],
+      "transforms": [
+        {
+          "name": "makeIdempotencyTokensClientOptional",
+          "args": {}
+        }
+      ],
+      "model": {
+        "smithy": "2.0",
+        "shapes": {
+          "example#Input": {
+            "type": "structure",
+            "traits": {
+              "smithy.api#input": {}
+            },
+            "members": {
+              "token": {
+                "target": "smithy.api#String",
+                "traits": {
+                  "smithy.api#required": {},
+                  "smithy.api#idempotencyToken": {}
+                }
+              },
+              "other": {
+                "target": "smithy.api#String",
+                "traits": {
+                  "smithy.api#required": {}
+                }
+              }
+            }
+          },
+          "example#OptionalInput": {
+            "type": "structure",
+            "traits": {
+              "smithy.api#input": {}
+            },
+            "members": {
+              "optional": {
+                "target": "smithy.api#String",
+                "traits": {
+                  "smithy.api#idempotencyToken": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "simple-config",
+      "mode": "build",
+      "configs": [
+        "simple-config.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "config-with-abstract",
+      "mode": "build",
+      "configs": [
+        "config-with-abstract.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "empty-config",
+      "mode": "build",
+      "configs": [
+        "empty-config.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "rewrites-args-array",
+      "mode": "build",
+      "configs": [
+        "rewrites-args-array.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "include-prelude-shapes",
+      "mode": "build",
+      "configs": [
+        "include-prelude-shapes.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "exclude-prelude-shapes",
+      "mode": "build",
+      "configs": [
+        "exclude-prelude-shapes.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "apply-multiple-projections",
+      "mode": "build",
+      "configs": [
+        "apply-multiple-projections.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "apply-cycle",
+      "failedProjections": ["bar","foo"],
+      "mode": "build",
+      "configs": [
+        "apply-cycle.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "apply-direct-recursion",
+      "failedProjections": ["foo"],
+      "mode": "build",
+      "configs": [
+        "apply-direct-recursion.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "apply-invalid-projection",
+      "failedProjections": ["foo"],
+      "mode": "build",
+      "configs": [
+        "apply-invalid-projection.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "unknown-transform",
+      "failedProjections": ["$build"],
+      "mode": "build",
+      "configs": [
+        "unknown-transform.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "unknown-plugin",
+      "failedProjections": ["$build"],
+      "mode": "build",
+      "configs": [
+        "unknown-plugin.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "unknown-plugin-ignored",
+      "mode": "build",
+      "configs": [
+        "unknown-plugin-ignored.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "bad-syntax",
+      "failedProjections": ["$config"],
+      "mode": "build",
+      "configs": [
+        "bad-syntax.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "missing-version",
+      "failedProjections": ["$config"],
+      "mode": "build",
+      "configs": [
+        "missing-version.json"
+      ],
+      "models": [
+        "simple-model.json"
+      ]
+    },
+    {
+      "id": "resource-model-projections",
+      "failedProjections": ["invalid"],
+      "mode": "build",
+      "configs": [
+        "resource-model-config.json"
+      ],
+      "models": [
+        "resource-model.json"
+      ]
+    },
+    {
+      "id": "commented-config",
+      "failedProjections": ["invalid","valid"],
+      "mode": "build",
+      "configs": [
+        "special-syntax.json"
+      ],
+      "models": [
+        "resource-model.json"
+      ]
+    },
+    {
+      "id": "scoped-imports",
+      "mode": "build",
+      "configs": [
+        "imports/smithy-build.json",
+        "otherimports/smithy-build.json"
+      ],
+      "models": []
+    },
+    {
+      "id": "invalid-base-model",
+      "failedProjections": ["$model"],
+      "mode": "build",
+      "configs": [
+        "empty-config.json"
+      ],
+      "models": [
+        "invalid-model.smithy"
+      ]
+    },
+    {
+      "id": "suppressions-traits-removeUnused",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/traits.removeUnused.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/traits.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/traits.removeUnused.smithy"
+    },
+    {
+      "id": "suppressions-traits-eventIdAllowList",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/traits.eventIdAllowList.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/traits.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/traits.eventIdAllowList.smithy"
+    },
+    {
+      "id": "suppressions-traits-eventIdDenyList",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/traits.eventIdDenyList.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/traits.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/traits.eventIdDenyList.smithy"
+    },
+    {
+      "id": "suppressions-namespaces-filterByNamespaceAllowList",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/namespaces.filterByNamespaceAllowList.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/namespaces.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/namespaces.filterByNamespaceAllowList.smithy"
+    },
+    {
+      "id": "suppressions-namespaces-removeReasons",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/namespaces.removeReasons.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/namespaces.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/namespaces.removeReasons.smithy"
+    },
+    {
+      "id": "suppressions-namespaces-removeUnused",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/namespaces.removeUnused.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/namespaces.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/namespaces.removeUnused.smithy"
+    },
+    {
+      "id": "suppressions-namespaces-namespaceDenyList",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/namespaces.namespaceDenyList.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/namespaces.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/namespaces.namespaceDenyList.smithy"
+    },
+    {
+      "id": "suppressions-namespaces-filterWithTopLevelImports",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/namespaces.filterWithTopLevelImports.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/namespaces.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/namespaces.filterWithTopLevelImports.smithy"
+    },
+    {
+      "id": "suppressions-namespaces-filterWithProjectionImports",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/namespaces.filterWithProjectionImports.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/namespaces.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/namespaces.filterWithProjectionImports.smithy"
+    },
+    {
+      "id": "suppressions-namespaces-detectsValidatorRemoval",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/namespaces.detectsValidatorRemoval.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/namespaces.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/namespaces.detectsValidatorRemoval.smithy"
+    },
+    {
+      "id": "suppressions-namespaces-unchanged",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/namespaces.unchanged.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/namespaces.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/namespaces.unchanged.smithy"
+    },
+    {
+      "id": "suppressions-noSuppressions-removeUnused",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/noSuppressions.removeUnused.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/noSuppressions.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/noSuppressions.removeUnused.smithy"
+    },
+    {
+      "id": "suppressions-eventHierarchy-removeUnused",
+      "mode": "build",
+      "configs": [
+        "transforms/filtersuppressions/eventHierarchy.removeUnused.json"
+      ],
+      "models": [
+        "transforms/filtersuppressions/eventHierarchy.smithy"
+      ],
+      "expectedModel": "transforms/filtersuppressions/eventHierarchy.removeUnused.smithy"
+    },
+    {
+      "id": "source-filtering",
+      "mode": "build",
+      "configs": [],
+      "models": [
+        "plugins/sources/a.smithy",
+        "plugins/sources/b.smithy",
+        "plugins/notsources/d.smithy"
+      ],
+      "sources": [
+        "plugins/sources/a.smithy",
+        "plugins/sources/b.smithy"
+      ],
+      "config": {
+        "version": "2.0",
+        "projections": {
+          "copy": {}
+        }
+      }
+    }
+  ],
+  "supportFiles": [
+    "REFERENCE_SHA",
+    "imports/a.json",
+    "imports/b.json",
+    "imports/c.json",
+    "imports/main.json",
+    "otherimports/d.json",
+    "transforms/filtersuppressions/namespaces.filterWithTopLevelImports.2.smithy",
+    "transforms/filtersuppressions/namespaces.filterWithProjectionImports.2.smithy"
+  ],
+  "exclusions": [
+    {
+      "file": "applies-global-serial-plugins.json",
+      "reason": "Requires reference test plugin implementations for ordering, sharing, dependency, or failure behavior; model transforms do not define this fixture's contract."
+    },
+    {
+      "file": "applies-plugins-with-shared-space.json",
+      "reason": "Requires reference test plugin implementations for ordering, sharing, dependency, or failure behavior; model transforms do not define this fixture's contract."
+    },
+    {
+      "file": "applies-plugins.json",
+      "reason": "Requires reference test plugin implementations for ordering, sharing, dependency, or failure behavior; model transforms do not define this fixture's contract."
+    },
+    {
+      "file": "applies-serial-plugins.json",
+      "reason": "Requires reference test plugin implementations for ordering, sharing, dependency, or failure behavior; model transforms do not define this fixture's contract."
+    },
+    {
+      "file": "artifact-names.json",
+      "reason": "Requires reference test plugin implementations for ordering, sharing, dependency, or failure behavior; model transforms do not define this fixture's contract."
+    },
+    {
+      "file": "config-with-imports-and-output-dir.json",
+      "reason": "Configuration-parser unit fixture contains illustrative paths without corresponding files."
+    },
+    {
+      "file": "defers-failure.json",
+      "reason": "Requires reference test plugin implementations for ordering, sharing, dependency, or failure behavior; model transforms do not define this fixture's contract."
+    },
+    {
+      "file": "detects-plugin-cycles.json",
+      "reason": "Requires reference test plugin implementations for ordering, sharing, dependency, or failure behavior; model transforms do not define this fixture's contract."
+    },
+    {
+      "file": "model/loads-from-node.json",
+      "reason": "Configuration-parser unit fixture contains illustrative paths without corresponding files."
+    },
+    {
+      "file": "plugins/build-info/example.smithy",
+      "reason": "Plugin artifact behavior or JAR/directory source packaging fixture; not a standalone model projection case."
+    },
+    {
+      "file": "plugins/conflicting/a.smithy",
+      "reason": "Plugin artifact behavior or JAR/directory source packaging fixture; not a standalone model projection case."
+    },
+    {
+      "file": "plugins/nullability/example.smithy",
+      "reason": "Plugin artifact behavior or JAR/directory source packaging fixture; not a standalone model projection case."
+    },
+    {
+      "file": "plugins/sources-ignores-unrecognized-files/a.smithy",
+      "reason": "Plugin artifact behavior or JAR/directory source packaging fixture; not a standalone model projection case."
+    },
+    {
+      "file": "plugins/sources-ignores-unrecognized-files/foo.md",
+      "reason": "Plugin artifact behavior or JAR/directory source packaging fixture; not a standalone model projection case."
+    },
+    {
+      "file": "plugins/sources/c/c.json",
+      "reason": "Plugin artifact behavior or JAR/directory source packaging fixture; not a standalone model projection case."
+    },
+    {
+      "file": "processor/package-info.java",
+      "reason": "Java annotation processor fixture; not a Smithy model."
+    },
+    {
+      "file": "run-plugin/invalid-artifact-name-malformed.json",
+      "reason": "Requires the reference run plugin and external shell processes; outside this model projection parity gate."
+    },
+    {
+      "file": "run-plugin/invalid-command-not-array.json",
+      "reason": "Requires the reference run plugin and external shell processes; outside this model projection parity gate."
+    },
+    {
+      "file": "run-plugin/invalid-command-not-found.json",
+      "reason": "Requires the reference run plugin and external shell processes; outside this model projection parity gate."
+    },
+    {
+      "file": "run-plugin/invalid-conflicting-artifact-names.json",
+      "reason": "Requires the reference run plugin and external shell processes; outside this model projection parity gate."
+    },
+    {
+      "file": "run-plugin/invalid-exit-code.json",
+      "reason": "Requires the reference run plugin and external shell processes; outside this model projection parity gate."
+    },
+    {
+      "file": "run-plugin/invalid-missing-command.json",
+      "reason": "Requires the reference run plugin and external shell processes; outside this model projection parity gate."
+    },
+    {
+      "file": "run-plugin/return-error.sh",
+      "reason": "Requires the reference run plugin and external shell processes; outside this model projection parity gate."
+    },
+    {
+      "file": "run-plugin/run-plugin-test.json",
+      "reason": "Requires the reference run plugin and external shell processes; outside this model projection parity gate."
+    },
+    {
+      "file": "run-plugin/run-plugin-with-sendprelude.json",
+      "reason": "Requires the reference run plugin and external shell processes; outside this model projection parity gate."
+    },
+    {
+      "file": "run-plugin/test-process.sh",
+      "reason": "Requires the reference run plugin and external shell processes; outside this model projection parity gate."
+    },
+    {
+      "file": "soft-plugin-dependencies.json",
+      "reason": "Requires reference test plugin implementations for ordering, sharing, dependency, or failure behavior; model transforms do not define this fixture's contract."
+    },
+    {
+      "file": "test-bad-trait-serializer-config.json",
+      "reason": "Requires custom reference test trait service to exercise plugin serialization failure."
+    },
+    {
+      "file": "test-bad-trait-serializer-import.smithy",
+      "reason": "Requires custom reference test trait service to exercise plugin serialization failure."
+    },
+    {
+      "file": "test-bad-trait-serializer.smithy",
+      "reason": "Requires custom reference test trait service to exercise plugin serialization failure."
+    },
+    {
+      "file": "topologically-sorts-plugins.json",
+      "reason": "Requires reference test plugin implementations for ordering, sharing, dependency, or failure behavior; model transforms do not define this fixture's contract."
+    },
+    {
+      "file": "trigger-plugin-error.json",
+      "reason": "Requires reference test plugin implementations for ordering, sharing, dependency, or failure behavior; model transforms do not define this fixture's contract."
+    }
+  ]
+}

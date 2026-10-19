@@ -1,0 +1,90 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#ValidEvent": {
+            "type": "structure",
+            "members": {
+                "foo": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#eventHeader": {}
+                    }
+                },
+                "bar": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#eventHeader": {}
+                    }
+                },
+                "baz": {
+                    "target": "smithy.api#Blob",
+                    "traits": {
+                        "smithy.api#eventPayload": {}
+                    }
+                }
+            }
+        },
+        "ns.foo#InvalidEvent1": {
+            "type": "structure",
+            "members": {
+                "foo": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#eventPayload": {}
+                    }
+                },
+                "baz": {
+                    "target": "smithy.api#Blob"
+                }
+            }
+        },
+        "ns.foo#InvalidEvent2": {
+            "type": "structure",
+            "members": {
+                "foo": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#eventPayload": {}
+                    }
+                },
+                "baz": {
+                    "target": "smithy.api#Blob",
+                    "traits": {
+                        "smithy.api#eventPayload": {}
+                    }
+                }
+            }
+        },
+        "ns.foo#InvalidEvent3": {
+            "type": "structure",
+            "members": {
+                "foo": {
+                    "target": "ns.foo#Structure",
+                    "traits": {
+                        "smithy.api#eventHeader": {}
+                    }
+                },
+                "baz": {
+                    "target": "ns.foo#Structure",
+                    "traits": {
+                        "smithy.api#eventPayload": {}
+                    }
+                }
+            }
+        },
+        "ns.foo#InvalidEvent4": {
+            "type": "structure",
+            "members": {
+                "foo": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#eventPayload": {}
+                    }
+                }
+            }
+        },
+        "ns.foo#Structure": {
+            "type": "structure"
+        }
+    }
+}

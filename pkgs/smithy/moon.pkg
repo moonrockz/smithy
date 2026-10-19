@@ -4,6 +4,8 @@ import {
   "moonrockz/jmespath",
   "moonrockz/smithy-syntax" @syntax,
   "moonbitlang/core/json",
+  "moonbitlang/core/string",
+  "moonbitlang/core/encoding/base64",
 }
 
 import {

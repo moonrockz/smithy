@@ -1,0 +1,1279 @@
+{
+    "added-default/missing-default.smithy": [
+        "TraitTarget|ERROR|smithy.example#Foo$bar"
+    ],
+    "added-default/valid-cases.smithy": [],
+    "annotation-trait-extra-properties.json": [
+        "TraitValue.UnknownMember.smithy.api#sensitive.test|WARNING|ns.foo#Baz"
+    ],
+    "auth/auth-trait-invalid-shape-id.json": [
+        "Model|ERROR|ns.foo#InvalidShapeId"
+    ],
+    "auth/auth-trait-must-target-auth-definitions.json": [
+        "TraitValue|ERROR|ns.foo#Invalid1"
+    ],
+    "auth/auth-trait-must-target-service-schemes.json": [
+        "AuthTrait|DANGER|ns.foo#InvalidOperation"
+    ],
+    "cors-trait.smithy": [
+        "CorsTrait|ERROR|ns.foo#ExplicitDefaultWithOrigins",
+        "CorsTrait|ERROR|ns.foo#InvalidService"
+    ],
+    "creates-resources-different-lists.smithy": [
+        "MemberShouldReferenceResource|SUPPRESSED|com.example#InstanceData$instanceId",
+        "MemberShouldReferenceResource|SUPPRESSED|com.example#VolumeData$volumeId",
+        "ResourceLifecycleTrait|ERROR|com.example#AttachVolumes",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#AttachVolumes"
+    ],
+    "creates-resources-from-root.smithy": [
+        "ResourceLifecycleTrait|ERROR|com.example#CreateFoo",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#CreateFoo"
+    ],
+    "creates-resources-identifier-type-mismatch.smithy": [
+        "ResourceLifecycleTrait|ERROR|com.example#CreateWidget",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#CreateWidget"
+    ],
+    "creates-resources-inferred-not-a-structure.smithy": [
+        "ResourceLifecycleTrait|ERROR|com.example#MakeWidget",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#MakeWidget"
+    ],
+    "creates-resources-inferred-projection-valid.smithy": [
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#MakeWidgets"
+    ],
+    "creates-resources-inferred-unmatched.smithy": [
+        "ResourceLifecycleTrait|ERROR|com.example#MakeWidget",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#MakeWidget"
+    ],
+    "creates-resources-missing-resource.smithy": [
+        "TraitValue|ERROR|com.example#CreateWidget"
+    ],
+    "creates-resources-nested-depth-mismatch.smithy": [
+        "MemberShouldReferenceResource|SUPPRESSED|com.example#Cluster$clusterId",
+        "MemberShouldReferenceResource|SUPPRESSED|com.example#Node$nodeId",
+        "ResourceLifecycleTrait|ERROR|com.example#ReserveNodes",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#ReserveNodes"
+    ],
+    "creates-resources-nested-same-list-valid.smithy": [
+        "MemberShouldReferenceResource|SUPPRESSED|com.example#Node$clusterId",
+        "MemberShouldReferenceResource|SUPPRESSED|com.example#Node$nodeId",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#ReserveNodes"
+    ],
+    "creates-resources-no-identifiers.smithy": [
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#StartJob"
+    ],
+    "creates-resources-not-a-resource.smithy": [
+        "TraitValue|ERROR|com.example#BadOperation"
+    ],
+    "creates-resources-path-not-in-structure.smithy": [
+        "MemberShouldReferenceResource|SUPPRESSED|com.example#ResultData$widgetId",
+        "ResourceLifecycleTrait|DANGER|com.example#CreateWidget",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#CreateWidget"
+    ],
+    "creates-resources-properties-inferred-valid.smithy": [
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#MakeWidget"
+    ],
+    "creates-resources-property-type-mismatch.smithy": [
+        "ResourceLifecycleTrait|ERROR|com.example#MakeWidget",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#MakeWidget"
+    ],
+    "creates-resources-redundant-lifecycle.smithy": [
+        "ResourceLifecycleTrait|WARNING|com.example#CreateFoo",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#CreateFoo"
+    ],
+    "creates-resources-reference-suppressed-by-binding.smithy": [
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#CreateWidget",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#CreateWidgetImplicit",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#CreateWidgetNested"
+    ],
+    "creates-resources-same-list-valid.smithy": [
+        "MemberShouldReferenceResource|SUPPRESSED|com.example#SnapshotData$dbInstanceId",
+        "MemberShouldReferenceResource|SUPPRESSED|com.example#SnapshotData$snapshotId",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#BatchCreateSnapshots"
+    ],
+    "creates-resources-unsupported-function.smithy": [
+        "ResourceLifecycleTrait|ERROR|com.example#CreateItems",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#CreateItems"
+    ],
+    "creates-resources-valid.smithy": [
+        "MemberShouldReferenceResource|SUPPRESSED|com.example#BarData$barId",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#CreateFooAndBar"
+    ],
+    "creates-resources-wrong-identifier.smithy": [
+        "ResourceLifecycleTrait|ERROR|com.example#CreateWidget",
+        "UnstableTrait.smithy.api#createsResources|SUPPRESSED|com.example#CreateWidget"
+    ],
+    "custom-trait-validation.json": [
+        "TraitValue|ERROR|ns.foo#String2",
+        "TraitValue|ERROR|ns.foo#String4"
+    ],
+    "defaults/default-with-invalid-blob.smithy": [
+        "DefaultTrait|WARNING|smithy.example#Foo$invalidBlob",
+        "DefaultTrait|WARNING|smithy.example#InvalidBlob"
+    ],
+    "defaults/default-with-null.smithy": [
+        "DefaultTrait|ERROR|smithy.example#NullableInteger"
+    ],
+    "defaults/detects-default-out-of-range.smithy": [
+        "DefaultTrait.Member.InvalidRange|WARNING|smithy.example#Integers$doublyInvalidDefault",
+        "DefaultTrait.Member.InvalidRange|WARNING|smithy.example#Integers$invalidMax",
+        "DefaultTrait.Member.InvalidRange|WARNING|smithy.example#Integers$invalidMin",
+        "DefaultTrait.Target.InvalidRange|WARNING|smithy.example#Integers$doublyInvalidDefault",
+        "DefaultTrait.Target.InvalidRange|WARNING|smithy.example#Integers$invalidMinWithMax",
+        "DefaultTrait.Target.InvalidRange|WARNING|smithy.example#Integers$invalidTargetMax",
+        "DefaultTrait.Target.InvalidRange|WARNING|smithy.example#Integers$invalidTargetMin",
+        "DefaultTrait.Target.InvalidRange|WARNING|smithy.example#MaxNegativeOne",
+        "DefaultTrait.Target.InvalidRange|WARNING|smithy.example#MinAndMax",
+        "DefaultTrait.Target.InvalidRange|WARNING|smithy.example#MinOne"
+    ],
+    "defaults/document-must-be-singular.smithy": [
+        "DefaultTrait|ERROR|smithy.example#Foo$f",
+        "DefaultTrait|ERROR|smithy.example#Foo$g"
+    ],
+    "defaults/enum-must-match-values.smithy": [
+        "DefaultTrait|ERROR|smithy.example#Foo$baz"
+    ],
+    "defaults/finds-patch-by-name-with-default.smithy": [
+        "DefaultValueInUpdate|WARNING|smithy.example#PatchFoo"
+    ],
+    "defaults/finds-resource-update-with-default.smithy": [
+        "DefaultValueInUpdate|WARNING|smithy.example#UpdateFoo"
+    ],
+    "defaults/finds-update-by-name-with-default.smithy": [
+        "DefaultValueInUpdate|WARNING|smithy.example#UpdateFoo"
+    ],
+    "defaults/incoherent-default.smithy": [
+        "DefaultTrait|ERROR|smithy.example#Foo$bad1",
+        "DefaultTrait|ERROR|smithy.example#Foo$bad2"
+    ],
+    "defaults/invalid-type-for-string.smithy": [
+        "DefaultTrait|ERROR|smithy.example#Foo$bar"
+    ],
+    "defaults/list-must-be-empty.smithy": [
+        "DefaultTrait|ERROR|smithy.example#Foo$bar"
+    ],
+    "defaults/list-must-match-constraints.smithy": [
+        "DefaultTrait|ERROR|smithy.example#Foo$bar"
+    ],
+    "defaults/map-must-be-empty.smithy": [
+        "DefaultTrait|ERROR|smithy.example#Foo$bar"
+    ],
+    "defaults/map-must-match-constraints.smithy": [
+        "DefaultTrait|ERROR|smithy.example#Foo$bar"
+    ],
+    "defaults/numbers-must-fit-type.smithy": [
+        "DefaultTrait|ERROR|smithy.example#Foo$badByte"
+    ],
+    "defaults/numbers-must-match-constraints.smithy": [
+        "DefaultTrait.Target.InvalidRange|WARNING|smithy.example#Foo$baz"
+    ],
+    "defaults/string-must-match-constraints.smithy": [
+        "DefaultTrait|ERROR|smithy.example#Foo$bar",
+        "DefaultTrait|ERROR|smithy.example#Foo$baz"
+    ],
+    "defaults/warn-when-union-targets-default.smithy": [
+        "Union|NOTE|smithy.example#Example$bar",
+        "Union|NOTE|smithy.example#Example$foo"
+    ],
+    "deletes-resources-invalid-jmespath.smithy": [
+        "ResourceLifecycleTrait|ERROR|com.example#DeleteThing",
+        "UnstableTrait.smithy.api#deletesResources|SUPPRESSED|com.example#DeleteThing"
+    ],
+    "deletes-resources-with-properties.smithy": [
+        "TraitValue.UnknownMember.smithy.api#ResourceDeletionBinding.propertiesFrom|WARNING|com.example#DeleteThingFrom",
+        "TraitValue.UnknownMember.smithy.api#ResourceDeletionBinding.properties|WARNING|com.example#DeleteThing",
+        "UnstableTrait.smithy.api#deletesResources|SUPPRESSED|com.example#DeleteThing",
+        "UnstableTrait.smithy.api#deletesResources|SUPPRESSED|com.example#DeleteThingFrom"
+    ],
+    "deprecated-shape/deprecated-shape.smithy": [
+        "DeprecatedShape.smithy.example#DeprecatedMixin|WARNING|smithy.example#Test",
+        "DeprecatedShape.smithy.example#Foo1|WARNING|smithy.example#Test$foo1",
+        "DeprecatedShape.smithy.example#Foo2|WARNING|smithy.example#Test$foo2",
+        "DeprecatedShape.smithy.example#Foo3|WARNING|smithy.example#Test$foo3"
+    ],
+    "deprecated-trait-validator.json": [
+        "DeprecatedTrait|WARNING|ns.foo#MyString",
+        "DeprecatedTrait|WARNING|ns.foo#MyString"
+    ],
+    "deprecated-trait.json": [
+        "Model|ERROR|ns.foo#Invalid2",
+        "Model|ERROR|ns.foo#Invalid3"
+    ],
+    "enums/enum-shapes.smithy": [
+        "EnumShape|ERROR|ns.foo#IntEnum$DUPLICATE_VALUE",
+        "EnumShape|ERROR|ns.foo#IntEnum$IMPLICIT_VALUE",
+        "EnumShape|ERROR|ns.foo#IntEnum$STRING_VALUE",
+        "EnumShape|ERROR|ns.foo#StringEnum$DUPLICATE_VALUE",
+        "EnumShape|ERROR|ns.foo#StringEnum$EMPTY_STRING",
+        "EnumShape|ERROR|ns.foo#StringEnum$INT_VALUE",
+        "EnumShape|WARNING|ns.foo#IntEnum$undesirableName",
+        "EnumShape|WARNING|ns.foo#StringEnum$undesirableName",
+        "ModelDeprecation|WARNING|ns.foo#EnumWithEnumTrait",
+        "TraitTarget|ERROR|ns.foo#EnumWithEnumTrait"
+    ],
+    "enums/enum-trait-validation.json": [
+        "ModelDeprecation|WARNING|ns.foo#Invalid1",
+        "ModelDeprecation|WARNING|ns.foo#Invalid2",
+        "ModelDeprecation|WARNING|ns.foo#Invalid3",
+        "ModelDeprecation|WARNING|ns.foo#Invalid4",
+        "ModelDeprecation|WARNING|ns.foo#ValidFullDefinition",
+        "ModelDeprecation|WARNING|ns.foo#ValidNoName",
+        "ModelDeprecation|WARNING|ns.foo#Warn1",
+        "TraitValue|ERROR|ns.foo#Invalid2",
+        "TraitValue|ERROR|ns.foo#Invalid2"
+    ],
+    "enums/enum-value-invalid-type.smithy": [
+        "EnumShape|ERROR|smithy.example#IntEnum$ARRAY",
+        "EnumShape|ERROR|smithy.example#IntEnum$BOOLEAN",
+        "EnumShape|ERROR|smithy.example#IntEnum$FLOAT",
+        "EnumShape|ERROR|smithy.example#IntEnum$MAP",
+        "EnumShape|ERROR|smithy.example#IntEnum$NULL"
+    ],
+    "error-trait.json": [
+        "Model|ERROR|ns.foo#InvalidDoesNotStartWithClientOrServer"
+    ],
+    "event-payload-validation.json": [
+        "ExclusiveStructureMemberTrait|ERROR|ns.foo#InvalidEvent2",
+        "TraitTarget|ERROR|ns.foo#InvalidEvent2$foo",
+        "TraitTarget|ERROR|ns.foo#InvalidEvent3$foo",
+        "TraitTarget|ERROR|ns.foo#InvalidEvent4$foo"
+    ],
+    "event-stream-with-errors.smithy": [],
+    "examples-trait-service-errors.smithy": [
+        "ExamplesTrait|ERROR|ns.foo#WithError",
+        "ExamplesTrait|ERROR|ns.foo#WithoutError",
+        "ExamplesTrait|ERROR|ns.foo#WithoutError"
+    ],
+    "examples-trait-validator.json": [
+        "ExamplesTrait.Member.InvalidRange|WARNING|ns.foo#Operation",
+        "ExamplesTrait.Member.InvalidRange|WARNING|ns.foo#Operation",
+        "ExamplesTrait.Member.InvalidRange|WARNING|ns.foo#Operation",
+        "ExamplesTrait.Member.InvalidRange|WARNING|ns.foo#Operation",
+        "ExamplesTrait.UnknownMember.ns.foo#OperationError.extra|WARNING|ns.foo#Operation",
+        "ExamplesTrait.UnknownMember.ns.foo#OperationOutput.additional|WARNING|ns.foo#Operation",
+        "ExamplesTrait.UnknownMember.smithy.api#Unit.bam|WARNING|ns.foo#Operation2",
+        "ExamplesTrait.UnknownMember.smithy.api#Unit.foo|WARNING|ns.foo#Operation2",
+        "ExamplesTrait|ERROR|ns.foo#Operation",
+        "ExamplesTrait|ERROR|ns.foo#Operation",
+        "ExamplesTrait|ERROR|ns.foo#Operation",
+        "ExamplesTrait|ERROR|ns.foo#Operation",
+        "ExamplesTrait|ERROR|ns.foo#Operation2",
+        "ExamplesTrait|WARNING|ns.foo#Operation",
+        "ExamplesTrait|WARNING|ns.foo#Operation",
+        "ExamplesTrait|WARNING|ns.foo#Operation",
+        "ExamplesTrait|WARNING|ns.foo#Operation",
+        "ExamplesTrait|WARNING|ns.foo#Operation",
+        "ExamplesTrait|WARNING|ns.foo#Operation",
+        "ExamplesTrait|WARNING|ns.foo#Operation",
+        "ExamplesTrait|WARNING|ns.foo#Operation",
+        "ExamplesTrait|WARNING|ns.foo#Operation"
+    ],
+    "exclusive-structure-member-traits-validator.json": [
+        "ExclusiveStructureMemberTrait|ERROR|ns.foo#Invalid1",
+        "ExclusiveStructureMemberTrait|ERROR|ns.foo#Invalid2",
+        "ExclusiveStructureMemberTrait|ERROR|ns.foo#Invalid3"
+    ],
+    "external-documentation/external-documentation-bad-url.json": [
+        "Model|ERROR|ns.foo#Invalid"
+    ],
+    "external-documentation/external-documentation-no-entries.json": [
+        "TraitValue|ERROR|ns.foo#Invalid2"
+    ],
+    "external-documentation/external-documentation-valid.json": [],
+    "finds-conflicting-traits.json": [
+        "TraitConflict|ERROR|ns.foo#String2",
+        "TraitConflict|ERROR|ns.foo#String3",
+        "TraitConflict|ERROR|ns.foo#String4"
+    ],
+    "host-request-validator.json": [
+        "TraitTarget|ERROR|ns.foo#EInput$foo",
+        "TraitTarget|ERROR|ns.foo#FInput$foo"
+    ],
+    "http-api-key-scheme-trait-validator-test.json": [
+        "HttpApiKeyAuthTrait|ERROR|ns.foo#MyService"
+    ],
+    "http-binding-trait-ignored.smithy": [
+        "TraitTarget|ERROR|smithy.example#IgnoredBindingOperationInput$code"
+    ],
+    "http-bindings-missing-validator-warning.json": [
+        "HttpBindingsMissing|WARNING|ns.foo#MissingBindings1",
+        "HttpBindingsMissing|WARNING|ns.foo#MissingBindings2"
+    ],
+    "http-bindings-missing-validator.json": [
+        "HttpBindingsMissing|ERROR|ns.foo#MissingBindings1",
+        "HttpBindingsMissing|ERROR|ns.foo#MissingBindings2"
+    ],
+    "http-checksum-required-trait.json": [
+        "TraitTarget|ERROR|ns.foo#InvalidError",
+        "TraitTarget|ERROR|ns.foo#InvalidInput",
+        "TraitTarget|ERROR|ns.foo#InvalidOutput",
+        "TraitTarget|ERROR|ns.foo#InvalidStructure$Body"
+    ],
+    "http-header-tchar-validator.json": [
+        "HttpHeaderTrait|DANGER|ns.foo#SayHelloInput$myHeader"
+    ],
+    "http-method-semantics-validator.json": [
+        "HttpMethodSemantics.MissingIdempotentTrait|WARNING|ns.foo#H",
+        "HttpMethodSemantics.MissingReadonlyTrait|WARNING|ns.foo#I",
+        "HttpMethodSemantics.OPTIONS|WARNING|ns.foo#Options",
+        "HttpMethodSemantics.UnexpectedPayload|DANGER|ns.foo#K",
+        "HttpMethodSemantics.UnexpectedPayload|DANGER|ns.foo#L",
+        "HttpMethodSemantics.UnexpectedPayload|DANGER|ns.foo#M",
+        "HttpMethodSemantics.UnnecessaryReadonlyTrait|WARNING|ns.foo#G",
+        "HttpMethodSemantics|WARNING|ns.foo#A"
+    ],
+    "http-query-literals-and-bindings-conflict1.smithy": [
+        "HttpQueryTrait|ERROR|smithy.example#OperationOneInput"
+    ],
+    "http-query-literals-and-bindings-conflict2.smithy": [
+        "HttpQueryTrait|ERROR|smithy.example#OperationOneInput"
+    ],
+    "http-query-literals-and-bindings-conflict3.smithy": [
+        "HttpQueryTrait|ERROR|smithy.example#OperationOneInput",
+        "HttpQueryTrait|ERROR|smithy.example#OperationOneInput"
+    ],
+    "http-request-response-validator.smithy": [
+        "ExclusiveStructureMemberTrait|ERROR|ns.foo#JInput",
+        "TraitConflict|ERROR|ns.foo#BadErrorMultipleBindings$foo",
+        "TraitConflict|ERROR|ns.foo#GInput$a",
+        "TraitConflict|ERROR|ns.foo#GInput$b",
+        "TraitConflict|ERROR|ns.foo#GOutput$a",
+        "TraitConflict|ERROR|ns.foo#GOutput$b",
+        "TraitTarget|ERROR|ns.foo#BadError",
+        "TraitTarget|ERROR|ns.foo#EInput$label2",
+        "TraitTarget|ERROR|ns.foo#GInput$b",
+        "TraitTarget|ERROR|ns.foo#GOutput$b",
+        "TraitTarget|ERROR|ns.foo#HInput$a",
+        "TraitTarget|ERROR|ns.foo#OInput$a"
+    ],
+    "http-response-code-input-conflicts.smithy": [
+        "TraitTarget|ERROR|ns.foo#HttpOperationInput$Int"
+    ],
+    "http-response-code-semantics-validator-204.smithy": [
+        "HttpResponseCodeSemantics|WARNING|smithy.example#InvalidStatusCode204",
+        "HttpResponseCodeSemantics|WARNING|smithy.example#InvalidStatusCode205"
+    ],
+    "http-response-code-semantics-validator.json": [
+        "HttpResponseCodeSemantics|DANGER|ns.foo#B",
+        "HttpResponseCodeSemantics|DANGER|ns.foo#C",
+        "HttpResponseCodeSemantics|DANGER|ns.foo#ErrorD",
+        "HttpResponseCodeSemantics|DANGER|ns.foo#ErrorE"
+    ],
+    "http-trait-conflicts.smithy": [
+        "TraitConflict|ERROR|ns.foo#HttpOperationOutput$Int"
+    ],
+    "http-uri-conflict-validator.json": [
+        "HttpUriConflict|ERROR|ns.foo#A",
+        "HttpUriConflict|ERROR|ns.foo#B",
+        "HttpUriConflict|ERROR|ns.foo#C",
+        "HttpUriConflict|ERROR|ns.foo#D",
+        "HttpUriConflict|ERROR|ns.foo#E",
+        "HttpUriConflict|ERROR|ns.foo#H",
+        "HttpUriConflict|ERROR|ns.foo#I",
+        "HttpUriConflict|ERROR|ns.foo#J",
+        "HttpUriConflict|ERROR|ns.foo#LackOfPatternEnablesConflict1",
+        "HttpUriConflict|ERROR|ns.foo#LackOfPatternEnablesConflict2"
+    ],
+    "http-uri-format-invalid.json": [
+        "HttpUriFormat|ERROR|ns.foo#SayHello"
+    ],
+    "http-uri-greedy-labels-validator1.smithy": [
+        "HttpUriGreedyLabel.GreedyLabelIsNotLastLabel|DANGER|smithy.example#OperationOne",
+        "HttpUriGreedyLabel.MultipleGreedyLabels|DANGER|smithy.example#OperationOne"
+    ],
+    "http-uri-greedy-labels-validator2.smithy": [
+        "HttpUriGreedyLabel.GreedyLabelIsNotLastLabel|DANGER|smithy.example#OperationOne"
+    ],
+    "httpprefixheaders-on-sparse-map.smithy": [
+        "TraitTarget|ERROR|smithy.example#Foo$headers"
+    ],
+    "idempotency-token-trait-ignored.smithy": [
+        "IdempotencyTokenIgnored|WARNING|io.smithy.example#StructureOne$stringMember",
+        "IdempotencyTokenIgnored|WARNING|io.smithy.example#StructureThree$stringMember"
+    ],
+    "idempotent-trait-bare.smithy": [],
+    "idempotent-trait-both-properties.smithy": [
+        "IdempotentTrait|ERROR|smithy.example#PutItem"
+    ],
+    "idempotent-trait-errors-not-on-operation.smithy": [
+        "IdempotentTrait|ERROR|smithy.example#CreateThing"
+    ],
+    "idempotent-trait-exists-empty-list.smithy": [],
+    "idempotent-trait-exists-errors-valid.smithy": [],
+    "idempotent-trait-multiple-errors-valid.smithy": [],
+    "idempotent-trait-not-found-errors-invalid.smithy": [
+        "IdempotentTrait|ERROR|smithy.example#DeleteThing"
+    ],
+    "idempotent-trait-notfound-empty-list.smithy": [],
+    "idempotent-trait-notfound-errors-valid.smithy": [],
+    "idref-trait.json": [
+        "TraitValue|ERROR|ns.foo#Invalid1",
+        "TraitValue|ERROR|ns.foo#Invalid2",
+        "TraitValue|ERROR|ns.foo#Invalid3",
+        "TraitValue|ERROR|ns.foo#Invalid4",
+        "TraitValue|ERROR|ns.foo#InvalidAllowsMissing1",
+        "TraitValue|ERROR|ns.foo#InvalidCustomErrorMessage1"
+    ],
+    "input-output-must-not-have-error-trait.json": [
+        "Target|ERROR|ns.foo#MyOperation",
+        "Target|ERROR|ns.foo#MyOperation"
+    ],
+    "json-name.json": [
+        "TraitTarget|ERROR|ns.foo#B"
+    ],
+    "jsonName-conflict.json": [
+        "JsonName|ERROR|ns.foo#A",
+        "JsonName|ERROR|ns.foo#B"
+    ],
+    "length-trait.json": [
+        "LengthTrait|ERROR|ns.foo#Invalid1",
+        "LengthTrait|ERROR|ns.foo#Invalid2",
+        "LengthTrait|ERROR|ns.foo#Invalid3"
+    ],
+    "lifecycle/valid-implicit-lifecycles.json": [],
+    "lifecycle/validates-idempotent-lifecycles.json": [
+        "ResourceLifecycle|ERROR|ns.foo#Resource",
+        "ResourceLifecycle|ERROR|ns.foo#Resource"
+    ],
+    "lifecycle/validates-instance-and-collection-operations.json": [
+        "ResourceIdentifierBinding|ERROR|ns.foo#CreateValidA",
+        "ResourceIdentifierBinding|ERROR|ns.foo#DeleteValidA",
+        "ResourceIdentifierBinding|ERROR|ns.foo#GenericCollectionOperation",
+        "ResourceIdentifierBinding|ERROR|ns.foo#GenericInstanceOperation",
+        "ResourceIdentifierBinding|ERROR|ns.foo#GetValidA",
+        "ResourceIdentifierBinding|ERROR|ns.foo#ListValidA",
+        "ResourceIdentifierBinding|ERROR|ns.foo#PutValidA",
+        "ResourceIdentifierBinding|ERROR|ns.foo#UpdateValidA"
+    ],
+    "lifecycle/validates-readonly-lifecycles.json": [
+        "ResourceLifecycle|ERROR|ns.foo#Resource",
+        "ResourceLifecycle|ERROR|ns.foo#Resource",
+        "ResourceLifecycle|ERROR|ns.foo#Resource",
+        "ResourceLifecycle|ERROR|ns.foo#Resource",
+        "ResourceLifecycle|ERROR|ns.foo#Resource",
+        "ResourceLifecycle|ERROR|ns.foo#Resource",
+        "ResourceLifecycle|ERROR|ns.foo#Resource",
+        "ResourceLifecycle|ERROR|ns.foo#Resource"
+    ],
+    "linters/emit-each-invalid-selector.json": [
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-",
+        "Model|ERROR|-"
+    ],
+    "linters/emit-each-selector-requires-selectors.json": [
+        "Model|ERROR|-",
+        "Model|ERROR|-"
+    ],
+    "linters/emit-each-selector-validator.json": [
+        "any|DANGER|ns.foo#Boolean",
+        "any|DANGER|ns.foo#Float",
+        "any|DANGER|ns.foo#Long",
+        "blob|DANGER|ns.foo#Blob",
+        "boolean|DANGER|ns.foo#Boolean",
+        "float|DANGER|ns.foo#Float",
+        "identifier|DANGER|ns.foo#MyResourceIdentifier",
+        "integer|DANGER|ns.foo#Integer",
+        "list|DANGER|ns.foo#List",
+        "long|DANGER|ns.foo#Long",
+        "map|DANGER|ns.foo#Map",
+        "memberTargetsString|DANGER|ns.foo#List$member",
+        "memberTargetsString|DANGER|ns.foo#Map$key",
+        "memberTargetsString|DANGER|ns.foo#Map$value",
+        "memberTargetsString|DANGER|ns.foo#OperationAInput$memberName",
+        "member|DANGER|ns.foo#List$member",
+        "member|DANGER|ns.foo#Map$key",
+        "member|DANGER|ns.foo#Map$value",
+        "member|DANGER|ns.foo#OperationAInput$memberName",
+        "member|DANGER|ns.foo#OperationAInput$otherMemberName",
+        "member|DANGER|ns.foo#OperationAOutput$b",
+        "member|DANGER|ns.foo#OperationBInput$id",
+        "not|DANGER|ns.foo#List",
+        "not|DANGER|ns.foo#List$member",
+        "not|DANGER|ns.foo#Map",
+        "not|DANGER|ns.foo#Map$key",
+        "not|DANGER|ns.foo#Map$value",
+        "not|DANGER|ns.foo#MyResource",
+        "not|DANGER|ns.foo#MyService",
+        "not|DANGER|ns.foo#OperationA",
+        "not|DANGER|ns.foo#OperationAInput",
+        "not|DANGER|ns.foo#OperationAInput$memberName",
+        "not|DANGER|ns.foo#OperationAInput$otherMemberName",
+        "not|DANGER|ns.foo#OperationAOutput",
+        "not|DANGER|ns.foo#OperationAOutput$b",
+        "not|DANGER|ns.foo#OperationB",
+        "not|DANGER|ns.foo#OperationBInput",
+        "not|DANGER|ns.foo#OperationBInput$id",
+        "number|DANGER|ns.foo#Float",
+        "number|DANGER|ns.foo#Integer",
+        "number|DANGER|ns.foo#Long",
+        "operation|DANGER|ns.foo#OperationA",
+        "operation|DANGER|ns.foo#OperationB",
+        "resource|DANGER|ns.foo#MyResource",
+        "serviceChild|DANGER|ns.foo#MyResource",
+        "serviceVersion|DANGER|ns.foo#MyService",
+        "shapeId|DANGER|ns.foo#String",
+        "shapeId|DANGER|ns.foo#String",
+        "shapeMember|DANGER|ns.foo#OperationAInput$memberName",
+        "shapeName|DANGER|ns.foo#String",
+        "shapeName|DANGER|ns.foo#String",
+        "shapeName|DANGER|other.ns#String",
+        "shapeName|DANGER|other.ns#String",
+        "simpleType|DANGER|ns.foo#Blob",
+        "simpleType|DANGER|ns.foo#Boolean",
+        "simpleType|DANGER|ns.foo#Float",
+        "simpleType|DANGER|ns.foo#Integer",
+        "simpleType|DANGER|ns.foo#Long",
+        "simpleType|DANGER|ns.foo#MyResourceIdentifier",
+        "simpleType|DANGER|ns.foo#String",
+        "simpleType|DANGER|ns.foo#UtcTimestamp",
+        "simpleType|DANGER|other.ns#String",
+        "traitContainsCaseInsensitive|DANGER|ns.foo#Blob",
+        "traitContains|DANGER|ns.foo#Blob",
+        "traitContains|DANGER|ns.foo#Blob",
+        "traitEndsWith|DANGER|ns.foo#Blob",
+        "traitEqualToCaseInsensitiveNoQuotes|DANGER|ns.foo#Blob",
+        "traitEqualToCaseInsensitive|DANGER|ns.foo#Blob",
+        "traitEqualTo|DANGER|ns.foo#Blob",
+        "traitExists|DANGER|ns.foo#Blob",
+        "traitStartsWith|DANGER|ns.foo#Blob",
+        "valid-neighbor-only|DANGER|ns.foo#Integer",
+        "valid-neighbor-only|DANGER|ns.foo#List$member",
+        "valid-neighbor-only|DANGER|ns.foo#Map",
+        "valid-neighbor-only|DANGER|ns.foo#Map$key",
+        "valid-neighbor-only|DANGER|ns.foo#Map$value",
+        "valid-neighbor-only|DANGER|ns.foo#MyResource",
+        "valid-neighbor-only|DANGER|ns.foo#MyResourceIdentifier",
+        "valid-neighbor-only|DANGER|ns.foo#OperationA",
+        "valid-neighbor-only|DANGER|ns.foo#OperationAInput",
+        "valid-neighbor-only|DANGER|ns.foo#OperationAInput$memberName",
+        "valid-neighbor-only|DANGER|ns.foo#OperationAInput$otherMemberName",
+        "valid-neighbor-only|DANGER|ns.foo#OperationAOutput",
+        "valid-neighbor-only|DANGER|ns.foo#OperationAOutput$b",
+        "valid-neighbor-only|DANGER|ns.foo#OperationB",
+        "valid-neighbor-only|DANGER|ns.foo#OperationBInput",
+        "valid-neighbor-only|DANGER|ns.foo#OperationBInput$id",
+        "valid-neighbor-only|DANGER|ns.foo#OperationErrorA",
+        "valid-neighbor-only|DANGER|ns.foo#OperationErrorB",
+        "valid-neighbor-only|DANGER|ns.foo#String"
+    ],
+    "linters/emit-none-selector-validator.json": [
+        "NoLengthTraits|DANGER|-"
+    ],
+    "long-poll-trait.smithy": [
+        "TraitValue.Member.InvalidRange|ERROR|smithy.example#LongPollWithNegativeTimeout",
+        "TraitValue.Member.InvalidRange|ERROR|smithy.example#LongPollWithZeroTimeout"
+    ],
+    "mediatype-trait.json": [
+        "MediaType|ERROR|smithy.example#Invalid1",
+        "MediaType|ERROR|smithy.example#Invalid2",
+        "MediaType|ERROR|smithy.example#Invalid3",
+        "MediaType|ERROR|smithy.example#Invalid4",
+        "MediaType|ERROR|smithy.example#Invalid5",
+        "MediaType|ERROR|smithy.example#Invalid6",
+        "MediaType|ERROR|smithy.example#Invalid7"
+    ],
+    "metadata/duplicate-key.smithy": [
+        "MetadataTrait|ERROR|smithy.example#AuditLevelA",
+        "MetadataTrait|ERROR|smithy.example#AuditLevelB"
+    ],
+    "metadata/invalid-value.smithy": [
+        "TypedMetadata.auditLevel|ERROR|-"
+    ],
+    "metadata/map-typed-metadata.smithy": [],
+    "metadata/missing-required-member.smithy": [
+        "TypedMetadata.auditLevel|ERROR|-"
+    ],
+    "metadata/missing-required-nested-member.smithy": [
+        "TypedMetadata.auditLevel|ERROR|-"
+    ],
+    "metadata/no-metadata-value.smithy": [],
+    "metadata/operation-io-metadata.smithy": [
+        "TraitTarget|ERROR|smithy.example#FooInput",
+        "TraitTarget|ERROR|smithy.example#FooOutput"
+    ],
+    "metadata/reserved-keys.smithy": [
+        "MetadataTrait|ERROR|smithy.example#SeverityOverrides",
+        "MetadataTrait|ERROR|smithy.example#Suppressions",
+        "MetadataTrait|ERROR|smithy.example#Validators"
+    ],
+    "metadata/triple-duplicate-key.smithy": [
+        "MetadataTrait|ERROR|smithy.example#AuditLevelA",
+        "MetadataTrait|ERROR|smithy.example#AuditLevelB",
+        "MetadataTrait|ERROR|smithy.example#AuditLevelC"
+    ],
+    "metadata/valid-typed-metadata.smithy": [],
+    "mixins/empty-enum-mixin.smithy": [
+        "Model|ERROR|smithy.example#EmptyEnum",
+        "Model|ERROR|smithy.example#EmptyEnumMixin"
+    ],
+    "mixins/mixin-illegal-redefined-member.smithy": [
+        "Model|ERROR|smithy.example#Bam$foo",
+        "Model|ERROR|smithy.example#Baz$foo",
+        "Model|ERROR|smithy.example#Boo$foo"
+    ],
+    "mixins/mixin-trait-applied.smithy": [
+        "TraitTarget|ERROR|smithy.example#InvalidUseOfMixinTrait"
+    ],
+    "mixins/mixin-used-in-illegal-relationship.smithy": [
+        "Target|ERROR|smithy.example#Baz$invalid"
+    ],
+    "mixins/non-empty-enum-mixin.smithy": [],
+    "model-validation/model-validation-stops-validating-on-core-errors.smithy": [
+        "Target.UnresolvedShape|ERROR|smithy.example#FooRequest$listVal",
+        "Target.UnresolvedShape|ERROR|smithy.example#FooRequest$mapVal"
+    ],
+    "no-inline-document-support.smithy": [
+        "NoInlineDocumentSupport|ERROR|smithy.example#FooService"
+    ],
+    "no-replace-trait.json": [
+        "TraitTarget|ERROR|ns.foo#InvalidResource"
+    ],
+    "operation/ambiguous-name.smithy": [
+        "OperationNameAmbiguity|WARNING|smithy.example#GetFooInput",
+        "OperationNameAmbiguity|WARNING|smithy.example#GetFooOutput",
+        "OperationNameAmbiguity|WARNING|smithy.example#GetFooRequest",
+        "OperationNameAmbiguity|WARNING|smithy.example#GetFooResponse"
+    ],
+    "operation/input-output-traits/invalid-input-output-operation-bindings.smithy": [
+        "OperationInputOutputMisuse|ERROR|smithy.example#GetFoo",
+        "OperationInputOutputMisuse|ERROR|smithy.example#GetFoo",
+        "OperationNameAmbiguity|SUPPRESSED|smithy.example#GetFooInput",
+        "OperationNameAmbiguity|SUPPRESSED|smithy.example#GetFooOutput"
+    ],
+    "operation/input-output-traits/invalid-member-target-to-input-output.smithy": [
+        "OperationInputOutputMisuse|ERROR|smithy.example#BadStructure$i",
+        "OperationInputOutputMisuse|ERROR|smithy.example#BadStructure$o"
+    ],
+    "operation/input-output-traits/invalid-multiple-operations-same-shape.smithy": [
+        "OperationInputOutputMisuse|ERROR|smithy.example#GetFooInput",
+        "OperationInputOutputMisuse|ERROR|smithy.example#GetFooOutput",
+        "OperationInputOutputName.input|WARNING|smithy.example#GetFoo2",
+        "OperationInputOutputName.output|WARNING|smithy.example#GetFoo2"
+    ],
+    "operation/input-output-traits/valid-input-output-traits.smithy": [],
+    "paginated/paginated-deeply-nested.json": [
+        "PaginatedTrait.DeeplyNested.items|WARNING|ns.foo#DeeplyNested",
+        "PaginatedTrait.DeeplyNested.outputToken|WARNING|ns.foo#DeeplyNested"
+    ],
+    "paginated/paginated-invalid.json": [
+        "PaginatedTrait.ShouldNotBeRequired.outputToken|DANGER|ns.foo#Invalid4",
+        "PaginatedTrait.ShouldNotBeRequired.pageSize|WARNING|ns.foo#Invalid4",
+        "PaginatedTrait.WrongShapeType.pageSize|DANGER|ns.foo#DangerSizeByte",
+        "PaginatedTrait.WrongShapeType.pageSize|DANGER|ns.foo#DangerSizeLong",
+        "PaginatedTrait.WrongShapeType.pageSize|DANGER|ns.foo#DangerSizeShort",
+        "PaginatedTrait|ERROR|ns.foo#Invalid1",
+        "PaginatedTrait|ERROR|ns.foo#Invalid1",
+        "PaginatedTrait|ERROR|ns.foo#Invalid2",
+        "PaginatedTrait|ERROR|ns.foo#Invalid2",
+        "PaginatedTrait|ERROR|ns.foo#Invalid3",
+        "PaginatedTrait|ERROR|ns.foo#Invalid3",
+        "PaginatedTrait|ERROR|ns.foo#Invalid3",
+        "PaginatedTrait|ERROR|ns.foo#Invalid4",
+        "PaginatedTrait|ERROR|ns.foo#Invalid5",
+        "PaginatedTrait|ERROR|ns.foo#Invalid6",
+        "PaginatedTrait|ERROR|ns.foo#Invalid7",
+        "PaginatedTrait|ERROR|ns.foo#Invalid7",
+        "PaginatedTrait|ERROR|ns.foo#Invalid8",
+        "PaginatedTrait|ERROR|ns.foo#Invalid8",
+        "PaginatedTrait|ERROR|ns.foo#InvalidNestedInput",
+        "PaginatedTrait|ERROR|ns.foo#InvalidNestedInput",
+        "PaginatedTrait|ERROR|ns.foo#InvalidNoOutput",
+        "PaginatedTrait|ERROR|ns.foo#InvalidNoOutput"
+    ],
+    "paginated/paginated-map-tokens.json": [
+        "PaginatedTrait.WrongShapeType.inputToken|DANGER|ns.foo#MapTokens",
+        "PaginatedTrait.WrongShapeType.outputToken|DANGER|ns.foo#MapTokens"
+    ],
+    "paginated/paginated-targets.json": [
+        "Target.UnresolvedShape|ERROR|ns.foo#UnresolvedInput$nextToken",
+        "Target.UnresolvedShape|ERROR|ns.foo#UnresolvedInput$pageSize",
+        "Target.UnresolvedShape|ERROR|ns.foo#UnresolvedOutput$items",
+        "Target.UnresolvedShape|ERROR|ns.foo#UnresolvedOutput$nextToken"
+    ],
+    "paginated/paginated-valid-merge.json": [],
+    "paginated/paginated-valid.json": [],
+    "pattern-trait.json": [
+        "PatternTrait|WARNING|ns.foo#Structure$WithoutAnchorsMember",
+        "PatternTrait|WARNING|ns.foo#Structure$WithoutLeadingAnchorMember",
+        "PatternTrait|WARNING|ns.foo#Structure$WithoutTrailingAnchorMember",
+        "PatternTrait|WARNING|ns.foo#WithoutAnchors",
+        "PatternTrait|WARNING|ns.foo#WithoutLeadingAnchor",
+        "PatternTrait|WARNING|ns.foo#WithoutTrailingAnchor"
+    ],
+    "private-access.json": [
+        "PrivateAccess|ERROR|smithy.example#InvalidList$member",
+        "PrivateAccess|ERROR|smithy.example#InvalidMap$key",
+        "PrivateAccess|ERROR|smithy.example#InvalidMap$value",
+        "PrivateAccess|ERROR|smithy.example#InvalidOperation",
+        "PrivateAccess|ERROR|smithy.example#InvalidOperation",
+        "PrivateAccess|ERROR|smithy.example#InvalidOperation",
+        "PrivateAccess|ERROR|smithy.example#InvalidService",
+        "PrivateAccess|ERROR|smithy.example#InvalidStructure$invalid",
+        "PrivateAccess|WARNING|smithy.example#InvalidTraitApplication"
+    ],
+    "private-mixin-member.smithy": [
+        "PrivateMixinMember|WARNING|smithy.example#MixinWithPrivateMember$sensitiveField"
+    ],
+    "puts-resources-valid.smithy": [
+        "UnstableTrait.smithy.api#putsResources|SUPPRESSED|com.example#CreateTable"
+    ],
+    "puts-resources-wrong-identifier.smithy": [
+        "ResourceLifecycleTrait|ERROR|com.example#PutTable",
+        "UnstableTrait.smithy.api#putsResources|SUPPRESSED|com.example#PutTable"
+    ],
+    "range-trait.json": [
+        "RangeTrait|ERROR|ns.foo#Invalid1",
+        "RangeTrait|ERROR|ns.foo#Invalid1",
+        "RangeTrait|ERROR|ns.foo#Invalid2",
+        "RangeTrait|ERROR|ns.foo#Invalid2",
+        "RangeTrait|ERROR|ns.foo#Invalid3",
+        "RangeTrait|ERROR|ns.foo#Invalid3",
+        "RangeTrait|ERROR|ns.foo#Invalid4",
+        "RangeTrait|ERROR|ns.foo#Invalid4",
+        "RangeTrait|ERROR|ns.foo#Invalid5",
+        "RangeTrait|ERROR|ns.foo#Invalid5",
+        "RangeTrait|ERROR|ns.foo#Invalid6",
+        "RangeTrait|ERROR|ns.foo#Structure$InvalidMember1",
+        "RangeTrait|ERROR|ns.foo#Structure$InvalidMember1",
+        "RangeTrait|ERROR|ns.foo#Structure$InvalidMember2",
+        "RangeTrait|ERROR|ns.foo#Structure$InvalidMember2",
+        "RangeTrait|ERROR|ns.foo#Structure$InvalidMember3",
+        "RangeTrait|ERROR|ns.foo#Structure$InvalidMember3",
+        "RangeTrait|ERROR|ns.foo#Structure$InvalidMember4",
+        "RangeTrait|ERROR|ns.foo#Structure$InvalidMember4",
+        "RangeTrait|ERROR|ns.foo#Structure$InvalidMember5",
+        "RangeTrait|ERROR|ns.foo#Structure$InvalidMember5",
+        "RangeTrait|ERROR|ns.foo#Structure$InvalidMember6"
+    ],
+    "reads-resources-property-type-mismatch.smithy": [
+        "ResourceLifecycleTrait|ERROR|com.example#GetWidget",
+        "UnstableTrait.smithy.api#readsResources|SUPPRESSED|com.example#GetWidget"
+    ],
+    "reads-updates-valid.smithy": [
+        "UnstableTrait.smithy.api#readsResources|SUPPRESSED|com.example#BatchGetItem",
+        "UnstableTrait.smithy.api#updatesResources|SUPPRESSED|com.example#BatchWriteItem"
+    ],
+    "recommended/recommended-trait.smithy": [],
+    "references/bad-ids.json": [
+        "ReferencesTrait|ERROR|ns.foo#MyStructure",
+        "ReferencesTrait|ERROR|ns.foo#MyStructure",
+        "ReferencesTrait|ERROR|ns.foo#MyStructure"
+    ],
+    "references/invalid-string-reference-multiple-identifiers.json": [
+        "ReferencesTrait|ERROR|ns.foo#MyString"
+    ],
+    "references/invalid-string-shape-reference-with-ids.json": [
+        "ReferencesTrait|ERROR|ns.foo#MyString"
+    ],
+    "references/missing-identifier-reference.json": [
+        "ReferencesTrait|ERROR|ns.foo#MyStructure",
+        "ReferencesTrait|ERROR|ns.foo#MyStructure"
+    ],
+    "references/missing-member-references.smithy": [
+        "MemberShouldReferenceResource|WARNING|ns.foo#Operation1Input$fooId"
+    ],
+    "references/recursive-member-references.smithy": [
+        "MemberShouldReferenceResource|WARNING|ns.recursive#N1$id"
+    ],
+    "references/reference-id-member-not-found.json": [
+        "ReferencesTrait|ERROR|ns.foo#MyStructure"
+    ],
+    "references/reference-must-target-resource.json": [
+        "ReferencesTrait|ERROR|ns.foo#MyStructure"
+    ],
+    "references/valid-implicit-references.json": [],
+    "request-token.json": [
+        "ExclusiveStructureMemberTrait|ERROR|ns.foo#InvalidInput"
+    ],
+    "requestCompression/absent-encodings.smithy": [
+        "Model|ERROR|com.foo#RequestCompressionOperation"
+    ],
+    "requestCompression/applied.smithy": [],
+    "requestCompression/empty-encodings.smithy": [
+        "RequestCompressionTrait|ERROR|com.foo#RequestCompressionOperation"
+    ],
+    "requestCompression/invalid-encodings.smithy": [
+        "RequestCompressionTrait|ERROR|com.foo#RequestCompressionOperation"
+    ],
+    "requestCompression/multiple-encodings.smithy": [],
+    "requestCompression/multiple-operations.smithy": [],
+    "requestCompression/no-input.smithy": [
+        "RequestCompressionTrait|ERROR|com.foo#RequestCompressionOperation"
+    ],
+    "requestCompression/streaming-requiredLength.smithy": [
+        "RequestCompressionTrait|ERROR|com.foo#RequestCompressionOperation"
+    ],
+    "requestCompression/streaming.smithy": [],
+    "required-trait-sanity-check.json": [
+        "TraitTarget|ERROR|ns.foo#Blob",
+        "TraitTarget|ERROR|ns.foo#Operation",
+        "TraitTarget|ERROR|ns.foo#OperationInput"
+    ],
+    "requiresLength-validator.json": [
+        "StreamingTrait|ERROR|ns.foo#InvalidStreamingOperationOutput"
+    ],
+    "resource-identifiers/detects-conflicting-bindings.smithy": [
+        "ResourceIdentifierBinding|ERROR|smithy.example#DeleteFooInput",
+        "ResourceIdentifierBinding|ERROR|smithy.example#PutFooInput",
+        "ResourceIdentifierBinding|WARNING|smithy.example#DeleteFooInput",
+        "ResourceIdentifierBinding|WARNING|smithy.example#GetFooInput"
+    ],
+    "resource-identifiers/detects-misbound-operations.smithy": [
+        "MemberShouldReferenceResource|WARNING|smithy.example#GetFooInput$fooId",
+        "ServiceBoundResourceOperation.smithy.example#FooService.GetFoo|WARNING|smithy.example#GetFoo"
+    ],
+    "resource-identifiers/resource-identifiers-bad-type.json": [
+        "Target|ERROR|ns.foo#BadTarget"
+    ],
+    "resource-identifiers/resource-identifiers.json": [
+        "ResourceIdentifier|ERROR|ns.foo#Invalid1",
+        "ResourceIdentifier|ERROR|ns.foo#Invalid2",
+        "ResourceIdentifier|ERROR|ns.foo#Invalid3",
+        "ResourceIdentifier|ERROR|ns.foo#Invalid4",
+        "ResourceOperationInputOutput|ERROR|ns.foo#Invalid3",
+        "ResourceOperationInputOutput|ERROR|ns.foo#Invalid4"
+    ],
+    "resource-must-bind-parent-identifiers.json": [
+        "ResourceIdentifierBinding|ERROR|ns.foo#InvokeB"
+    ],
+    "resource-operation-binding-validator.json": [
+        "ResourceIdentifierBinding|ERROR|ns.foo#InvalidResourceOperation1",
+        "ResourceIdentifierBinding|ERROR|ns.foo#InvalidResourceOperation2",
+        "ResourceIdentifierBinding|ERROR|ns.foo#ValidResourceOperation2",
+        "ResourceIdentifierBinding|ERROR|ns.foo#ValidResourceOperation4"
+    ],
+    "resource-operation-errors.smithy": [
+        "ResourceOperationInputOutput|ERROR|smithy.example#Resource"
+    ],
+    "resource-parent-validator.json": [
+        "ResourceCycle|ERROR|ns.foo#CycleA",
+        "ResourceCycle|ERROR|ns.foo#CycleB",
+        "ResourceCycle|ERROR|ns.foo#CycleC",
+        "ResourceCycle|ERROR|ns.foo#InvalidSelfResourceBinding",
+        "Target|ERROR|ns.foo#InvalidResourceBindingType"
+    ],
+    "resource-properties/collection-operation-input-properties.smithy": [],
+    "resource-properties/collection-operation-no-auto-detection.smithy": [
+        "ResourceOperationInputOutput|ERROR|smithy.example#Task"
+    ],
+    "resource-properties/collection-operation-output-properties.smithy": [],
+    "resource-properties/invalid-output-identifier.smithy": [
+        "ResourceOperationInputOutput|ERROR|com.example#CreateResourceOutput$id"
+    ],
+    "resource-properties/invalid-resource-properties-nested.smithy": [
+        "TraitTarget|ERROR|smithy.example#ResourceDescription$invalidToken",
+        "TraitTarget|ERROR|smithy.example#SetTitleInput$title",
+        "TraitTarget|ERROR|smithy.example#UpdateBookNest$book"
+    ],
+    "resource-properties/list-element-bindings.smithy": [],
+    "resource-properties/list-element-identifier-rename.smithy": [],
+    "resource-properties/list-element-marker-misuse.smithy": [
+        "ResourceOperationInputOutput|ERROR|smithy.example#Task",
+        "ResourceOperationInputOutput|WARNING|smithy.example#ListTasksOutput$summary"
+    ],
+    "resource-properties/list-element-notproperty.smithy": [],
+    "resource-properties/list-element-property-mismatch.smithy": [
+        "ResourceOperationInputOutput|WARNING|smithy.example#TaskSummary$status"
+    ],
+    "resource-properties/list-element-strict-unknown-member.smithy": [
+        "ResourceOperationInputOutput|ERROR|smithy.example#TaskSummary$unknownExtra"
+    ],
+    "resource-properties/list-only-resource-properties.smithy": [],
+    "resource-properties/list-output-ambiguous.smithy": [
+        "ResourceOperationInputOutput|ERROR|smithy.example#Task"
+    ],
+    "resource-properties/resource-properties-errors.smithy": [
+        "ResourceOperationInputOutput|ERROR|smithy.example#GetForecastInput",
+        "ResourceOperationInputOutput|ERROR|smithy.example#GetForecastInput$booleanProperty",
+        "ResourceOperationInputOutput|ERROR|smithy.example#GetForecastInput$memberIsNotProperty",
+        "ResourceOperationInputOutput|ERROR|smithy.example#GetForecastOutput"
+    ],
+    "resource-properties/resource-properties-nested.smithy": [],
+    "resource-properties/resource-properties.smithy": [],
+    "resource-properties/shared-list-element-structure.smithy": [],
+    "sensitive-trait.json": [
+        "TraitTarget|ERROR|ns.foo#Operation"
+    ],
+    "service-auth-definitions/multiple-auth-schemes.smithy": [
+        "ServiceAuthDefinitions|WARNING|smithy.example#FooService"
+    ],
+    "service-auth-definitions/one-auth-scheme.smithy": [],
+    "service-conflict-validator.json": [
+        "Service|ERROR|another.ns#Baz",
+        "Service|ERROR|another.ns#Foo",
+        "Service|ERROR|another.ns#ListB",
+        "Service|ERROR|another.ns#ListC",
+        "Service|ERROR|another.ns#MapA",
+        "Service|ERROR|another.ns#OperationA",
+        "Service|ERROR|another.ns#Qux",
+        "Service|ERROR|another.ns#ResourceA",
+        "Service|ERROR|ns.foo#Baz",
+        "Service|ERROR|ns.foo#Foo",
+        "Service|ERROR|ns.foo#ListB",
+        "Service|ERROR|ns.foo#ListC",
+        "Service|ERROR|ns.foo#MapA",
+        "Service|ERROR|ns.foo#OperationA",
+        "Service|ERROR|ns.foo#Qux",
+        "Service|ERROR|ns.foo#ResourceA",
+        "Service|NOTE|ns.foo#String",
+        "Service|WARNING|another.ns#ListA",
+        "Service|WARNING|another.ns#ListA",
+        "Service|WARNING|even.more.ns#ListA",
+        "Service|WARNING|even.more.ns#ListA",
+        "Service|WARNING|ns.foo#ListA",
+        "Service|WARNING|ns.foo#ListA"
+    ],
+    "service-rename/conflict.smithy": [
+        "Service|ERROR|smithy.example#Baz",
+        "Service|ERROR|smithy.example#Foo"
+    ],
+    "service-rename/error-rename-invalid.smithy": [],
+    "service-rename/invalid-identifier.smithy": [
+        "Service|ERROR|smithy.example#MyService"
+    ],
+    "service-rename/invalid-shape.smithy": [
+        "Service|ERROR|smithy.example#MyService"
+    ],
+    "service-rename/member-invalid.smithy": [
+        "Service|ERROR|smithy.example#MyService"
+    ],
+    "service-rename/operation-invalid.smithy": [
+        "Service|ERROR|smithy.example#MyService"
+    ],
+    "service-rename/redundant-rename-invalid.smithy": [
+        "Service|ERROR|smithy.example#MyService"
+    ],
+    "service-rename/shape-same-name.smithy": [],
+    "sets/valid-sets.smithy": [
+        "ModelDeprecation|WARNING|smithy.example#BigDecimalSet",
+        "ModelDeprecation|WARNING|smithy.example#BigIntSet",
+        "ModelDeprecation|WARNING|smithy.example#BlobSet",
+        "ModelDeprecation|WARNING|smithy.example#BooleanSet",
+        "ModelDeprecation|WARNING|smithy.example#ByteSet",
+        "ModelDeprecation|WARNING|smithy.example#IntegerSet",
+        "ModelDeprecation|WARNING|smithy.example#ListSet",
+        "ModelDeprecation|WARNING|smithy.example#LongSet",
+        "ModelDeprecation|WARNING|smithy.example#MapSet",
+        "ModelDeprecation|WARNING|smithy.example#SetSet",
+        "ModelDeprecation|WARNING|smithy.example#ShortSet",
+        "ModelDeprecation|WARNING|smithy.example#StringSet",
+        "ModelDeprecation|WARNING|smithy.example#StructSet",
+        "ModelDeprecation|WARNING|smithy.example#TimestampSet",
+        "ModelDeprecation|WARNING|smithy.example#UnionSet"
+    ],
+    "severityOverrides/cannot-change-severity-of-error.smithy": [
+        "LengthTrait|ERROR|smithy.example#Invalid"
+    ],
+    "severityOverrides/cannot-elevate-to-error.smithy": [
+        "Model|ERROR|-"
+    ],
+    "severityOverrides/elevate-severity.smithy": [
+        "NoteTheInteger|DANGER|smithy.example#IntegerTarget",
+        "NoteTheList|DANGER|smithy.example#ListTarget",
+        "NoteTheString|WARNING|smithy.example#MyString"
+    ],
+    "severityOverrides/missing-id.smithy": [
+        "Model|ERROR|-"
+    ],
+    "severityOverrides/missing-namespace.smithy": [
+        "Model|ERROR|-"
+    ],
+    "severityOverrides/missing-severity.smithy": [
+        "Model|ERROR|-"
+    ],
+    "severityOverrides/override-hierarchy.smithy": [
+        "NoteTheShape.Integer|WARNING|smithy.example#IntegerTarget",
+        "NoteTheShape.List|WARNING|smithy.example#ListTarget"
+    ],
+    "severityOverrides/should-be-array-of-objects.smithy": [
+        "Model|ERROR|-"
+    ],
+    "severityOverrides/should-be-array.smithy": [
+        "Model|ERROR|-"
+    ],
+    "severityOverrides/suppressions-take-precedence.smithy": [
+        "NoteTheInteger|SUPPRESSED|smithy.example#IntegerTarget"
+    ],
+    "shape-recursion-required-trait.smithy": [
+        "ShapeRecursion|ERROR|smithy.example#RecursiveShape1",
+        "ShapeRecursion|ERROR|smithy.example#RecursiveShape2"
+    ],
+    "shape-recursion-union.smithy": [
+        "ShapeRecursion|ERROR|smithy.example#RecursiveNext",
+        "ShapeRecursion|ERROR|smithy.example#RecursiveUnion",
+        "ShapeRecursion|ERROR|smithy.example#RecursiveUnionA",
+        "ShapeRecursion|ERROR|smithy.example#RecursiveUnionB"
+    ],
+    "shape-recursion.json": [
+        "ShapeRecursion|ERROR|ns.foo#IndirectRecursiveList",
+        "ShapeRecursion|ERROR|ns.foo#IndirectRecursiveListIntermediate1",
+        "ShapeRecursion|ERROR|ns.foo#IndirectRecursiveListIntermediate2",
+        "ShapeRecursion|ERROR|ns.foo#IndirectRecursiveMap",
+        "ShapeRecursion|ERROR|ns.foo#IndirectRecursiveMapIntermediate1",
+        "ShapeRecursion|ERROR|ns.foo#IndirectRecursiveMapIntermediate2",
+        "ShapeRecursion|ERROR|ns.foo#InvalidDirectlyRecursiveList",
+        "ShapeRecursion|ERROR|ns.foo#InvalidDirectlyRecursiveMap"
+    ],
+    "shapeClosures/closure-id-collision.smithy": [
+        "ShapeClosure|ERROR|-"
+    ],
+    "shapeClosures/documentation.smithy": [],
+    "shapeClosures/duplicate-closure-id.smithy": [
+        "ShapeClosure|ERROR|-"
+    ],
+    "shapeClosures/empty-namespace.smithy": [
+        "ShapeClosure.EmptyNamespace.com.example#EmptyNamespace|DANGER|-"
+    ],
+    "shapeClosures/empty-selector.smithy": [
+        "ShapeClosure.EmptySelector.com.example#SelectorMatchesNothingOutsideNamespace|DANGER|-",
+        "ShapeClosure.EmptySelector.com.example#SelectorMatchesNothing|DANGER|-"
+    ],
+    "shapeClosures/invalid-selector-syntax.smithy": [
+        "ShapeClosure|ERROR|-",
+        "TypedMetadata.shapeClosures|ERROR|-"
+    ],
+    "shapeClosures/malformed-closure-id.smithy": [
+        "TypedMetadata.shapeClosures|ERROR|-"
+    ],
+    "shapeClosures/malformed-rename-id.smithy": [
+        "TypedMetadata.shapeClosures|ERROR|-"
+    ],
+    "shapeClosures/no-namespaces-or-selector.smithy": [
+        "ShapeClosure|ERROR|-"
+    ],
+    "shapeClosures/rename-outside-closure.json": [
+        "ShapeClosure|ERROR|-"
+    ],
+    "shapeClosures/rename-rules.smithy": [
+        "ShapeClosure|ERROR|-",
+        "ShapeClosure|ERROR|-",
+        "ShapeClosure|ERROR|-",
+        "TypedMetadata.shapeClosures|ERROR|-",
+        "TypedMetadata.shapeClosures|ERROR|-",
+        "TypedMetadata.shapeClosures|ERROR|-",
+        "TypedMetadata.shapeClosures|ERROR|-"
+    ],
+    "shapeClosures/shape-name-conflict.json": [
+        "ShapeClosure.NameConflicts.com.example#NameConflict|WARNING|-"
+    ],
+    "single-operation-binding.json": [
+        "SingleOperationBinding|ERROR|ns.foo#OA",
+        "SingleOperationBinding|ERROR|ns.foo#OB"
+    ],
+    "single-resource-binding.json": [
+        "SingleResourceBinding|ERROR|ns.foo#ResourceB"
+    ],
+    "sparse-trait-invalid.smithy": [
+        "TraitTarget|ERROR|smithy.example#InvalidStruct"
+    ],
+    "sparse-trait-valid.smithy": [],
+    "streaming-blob-without-httppayload.smithy": [
+        "StreamingTrait|ERROR|com.amazonaws.simple#StreamingOperationOutput$output"
+    ],
+    "streaming-default-required.smithy": [
+        "StreamingTrait|ERROR|smithy.example#NeitherRequiredNorDefaultStream$payload"
+    ],
+    "streaming-trait-event.json": [
+        "StreamingTrait|ERROR|ns.foo#InvalidEventStreamTargeting$member",
+        "StreamingTrait|ERROR|ns.foo#InvalidUnion"
+    ],
+    "streaming-trait.json": [
+        "ExclusiveStructureMemberTrait|ERROR|ns.foo#InvalidStreamingOperationOutput"
+    ],
+    "target-validator-service-errors.json": [
+        "Target.UnresolvedShape|ERROR|ns.foo#InvalidService1",
+        "Target|ERROR|ns.foo#InvalidService2",
+        "Target|ERROR|ns.foo#InvalidService3"
+    ],
+    "target-validator-suggestions.json": [
+        "Target.UnresolvedShape|ERROR|ns.foo#InvalidList1$member",
+        "Target.UnresolvedShape|ERROR|ns.foo#InvalidList2$member",
+        "Target.UnresolvedShape|ERROR|ns.foo#InvalidList3$member",
+        "Target.UnresolvedShape|ERROR|ns.foo#Operation"
+    ],
+    "target-validator.json": [
+        "Target.UnresolvedShape|ERROR|ns.foo#InalidOperationInputOutputErrorNotFound",
+        "Target.UnresolvedShape|ERROR|ns.foo#InalidOperationInputOutputErrorNotFound",
+        "Target.UnresolvedShape|ERROR|ns.foo#InalidOperationInputOutputErrorNotFound",
+        "Target.UnresolvedShape|ERROR|ns.foo#InvalidListMemberReference$member",
+        "Target.UnresolvedShape|ERROR|ns.foo#InvalidResourceBindingReference",
+        "Target.UnresolvedShape|ERROR|ns.foo#InvalidResourceIdentifierReference",
+        "Target|ERROR|ns.foo#InalidOperationInputOutputErrorBadTypes",
+        "Target|ERROR|ns.foo#InalidOperationInputOutputErrorBadTypes",
+        "Target|ERROR|ns.foo#InalidOperationInputOutputErrorBadTypes",
+        "Target|ERROR|ns.foo#InvalidListMemberMember$member",
+        "Target|ERROR|ns.foo#InvalidListMemberResource$member",
+        "Target|ERROR|ns.foo#InvalidListMemberService$member",
+        "Target|ERROR|ns.foo#InvalidMapType",
+        "Target|ERROR|ns.foo#InvalidOperationBadErrorTraits",
+        "Target|ERROR|ns.foo#InvalidOperationBadErrorTraits",
+        "Target|ERROR|ns.foo#InvalidOperationBadErrorTraits",
+        "Target|ERROR|ns.foo#InvalidResourceBindingType",
+        "Target|ERROR|ns.foo#InvalidResourceIdentifierType",
+        "Target|ERROR|ns.foo#InvalidResourceLifecycle",
+        "Target|ERROR|ns.foo#InvalidResourceLifecycle",
+        "Target|ERROR|ns.foo#InvalidResourceLifecycle",
+        "Target|ERROR|ns.foo#InvalidResourceLifecycle",
+        "Target|ERROR|ns.foo#InvalidTraitReference$member"
+    ],
+    "timestampFormat-trait.json": [
+        "TraitTarget|ERROR|ns.foo#Invalid2",
+        "TraitValue|ERROR|ns.foo#Invalid1"
+    ],
+    "trait-breaking-changes/allows-empty-paths.smithy": [],
+    "trait-breaking-changes/invalid-member-of-collection.smithy": [
+        "TraitBreakingChanges|ERROR|smithy.example#badList",
+        "TraitBreakingChanges|ERROR|smithy.example#badSet"
+    ],
+    "trait-breaking-changes/invalid-named-members.smithy": [
+        "TraitBreakingChanges|ERROR|smithy.example#a",
+        "TraitBreakingChanges|ERROR|smithy.example#b"
+    ],
+    "trait-breaking-changes/valid-for-nested.smithy": [],
+    "trait-target/lists-do-not-support-member-defaults.smithy": [
+        "TraitTarget|ERROR|com.foo#Foo$member"
+    ],
+    "trait-target/maps-do-not-support-member-defaults.smithy": [
+        "TraitTarget|ERROR|com.foo#Foo$key",
+        "TraitTarget|ERROR|com.foo#Foo$value"
+    ],
+    "trait-target/trait-target.json": [
+        "TraitTarget|ERROR|ns.foo#Invalid$baz",
+        "TraitTarget|ERROR|ns.foo#String"
+    ],
+    "trait-target/unions-do-not-support-member-defaults.smithy": [
+        "TraitTarget|ERROR|com.foo#Foo$bar"
+    ],
+    "trait-value/extra-trait-property.smithy": [
+        "TraitValue.UnknownMember.smithy.api#range.maxx|WARNING|smithy.example#MyInteger"
+    ],
+    "traitValidators/event-ids.smithy": [
+        "TraitValidators|ERROR|com.amazonaws.simple#invalid1",
+        "TraitValidators|ERROR|com.amazonaws.simple#invalid2",
+        "TraitValidators|ERROR|com.amazonaws.simple#invalid3",
+        "TraitValidators|ERROR|com.amazonaws.simple#invalid4",
+        "TraitValidators|ERROR|com.amazonaws.simple#invalid5",
+        "TraitValidators|ERROR|com.amazonaws.simple#invalid6",
+        "TraitValidators|ERROR|com.amazonaws.simple#invalid7"
+    ],
+    "traitValidators/find-incompatible-shapes.smithy": [
+        "com.amazonaws.simple.myProtocol.NoDocuments|ERROR|com.amazonaws.simple#GetFooInput$document",
+        "com.amazonaws.simple.myProtocol.NoErrors|ERROR|com.amazonaws.simple#GetFoo",
+        "com.amazonaws.simple.myProtocol.NoEventStreams|ERROR|com.amazonaws.simple#GetFooOutput"
+    ],
+    "traitValidators/is-not-transitive.smithy": [],
+    "union-requires-members.smithy": [
+        "Union|ERROR|smithy.example#NeedsOneOrMoreMembers"
+    ],
+    "unions/warn-box-on-union-member.smithy": [
+        "Union|NOTE|smithy.example#Example$a",
+        "Union|WARNING|smithy.example#Example$a"
+    ],
+    "unique-items-floats.smithy": [
+        "TraitTarget|ERROR|smithy.example#Documents",
+        "TraitTarget|ERROR|smithy.example#Doubles",
+        "TraitTarget|ERROR|smithy.example#Floats",
+        "TraitTarget|ERROR|smithy.example#Structures"
+    ],
+    "unique-structure-member.json": [
+        "ShapeIdConflict|ERROR|ns.foo#A$Baz",
+        "ShapeIdConflict|ERROR|ns.foo#A$Foo",
+        "ShapeIdConflict|ERROR|ns.foo#A$baz",
+        "ShapeIdConflict|ERROR|ns.foo#A$fOO",
+        "ShapeIdConflict|ERROR|ns.foo#A$foo"
+    ],
+    "unique-taggedunion-member.json": [
+        "ShapeIdConflict|ERROR|ns.foo#A$Baz",
+        "ShapeIdConflict|ERROR|ns.foo#A$Foo",
+        "ShapeIdConflict|ERROR|ns.foo#A$baz",
+        "ShapeIdConflict|ERROR|ns.foo#A$fOO",
+        "ShapeIdConflict|ERROR|ns.foo#A$foo"
+    ],
+    "unit/invalid-members.smithy": [
+        "UnitType|ERROR|smithy.example#Bam$value",
+        "UnitType|ERROR|smithy.example#Baz$member",
+        "UnitType|ERROR|smithy.example#Foo$bar"
+    ],
+    "unit/valid-operation.smithy": [],
+    "unit/valid-union.smithy": [],
+    "unreferenced-shapes/custom-root.smithy": [
+        "UnreferencedShape|WARNING|smithy.example#Bam",
+        "UnreferencedShape|WARNING|smithy.example#Baz"
+    ],
+    "unreferenced-shapes/invalid-root-selector.smithy": [
+        "Model|ERROR|-"
+    ],
+    "unreferenced-shapes/selector-defaults-to-services.smithy": [
+        "UnreferencedShape|NOTE|smithy.example#Baz"
+    ],
+    "unreferenced-shapes/service-root-multiple-matches.smithy": [
+        "UnreferencedShape|NOTE|smithy.example#Bam",
+        "UnreferencedShape|NOTE|smithy.example#Baz"
+    ],
+    "unreferenced-shapes/service-root-single-match.smithy": [
+        "UnreferencedShape|NOTE|smithy.example#Bam",
+        "UnreferencedShape|NOTE|smithy.example#Baz"
+    ],
+    "unstable-features-since.smithy": [
+        "TraitValue|ERROR|smithy.example#MyService"
+    ],
+    "unstable-features-trait.smithy": [
+        "UnstableFeatures.NestedFeature|ERROR|smithy.example#MixinPreviewInput$nestedMixinMember",
+        "UnstableFeatures.NestedFeature|ERROR|smithy.example#NestedMemberOperationInput$nestedMember",
+        "UnstableFeatures.NestedFeature|ERROR|smithy.example#NestedMixin$nestedMixinMember",
+        "UnstableFeatures.UndefinedFeature|ERROR|smithy.example#BadPreviewService",
+        "UnstableFeatures.UndefinedFeature|ERROR|smithy.example#CrossServiceOperation",
+        "UnstableFeatures.UndefinedFeature|ERROR|smithy.example#InvalidMultiServiceOperation",
+        "UnstableFeatures.UndefinedFeature|ERROR|smithy.example#MemberFeatureOperationInput$badMember",
+        "UnstableFeatures.UndefinedFeature|ERROR|smithy.example#NoFeaturesOperation",
+        "UnstableFeatures.UndefinedFeature|ERROR|smithy.example#UnboundOperation",
+        "UnstableFeatures.UndefinedFeature|ERROR|smithy.example#UndefinedFeatureOperation",
+        "UnstableFeatures.UnreferencedFeature|WARNING|smithy.example#BadPreviewService",
+        "UnstableFeatures.UnreferencedFeature|WARNING|smithy.example#MyOtherService"
+    ],
+    "unstable-trait-validator.json": [
+        "UnstableTrait.ns.foo#fooTrait|WARNING|ns.foo#MyString"
+    ],
+    "updates-resources-invalid-jmespath.smithy": [
+        "ResourceLifecycleTrait|ERROR|com.example#UpdateWidget",
+        "UnstableTrait.smithy.api#updatesResources|SUPPRESSED|com.example#UpdateWidget"
+    ],
+    "xml-flattened-and-name.smithy": [
+        "XmlFlattenedTrait|WARNING|smithy.example#Struct$flattenedNoXmlName"
+    ],
+    "xml-flattened.json": [
+        "TraitTarget|ERROR|ns.foo#InvalidStringList",
+        "TraitTarget|ERROR|ns.foo#InvalidStringMap"
+    ],
+    "xml-name.json": [
+        "TraitValue|ERROR|ns.foo#InvalidName$a"
+    ],
+    "xml-namespace.json": [
+        "XmlNamespaceTrait|ERROR|ns.foo#InvalidNamespace"
+    ]
+}

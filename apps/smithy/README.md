@@ -1,6 +1,6 @@
 # smithy CLI
 
-Assemble, validate, format and convert Smithy models.
+Assemble, validate, select, format, convert and build Smithy models.
 
 ## Run
 
@@ -40,6 +40,9 @@ Use `smithy --help` for the command list, and `smithy convert --help` or
 ```shell
 smithy ast model.smithy extra.json
 smithy validate model.smithy extra.json
+smithy build --config smithy-build.json
+smithy clean --config smithy-build.json
+smithy select --selector 'structure > member > string' model.smithy
 smithy convert --to json model.smithy -o model.json
 smithy convert --to idl model.json -o model.smithy
 smithy convert --to idl one.json two.json --output-dir generated
@@ -52,6 +55,23 @@ smithy format --write model.smithy model.json
 omit built-in prelude and contract definitions. `validate` assembles the same model and prints
 any diagnostics. Reference resolution, mixin expansion, trait application and
 metadata merging follow the model library's rules.
+
+`build` reads the configured local sources and imports, runs each concrete
+projection, and writes model, sources and build-info artifacts under its output
+directory. A `jsonSchema` plugin setting writes `schema.json` for each
+projection. `clean` removes that configured output directory.
+
+Build sources and imports also accept local JAR files with a
+`META-INF/smithy/manifest`. Configuration strings and keys expand `${NAME}`
+from environment variables; `\${NAME}` escapes a placeholder.
+`${SMITHY_ROOT_DIR}` always expands to the CLI's working directory.
+
+Use a dedicated output directory. Builds replace their previous artifacts,
+including artifacts from projections that become abstract. An ownership file
+ties the output to its configuration; an existing nonempty directory must
+have that configuration's ownership marker. All files in an owned output
+directory are replaced. Keep the output directory separate from source and
+import directories; neither may contain the other.
 
 The `smithy.contracts#conditions` trait is included. Validation checks its
 targets, condition names and required string fields, then analyzes JMESPath

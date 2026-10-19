@@ -1,0 +1,136 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "ns.foo#bar": {
+            "type": "structure",
+            "members": {
+                "member": {
+                    "target": "ns.foo#BarTraitShapeMember"
+                }
+            },
+            "traits": {
+                "smithy.api#trait": {},
+                "smithy.api#tags": [
+                    "foo",
+                    "baz"
+                ]
+            }
+        },
+        "ns.foo#quux": {
+            "type": "structure",
+            "members": {
+                "member": {
+                    "target": "ns.foo#QuuxTraitShapeMember"
+                }
+            },
+            "traits": {
+                "smithy.api#trait": {},
+                "smithy.api#tags": [
+                    "foo",
+                    "qux"
+                ]
+            }
+        },
+        "ns.foo#corge": {
+            "type": "structure",
+            "members": {
+                "member": {
+                    "target": "ns.foo#CorgeTraitShapeMember"
+                }
+            },
+            "traits": {
+                "smithy.api#trait": {},
+                "smithy.api#tags": [
+                    "foo",
+                    "qux"
+                ]
+            }
+        },
+        "ns.foo#MyService": {
+            "type": "service",
+            "version": "2017-01-19",
+            "operations": [
+                {
+                    "target": "ns.foo#MyOperation"
+                }
+            ]
+        },
+        "ns.foo#MyOperation": {
+            "type": "operation",
+            "input": {
+                "target": "ns.foo#MyOperationInput"
+            }
+        },
+        "ns.foo#MyMixin": {
+            "type": "structure",
+            "members": {
+                "mixedMember": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "ns.foo#bar": {
+                            "member": "baz"
+                        }
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#mixin": {}
+            }
+        },
+        "ns.foo#MyOperationInput": {
+            "type": "structure",
+            "members": {
+                "fizz": {
+                    "target": "ns.foo#Include1"
+                },
+                "buzz": {
+                    "target": "ns.foo#Include2"
+                }
+            },
+            "mixins": [
+                {
+                    "target": "ns.foo#MyMixin"
+                }
+            ]
+        },
+        "ns.foo#Exclude1": {
+            "type": "string",
+            "traits": {
+                "ns.foo#quux": {
+                    "member": "pop"
+                }
+            }
+        },
+        "ns.foo#Exclude2": {
+            "type": "string"
+        },
+        "ns.foo#Include1": {
+            "type": "string",
+            "traits": {
+                "ns.foo#bar": {
+                    "member": "baz"
+                }
+            }
+        },
+        "ns.foo#Include2": {
+            "type": "string"
+        },
+        "ns.foo#BarTraitShapeMember": {
+            "type": "string"
+        },
+        "ns.foo#QuuxTraitShapeMember": {
+            "type": "string"
+        },
+        "ns.foo#CorgeTraitShapeMember": {
+            "type": "string"
+        },
+        "ns.foo#MyOperationInput$mixedMember": {
+            "type": "apply",
+            "traits": {
+                "ns.foo#corge": {
+                    "member": "hi"
+                }
+            }
+        }
+    }
+}
