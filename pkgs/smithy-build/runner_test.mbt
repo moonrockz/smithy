@@ -113,3 +113,21 @@ test "apply rejects projection cycles" {
   }
   assert_true(failed)
 }
+
+///|
+test "build info lists projected services and operations" {
+  let source =
+    #|$version: "2"
+    #|namespace example
+    #|service Api { version: "1", operations: [Get] }
+    #|operation Get {}
+  let loaded = @smithy.Loader::new().add_idl("input.smithy", source).assemble()
+  guard loaded.model is Some(model) else { fail("model did not assemble") }
+  let config = @build.BuildConfig::parse("{\"version\":\"1.0\"}")
+  let artifacts = @build.BuildRunner::new(config).run(model)
+  guard artifacts.get("source/build-info/smithy-build-info.json") is Some(info) else {
+    fail("missing build info")
+  }
+  assert_true(info.contains("example#Api"))
+  assert_true(info.contains("example#Get"))
+}

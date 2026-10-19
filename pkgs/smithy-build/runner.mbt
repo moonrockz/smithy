@@ -135,15 +135,66 @@ fn build_info(model : @smithy.Model, projection : ProjectionConfig) -> String {
   for key, value in model.metadata {
     metadata[key] = @json.to_json(value)
   }
+  let trait_names : Array[String] = []
+  let trait_defs : Array[String] = []
+  let services : Array[String] = []
+  let operations : Array[String] = []
+  let resources : Array[String] = []
+  for id, shape in model.shapes {
+    if shape.trait_value("smithy.api#trait") is Some(_) {
+      trait_defs.push(id.to_string())
+    }
+    for trait_id, _ in shape.traits {
+      if !trait_names.contains(trait_id.to_string()) {
+        trait_names.push(trait_id.to_string())
+      }
+    }
+    match shape.body {
+      @smithy.Service(..) => services.push(id.to_string())
+      @smithy.Operation(..) => operations.push(id.to_string())
+      @smithy.Resource(..) => resources.push(id.to_string())
+      _ => ()
+    }
+  }
+  for ids in [trait_names, trait_defs, services, operations, resources] {
+    ids.sort()
+  }
+  let validation_events : Array[Json] = []
+  for event in model.validation_events() {
+    let encoded : Map[String, Json] = {
+      "id": Json::string(event.id),
+      "severity": Json::string(event.severity),
+      "message": Json::string(event.message),
+      "filename": Json::string(event.source.map(s => s.file).unwrap_or("-")),
+      "line": Json::number(0.0),
+      "column": Json::number(0.0),
+    }
+    if event.shape is Some(id) {
+      encoded["shapeId"] = Json::string(id.to_string())
+    }
+    if event.suppression_reason is Some(reason) {
+      encoded["suppressionReason"] = Json::string(reason)
+    }
+    validation_events.push(Json::object(encoded))
+  }
+  let transforms = projection.transforms.map(t => {
+    Json::object({ "name": Json::string(t.name), "args": t.args })
+  })
+  let projection_fields : Map[String, Json] = {
+    "abstract": Json::boolean(projection.is_abstract),
+    "transforms": Json::array(transforms),
+    "plugins": Json::object(projection.plugins),
+  }
   let fields : Map[String, Json] = {
     "version": Json::string("1.0"),
     "projectionName": Json::string(projection.name),
-    "validationEvents": Json::array([]),
-    "traitNames": Json::array([]),
-    "traitDefNames": Json::array([]),
-    "serviceShapeIds": Json::array([]),
-    "operationShapeIds": Json::array([]),
-    "resourceShapeIds": Json::array([]),
+    "projection": Json::object(projection_fields),
+    "validationEvents": Json::array(validation_events),
+    "traitNames": Json::array(trait_names.map(Json::string)),
+    "traitDefNames": Json::array(trait_defs.map(Json::string)),
+    "serviceShapeIds": Json::array(services.map(Json::string)),
+    "operationShapeIds": Json::array(operations.map(Json::string)),
+    "resourceShapeIds": Json::array(resources.map(Json::string)),
     "metadata": Json::object(metadata),
   }
   Json::object(fields).stringify(indent=4) + "\n"
