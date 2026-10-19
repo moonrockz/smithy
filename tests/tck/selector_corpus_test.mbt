@@ -23,7 +23,7 @@ fn check_selector_case_file(name : String) -> Unit raise {
         expected.push(id)
       }
     }
-    expected.sort()
+    expected.sort_by((a, b) => a.lexical_compare(b))
     let selector = @smithy.Selector::parse(expression) catch {
       @smithy.InvalidSelector(message) =>
         fail(name + ": " + expression + ": " + message)

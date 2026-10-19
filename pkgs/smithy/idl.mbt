@@ -338,13 +338,6 @@ fn Assembly::add_idl(
         { ..source, span: Some(use_.span), },
       )
     }
-    if !self.known.contains(imported) {
-      self.problem(
-        "SM-MODEL-004",
-        "I could not resolve the imported shape \{imported}.",
-        { ..source, span: Some(use_.span), },
-      )
-    }
     uses[id.name] = imported
   }
   for metadata in file.metadata {

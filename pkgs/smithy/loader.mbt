@@ -114,10 +114,13 @@ fn Assembly::problem(
   message : String,
   source : SourceLocation,
   shape? : String,
+  event_id~ : String = "Model",
+  severity~ : @syntax.Severity = Error,
 ) -> Unit {
   self.diagnostics.push({
     code,
-    severity: Error,
+    event_id,
+    severity,
     message,
     source,
     shape: shape.bind(ShapeId::parse),
@@ -388,6 +391,7 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
   let assembly = Assembly::new()
   let idls : Array[(String, @syntax.IdlFile)] = []
   let jsons : Array[(String, @syntax.JsonAst)] = []
+  let input_order : Array[(Bool, Int32)] = []
   let inputs = [
     ModelInput::Idl(name="<prelude>", text=prelude_text()),
     ModelInput::Idl(name="<contracts>", text=contracts_text()),
@@ -413,6 +417,7 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
         for d in parsed.diagnostics {
           assembly.diagnostics.push({
             code: d.code,
+            event_id: "Model",
             severity: d.severity,
             message: d.message,
             source: location(name, span=d.span),
@@ -420,6 +425,7 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
           })
         }
         if !parsed.has_errors() && parsed.ast is Some(file) {
+          input_order.push((true, idls.length()))
           idls.push((name, file))
           assembly.collect_idl_names(name, file)
         }
@@ -427,6 +433,7 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
       Json(name~, text~) =>
         try {
           let document = @syntax.parse_json_ast(text)
+          input_order.push((false, jsons.length()))
           jsons.push((name, document))
         } catch {
           @json.JsonDecodeError((path, message)) =>
@@ -443,9 +450,13 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
             )
         }
       Ast(name~, document~) =>
-        jsons.push(
-          (name, @syntax.decode_json_ast(@syntax.encode_json_ast(document))),
-        ) catch {
+        try {
+          let document = @syntax.decode_json_ast(
+            @syntax.encode_json_ast(document),
+          )
+          input_order.push((false, jsons.length()))
+          jsons.push((name, document))
+        } catch {
           @json.JsonDecodeError((path, message)) =>
             assembly.problem(
               "SM-MODEL-001",
@@ -464,11 +475,14 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
       assembly.kinds[id] = shape.kind.keyword()
     }
   }
-  for (name, file) in idls {
-    assembly.add_idl(name, file)
-  }
-  for (name, document) in jsons {
-    assembly.add_document(name, document)
+  for (is_idl, index) in input_order {
+    if is_idl {
+      let (name, file) = idls[index]
+      assembly.add_idl(name, file)
+    } else {
+      let (name, document) = jsons[index]
+      assembly.add_document(name, document)
+    }
   }
   assembly.finish()
 }

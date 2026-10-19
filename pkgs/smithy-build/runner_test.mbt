@@ -1,4 +1,74 @@
 ///|
+test "invalid projected models still write build info and preserve successful projections" {
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "input.smithy", "$version: \"2\"\nmetadata validators = [{name: \"EmitNoneSelector\", configuration: {selector: \"structure\"}}]\nnamespace example\nstructure Thing {}",
+  )
+  .assemble().model.unwrap()
+  let config = @build.BuildConfig::parse(
+    "{\"version\":\"1.0\",\"projections\":{\"broken\":{\"transforms\":[{\"name\":\"excludeShapesBySelector\",\"args\":{\"selector\":\"structure\"}}]},\"good\":{}}}",
+  )
+  let runner = @build.BuildRunner::new(config)
+  let result = runner.run_result(model)
+  assert_false(result.errors.is_empty())
+  assert_true(
+    result.artifacts.contains("broken/build-info/smithy-build-info.json"),
+  )
+  assert_false(result.artifacts.contains("broken/model/model.json"))
+  assert_true(result.artifacts.contains("good/model/model.json"))
+}
+
+///|
+test "projected sources include original sources and new shapes but omit imports" {
+  let source = "$version: \"2\"\nmetadata local = true\nnamespace source\nstructure Original { value: imported#Value }"
+  let imported = "$version: \"2\"\nmetadata imported = true\nnamespace imported\nstring Value"
+  let model = @smithy.Loader::new()
+  .add_idl("source.smithy", source)
+  .add_idl("imported.smithy", imported)
+  .assemble().model.unwrap()
+  let config = @build.BuildConfig::parse(
+    "{\"version\":\"1.0\",\"projections\":{\"copy\":{}}}",
+  )
+  let artifacts = @build.BuildRunner::new(config)
+    .add_source("source.smithy", source)
+    .run(model)
+  let projected = @json.parse(artifacts["copy/sources/model.json"])
+  assert_true(
+    projected
+    is {
+      "shapes": { "source#Original": _, .. },
+      "metadata": { "local": _, .. },
+      ..
+    },
+  )
+  assert_false(projected is { "shapes": { "imported#Value": _, .. }, .. })
+  assert_false(projected is { "metadata": { "imported": _, .. }, .. })
+  assert_true(artifacts["copy/model/model.json"].contains("imported#Value"))
+}
+
+///|
+test "projection imports merge only into their projection" {
+  let model = @smithy.Loader::new()
+  .add_idl("base.smithy", "$version: \"2\"\nnamespace example\nstring Original")
+  .assemble().model.unwrap()
+  let config = @build.BuildConfig::parse(
+    "{\"version\":\"1.0\",\"projections\":{\"extra\":{\"imports\":[\"extra.smithy\"]},\"plain\":{}}}",
+  )
+  assert_eq(config.projections[0].imports, ["extra.smithy"])
+  let runner = @build.BuildRunner::new(config).add_projection_import(
+    "extra",
+    @smithy.ModelInput::Idl(
+      name="extra.smithy",
+      text="$version: \"2\"\nnamespace extra\nstructure Added {}",
+    ),
+  )
+  let artifacts = runner.run(model)
+  assert_true(artifacts["extra/model/model.json"].contains("extra#Added"))
+  assert_false(artifacts["plain/model/model.json"].contains("extra#Added"))
+  assert_false(artifacts["source/model/model.json"].contains("extra#Added"))
+}
+
+///|
 test "build runner writes source and transformed model projections" {
   let source =
     #|$version: "2"

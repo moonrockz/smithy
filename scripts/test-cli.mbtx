@@ -25,11 +25,12 @@ async fn Runner::command(
   args : Array[String],
   expected : Int32,
   input? : String,
+  extra_env~ : Map[String, String] = Map([]),
 ) -> (String, String) {
   let all = self.prefix.copy()
   all.append(args)
   let (code, out, err) = match input {
-    None => @process.collect_output(self.executable, all, cwd=self.dir)
+    None => @process.collect_output(self.executable, all, cwd=self.dir, extra_env~)
     Some(text) =>
       @async.with_task_group(group => {
         let (stdin, writer) = @process.write_to_process()
@@ -37,7 +38,7 @@ async fn Runner::command(
           defer writer.close()
           writer.write(text)
         })
-        @process.collect_output(self.executable, all, cwd=self.dir, stdin~)
+        @process.collect_output(self.executable, all, cwd=self.dir, stdin~, extra_env~)
       })
   }
   assert_eq(
@@ -122,6 +123,9 @@ async fn exercise(
   runner.command(["ast", "missing.smithy"], 1) |> ignore
   let (out, stderr) = runner.command(["validate", "broken.smithy"], 1)
   let err = if target == "wasm-gc" { out + stderr } else { stderr }
+  assert_true(err.contains("[ERROR] example#Broken$x:") && err.contains(" | Target.UnresolvedShape"))
+  let (out, stderr) = runner.command(["ast", "broken.smithy"], 1)
+  let err = if target == "wasm-gc" { out + stderr } else { stderr }
   assert_true(err.contains("SM-MODEL-004") && err.contains("broken.smithy:3:"))
   runner.command(["validate", "syntax.smithy"], 1) |> ignore
   @fs.write_file(
@@ -144,7 +148,7 @@ async fn exercise(
     ],
     0,
   )
-  assert_eq(selected, "example#Example\n")
+  assert_eq(selected, "")
   let (ast, _) = runner.command(["ast", "input.smithy"], 0)
   assert_true(ast.contains("9007199254740993"))
   // Test an actual pipe, including multiple chunks and non-ASCII UTF-8.
@@ -184,9 +188,68 @@ async fn exercise(
     .text().contains("Example"))
   assert_true(@fs.read_file("\{dir}/build-output/source/jsonSchema/schema.json")
     .text().contains("\"$defs\""))
+  @fs.write_file("\{dir}/smithy-build.json", "{\"version\":\"1.0\",\"sources\":[\"input.smithy\"],\"outputDirectory\":\"build-output\",\"projections\":{\"filtered\":{\"abstract\":true}}}")
+  runner.command(["build"], 0) |> ignore
+  assert_false(@fs.exists("\{dir}/build-output/filtered/model/model.json"))
   runner.command(["clean"], 0) |> ignore
   assert_false(@fs.exists("\{dir}/build-output"))
+  @fs.write_file("\{dir}/env-build.json", "{\"version\":\"2.0\",\"sources\":[\"${SMITHY_ROOT_DIR}/input.smithy\"],\"outputDirectory\":\"${SMITHY_TEST_OUTPUT}\"}")
+  runner.command(["build", "--config", "env-build.json"], 0, extra_env={ "SMITHY_TEST_OUTPUT": "env-output", "SMITHY_ROOT_DIR": "invalid-override" }) |> ignore
+  assert_true(@fs.exists("\{dir}/env-output/source/model/model.json"))
+  @fs.write_file("\{dir}/jar-import.jar", @fs.read_file("\{root}/tests/tck/build/plugins/sources/jar-import.jar"))
+  @fs.write_file("\{dir}/jar-build.json", "{\"version\":\"2.0\",\"sources\":[\"jar-import.jar\"],\"imports\":[\"input.smithy\"],\"outputDirectory\":\"jar-output\"}")
+  runner.command(["build", "--config", "jar-build.json"], 0) |> ignore
+  let jar_manifest = @fs.read_file("\{dir}/jar-output/source/sources/manifest").text()
+  assert_eq(jar_manifest, "jar-import/a.smithy\njar-import/b/b.smithy\njar-import/b/c/c.json\n")
+  for name in ["jar-import/a.smithy", "jar-import/b/b.smithy", "jar-import/b/c/c.json"] {
+    assert_true(@fs.exists("\{dir}/jar-output/source/sources/\{name}"))
+  }
+  let jar_model = @fs.read_file("\{dir}/jar-output/source/model/model.json").text()
+  for name in ["foo.baz#A", "foo.baz#B", "foo.baz#C", "example#Example"] {
+    assert_true(jar_model.contains(name))
+  }
+  assert_false(@fs.exists("\{dir}/jar-output/source/sources/input.smithy"))
+  @fs.mkdir("\{dir}/jar-models/nested", recursive=true, allow_exist=true)
+  @fs.write_file("\{dir}/jar-models/nested/jar-import.jar", @fs.read_file("\{dir}/jar-import.jar"))
+  @fs.write_file("\{dir}/jar-directory.json", "{\"version\":\"2.0\",\"sources\":[\"jar-models\"],\"outputDirectory\":\"jar-directory-output\"}")
+  runner.command(["build", "--config", "jar-directory.json"], 0) |> ignore
+  assert_eq(@fs.read_file("\{dir}/jar-directory-output/source/sources/manifest").text(), "nested/jar-import.jar/jar-import/a.smithy\nnested/jar-import.jar/jar-import/b/b.smithy\nnested/jar-import.jar/jar-import/b/c/c.json\n")
+  @fs.write_file("\{dir}/jar-projection.json", "{\"version\":\"2.0\",\"sources\":[\"input.smithy\"],\"outputDirectory\":\"jar-projection-output\",\"projections\":{\"withJar\":{\"imports\":[\"jar-import.jar\"]}}}")
+  runner.command(["build", "--config", "jar-projection.json"], 0) |> ignore
+  assert_false(@fs.read_file("\{dir}/jar-projection-output/source/model/model.json").text().contains("foo.baz#A"))
+  assert_true(@fs.read_file("\{dir}/jar-projection-output/withJar/model/model.json").text().contains("foo.baz#A"))
   assert_true(@fs.exists("\{dir}/input.smithy"))
+  @fs.mkdir("\{dir}/nested", allow_exist=true)
+  @fs.write_file("\{dir}/nested/keep.smithy", input)
+  @fs.write_file("\{dir}/nested/smithy-build.json", "{\"version\":\"1.0\",\"outputDirectory\":\".\"}")
+  runner.command(["clean", "--config", "nested/smithy-build.json"], 2) |> ignore
+  assert_true(@fs.exists("\{dir}/nested/keep.smithy"))
+  @fs.write_file("\{dir}/protect-sources.json", "{\"version\":\"1.0\",\"sources\":[\"nested\"],\"outputDirectory\":\"nested\"}")
+  runner.command(["clean", "--config", "protect-sources.json"], 2) |> ignore
+  assert_true(@fs.exists("\{dir}/nested/keep.smithy"))
+  if @env.get_env_var("OS") != Some("Windows_NT") {
+    runner.command(["build"], 0) |> ignore
+    @fs.symlink(target="\{dir}/nested", "\{dir}/build-output/linked")
+    runner.command(["clean"], 0) |> ignore
+    assert_true(@fs.exists("\{dir}/nested/keep.smithy"))
+    runner.command(["build"], 0) |> ignore
+    @fs.remove("\{dir}/build-output/source/model/model.json")
+    @fs.symlink(target="\{dir}/nested/keep.smithy", "\{dir}/build-output/source/model/model.json")
+    runner.command(["build"], 0) |> ignore
+    assert_eq(@fs.read_file("\{dir}/nested/keep.smithy").text(), input)
+    runner.command(["clean"], 0) |> ignore
+    @fs.symlink(target=dir, "\{dir}/alias")
+    @fs.mkdir("\{dir}/alias-source", allow_exist=true)
+    @fs.write_file("\{dir}/alias-source/input.smithy", input)
+    @fs.write_file("\{dir}/protect-alias.json", "{\"version\":\"1.0\",\"sources\":[\"alias-source\"],\"outputDirectory\":\"alias/alias-source\"}")
+    runner.command(["clean", "--config", "protect-alias.json"], 2) |> ignore
+    runner.command(["build", "--config", "protect-alias.json"], 2) |> ignore
+    assert_eq(@fs.read_file("\{dir}/alias-source/input.smithy").text(), input)
+  }
+  runner.command(["build"], 0) |> ignore
+  @fs.write_file("\{dir}/smithy-build.json", "{\"version\":\"1.0\",\"sources\":[\"input.smithy\"],\"outputDirectory\":\"build-output\",\"projections\":{\"source\":{\"abstract\":true},\"filtered\":{\"abstract\":true}}}")
+  runner.command(["build"], 0) |> ignore
+  assert_false(@fs.exists("\{dir}/build-output"))
   runner.command(["format", "--check", "input.smithy"], 1) |> ignore
   let (formatted, _) = runner.command(["format", "input.smithy"], 0)
   assert_true(formatted.contains("// comment"))

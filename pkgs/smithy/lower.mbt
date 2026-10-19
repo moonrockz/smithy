@@ -58,13 +58,53 @@ fn Assembly::lower_member(
   raw : RawShape,
   name : String,
   member_ : @syntax.JsonMember,
+  inherited : Map[String, Json],
+  flattened : Map[String, RawShape],
 ) -> ShapeId raise {
   let id = require_id(raw.id + "$" + name)
+  let local = self.raw.get(raw.id).unwrap_or(raw)
+  let local_fields = object(
+    raw_members(local.fields).get(name).unwrap_or(Json::empty_object()),
+  )
+  let inherited_fields = object(
+    raw_members(inherited).get(name).unwrap_or(Json::empty_object()),
+  )
+  let traits = self.lower_traits(member_.traits)
+  let local_keys = copy(object_field(local_fields, "traits"))
+  for application in self.applications {
+    if application.target == id.to_string() {
+      override(local_keys, application.traits)
+    }
+  }
+  let introduced_traits : Map[ShapeId, NodeValue] = Map([])
+  for key, _ in local_keys {
+    let trait_id = require_id(key)
+    if traits.get(trait_id) is Some(value) {
+      introduced_traits[trait_id] = value
+    }
+  }
+  let mixins : Array[ShapeId] = []
+  for reference_ in array_field(local.fields, "mixins") {
+    if string_field(object(reference_), "target") is Some(base_id) &&
+      flattened.get(base_id) is Some(base) &&
+      raw_members(base.fields).contains(name) {
+      mixins.push(require_id(base_id + "$" + name))
+    }
+  }
   shapes[id] = {
     id,
     body: Member(target=require_id(member_.target)),
-    traits: self.lower_traits(member_.traits),
-    mixins: [],
+    traits,
+    mixins,
+    provenance: Some({
+      introduced_traits,
+      inherited_traits: self.lower_traits(
+        Some(object_field(inherited_fields, "traits")),
+      ),
+      introduced_fields: node_fields(local_fields),
+      inherited_fields: node_fields(inherited_fields),
+      legacy_set: false,
+    }),
     source: self.locations
     .get(id.to_string())
     .unwrap_or({
@@ -81,10 +121,14 @@ fn Assembly::lower_members(
   shapes : Map[ShapeId, Shape],
   raw : RawShape,
   members : Map[String, @syntax.JsonMember]?,
+  inherited : Map[String, Json],
+  flattened : Map[String, RawShape],
 ) -> Array[ShapeId] raise {
   let out = []
   for name, member_ in members.unwrap_or(Map([])) {
-    out.push(self.lower_member(shapes, raw, name, member_))
+    out.push(
+      self.lower_member(shapes, raw, name, member_, inherited, flattened),
+    )
   }
   out
 }
@@ -94,7 +138,10 @@ fn Assembly::lower(
   self : Assembly,
   raw : RawShape,
   shapes : Map[ShapeId, Shape],
+  flattened : Map[String, RawShape],
 ) -> Unit raise {
+  let local = self.raw.get(raw.id).unwrap_or(raw)
+  let inherited = self.inherited_fields(local, flattened)
   let ast = @syntax.decode_json_ast({
     "smithy": "2.0",
     "shapes": Json::object(Map([(raw.id, Json::object(raw.fields))])),
@@ -104,12 +151,24 @@ fn Assembly::lower(
   let body : ShapeBody = match shape.kind {
     Simple(type_) => Simple(type_)
     List(member_) | Set(member_) => {
+      if shape.kind is Set(_) {
+        self.problem(
+          "SM-MODEL-015",
+          "I found deprecated set shape \{id}; I recommend a list with uniqueItems.",
+          raw.source,
+          shape=id.to_string(),
+          event_id="ModelDeprecation",
+          severity=Warning,
+        )
+      }
       guard member_ is Some(member_) else {
         raise InvalidShape(
           "I expected the member of list \{id}, but found no member.",
         )
       }
-      List(self.lower_member(shapes, raw, "member", member_))
+      List(
+        self.lower_member(shapes, raw, "member", member_, inherited, flattened),
+      )
     }
     Map(key~, value~) => {
       guard key is Some(key) && value is Some(value) else {
@@ -118,14 +177,20 @@ fn Assembly::lower(
         )
       }
       Map(
-        key=self.lower_member(shapes, raw, "key", key),
-        value=self.lower_member(shapes, raw, "value", value),
+        key=self.lower_member(shapes, raw, "key", key, inherited, flattened),
+        value=self.lower_member(
+          shapes, raw, "value", value, inherited, flattened,
+        ),
       )
     }
-    Structure(members) => Structure(self.lower_members(shapes, raw, members))
-    Union(members) => Union(self.lower_members(shapes, raw, members))
-    Enum(members) => Enum(self.lower_members(shapes, raw, members))
-    IntEnum(members) => IntEnum(self.lower_members(shapes, raw, members))
+    Structure(members) =>
+      Structure(self.lower_members(shapes, raw, members, inherited, flattened))
+    Union(members) =>
+      Union(self.lower_members(shapes, raw, members, inherited, flattened))
+    Enum(members) =>
+      Enum(self.lower_members(shapes, raw, members, inherited, flattened))
+    IntEnum(members) =>
+      IntEnum(self.lower_members(shapes, raw, members, inherited, flattened))
     Operation(operation) =>
       Operation(
         input=require_id(
@@ -174,6 +239,17 @@ fn Assembly::lower(
     body,
     traits,
     mixins: references(shape.mixins),
+    provenance: Some({
+      introduced_traits: self.lower_traits(
+        Some(object_field(local.fields, "traits")),
+      ),
+      inherited_traits: self.lower_traits(
+        Some(object_field(inherited, "traits")),
+      ),
+      introduced_fields: node_fields(local.fields),
+      inherited_fields: node_fields(inherited),
+      legacy_set: shape.kind is Set(_),
+    }),
     source: raw.source,
   }
 }
@@ -268,7 +344,7 @@ fn Assembly::finish(self : Assembly) -> LoadResult {
   }
   let shapes : Map[ShapeId, Shape] = Map([])
   for _, raw in flattened {
-    self.lower(raw, shapes) catch {
+    self.lower(raw, shapes, flattened) catch {
       InvalidShape(message) =>
         self.problem("SM-MODEL-010", message, raw.source, shape=raw.id)
       @json.JsonDecodeError((path, message)) =>
@@ -277,6 +353,11 @@ fn Assembly::finish(self : Assembly) -> LoadResult {
           message,
           { ..raw.source, path: path.to_string(), },
           shape=raw.id,
+          event_id=if path.to_string().contains("/rename/") {
+            "Service"
+          } else {
+            "Model"
+          },
         )
       InvalidNode(message) =>
         self.problem("SM-MODEL-001", message, raw.source, shape=raw.id)
@@ -299,5 +380,8 @@ fn Assembly::finish(self : Assembly) -> LoadResult {
       Some(model)
     },
     diagnostics: self.diagnostics,
+    validation_findings: model.collect_validation_events(
+      self.diagnostics.map(diagnostic_event),
+    ),
   }
 }

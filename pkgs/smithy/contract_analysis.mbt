@@ -25,6 +25,7 @@ fn ContractAnalysis::problem(
   let (line, column) = location.line_column(self.expression)
   self.assembly.diagnostics.push({
     code,
+    event_id: code,
     severity,
     message: "I found a problem in JMESPath condition \{Json::string(self.condition).stringify()} on \{self.owner.id} at expression \{line}:\{column} (UTF-16 offsets \{span.start}..\{span.end}): \{message}",
     source: {

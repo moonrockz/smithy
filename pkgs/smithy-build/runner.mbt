@@ -6,11 +6,23 @@ pub struct BuildRunner {
     (@smithy.Model, Json) -> Map[String, String] raise BuildError,
   ]
   sources : Map[String, String]
+  source_conflicts : Array[String]
+  source_origins : Set[String]
+  source_metadata : Set[String]
+  projection_imports : Map[String, Array[@smithy.ModelInput]]
 }
 
 ///|
 pub fn BuildRunner::new(config : BuildConfig) -> BuildRunner {
-  { config, plugins: Map([]), sources: Map([]), }
+  {
+    config,
+    plugins: Map([]),
+    sources: Map([]),
+    source_conflicts: [],
+    source_origins: Set([]),
+    source_metadata: Set([]),
+    projection_imports: Map([]),
+  }
 }
 
 ///|
@@ -18,9 +30,113 @@ pub fn BuildRunner::add_source(
   self : BuildRunner,
   name : String,
   content : String,
+  source_file~ : String? = None,
 ) -> BuildRunner {
+  if self.sources.contains(name) {
+    self.source_conflicts.push(
+      "Conflicting source filename `" +
+      name +
+      "` from `" +
+      source_file.unwrap_or(name) +
+      "`",
+    )
+    return self
+  }
   self.sources[name] = content
+  self.source_origins.add(source_file.unwrap_or(name))
+  if name.has_suffix(".smithy") {
+    if @syntax.parse(@syntax.SourceText::new(content)).ast is Some(file) {
+      for metadata in file.metadata {
+        self.source_metadata.add(metadata.key.value)
+      }
+    }
+  } else if name.has_suffix(".json") {
+    let document = @json.parse(content) catch { _ => Json::null() }
+    if document is { "metadata": Object(metadata), .. } {
+      for key, _ in metadata {
+        self.source_metadata.add(key)
+      }
+    }
+  }
   self
+}
+
+///|
+fn BuildRunner::projected_sources(
+  self : BuildRunner,
+  original : @smithy.Model,
+  projected : @smithy.Model,
+) -> @smithy.Model {
+  let shapes : Map[@smithy.ShapeId, @smithy.Shape] = Map([])
+  for id, shape in projected.shapes {
+    let source = match original.shapes.get(id.root()) {
+      None => true
+      Some(original_shape) =>
+        self.source_origins.contains(original_shape.source.file)
+    }
+    if source {
+      shapes[id] = shape
+    }
+  }
+  let metadata : Map[String, @smithy.NodeValue] = Map([])
+  for key, value in projected.metadata {
+    if !original.metadata.contains(key) || self.source_metadata.contains(key) {
+      metadata[key] = value
+    }
+  }
+  { shapes, metadata, }
+}
+
+///|
+/// Supply local projection imports; the caller owns file access.
+pub fn BuildRunner::add_projection_import(
+  self : BuildRunner,
+  projection : String,
+  input : @smithy.ModelInput,
+) -> BuildRunner {
+  let inputs = self.projection_imports.get(projection).unwrap_or([])
+  inputs.push(input)
+  self.projection_imports[projection] = inputs
+  self
+}
+
+///|
+fn BuildRunner::merge_projection_imports(
+  self : BuildRunner,
+  model : @smithy.Model,
+  projection : String,
+) -> @smithy.Model raise BuildError {
+  let inputs = self.projection_imports.get(projection).unwrap_or([])
+  if inputs.is_empty() {
+    return model
+  }
+  let document = model.to_json_ast(preserve_mixins=true) catch {
+    _ =>
+      raise InvalidBuildConfig(
+        "Could not serialize model before projection imports",
+      )
+  }
+  let loader = @smithy.Loader::new().add_ast("<projection-base>", document)
+  for input in inputs {
+    ignore(loader.add(input))
+  }
+  let result = loader.assemble()
+  guard result.model is Some(merged) else {
+    raise InvalidBuildConfig(
+      "Could not merge imports of projection `" +
+      projection +
+      "`: " +
+      result.diagnostics.map(d => d.message).join("\n"),
+    )
+  }
+  let shapes : Map[@smithy.ShapeId, @smithy.Shape] = Map([])
+  for id, shape in merged.shapes {
+    shapes[id] = match model.shapes.get(id) {
+      Some(original) => { ..shape, source: original.source, }
+      None => shape
+    }
+  }
+  { shapes, metadata: merged.metadata, }
 }
 
 ///|
@@ -44,10 +160,31 @@ fn transform_trait_id(text : String) -> String {
 }
 
 ///|
-fn transform_model(
+/// Apply one built-in transform without validating or running plugins.
+pub fn apply_transform(
   model : @smithy.Model,
   transform : TransformConfig,
 ) -> @smithy.Model raise BuildError {
+  transform_model(model, transform)
+}
+
+///|
+fn transform_model(
+  model : @smithy.Model,
+  transform : TransformConfig,
+  original_model~ : @smithy.Model? = None,
+  original_events~ : Array[@smithy.ValidationEvent]? = None,
+) -> @smithy.Model raise BuildError {
+  if transform_misc(model, transform, original_model~, original_events~)
+    is Some(projected) {
+    return projected
+  }
+  if transform_rewrite(model, transform) is Some(projected) {
+    return projected
+  }
+  if transform_shape_filter(model, transform) is Some(projected) {
+    return projected
+  }
   let shapes : Map[@smithy.ShapeId, @smithy.Shape] = Map([])
   let metadata : Map[String, @smithy.NodeValue] = Map([])
   for key, value in model.metadata {
@@ -123,7 +260,11 @@ fn model_json(
   settings : Json,
 ) -> String raise BuildError {
   let include_prelude = config_bool(settings, "includePreludeShapes")
-  let document = model.to_json_ast(include_prelude~) catch {
+  let shapes = model.shapes.filter((_, shape) => {
+    shape.source.file != "<contracts>"
+  })
+  let model = { ..model, shapes, }
+  let document = model.to_json_ast(include_prelude~, preserve_mixins=true) catch {
     _ => raise InvalidBuildConfig("Could not serialize projected model")
   }
   @syntax.encode_json_ast(document).stringify(indent=4) + "\n"
@@ -141,6 +282,9 @@ fn build_info(model : @smithy.Model, projection : ProjectionConfig) -> String {
   let operations : Array[String] = []
   let resources : Array[String] = []
   for id, shape in model.shapes {
+    if shape.source.file == "<contracts>" {
+      continue
+    }
     if shape.trait_value("smithy.api#trait") is Some(_) {
       trait_defs.push(id.to_string())
     }
@@ -157,8 +301,9 @@ fn build_info(model : @smithy.Model, projection : ProjectionConfig) -> String {
     }
   }
   for ids in [trait_names, trait_defs, services, operations, resources] {
-    ids.sort()
+    ids.sort_by((a, b) => a.lexical_compare(b))
   }
+  let trait_names = trait_names.filter(name => trait_defs.contains(name))
   let validation_events : Array[Json] = []
   for event in model.validation_events() {
     let encoded : Map[String, Json] = {
@@ -182,6 +327,7 @@ fn build_info(model : @smithy.Model, projection : ProjectionConfig) -> String {
   })
   let projection_fields : Map[String, Json] = {
     "abstract": Json::boolean(projection.is_abstract),
+    "imports": Json::array(projection.imports.map(Json::string)),
     "transforms": Json::array(transforms),
     "plugins": Json::object(projection.plugins),
   }
@@ -206,6 +352,8 @@ fn BuildRunner::apply_transforms(
   model : @smithy.Model,
   projection : ProjectionConfig,
   active : Array[String],
+  original_model~ : @smithy.Model? = None,
+  original_events~ : Array[@smithy.ValidationEvent]? = None,
 ) -> @smithy.Model raise BuildError {
   if active.contains(projection.name) {
     raise InvalidBuildConfig(
@@ -215,9 +363,17 @@ fn BuildRunner::apply_transforms(
   let path = active.copy()
   path.push(projection.name)
   let mut projected = model
+  let original_model = original_model.unwrap_or(model)
+  let original_events = original_events.unwrap_or_else(() => {
+    model.validation_events()
+  })
   for transform in projection.transforms {
     if transform.name == "apply" {
-      for name in config_strings(transform.args, "projections") {
+      for
+        name in config_strings(
+          misc_args(transform, "projections"),
+          "projections",
+        ) {
         let mut found : ProjectionConfig? = None
         for candidate in self.config.projections {
           if candidate.name == name {
@@ -228,105 +384,163 @@ fn BuildRunner::apply_transforms(
         guard found is Some(target) else {
           raise InvalidBuildConfig("Unknown applied projection `" + name + "`")
         }
-        projected = self.apply_transforms(projected, target, path)
+        projected = self.apply_transforms(
+          projected,
+          target,
+          path,
+          original_model=Some(original_model),
+          original_events=Some(original_events),
+        )
       }
     } else {
-      projected = transform_model(projected, transform)
+      projected = transform_model(
+        projected,
+        transform,
+        original_model=Some(original_model),
+        original_events=Some(original_events),
+      )
     }
   }
   projected
 }
 
 ///|
-/// Produce relative artifact paths and contents for each concrete projection.
+fn BuildRunner::validate_config(self : BuildRunner) -> Unit raise BuildError {
+  if !self.source_conflicts.is_empty() {
+    raise InvalidBuildConfig(self.source_conflicts.join("\n"))
+  }
+  let transform_names = [
+    "apply", "changeStringEnumsToEnumShapes", "changeTypes", "excludeMetadata", "excludeShapesBySelector",
+    "excludeShapesByTag", "excludeShapesByTrait", "excludeTags", "excludeTraits",
+    "excludeTraitsByTag", "filterSuppressions", "flattenAndRemoveMixins", "flattenClosureNamespaces",
+    "flattenNamespaces", "includeClosures", "includeMetadata", "includeNamespaces",
+    "includeServices", "includeShapesBySelector", "includeShapesByTag", "includeTags",
+    "includeTraits", "includeTraitsByTag", "makeIdempotencyTokensClientOptional",
+    "removeDeprecatedShapes", "removeTraitDefinitions", "removeUnusedShapes", "renameShapes",
+  ]
+  for projection in self.config.projections {
+    if !plugin_name_part(projection.name) {
+      raise InvalidBuildConfig(
+        "Invalid projection name `" + projection.name + "`",
+      )
+    }
+    for transform in projection.transforms {
+      if !transform_names.contains(transform.name) {
+        raise InvalidBuildConfig(
+          "Unknown projection transform `" + transform.name + "`",
+        )
+      }
+    }
+  }
+  let plugin_sets = [self.config.plugins]
+  for projection in self.config.projections {
+    if !projection.is_abstract {
+      plugin_sets.push(projection.plugins)
+    }
+  }
+  for plugins in plugin_sets {
+    for name, _ in plugins {
+      let (plugin, _) = plugin_id(name)
+      if !self.config.ignore_missing_plugins &&
+        !self.plugins.contains(plugin) &&
+        !["model", "sources", "build-info"].contains(plugin) {
+        raise InvalidBuildConfig("Unknown build plugin `" + name + "`")
+      }
+    }
+  }
+}
+
+///|
+/// Artifacts from successful plugins and failures reported by the build.
+pub(all) struct BuildResult {
+  artifacts : Map[String, String]
+  errors : Array[String]
+} derive(Debug)
+
+///|
+/// Produce artifacts, raising if any projection failed.
 pub fn BuildRunner::run(
   self : BuildRunner,
   model : @smithy.Model,
 ) -> Map[String, String] raise BuildError {
+  let result = self.run_result(model)
+  if !result.errors.is_empty() {
+    raise InvalidBuildConfig(result.errors.join("\n"))
+  }
+  result.artifacts
+}
+
+///|
+/// Preserve successful projections and build information when another projection fails.
+pub fn BuildRunner::run_result(
+  self : BuildRunner,
+  model : @smithy.Model,
+) -> BuildResult {
+  let artifacts : Map[String, String] = Map([])
+  let errors : Array[String] = []
+  self.validate_config() catch {
+    InvalidBuildConfig(message) => return { artifacts, errors: [message], }
+  }
   for event in model.validation_events() {
     if event.severity == "DANGER" || event.severity == "ERROR" {
-      raise InvalidBuildConfig(
-        "Model validation failed: " + event.id + ": " + event.message,
-      )
+      errors.push("Model validation failed: " + event.id + ": " + event.message)
     }
   }
-  let artifacts : Map[String, String] = Map([])
+  if !errors.is_empty() {
+    return { artifacts, errors, }
+  }
   let projections = self.config.projections.copy()
   if !projections.iter().any(p => p.name == "source") {
     projections.push({
       name: "source",
       is_abstract: false,
+      imports: [],
       transforms: [],
       plugins: Map([]),
     })
   }
   for projection in projections {
-    if projection.name == "source" && !projection.transforms.is_empty() {
-      raise InvalidBuildConfig(
-        "The source projection cannot contain transforms",
-      )
-    }
     if projection.is_abstract {
       continue
     }
-    let projected = self.apply_transforms(model, projection, [])
-    for event in projected.validation_events() {
-      if event.severity == "DANGER" || event.severity == "ERROR" {
+    try {
+      if projection.name == "source" && !projection.transforms.is_empty() {
         raise InvalidBuildConfig(
-          "Projection `" +
-          projection.name +
-          "` validation failed: " +
-          event.id +
-          ": " +
-          event.message,
+          "The source projection cannot contain transforms",
         )
       }
-    }
-    let model_settings = match projection.plugins.get("model") {
-      Some(settings) => settings
-      None => self.config.plugins.get("model").unwrap_or(Json::object(Map([])))
-    }
-    artifacts[projection.name + "/model/model.json"] = model_json(
-      projected, model_settings,
-    )
-    artifacts[projection.name + "/build-info/smithy-build-info.json"] = build_info(
-      projected, projection,
-    )
-    if projection.name == "source" {
-      let names = self.sources.keys().to_array()
-      names.sort()
-      for name in names {
-        artifacts[projection.name + "/sources/" + name] = self.sources[name]
-      }
-      artifacts[projection.name + "/sources/manifest"] = names.join("\n") + "\n"
-    } else {
-      artifacts[projection.name + "/sources/model.json"] = model_json(
-        projected,
-        Json::object(Map([])),
+      let projection_model = self.merge_projection_imports(
+        model,
+        projection.name,
       )
-      artifacts[projection.name + "/sources/manifest"] = "model.json\n"
-    }
-    let plugins : Map[String, Json] = Map([])
-    for name, settings in self.config.plugins {
-      plugins[name] = settings
-    }
-    for name, settings in projection.plugins {
-      plugins[name] = settings
-    }
-    for name, settings in plugins {
-      if name == "model" || name == "build-info" || name == "sources" {
-        continue
-      }
-      guard self.plugins.get(name) is Some(execute) else {
-        if self.config.ignore_missing_plugins {
-          continue
+      let projected = self.apply_transforms(projection_model, projection, [])
+      let findings = projected.validation_events()
+      let valid_model = !findings
+        .iter()
+        .any(event => event.severity == "DANGER" || event.severity == "ERROR")
+      for event in findings {
+        if event.severity == "DANGER" || event.severity == "ERROR" {
+          errors.push(
+            "Projection `" +
+            projection.name +
+            "` validation failed: " +
+            event.id +
+            ": " +
+            event.message,
+          )
         }
-        raise InvalidBuildConfig("Unknown build plugin `" + name + "`")
       }
-      for file, content in execute(projected, settings) {
-        artifacts[projection.name + "/" + name + "/" + file] = content
-      }
+      self.emit_plugins(
+        projected,
+        projection_model,
+        projection,
+        artifacts,
+        valid_model~,
+      )
+    } catch {
+      InvalidBuildConfig(message) =>
+        errors.push("Projection `" + projection.name + "`: " + message)
     }
   }
-  artifacts
+  { artifacts, errors, }
 }

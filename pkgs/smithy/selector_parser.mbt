@@ -218,6 +218,10 @@ fn SelectorParser::attribute(
         "I expected an attribute comparator at selector offset \{self.pos}.",
       )
   }
+  self.space()
+  if self.peek() == '=' {
+    raise InvalidSelector("I found a repeated attribute comparator.")
+  }
   let values = [self.value()]
   self.space()
   while self.peek() == ',' {
@@ -371,7 +375,8 @@ fn SelectorParser::function_(
     }
   }
   self.expect(')')
-  if (["not", "in", "root", "recursive"].contains(name) && args.length() != 1) ||
+  if args.is_empty() ||
+    (["not", "in", "root", "recursive"].contains(name) && args.length() != 1) ||
     (name == "topdown" && (args.is_empty() || args.length() > 2)) ||
     (["is", "each", "test"].contains(name) && args.is_empty()) {
     raise InvalidSelector("I found the wrong number of arguments for :\{name}.")

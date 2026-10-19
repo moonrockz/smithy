@@ -14,10 +14,23 @@ pub(all) struct SourceLocation {
 /// An assembly error. Syntax diagnostics retain their original code and span.
 pub(all) struct ModelDiagnostic {
   code : String
+  event_id : String
   severity : @syntax.Severity
   message : String
   source : SourceLocation
   shape : ShapeId?
+} derive(Eq, Debug)
+
+///|
+/// Source declarations and the inherited baseline of an assembled shape.
+/// Effective traits and members stay on Shape; provenance distinguishes local
+/// overrides, including overrides equal to the inherited value.
+pub(all) struct ShapeProvenance {
+  introduced_traits : Map[ShapeId, NodeValue]
+  inherited_traits : Map[ShapeId, NodeValue]
+  introduced_fields : Map[String, NodeValue]
+  inherited_fields : Map[String, NodeValue]
+  legacy_set : Bool
 } derive(Eq, Debug)
 
 ///|
@@ -27,8 +40,31 @@ pub(all) struct Shape {
   body : ShapeBody
   traits : Map[ShapeId, NodeValue]
   mixins : Array[ShapeId]
+  provenance : ShapeProvenance?
   source : SourceLocation
 } derive(Eq, Debug)
+
+///|
+/// Traits introduced by this shape, including changes made after assembly.
+pub fn Shape::introduced_traits(self : Shape) -> Map[ShapeId, NodeValue] {
+  guard self.provenance is Some(origin) && !self.mixins.is_empty() else {
+    return self.traits
+  }
+  let out : Map[ShapeId, NodeValue] = Map([])
+  for id, value in self.traits {
+    if origin.introduced_traits.contains(id) ||
+      origin.inherited_traits.get(id) != Some(value) {
+      out[id] = value
+    }
+  }
+  out
+}
+
+///|
+/// Whether this collection retains the identity of a Smithy 1.0 set.
+pub fn Shape::is_legacy_set(self : Shape) -> Bool {
+  self.provenance.map(origin => origin.legacy_set).unwrap_or(false)
+}
 
 ///|
 pub(all) enum ShapeBody {
@@ -103,6 +139,7 @@ pub fn Shape::trait_value(self : Shape, id : String) -> NodeValue? {
 pub(all) struct LoadResult {
   model : Model?
   diagnostics : Array[ModelDiagnostic]
+  validation_findings : Array[ValidationEvent]
 } derive(Debug)
 
 ///|

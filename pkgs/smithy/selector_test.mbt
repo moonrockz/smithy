@@ -13,9 +13,28 @@ test "selector traverses members and their targets" {
 }
 
 ///|
+test "selected IDs sort lexically across different name lengths" {
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "value.smithy", "$version: \"2\"\nnamespace example\nstring Z\nstring AA",
+  )
+  .assemble().model.unwrap()
+  assert_eq(
+    @smithy.Selector::parse("[id|namespace=example]").select_ids(model),
+    ["example#AA", "example#Z"],
+  )
+}
+
+///|
 test "unknown selector functions parse successfully" {
   let selector = @smithy.Selector::parse(":futureFunction(structure)")
   assert_eq(selector.source, ":futureFunction(structure)")
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "value.smithy", "$version: \"2\"\nnamespace example\nstructure Value {}",
+  )
+  .assemble().model.unwrap()
+  assert_eq(selector.select_ids(model), [])
 }
 
 ///|

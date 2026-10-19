@@ -1,4 +1,112 @@
 ///|
+test "media types and deprecation descriptions follow the reference" {
+  let source = "$version: \"2\"\nnamespace example\n@mediaType(\"image/png\")\nblob Image\n@documentation(\"docs\")\n@deprecated(since: \"1\", message: \"use new\")\nstructure Value { image: Image }"
+  let model = @smithy.Loader::new().add_idl("value.smithy", source).assemble().model.unwrap()
+  let document = @jsonschema.convert(model)
+  assert_true(
+    document
+    is {
+      "definitions": {
+        "Value": {
+          "description": String(
+            "docs\nThis shape is deprecated since 1: use new"
+          ),
+          "properties": {
+            "image": { "contentMediaType": String("image/png"), .. },
+            ..
+          },
+          ..
+        },
+        ..
+      },
+      ..
+    },
+  )
+}
+
+///|
+test "member timestamps override target formats and map keys inherit target patterns" {
+  let source = "$version: \"2\"\nnamespace example\n@timestampFormat(\"date-time\")\ntimestamp Time\n@pattern(\"^key-[a-z]+$\")\nstring Key\nstructure Value { @timestampFormat(\"epoch-seconds\") time: Time, @timestampFormat(\"http-date\") date: Timestamp }\nmap Entries { key: Key, value: String }"
+  let model = @smithy.Loader::new().add_idl("model.smithy", source).assemble().model.unwrap()
+  let document = @jsonschema.convert(
+    model,
+    config=@jsonschema.Config::new(map_strategy="patternProperties"),
+  )
+  assert_true(
+    document
+    is {
+      "definitions": {
+        "Value": {
+          "properties": {
+            "time": { "type": String("number"), .. },
+            "date": { "type": String("string"), .. },
+            ..
+          },
+          ..
+        },
+        ..
+      },
+      ..
+    },
+  )
+  assert_false(
+    document
+    is {
+      "definitions": {
+        "Value": { "properties": { "time": { "format": _, .. }, .. }, .. },
+        ..
+      },
+      ..
+    },
+  )
+  assert_true(
+    document
+    is {
+      "definitions": {
+        "Entries": { "patternProperties": { "^key-[a-z]+$": _, .. }, .. },
+        ..
+      },
+      ..
+    },
+  )
+}
+
+///|
+test "invalid conversion configuration and unknown services fail" {
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "model.smithy", "$version: \"2\"\nnamespace example\nstructure Value {}",
+  )
+  .assemble().model.unwrap()
+  for
+    config in [
+      @jsonschema.Config::new(map_strategy="invalid"),
+      @jsonschema.Config::new(union_strategy="invalid"),
+      @jsonschema.Config::new(enum_strategy="invalid"),
+      @jsonschema.Config::new(default_timestamp_format="invalid"),
+      @jsonschema.Config::new(definition_pointer="definitions"),
+      @jsonschema.Config::new(schema_document_extensions=Json::array([])),
+    ] {
+    let rejected = try {
+      ignore(@jsonschema.convert(model, config~))
+      false
+    } catch {
+      _ => true
+    }
+    assert_true(rejected)
+  }
+  for service in ["example#Missing", "example#Value", "malformed"] {
+    let rejected = try {
+      ignore(@jsonschema.convert(model, service~))
+      false
+    } catch {
+      _ => true
+    }
+    assert_true(rejected)
+  }
+}
+
+///|
 test "structure members become value schemas and linked shapes become references" {
   let source =
     #|$version: "2.0"

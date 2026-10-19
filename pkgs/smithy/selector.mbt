@@ -22,8 +22,10 @@ fn selector_edges(model : Model) -> Array[SelectorEdge] {
     if shape.source.file == "<contracts>" {
       continue
     }
-    for mixin in shape.mixins {
-      link(edges, id, mixin, "mixin")
+    if !(shape.body is Member(..)) {
+      for mixin in shape.mixins {
+        link(edges, id, mixin, "mixin")
+      }
     }
     for trait_id, _ in shape.traits {
       link(edges, id, trait_id, "trait")
@@ -124,11 +126,16 @@ fn selector_type_matches(shape : Shape, keyword : String) -> Bool {
     return true
   }
   match keyword {
+    "set" => kind == "list"
+    "string" => kind == "enum"
+    "integer" => kind == "intEnum"
     "number" =>
       [
         "byte", "short", "integer", "long", "float", "double", "bigInteger", "bigDecimal",
+        "intEnum",
       ].contains(kind)
-    "simpleType" => shape.body is Simple(_)
+    "simpleType" =>
+      shape.body is Simple(_) || kind == "enum" || kind == "intEnum"
     "collection" => kind == "list"
     "aggregateType" => ["list", "map", "structure", "union"].contains(kind)
     "serviceType" => ["service", "resource", "operation"].contains(kind)
@@ -196,73 +203,20 @@ fn selector_attribute(shape : Shape, path : Array[String]) -> Array[String] {
       return keys
     }
     if path[1] == "(values)" {
-      let values : Array[String] = []
+      let values : Array[NodeValue] = []
       for _, trait_value in shape.traits {
-        if path.length() == 2 {
-          values.push("true")
-        } else if trait_value is Object(fields) &&
-          fields.get(path[2]) is Some(String(text)) {
-          values.push(text)
-        }
+        values.push(trait_value)
       }
-      return values
-    }
-    guard selector_trait(shape, path[1]) is Some(initial) else { return [] }
-    if path.length() == 2 {
-      return [
-        match initial {
-          String(text) => text
-          Boolean(value) => if value { "true" } else { "false" }
-          Number(value) => @json.to_json(value).stringify()
-          _ => "true"
-        },
-      ]
-    }
-    let mut current = [initial]
-    for i = 2; i < path.length(); i = i + 1 {
-      let next : Array[NodeValue] = []
-      for value in current {
-        if path[i] == "(values)" {
-          match value {
-            Array(values) => next.append(values)
-            Object(fields) =>
-              for _, item in fields {
-                next.push(item)
-              }
-            _ => ()
-          }
-        } else if path[i] == "(keys)" {
-          if value is Object(fields) {
-            for key, _ in fields {
-              next.push(String(key))
-            }
-          }
-        } else if path[i] == "(length)" {
-          let length = match value {
-            String(text) => text.length()
-            Array(values) => values.length()
-            Object(fields) => fields.length()
-            _ => 0
-          }
-          next.push(String(length.to_string()))
-        } else if value is Object(fields) && fields.get(path[i]) is Some(item) {
-          next.push(item)
-        }
-      }
-      current = next
-    }
-    let values : Array[String] = []
-    for value in current {
-      values.push(
-        match value {
-          String(text) => text
-          Boolean(value) => if value { "true" } else { "false" }
-          Number(value) => @json.to_json(value).stringify()
-          _ => "true"
-        },
+      return selector_node_strings(
+        selector_node_path(values, path, 2, projection=true),
+        projection=selector_path_projection(path, 2, initial=true),
       )
     }
-    return values
+    guard selector_trait(shape, path[1]) is Some(initial) else { return [] }
+    return selector_node_strings(
+      selector_node_path([initial], path, 2),
+      projection=selector_path_projection(path, 2),
+    )
   }
   []
 }
@@ -272,9 +226,16 @@ fn selector_node_path(
   initial : Array[NodeValue],
   path : Array[String],
   start : Int32,
+  projection~ : Bool = false,
 ) -> Array[NodeValue] {
   let mut current = initial
+  let mut is_projection = projection
   for i = start; i < path.length(); i = i + 1 {
+    if path[i] == "(first)" && is_projection {
+      current = if current.is_empty() { [] } else { [current[0]] }
+      is_projection = false
+      continue
+    }
     let next : Array[NodeValue] = []
     for value in current {
       match path[i] {
@@ -295,35 +256,70 @@ fn selector_node_path(
           }
         "(length)" => {
           let length = match value {
-            String(text) => text.length()
-            Array(items) => items.length()
-            Object(fields) => fields.length()
-            _ => 0
+            String(text) => Some(text.length())
+            Array(items) => Some(items.length())
+            Object(fields) => Some(fields.length())
+            _ => None
           }
-          next.push(String(length.to_string()))
+          if length is Some(length) {
+            next.push(String(length.to_string()))
+          }
         }
         key =>
           if value is Object(fields) && fields.get(key) is Some(item) {
-            next.push(item)
+            if !is_projection || item != Null {
+              next.push(item)
+            }
           }
       }
     }
     current = next
+    if path[i] == "(values)" || path[i] == "(keys)" {
+      is_projection = true
+    }
   }
   current
 }
 
 ///|
-fn selector_node_strings(values : Array[NodeValue]) -> Array[String] {
-  values.map(value => {
-    match value {
-      String(text) => text
-      Boolean(value) => if value { "true" } else { "false" }
-      Number(value) => @json.to_json(value).stringify()
-      Null => "null"
-      _ => "true"
+fn selector_path_projection(
+  path : Array[String],
+  start : Int32,
+  initial~ : Bool = false,
+) -> Bool {
+  let mut projection = initial
+  for i = start; i < path.length(); i = i + 1 {
+    if path[i] == "(values)" || path[i] == "(keys)" {
+      projection = true
     }
-  })
+    if path[i] == "(first)" {
+      projection = false
+    }
+  }
+  projection
+}
+
+///|
+// A null inside a projection preserves the projection's presence, but cannot
+// compare equal to any value, including itself.
+let selector_null_marker : String = "\u{0}selector.null"
+
+///|
+fn selector_node_strings(
+  values : Array[NodeValue],
+  projection~ : Bool = false,
+) -> Array[String] {
+  let result : Array[String] = []
+  for value in values {
+    match value {
+      String(text) => result.push(text)
+      Boolean(value) => result.push(if value { "true" } else { "false" })
+      Number(value) => result.push(@json.to_json(value).stringify())
+      Null => if projection { result.push(selector_null_marker) }
+      _ => result.push("")
+    }
+  }
+  result
 }
 
 ///|
@@ -337,7 +333,12 @@ fn selector_scope_nodes(
   if path.length() >= 2 &&
     path[0] == "trait" &&
     selector_trait(shape, path[1]) is Some(value) {
-    return selector_node_path([value], path, 2)
+    let nodes = selector_node_path([value], path, 2)
+    return if selector_path_projection(path, 2) {
+      nodes
+    } else {
+      nodes.filter(node => node != Null)
+    }
   }
   []
 }
@@ -368,7 +369,10 @@ fn selector_scoped_value(
       if path[0] == "trait" || path[0] == "id" || path[0] == "service" {
         return selector_attribute(shape, path)
       }
-      selector_node_strings(selector_node_path([node], path, 0))
+      selector_node_strings(
+        selector_node_path([node], path, 0),
+        projection=selector_path_projection(path, 0),
+      )
     }
   }
 }
@@ -401,8 +405,13 @@ fn selector_compare(
     } else {
       values
     }
-    let subset = left.iter().all(value => right.contains(value))
-    let equal = subset && right.iter().all(value => left.contains(value))
+    let subset = left
+      .iter()
+      .all(value => value != selector_null_marker && right.contains(value))
+    let equal = subset &&
+      right
+      .iter()
+      .all(value => value != selector_null_marker && left.contains(value))
     return match operator {
       "{<}" => subset
       "{<<}" => subset && !equal
@@ -411,8 +420,14 @@ fn selector_compare(
     }
   }
   for raw in actual {
+    if raw == selector_null_marker {
+      continue
+    }
     let value = if insensitive { raw.to_lower() } else { raw }
     for expected in values {
+      if expected == selector_null_marker {
+        continue
+      }
       let expected = if insensitive { expected.to_lower() } else { expected }
       let matched = match operator {
         "=" => value == expected
@@ -633,8 +648,6 @@ fn selector_eval(
               if (name == "not" && !matched) || (name != "not" && matched) {
                 selector_add(next, id)
               }
-            } else {
-              selector_add(next, id)
             }
           }
         }
@@ -658,7 +671,7 @@ pub fn Selector::select_ids(self : Selector, model : Model) -> Array[String] {
     }
   }
   let ids = result.map(id => id.to_string())
-  ids.sort()
+  ids.sort_by((a, b) => a.lexical_compare(b))
   ids
 }
 
@@ -681,7 +694,7 @@ pub fn Selector::select_ids_from(
     selector_edges(model),
     vars,
   ).map(id => id.to_string())
-  ids.sort()
+  ids.sort_by((a, b) => a.lexical_compare(b))
   ids
 }
 

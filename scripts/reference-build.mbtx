@@ -1,0 +1,282 @@
+///|
+/// Regenerate Java-reference build projection or validation goldens.
+///
+/// Usage: moonx scripts/reference-build.mbtx [build|validation|all] [CHECKOUT]
+/// CHECKOUT defaults to .dev/out/reference-smithy and must be at the exact
+/// recorded SHA. Requires a JDK with javac/java on PATH. No Gradle or JUnit
+/// is needed: utils, jmespath, model and build main sources compile together.
+/// All generated classes and Java source remain under .dev/.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let reference_sha : String = "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
+
+///|
+let harness : String =
+  #|import java.nio.charset.StandardCharsets;
+  #|import java.nio.file.*;
+  #|import java.util.*;
+  #|import java.util.concurrent.*;
+  #|import java.util.logging.*;
+  #|import software.amazon.smithy.build.*;
+  #|import software.amazon.smithy.build.model.*;
+  #|import software.amazon.smithy.model.*;
+  #|import software.amazon.smithy.model.loader.*;
+  #|import software.amazon.smithy.model.node.*;
+  #|import software.amazon.smithy.model.shapes.*;
+  #|import software.amazon.smithy.model.validation.*;
+  #|
+  #|public final class ReferenceBuildCorpus {
+  #|    private static final String SHA = "30bdab593f0c2cdf96036782cc3ce15c43a711ef";
+  #|    private static List<String> strings(ObjectNode node, String key) {
+  #|        return node.getArrayMember(key).map(a -> a.getElementsAs(StringNode::getValue))
+  #|                .orElse(Collections.emptyList());
+  #|    }
+  #|    private static ObjectNode capture(ObjectNode test, Path corpus) {
+  #|        Map<String, Node> artifacts = new ConcurrentSkipListMap<>();
+  #|        Map<String, Node> failureEvents = new ConcurrentSkipListMap<>();
+  #|        Set<String> failed = new ConcurrentSkipListSet<>();
+  #|        Map<String, String> previousEnvironment = new LinkedHashMap<>();
+  #|        String stage = "$config";
+  #|        try {
+  #|            test.getObjectMember("environment").ifPresent(environment ->
+  #|                    environment.getStringMap().forEach((name, value) -> {
+  #|                        previousEnvironment.put(name, System.getProperty(name));
+  #|                        System.setProperty(name, value.expectStringNode().getValue());
+  #|                    }));
+  #|            SmithyBuildConfig.Builder settings = SmithyBuildConfig.builder().version("2.0");
+  #|            for (String file : strings(test, "configs")) settings.load(corpus.resolve(file));
+  #|            test.getObjectMember("config").ifPresent(n -> settings.merge(SmithyBuildConfig.fromNode(n)));
+  #|            SmithyBuildConfig config = settings.build();
+  #|            List<String> sources = new ArrayList<>(config.getSources());
+  #|            for (String file : strings(test, "sources")) sources.add(corpus.resolve(file).toString());
+  #|            config = config.toBuilder().sources(sources).build();
+  #|
+  #|            stage = "$model";
+  #|            ModelAssembler assembler = Model.assembler();
+  #|            Set<String> files = new LinkedHashSet<>();
+  #|            for (String file : strings(test, "models")) files.add(corpus.resolve(file).toString());
+  #|            files.addAll(sources);
+  #|            for (String file : files) assembler.addImport(file);
+  #|            test.getObjectMember("model").ifPresent(n -> assembler.addUnparsedModel(
+  #|                    test.expectStringMember("id").getValue() + ".json", Node.printJson(n)));
+  #|            ValidatedResult<Model> loaded = assembler.assemble();
+  #|            if (loaded.isBroken() || loaded.getResult().isEmpty()) {
+  #|                failed.add("$model");
+  #|                failureEvents.put("$model", eventKeys(loaded.getValidationEvents()));
+  #|            } else if (test.expectStringMember("mode").getValue().equals("transform")) {
+  #|                stage = "transform";
+  #|                Model original = loaded.unwrap();
+  #|                Model projected = original;
+  #|                var factory = ProjectionTransformer.createServiceFactory();
+  #|                for (Node node : test.expectArrayMember("transforms").getElements()) {
+  #|                    TransformConfig transform = TransformConfig.fromNode(node);
+  #|                    projected = factory.apply(transform.getName()).orElseThrow().transform(
+  #|                            TransformContext.builder().model(projected).originalModel(original)
+  #|                                    .originalModelValidationEvents(loaded.getValidationEvents())
+  #|                                    .settings(transform.getArgs()).projectionName("transform").build());
+  #|                }
+  #|                artifacts.put("transform/model/model.json",
+  #|                        ModelSerializer.builder().build().serialize(projected));
+  #|            } else {
+  #|                stage = "$build";
+  #|                new SmithyBuild().config(config).model(loaded.unwrap())
+  #|                        .fileManifestFactory(MockManifest::new)
+  #|                        .build(result -> {
+  #|                            if (result.getEvents().stream().anyMatch(e ->
+  #|                                    e.getSeverity() == Severity.ERROR || e.getSeverity() == Severity.DANGER)) {
+  #|                                failed.add(result.getProjectionName());
+  #|                                failureEvents.put(result.getProjectionName(), eventKeys(result.getEvents()));
+  #|                            }
+  #|                            result.getPluginManifests().forEach((name, manifest) ->
+  #|                                    ((MockManifest) manifest).getFileString("model.json").ifPresent(text ->
+  #|                                            artifacts.put(result.getProjectionName() + "/" + name + "/model.json",
+  #|                                                    Node.parse(text))));
+  #|                        }, (projection, error) -> failed.add(projection));
+  #|            }
+  #|        } catch (Exception error) {
+  #|            failed.add(stage);
+  #|        } finally {
+  #|            previousEnvironment.forEach((name, value) -> {
+  #|                if (value == null) System.clearProperty(name);
+  #|                else System.setProperty(name, value);
+  #|            });
+  #|        }
+  #|        ObjectNode.Builder outputs = Node.objectNodeBuilder();
+  #|        artifacts.forEach(outputs::withMember);
+  #|        ObjectNode.Builder eventOutput = Node.objectNodeBuilder();
+  #|        failureEvents.forEach(eventOutput::withMember);
+  #|        return Node.objectNode().withMember("artifacts", outputs.build())
+  #|                .withMember("failureEvents", eventOutput.build())
+  #|                .withMember("failedProjections", Node.fromStrings(failed));
+  #|    }
+  #|    private static ArrayNode eventKeys(List<ValidationEvent> events) {
+  #|        return Node.fromStrings(events.stream().filter(e ->
+  #|                e.getSeverity() == Severity.ERROR || e.getSeverity() == Severity.DANGER)
+  #|                .map(e -> e.getId() + "|" + e.getSeverity() + "|"
+  #|                        + e.getShapeId().map(Object::toString).orElse("-")).sorted().toList());
+  #|    }
+  #|    private static void build(Path repository) throws Exception {
+  #|        Path corpus = repository.resolve("tests/tck/build").toAbsolutePath();
+  #|        ObjectNode manifest = Node.parse(Files.readString(
+  #|                repository.resolve("tests/tck/build-cases.json"))).expectObjectNode();
+  #|        if (!manifest.expectStringMember("referenceSha").getValue().equals(SHA)) {
+  #|            throw new IllegalStateException("Build manifest reference SHA changed");
+  #|        }
+  #|        Set<String> referenceTransforms = new TreeSet<>();
+  #|        ServiceLoader.load(ProjectionTransformer.class).forEach(t -> referenceTransforms.add(t.getName()));
+  #|        if (!referenceTransforms.equals(new TreeSet<>(strings(manifest, "transforms")))) {
+  #|            throw new IllegalStateException("Build manifest must list every reference transform: " + referenceTransforms);
+  #|        }
+  #|        ObjectNode.Builder expected = Node.objectNodeBuilder();
+  #|        int count = 0;
+  #|        for (Node test : manifest.expectArrayMember("cases").getElements()) {
+  #|            ObjectNode entry = test.expectObjectNode();
+  #|            ObjectNode result = capture(entry, corpus);
+  #|            Node intendedFailures = Node.fromStrings(new TreeSet<>(strings(entry, "failedProjections")));
+  #|            if (!result.expectArrayMember("failedProjections").equals(intendedFailures)) {
+  #|                throw new IllegalStateException("Unexpected reference failure outcome in "
+  #|                        + entry.expectStringMember("id").getValue() + ": "
+  #|                        + Node.printJson(result.expectArrayMember("failedProjections")));
+  #|            }
+  #|            expected.withMember(entry.expectStringMember("id").getValue(), result);
+  #|            count++;
+  #|        }
+  #|        Files.writeString(repository.resolve("tests/tck/build-models.json"),
+  #|                Node.prettyPrintJson(expected.build()) + "\n", StandardCharsets.UTF_8);
+  #|        System.out.println("Recorded " + count + " build projection cases");
+  #|    }
+  #|    private static void validation(Path repository) throws Exception {
+  #|        Path root = repository.resolve("tests/tck/validation");
+  #|        ObjectNode.Builder expected = Node.objectNodeBuilder();
+  #|        int count = 0;
+  #|        try (var files = Files.walk(root)) {
+  #|            for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
+  #|                String name = file.toString();
+  #|                if (!name.endsWith(".smithy") && !name.endsWith(".json")) continue;
+  #|                if (!Files.exists(Path.of(name.substring(0, name.lastIndexOf('.')) + ".errors"))) continue;
+  #|                List<String> events = Model.assembler().addImport(file).assemble().getValidationEvents().stream()
+  #|                        .map(e -> e.getId() + "|" + e.getSeverity() + "|"
+  #|                                + e.getShapeId().map(Object::toString).orElse("-")).sorted().toList();
+  #|                expected.withMember(root.relativize(file).toString().replace('\\', '/'), Node.fromStrings(events));
+  #|                count++;
+  #|            }
+  #|        }
+  #|        Files.writeString(repository.resolve("tests/tck/validation-events.json"),
+  #|                Node.prettyPrintJson(expected.build()) + "\n", StandardCharsets.UTF_8);
+  #|        System.out.println("Recorded " + count + " validation models");
+  #|    }
+  #|    public static void main(String[] args) throws Exception {
+  #|        Logger.getLogger("").setLevel(Level.OFF);
+  #|        Path repository = Path.of(args[1]);
+  #|        if (args[0].equals("build") || args[0].equals("all")) build(repository);
+  #|        if (args[0].equals("validation") || args[0].equals("all")) validation(repository);
+  #|    }
+  #|}
+
+///|
+async fn java_files(dir : String) -> Array[String] {
+  let files : Array[String] = []
+  for name in @fs.readdir(dir) {
+    let path = dir + "/" + name
+    if @fs.kind(path) is Directory {
+      files.append(java_files(path))
+    } else if name.has_suffix(".java") && name != "module-info.java" {
+      files.push(path)
+    }
+  }
+  files
+}
+
+///|
+async fn copy_resources(source : String, destination : String) -> Unit {
+  if !@fs.exists(source) {
+    return
+  }
+  @fs.mkdir(destination, recursive=true, allow_exist=true)
+  for name in @fs.readdir(source) {
+    let from = source + "/" + name
+    let to = destination + "/" + name
+    if @fs.kind(from) is Directory {
+      copy_resources(from, to)
+    } else {
+      @fs.write_file(to, @fs.read_file(from))
+    }
+  }
+}
+
+///|
+async fn checked(command : String, args : Array[String]) -> String {
+  let (status, output, errors) = @process.collect_output(command, args)
+  if status != 0 {
+    println(command + " failed")
+    println(errors.text())
+    println(output.text())
+    @sys.exit(1)
+  }
+  output.text()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let mode = if args.length() > 1 { args[1] } else { "build" }
+  if !["build", "validation", "all"].contains(mode) {
+    println(
+      "Usage: moonx scripts/reference-build.mbtx [build|validation|all] [CHECKOUT]",
+    )
+    @sys.exit(1)
+  }
+  let checkout = if args.length() > 2 {
+    args[2]
+  } else {
+    ".dev/out/reference-smithy"
+  }
+  let actual_sha = checked("git", ["-C", checkout, "rev-parse", "HEAD"])
+    .trim()
+    .to_owned()
+  if actual_sha != reference_sha {
+    println("Expected reference SHA " + reference_sha + ", found " + actual_sha)
+    @sys.exit(1)
+  }
+  let changes = checked("git", ["-C", checkout, "status", "--porcelain"])
+    .trim()
+    .to_owned()
+  if !changes.is_empty() {
+    println(
+      "The reference checkout must be clean before generating pinned goldens",
+    )
+    @sys.exit(1)
+  }
+  let scratch = ".dev/out/reference-build"
+  let classes = scratch + "/classes"
+  @fs.mkdir(classes, recursive=true, allow_exist=true)
+  let source = scratch + "/ReferenceBuildCorpus.java"
+  @fs.write_file(source, harness)
+  let files = [source]
+  for
+    module_ in [
+      "smithy-utils", "smithy-jmespath", "smithy-model", "smithy-build",
+    ] {
+    files.append(java_files(checkout + "/" + module_ + "/src/main/java"))
+    copy_resources(checkout + "/" + module_ + "/src/main/resources", classes)
+  }
+  println("Compiling pinned reference main sources")
+  let options = [
+    "-proc:none", "-encoding", "UTF-8", "-d", classes, "-cp", classes,
+  ]
+  options.append(files)
+  ignore(checked("javac", options))
+  let repository = checked("git", ["rev-parse", "--show-toplevel"])
+    .trim()
+    .to_owned()
+  println(
+    checked("java", ["-cp", classes, "ReferenceBuildCorpus", mode, repository]).trim(),
+  )
+}

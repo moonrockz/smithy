@@ -61,6 +61,17 @@ projection, and writes model, sources and build-info artifacts under its output
 directory. A `jsonSchema` plugin setting writes `schema.json` for each
 projection. `clean` removes that configured output directory.
 
+Build sources and imports also accept local JAR files with a
+`META-INF/smithy/manifest`. Configuration strings and keys expand `${NAME}`
+from environment variables; `\${NAME}` escapes a placeholder.
+`${SMITHY_ROOT_DIR}` always expands to the CLI's working directory.
+
+Use a dedicated output directory. Builds replace their previous artifacts,
+including artifacts from projections that become abstract. An ownership file
+ties the output to its configuration; an existing nonempty directory must
+have that configuration's ownership marker. All files in an owned output
+directory are replaced. Source and import directories cannot be output directories.
+
 The `smithy.contracts#conditions` trait is included. Validation checks its
 targets, condition names and required string fields, then analyzes JMESPath
 syntax, modeled member references, function arguments and boolean result types.

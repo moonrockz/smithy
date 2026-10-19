@@ -67,6 +67,129 @@ fn validator_config_error(name : String, detail : String) -> ValidationEvent {
 }
 
 ///|
+fn validation_node_type(value : NodeValue) -> String {
+  match value {
+    Null => "null"
+    Boolean(_) => "boolean"
+    Number(_) => "number"
+    String(_) => "string"
+    Array(_) => "array"
+    Object(_) => "object"
+  }
+}
+
+///|
+fn Model::validation_metadata_events(self : Model) -> Array[ValidationEvent] {
+  let events : Array[ValidationEvent] = []
+  if self.metadata.get("validators") is Some(value) {
+    match value {
+      Array(definitions) =>
+        for definition in definitions {
+          if !(definition is Object(_)) {
+            events.push(
+              validation_event(
+                "Model",
+                "ERROR",
+                None,
+                "Each element of `validators` must be an object. Found " +
+                validation_node_type(definition) +
+                ".",
+              ),
+            )
+          }
+        }
+      _ =>
+        events.push(
+          validation_event(
+            "Model",
+            "ERROR",
+            None,
+            "validators must be an array. Found " +
+            validation_node_type(value) +
+            ".",
+          ),
+        )
+    }
+  }
+  for name in ["suppressions", "severityOverrides"] {
+    guard self.metadata.get(name) is Some(value) else { continue }
+    guard value is Array(rules) else {
+      events.push(
+        validation_event(
+          "Model",
+          "ERROR",
+          None,
+          "Expected array, but found " + validation_node_type(value) + ".",
+        ),
+      )
+      continue
+    }
+    let mut invalid_array = false
+    for i = 0; i < rules.length(); i = i + 1 {
+      if !(rules[i] is Object(_)) {
+        events.push(
+          validation_event(
+            "Model",
+            "ERROR",
+            None,
+            "Expected array element " +
+            i.to_string() +
+            " to be a object but found " +
+            validation_node_type(rules[i]) +
+            ".",
+          ),
+        )
+        invalid_array = true
+        break
+      }
+    }
+    if invalid_array {
+      continue
+    }
+    let required = if name == "severityOverrides" {
+      ["id", "namespace", "severity"]
+    } else {
+      ["id", "namespace"]
+    }
+    for rule in rules {
+      let mut invalid_rule = false
+      for key in required {
+        let detail = match validation_field(rule, key) {
+          None => Some("Missing expected member `" + key + "`.")
+          Some(String(_)) => None
+          Some(value) =>
+            Some(
+              "Expected string, but found " + validation_node_type(value) + ".",
+            )
+        }
+        if detail is Some(message) {
+          events.push(validation_event("Model", "ERROR", None, message))
+          invalid_rule = true
+          break
+        }
+      }
+      if invalid_rule {
+        continue
+      }
+      if name == "severityOverrides" &&
+        validation_string(rule, "severity") is Some(severity) &&
+        severity != "WARNING" &&
+        severity != "DANGER" {
+        events.push(
+          validation_event(
+            "Model",
+            "ERROR",
+            None,
+            "Expected one of `DANGER`, `WARNING`; got `" + severity + "`.",
+          ),
+        )
+      }
+    }
+  }
+  events
+}
+
+///|
 fn validation_namespace_matches(rule : String, event : ValidationEvent) -> Bool {
   rule == "*" ||
   (match event.shape {
@@ -224,11 +347,134 @@ fn Model::decorate_validation_event(
 }
 
 ///|
+fn validator_definition_error(definition : NodeValue) -> String? {
+  match validation_field(definition, "name") {
+    None => return Some("Missing expected member `name`.")
+    Some(String(_)) => ()
+    Some(value) =>
+      return Some(
+        "Expected `name` to be a string; found " + validation_node_type(value),
+      )
+  }
+  for key in ["id", "message", "severity"] {
+    if validation_field(definition, key) is Some(value) && !(value is String(_)) {
+      return Some(
+        "Expected `" +
+        key +
+        "` to be a string; found " +
+        validation_node_type(value),
+      )
+    }
+  }
+  if validation_string(definition, "severity") is Some(severity) &&
+    !["DANGER", "WARNING", "NOTE"].contains(severity) {
+    return Some(
+      "Expected one of `DANGER`, `WARNING`, `NOTE`; got `" + severity + "`.",
+    )
+  }
+  if validation_field(definition, "namespaces") is Some(value) {
+    guard value is Array(namespaces) else {
+      return Some(
+        "Expected `namespaces` to be an array of strings. Found " +
+        validation_node_type(value) +
+        ".",
+      )
+    }
+    for namespace in namespaces {
+      if !(namespace is String(_)) {
+        return Some(
+          "Expected string, but found " + validation_node_type(namespace) + ".",
+        )
+      }
+    }
+  }
+  if validation_field(definition, "configuration") is Some(value) &&
+    !(value is Object(_)) {
+    return Some(
+      "Expected `configuration` to be an object; found " +
+      validation_node_type(value),
+    )
+  }
+  if validation_field(definition, "selector") is Some(value) {
+    guard value is String(selector) else {
+      return Some(
+        "Expected `selector` to be a string; found " +
+        validation_node_type(value),
+      )
+    }
+    ignore(Selector::parse(selector)) catch {
+      InvalidSelector(message) => return Some(message)
+    }
+  }
+  None
+}
+
+///|
+fn validator_factory_configuration_error(
+  name : String,
+  configuration : NodeValue,
+) -> String? {
+  if name == "UnreferencedShape" {
+    if configuration is Object(fields) &&
+      fields.keys().any(key => key != "rootShapeSelector") {
+      return Some(
+        "Unexpected property in UnreferencedShape configuration; expected only `rootShapeSelector`.",
+      )
+    }
+    if validation_field(configuration, "rootShapeSelector") is Some(value) &&
+      !(value is String(_)) {
+      return Some(
+        "Expected `rootShapeSelector` to be a string; found " +
+        validation_node_type(value),
+      )
+    }
+  }
+  if name == "EmitEachSelector" || name == "EmitNoneSelector" {
+    if validation_field(configuration, "selector") is Some(value) &&
+      !(value is String(_)) {
+      return Some(
+        "Expected `selector` to be a string; found " +
+        validation_node_type(value),
+      )
+    }
+  }
+  if name == "EmitEachSelector" {
+    if validation_field(configuration, "bindToTrait") is Some(value) &&
+      value != Null {
+      guard value is String(id) else {
+        return Some(
+          "Expected `bindToTrait` to be a string; found " +
+          validation_node_type(value),
+        )
+      }
+      if ShapeId::parse(id) is None {
+        return Some("Invalid shape ID: " + id)
+      }
+    }
+    if validation_field(configuration, "messageTemplate") is Some(value) &&
+      !(value is String(_)) {
+      return Some(
+        "Expected `messageTemplate` to be a string; found " +
+        validation_node_type(value),
+      )
+    }
+  }
+  None
+}
+
+///|
 fn Model::configured_validation_events(
   self : Model,
   definition : NodeValue,
 ) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
+  if !(definition is Object(_)) {
+    return events
+  }
+  if validator_definition_error(definition) is Some(message) {
+    events.push(validation_event("Model", "ERROR", None, message))
+    return events
+  }
   guard validation_string(definition, "name") is Some(name) else {
     return events
   }
@@ -236,6 +482,10 @@ fn Model::configured_validation_events(
   let configuration = validation_field(definition, "configuration").unwrap_or(
     Object(Map([])),
   )
+  if validator_factory_configuration_error(name, configuration) is Some(message) {
+    events.push(validator_config_error(name, message))
+    return events
+  }
   let selector_text = validation_string(configuration, "selector")
   if name == "UnreferencedShape" {
     let expression = validation_string(configuration, "rootShapeSelector").unwrap_or(
@@ -472,6 +722,25 @@ fn Model::trait_validator_events(self : Model) -> Array[ValidationEvent] {
       is Some(Object(validators)) else {
       continue
     }
+    let mut valid = true
+    for event_id, _ in validators {
+      if ShapeId::parse(event_id + "#Event") is None {
+        valid = false
+        events.push(
+          validation_event(
+            "TraitValidators",
+            "ERROR",
+            Some(trait_shape),
+            "`smithy.api#traitValidators` key is not a valid event ID: `" +
+            event_id +
+            "`",
+          ),
+        )
+      }
+    }
+    if !valid {
+      continue
+    }
     for _, applied in self.shapes {
       if applied.traits.get(trait_id) is None {
         continue
@@ -513,11 +782,119 @@ fn Model::trait_validator_events(self : Model) -> Array[ValidationEvent] {
 ///|
 /// Run validators configured in model metadata and apply event decoration.
 pub fn Model::validation_events(self : Model) -> Array[ValidationEvent] {
+  let assembly = Assembly::new()
+  assembly.validate(self, check_trait_definitions=false)
+  self.collect_validation_events(assembly.diagnostics.map(diagnostic_event))
+}
+
+///|
+fn validation_is_correctness(event : ValidationEvent) -> Bool {
+  suppression_matches("Target", event.id) ||
+  suppression_matches("ResourceCycle", event.id) ||
+  suppression_matches("DeprecatedShape", event.id)
+}
+
+///|
+fn validation_is_critical(event : ValidationEvent) -> Bool {
+  [
+    "EnumShape", "ExclusiveStructureMemberTrait", "TraitTarget", "TraitValue", "TraitConflict",
+    "DefaultTrait", "ShapeIdConflict", "SingleOperationBinding", "SingleResourceBinding",
+  ]
+  .iter()
+  .any(id => suppression_matches(id, event.id))
+}
+
+///|
+fn validation_is_loading_event(event : ValidationEvent) -> Bool {
+  event.id == "Model" ||
+  event.id == "ModelDeprecation" ||
+  event.id.has_prefix("UnknownValidator_") ||
+  event.id.has_prefix("SM-")
+}
+
+///|
+fn Model::collect_validation_events(
+  self : Model,
+  initial : Array[ValidationEvent],
+) -> Array[ValidationEvent] {
+  if initial.iter().any(e => e.severity == "ERROR" && e.id == "Model") {
+    return initial
+      .filter(validation_is_loading_event)
+      .map(e => self.decorate_validation_event(e))
+  }
   let events : Array[ValidationEvent] = []
+  events.append(initial)
+  events.append(self.validation_metadata_events())
   events.append(self.trait_target_events())
   events.append(self.trait_validator_events())
+  events.append(self.constraint_trait_events())
+  events.append(self.basic_trait_events())
+  events.append(self.default_trait_events())
+  events.append(self.trait_conflict_events())
+  events.append(self.exclusive_trait_events())
+  events.append(self.json_name_events())
+  events.append(self.service_events())
+  events.append(self.operation_events())
+  events.append(self.resource_events())
+  events.append(self.http_events())
+  events.append(self.protocol_events())
+  events.append(self.metadata_trait_events())
+  events.append(self.semantic_trait_events())
+  events.append(self.examples_events())
+  events.append(self.recursion_and_format_events())
   for definition in validation_array(self.metadata.get("validators")) {
     events.append(self.configured_validation_events(definition))
   }
-  events.map(event => self.decorate_validation_event(event))
+  let decorated = events
+    .filter(event => {
+      event.severity == "ERROR" ||
+      event.shape.map(id => id.namespace != "smithy.api").unwrap_or(true)
+    })
+    .map(event => self.decorate_validation_event(event))
+  if decorated.iter().any(e => e.severity == "ERROR" && e.id == "Model") {
+    return decorated.filter(e => {
+      validation_is_loading_event(e) || validation_is_correctness(e)
+    })
+  }
+  if decorated
+    .iter()
+    .any(e => e.severity == "ERROR" && validation_is_correctness(e)) {
+    return decorated.filter(e => {
+      validation_is_correctness(e) || validation_is_loading_event(e)
+    })
+  }
+  if decorated
+    .iter()
+    .any(e => e.severity == "ERROR" && validation_is_critical(e)) {
+    return decorated.filter(e => {
+      validation_is_correctness(e) ||
+      validation_is_critical(e) ||
+      validation_is_loading_event(e)
+    })
+  }
+  decorated
+}
+
+///|
+/// Include assembly findings even when no complete model could be returned.
+pub fn LoadResult::validation_events(
+  self : LoadResult,
+) -> Array[ValidationEvent] {
+  self.validation_findings
+}
+
+///|
+fn diagnostic_event(d : ModelDiagnostic) -> ValidationEvent {
+  {
+    id: d.event_id,
+    severity: if d.severity == Error {
+      "ERROR"
+    } else {
+      "WARNING"
+    },
+    shape: d.shape,
+    message: d.message,
+    source: Some(d.source),
+    suppression_reason: None,
+  }
 }

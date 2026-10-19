@@ -1,6 +1,7 @@
 ///|
 pub(all) suberror JsonSchemaError {
   ConflictingShapeName(String)
+  InvalidConfiguration(String)
 } derive(Debug)
 
 ///|
@@ -24,6 +25,31 @@ fn property_name(name : String, entry : Json, config : Config) -> String {
 }
 
 ///|
+fn schema_description(traits : Map[String, Json]) -> Json? {
+  let mut description = match traits.get("smithy.api#documentation") {
+    Some(String(text)) => text
+    _ => ""
+  }
+  if traits.get("smithy.api#deprecated") is Some(Object(deprecated)) {
+    let since = match deprecated.get("since") {
+      Some(String(text)) => " since " + text
+      _ => ""
+    }
+    let message = match deprecated.get("message") {
+      Some(String(text)) => ": " + text
+      _ => "."
+    }
+    description += "\nThis shape is deprecated" + since + message
+  }
+  let description = description.trim().to_owned()
+  if description.is_empty() {
+    None
+  } else {
+    Some(Json::string(description))
+  }
+}
+
+///|
 fn apply_traits(
   schema : Map[String, Json],
   traits : Map[String, Json],
@@ -32,13 +58,16 @@ fn apply_traits(
 ) -> Unit {
   for
     (trait_id, keyword) in [
-      ("smithy.api#documentation", "description"),
       ("smithy.api#title", "title"),
       ("smithy.api#pattern", "pattern"),
+      ("smithy.api#mediaType", "contentMediaType"),
     ] {
     if traits.get(trait_id) is Some(value) {
       schema[keyword] = value
     }
+  }
+  if schema_description(traits) is Some(description) {
+    schema["description"] = description
   }
   if traits.get("smithy.api#length") is Some(Object(length)) {
     let prefix = if kind == "list" {
@@ -226,8 +255,26 @@ fn member_schema(
       Some(String("string")) => "string"
       _ => ""
     }
-    apply_traits(schema, traits, kind, config)
-    if traits.get("smithy.api#documentation") is Some(description) &&
+    if schema.get("$ref") is None {
+      apply_traits(schema, traits, kind, config)
+    }
+    if schema.get("$ref") is None &&
+      traits.get("smithy.api#timestampFormat") is Some(String(format)) {
+      schema["type"] = Json::string(
+        if format.has_prefix("epoch-") {
+          "number"
+        } else {
+          "string"
+        },
+      )
+      if format == "date-time" {
+        schema["format"] = Json::string("date-time")
+      }
+      if format == "epoch-seconds" {
+        ignore(schema.remove("format"))
+      }
+    }
+    if schema_description(traits) is Some(description) &&
       (schema.get("$ref") is None || config.add_reference_descriptions) {
       schema["description"] = description
     } else if schema.get("$ref") is Some(_) {
@@ -335,6 +382,11 @@ fn shape_schema(
     let value_schema = member_schema(value_entry, shapes, active, config, names)
     if config.map_strategy == "patternProperties" {
       let mut pattern = ".+"
+      if member_target(key_entry) is Some(target) &&
+        shapes.get(target)
+        is Some({ "traits": { "smithy.api#pattern": String(value), .. }, .. }) {
+        pattern = value
+      }
       if key_entry is Object(key_fields) &&
         key_fields.get("traits") is Some(Object(traits)) &&
         traits.get("smithy.api#pattern") is Some(String(value)) {
@@ -572,6 +624,28 @@ pub fn convert(
   service~ : String = "",
   config~ : Config = Config::new(),
 ) -> Json raise {
+  if !["propertyNames", "patternProperties"].contains(config.map_strategy) ||
+    !["oneOf", "object", "structure"].contains(config.union_strategy) ||
+    !["enum", "oneOf"].contains(config.enum_strategy) {
+    raise InvalidConfiguration("Unknown JSON Schema strategy")
+  }
+  if !["date-time", "http-date", "epoch-seconds"].contains(
+      config.default_timestamp_format,
+    ) {
+    raise InvalidConfiguration(
+      "Unknown timestamp format: " + config.default_timestamp_format,
+    )
+  }
+  if !config.definition_pointer.has_prefix("#/") {
+    raise InvalidConfiguration("definitionPointer must start with #/")
+  }
+  if !(config.schema_document_extensions is Object(_)) {
+    raise InvalidConfiguration("schemaDocumentExtensions must be an object")
+  }
+  if service != "" &&
+    !(model.get(service) is Some({ body: @smithy.Service(..), .. })) {
+    raise InvalidConfiguration("Unknown service shape: " + service)
+  }
   let ast = @syntax.encode_json_ast(model.to_json_ast())
   guard ast is Object(fields) && fields.get("shapes") is Some(Object(shapes)) else {
     return Json::object(Map([]))

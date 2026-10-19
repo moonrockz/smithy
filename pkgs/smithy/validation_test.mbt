@@ -106,3 +106,62 @@ test "EmitEachSelector rejects malformed message template paths" {
     )
   }
 }
+
+///|
+test "invalid validator configuration stops later validation phases" {
+  let source = "$version: \"2\"\nmetadata validators = [{}]\nnamespace example\n@pattern(\"x\")\nstring Value"
+  let events = @smithy.Loader::new()
+    .add_idl("config.smithy", source)
+    .assemble()
+    .validation_events()
+  assert_true(events.iter().any(e => e.id == "Model" && e.severity == "ERROR"))
+  assert_false(events.iter().any(e => e.id == "PatternTrait"))
+}
+
+///|
+test "invalid union trait arity stops checking child values" {
+  let source = "$version: \"2\"\nnamespace example\n@trait\nunion t { a: String, b: Integer }\n@t(a: 1, b: \"x\")\nstructure Value {}"
+  let events = @smithy.Loader::new()
+    .add_idl("union.smithy", source)
+    .assemble()
+    .validation_events()
+  assert_eq(events.filter(e => e.id == "TraitValue").length(), 1)
+}
+
+///|
+test "models constructed or transformed in memory rerun structural checks" {
+  let source = "$version: \"2\"\nnamespace example\nstructure Value { value: String }"
+  let model = @smithy.Loader::new().add_idl("value.smithy", source).assemble().model.unwrap()
+  let shapes = model.shapes.copy()
+  ignore(shapes.remove(@smithy.ShapeId::parse("smithy.api#String").unwrap()))
+  let model = { ..model, shapes, }
+  assert_true(
+    model
+    .validation_events()
+    .iter()
+    .any(event => {
+      event.id == "Target.UnresolvedShape" &&
+      event.shape.map(id => id.to_string()) == Some("example#Value$value")
+    }),
+  )
+}
+
+///|
+test "assembly failures retain reference validation event identities" {
+  let source =
+    #|$version: "2"
+    #|namespace example
+    #|structure Broken { value: Missing }
+  let result = @smithy.Loader::new().add_idl("broken.smithy", source).assemble()
+  assert_true(result.model is None)
+  assert_true(
+    result
+    .validation_events()
+    .iter()
+    .any(e => {
+      e.id == "Target.UnresolvedShape" &&
+      e.severity == "ERROR" &&
+      e.shape.map(id => id.to_string()) == Some("example#Broken$value")
+    }),
+  )
+}

@@ -52,9 +52,17 @@ build fresh state without changing caller-owned AST documents.
   range remain distinct. Large exponents are stored without expanding zeros.
 - A `Shape` retains its source, applied traits and direct mixin IDs.
   Inherited members have IDs belonging to their containing shape.
+  `Shape::introduced_traits()` reports explicitly declared traits;
+  `Shape::is_legacy_set()` retains the origin of Smithy 1 set shapes.
+  Its optional provenance record lets transforms remove mixins while
+  preserving declared overrides.
 
 These records can also be constructed directly. Assembly validates a model;
 mutating its maps afterward requires the caller to maintain those invariants.
+
+`Model::to_json_ast()` emits flattened contents. Set `preserve_mixins=true` to
+emit mixin declarations, introduced fields and member `apply` entries in the
+reference representation. The build model plugin uses this form.
 
 ## Assembly rules
 
@@ -87,6 +95,14 @@ lists with `uniqueItems`; set syntax in a Smithy 2.0 input is an error.
 Assembly checks reference existence and target kinds, member-name collisions,
 required collection members, enum values, resource cycles and the structure
 of applied trait values. Configurable validation plugins run after assembly.
+
+`LoadResult::validation_events()` reports assembly findings and model validation
+events with their reference IDs, severities and shape IDs. It also works when
+assembly cannot return a model. `Model::validation_events()` validates a model
+constructed or transformed in memory. Both apply metadata suppressions,
+severity overrides and `@suppress`, and run critical checks before later
+validators. The test suite compares these event identities with Java Smithy
+for all 277 paired validation corpus models.
 
 ## Select shapes
 

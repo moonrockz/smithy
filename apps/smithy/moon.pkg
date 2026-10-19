@@ -13,6 +13,10 @@ import {
   "moonbitlang/x/sys",
 }
 
+import {
+  "moonbit-community/zipc",
+} for "wbtest"
+
 options(
   "native-stub": [ "stdin_native.c" ],
   targets: {

@@ -1,4 +1,150 @@
 ///|
+/// Rebuild inherited content after removing mixin relationships, without
+/// running validation or reintroducing prelude shapes into projected models.
+pub fn Model::remove_mixin_relationships(
+  self : Model,
+  removed : Array[ShapeId],
+) -> Model raise {
+  if !self.shapes
+    .values()
+    .any(shape => shape.mixins.iter().any(id => removed.contains(id.root()))) {
+    return self
+  }
+  let document = self.to_json_ast(include_prelude=true, preserve_mixins=true)
+  let assembly = Assembly::new()
+  for id, shape in self.shapes {
+    assembly.kinds[id.to_string()] = if shape.is_legacy_set() {
+      "set"
+    } else {
+      shape.body.keyword()
+    }
+    assembly.locations[id.to_string()] = shape.source
+  }
+  for id, entry in document.shapes.unwrap_or(Map([])) {
+    let source = self
+      .get(id)
+      .map(shape => shape.source)
+      .unwrap_or(location("<transform>"))
+    let fields = copy(object(@json.to_json(entry)))
+    if entry.kind is Apply {
+      let removed_member = self
+        .get(id)
+        .map(shape => shape.mixins.iter().any(id => removed.contains(id.root())))
+        .unwrap_or(false)
+      if !removed_member {
+        assembly.applications.push({
+          target: id,
+          traits: object_field(fields, "traits"),
+          source,
+        })
+      }
+    } else {
+      if fields.get("mixins") is Some(Array(mixins)) {
+        let kept = mixins.filter(value => {
+          string_field(object(value), "target")
+          .bind(ShapeId::parse)
+          .map(id => !removed.contains(id))
+          .unwrap_or(true)
+        })
+        if kept.is_empty() {
+          fields.remove("mixins")
+        } else {
+          fields["mixins"] = Json::array(kept)
+        }
+      }
+      if self.get(id).map(shape => shape.is_legacy_set()).unwrap_or(false) {
+        fields["type"] = Json::string("set")
+      }
+      assembly.raw[id] = { id, fields, source, }
+      assembly.known.add(id)
+    }
+  }
+  let flattened = assembly.flatten()
+  let shapes : Map[ShapeId, Shape] = Map([])
+  for _, raw in flattened {
+    assembly.lower(raw, shapes, flattened)
+  }
+  // Restore the original locations even for member declarations represented as
+  // apply entries in the preserved JSON AST.
+  for id, shape in shapes {
+    if self.shapes.get(id) is Some(original) {
+      shapes[id] = { ..shape, source: original.source, }
+    }
+  }
+  { shapes, metadata: self.metadata, }
+}
+
+///|
+fn node_fields(fields : Map[String, Json]) -> Map[String, NodeValue] raise {
+  let out : Map[String, NodeValue] = Map([])
+  for key, value in fields {
+    out[key] = NodeValue::from_json(value)
+  }
+  out
+}
+
+///|
+fn Assembly::inherited_fields(
+  _self : Assembly,
+  raw : RawShape,
+  finished : Map[String, RawShape],
+) -> Map[String, Json] {
+  let fields : Map[String, Json] = Map([])
+  let members : Map[String, Json] = Map([])
+  let traits : Map[String, Json] = Map([])
+  for reference_ in array_field(raw.fields, "mixins") {
+    guard string_field(object(reference_), "target") is Some(id) &&
+      finished.get(id) is Some(base) else {
+      continue
+    }
+    let base_traits = object_field(base.fields, "traits")
+    let local_traits = array_field(
+      object(base_traits.get("smithy.api#mixin").unwrap_or(Json::null())),
+      "localTraits",
+    )
+    for id, value in base_traits {
+      if id != "smithy.api#mixin" && !local_traits.contains(Json::string(id)) {
+        traits[id] = value
+      }
+    }
+    for name, member_ in raw_members(base.fields) {
+      let member_fields = copy(object(member_))
+      let member_traits = copy(
+        object_field(
+          object(members.get(name).unwrap_or(Json::empty_object())),
+          "traits",
+        ),
+      )
+      override(member_traits, object_field(member_fields, "traits"))
+      if !member_traits.is_empty() {
+        member_fields["traits"] = Json::object(member_traits)
+      }
+      members[name] = Json::object(member_fields)
+    }
+    for key, value in base.fields {
+      if ["type", "traits", "mixins", "members", "member", "key", "value"].contains(
+          key,
+        ) {
+        continue
+      }
+      match (fields.get(key), value) {
+        (Some(Array(a)), Array(b)) => fields[key] = Json::array(unique(a, b))
+        (Some(Object(a)), Object(b)) => {
+          let out = copy(a)
+          override(out, b)
+          fields[key] = Json::object(out)
+        }
+        _ => fields[key] = value
+      }
+    }
+  }
+  fields["type"] = raw.fields.get("type").unwrap_or(Json::null())
+  set_members(fields, members)
+  fields["traits"] = Json::object(traits)
+  fields
+}
+
+///|
 fn override(fields : Map[String, Json], incoming : Map[String, Json]) -> Unit {
   for key, value in incoming {
     fields[key] = value
@@ -62,7 +208,7 @@ fn Assembly::merge_member(
         "SM-MODEL-008",
         "I found conflicting targets for member \{parent}$\{name}: \{a} and \{b}.",
         source,
-        shape=parent,
+        shape=parent + "$" + name,
       )
     }
     let merged = copy(old)

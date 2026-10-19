@@ -20,4 +20,5 @@ import {
   "moonrockz/smithy-jsonschema@0.2.0",
   "moonrockz/smithy-syntax@0.2.0",
   "moonbitlang/x@0.5.5",
+  "moonbit-community/zipc@0.2.2",
 }

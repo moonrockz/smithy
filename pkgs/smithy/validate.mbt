@@ -17,17 +17,30 @@ fn Assembly::target(
       "I could not resolve shape \{id}, referenced by \{owner.id}.",
       owner.source,
       shape=owner.id.to_string(),
+      event_id="Target.UnresolvedShape",
     )
     return
   }
   let kind = target.body.keyword()
-  if owner.id.namespace != id.namespace &&
+  if target.trait_value("smithy.api#trait") is Some(_) {
+    self.problem(
+      "SM-MODEL-005",
+      "I cannot target trait definition \{id} from \{owner.id}.",
+      owner.source,
+      shape=owner.id.to_string(),
+      event_id="Target",
+    )
+    return
+  }
+  if !(owner.body is Map(..)) &&
+    owner.id.namespace != id.namespace &&
     target.trait_value("smithy.api#private") is Some(_) {
     self.problem(
       "SM-MODEL-005",
       "I cannot reference private shape \{id} from namespace \{owner.id.namespace}.",
       owner.source,
       shape=owner.id.to_string(),
+      event_id="PrivateAccess",
     )
   }
   let valid = match expected {
@@ -43,6 +56,7 @@ fn Assembly::target(
       "I expected a \{expected} target from \{owner.id}, but found \{kind} \{id}.",
       owner.source,
       shape=owner.id.to_string(),
+      event_id="Target",
     )
   }
 }
@@ -134,6 +148,7 @@ fn Assembly::validate_value(
                   "I expected required property \{name} in trait \{trait_}\{path} on \{owner.id}.",
                   owner.source,
                   shape=owner.id.to_string(),
+                  event_id="TraitValue",
                 )
               }
           }
@@ -145,6 +160,15 @@ fn Assembly::validate_value(
               "I found unknown property \{key} in trait \{trait_}\{path} on \{owner.id}.",
               owner.source,
               shape=owner.id.to_string(),
+              event_id="TraitValue.UnknownMember." +
+                shape.id.to_string() +
+                "." +
+                key,
+              severity=if trait_ == "smithy.contracts#conditions" {
+                Error
+              } else {
+                Warning
+              },
             )
           }
         }
@@ -176,13 +200,18 @@ fn Assembly::validate_value(
         "I expected a \{shape.body.keyword()} value in trait \{trait_}\{path} on \{owner.id}.",
         owner.source,
         shape=owner.id.to_string(),
+        event_id="TraitValue",
       )
     }
   }
 }
 
 ///|
-fn Assembly::validate(self : Assembly, model : Model) -> Unit {
+fn Assembly::validate(
+  self : Assembly,
+  model : Model,
+  check_trait_definitions~ : Bool = true,
+) -> Unit {
   for (target, source) in self.syntactic {
     if model.get(target) is None {
       self.problem(
@@ -193,26 +222,33 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
       )
     }
   }
-  let names : Map[String, ShapeId] = Map([])
+  let names : Map[String, Array[Shape]] = Map([])
   for id, shape in model.shapes {
     let folded = id.to_string().to_lower()
-    if names.get(folded) is Some(other) && other != id {
-      self.problem(
-        "SM-MODEL-010",
-        "I found case-insensitively conflicting shape IDs \{other} and \{id}.",
-        shape.source,
-        shape=id.to_string(),
-      )
-    }
-    names[folded] = id
+    let group = names.get(folded).unwrap_or([])
+    group.push(shape)
+    names[folded] = group
     for trait_id, value in shape.traits {
-      guard model.shapes.get(trait_id) is Some(definition) else {
+      if trait_id.to_string() == "smithy.api#enum" &&
+        !is_builtin_source(shape.source.file) {
         self.problem(
-          "SM-MODEL-004",
-          "I could not resolve trait \{trait_id} on \{id}.",
+          "SM-MODEL-015",
+          "I found the deprecated enum trait on \{id}; I recommend an enum shape.",
           shape.source,
           shape=id.to_string(),
+          event_id="ModelDeprecation",
+          severity=Warning,
         )
+      }
+      guard model.shapes.get(trait_id) is Some(definition) else {
+        if check_trait_definitions {
+          self.problem(
+            "SM-MODEL-004",
+            "I could not resolve trait \{trait_id} on \{id}.",
+            shape.source,
+            shape=id.to_string(),
+          )
+        }
         continue
       }
       if definition.id.namespace != id.namespace &&
@@ -222,6 +258,8 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
           "I cannot apply private trait \{trait_id} outside its namespace.",
           shape.source,
           shape=id.to_string(),
+          event_id="PrivateAccess",
+          severity=Warning,
         )
       }
       if definition.trait_value("smithy.api#trait") is None {
@@ -232,9 +270,71 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
           shape=id.to_string(),
         )
       } else {
-        self.validate_value(model, trait_id, value, shape, trait_id.to_string())
+        let factory_error = match (trait_id.to_string(), value) {
+          ("smithy.api#error", String("client" | "server")) => false
+          ("smithy.api#error", _) => true
+          ("smithy.api#deprecated", Object(_)) => false
+          ("smithy.api#deprecated", _) => true
+          ("smithy.api#requestCompression", Object(fields)) =>
+            !fields.contains("encodings")
+          ("smithy.api#auth", Array(values)) =>
+            values
+            .iter()
+            .any(v => {
+              match v {
+                String(text) => ShapeId::parse(text) is None
+                _ => true
+              }
+            })
+          ("smithy.api#externalDocumentation", Object(fields)) =>
+            fields
+            .values()
+            .any(v => {
+              match v {
+                String(text) => !text.contains(":") || text.contains(" ")
+                _ => true
+              }
+            })
+          _ => false
+        }
+        if factory_error {
+          self.problem(
+            "SM-MODEL-011",
+            "I found an invalid \{trait_id} trait value on \{id}.",
+            shape.source,
+            shape=id.to_string(),
+            event_id="Model",
+          )
+          continue
+        }
         if trait_id.to_string() == "smithy.contracts#conditions" {
+          self.validate_value(
+            model,
+            trait_id,
+            value,
+            shape,
+            trait_id.to_string(),
+          )
           self.validate_conditions(model, shape, value)
+        } else if !is_builtin_source(shape.source.file) ||
+          model.metadata.contains("__validatePrelude__") {
+          for
+            event in model.node_validation_events(
+              value,
+              trait_id,
+              Some(shape),
+              "TraitValue",
+              "ERROR",
+            ) {
+            self.problem(
+              "SM-MODEL-011",
+              event.message,
+              shape.source,
+              shape=id.to_string(),
+              event_id=event.id,
+              severity=if event.severity == "ERROR" { Error } else { Warning },
+            )
+          }
         }
       }
     }
@@ -260,6 +360,7 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
             "I expected enum member \{id} to target smithy.api#Unit, but found \{target}.",
             shape.source,
             shape=id.to_string(),
+            event_id="EnumShape",
           )
         }
       }
@@ -268,12 +369,13 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
           self.target(model, shape, target, "string")
         }
       Union(members) | Enum(members) | IntEnum(members) => {
-        if members.is_empty() && !is_mixin(shape) {
+        if members.is_empty() && (!(shape.body is Union(_)) || !is_mixin(shape)) {
           self.problem(
             "SM-MODEL-010",
             "I expected at least one member in \{shape.body.keyword()} \{id}.",
             shape.source,
             shape=id.to_string(),
+            event_id=if shape.body is Union(_) { "Union" } else { "Model" },
           )
         }
         if shape.body is Enum(_) || shape.body is IntEnum(_) {
@@ -295,6 +397,7 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
                 "I expected an enumValue of the correct type for \{member_}.",
                 member_shape.source,
                 shape=member_.to_string(),
+                event_id="EnumShape",
               )
             }
             if value is Some(value) {
@@ -303,10 +406,39 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
                   "SM-MODEL-010",
                   "I found a duplicate enumValue in \{id}.",
                   member_shape.source,
-                  shape=id.to_string(),
+                  shape=member_.to_string(),
+                  event_id="EnumShape",
                 )
               }
               values.push(value)
+            }
+            if value == Some(String("")) {
+              self.problem(
+                "SM-MODEL-010",
+                "I found an empty enum value on \{member_}.",
+                member_shape.source,
+                shape=member_.to_string(),
+                event_id="EnumShape",
+              )
+            }
+            if valid &&
+              member_.member is Some(name) &&
+              (
+                !name
+                .iter()
+                .all(c => {
+                  (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
+                }) ||
+                !(name[0] >= 'A' && name[0] <= 'Z')
+              ) {
+              self.problem(
+                "SM-MODEL-015",
+                "I recommend uppercase enum member name for \{member_}.",
+                member_shape.source,
+                shape=member_.to_string(),
+                event_id="EnumShape",
+                severity=Warning,
+              )
             }
           }
         }
@@ -314,6 +446,19 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
       Operation(input~, output~, errors~) => {
         self.target(model, shape, input, "structure")
         self.target(model, shape, output, "structure")
+        for target in [input, output] {
+          if model.shapes.get(target) is Some(target_shape) &&
+            target_shape.body is Structure(_) &&
+            target_shape.trait_value("smithy.api#error") is Some(_) {
+            self.problem(
+              "SM-MODEL-005",
+              "I cannot use error structure \{target} as input or output of \{id}.",
+              shape.source,
+              shape=id.to_string(),
+              event_id="Target",
+            )
+          }
+        }
         for error in errors {
           self.target(model, shape, error, "error")
         }
@@ -330,7 +475,7 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
           )
         }
       }
-      Service(operations~, resources~, errors~, rename~, ..) => {
+      Service(operations~, resources~, errors~, ..) => {
         for operation in operations {
           self.target(model, shape, operation, "operation")
         }
@@ -339,16 +484,6 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
         }
         for error in errors {
           self.target(model, shape, error, "error")
-        }
-        for target, _ in rename {
-          if !model.shapes.contains(target) {
-            self.problem(
-              "SM-MODEL-004",
-              "I could not resolve renamed shape \{target} in \{id}.",
-              shape.source,
-              shape=id.to_string(),
-            )
-          }
         }
       }
       Resource(
@@ -364,16 +499,8 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
         collectionOperations~,
         resources~
       ) => {
-        for name, target in identifiers {
+        for _, target in identifiers {
           self.target(model, shape, target, "string")
-          if properties.contains(name) {
-            self.problem(
-              "SM-MODEL-010",
-              "I found resource identifier and property named \{name} on \{id}.",
-              shape.source,
-              shape=id.to_string(),
-            )
-          }
         }
         for _, target in properties {
           self.target(model, shape, target, "data")
@@ -409,42 +536,51 @@ fn Assembly::validate(self : Assembly, model : Model) -> Unit {
       _ => ()
     }
   }
+  for _, group in names {
+    if group.length() > 1 {
+      for shape in group {
+        self.problem(
+          "SM-MODEL-010",
+          "I found case-insensitively conflicting shape ID \{shape.id}.",
+          shape.source,
+          shape=shape.id.to_string(),
+          event_id="ShapeIdConflict",
+        )
+      }
+    }
+  }
   self.resource_cycles(model)
 }
 
 ///|
 fn Assembly::resource_cycles(self : Assembly, model : Model) -> Unit {
-  let done : Set[ShapeId] = Set([])
-  let active : Set[ShapeId] = Set([])
   for id, shape in model.shapes {
     guard shape.body is Resource(..) else { continue }
-    let stack = [(id, false)]
-    while stack.pop() is Some((id, leaving)) {
-      if done.contains(id) {
-        continue
-      }
-      if leaving {
-        active.remove(id)
-        done.add(id)
-        continue
-      }
+    let visited : Set[ShapeId] = Set([])
+    let chain : Array[String] = []
+    let stack = [id]
+    while stack.pop() is Some(id) {
       guard model.shapes.get(id) is Some(shape) &&
         shape.body is Resource(resources~, ..) else {
         continue
       }
-      if active.contains(id) {
+      if visited.contains(id) {
         self.problem(
           "SM-MODEL-009",
-          "I found a resource containment cycle at \{id}.",
+          "Circular resource hierarchy found: " +
+          chain.join(" -> ") +
+          " -> " +
+          id.to_string(),
           shape.source,
           shape=id.to_string(),
+          event_id="ResourceCycle",
         )
-        continue
+        break
       }
-      active.add(id)
-      stack.push((id, true))
+      visited.add(id)
+      chain.push(id.to_string())
       for child in resources.rev() {
-        stack.push((child, false))
+        stack.push(child)
       }
     }
   }

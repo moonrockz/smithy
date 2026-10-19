@@ -322,13 +322,9 @@ fn run(args : Array[String]) -> Int32 raise {
     return if failed { 1 } else { 0 }
   }
   let result = loader.assemble()
-  for d in result.diagnostics {
-    eprintln(diagnostic(d, inputs))
-  }
-  guard result.model is Some(model) else { return 1 }
   if opts.command == "validate" {
-    let mut failed = false
-    for event in model.validation_events() {
+    let mut failed = result.model is None
+    for event in result.validation_events() {
       if event.severity == "DANGER" || event.severity == "ERROR" {
         failed = true
       }
@@ -340,6 +336,10 @@ fn run(args : Array[String]) -> Int32 raise {
     }
     return if failed { 1 } else { 0 }
   }
+  for d in result.diagnostics {
+    eprintln(diagnostic(d, inputs))
+  }
+  guard result.model is Some(model) else { return 1 }
   if opts.command == "select" {
     guard opts.selector is Some(expression) else {
       raise CliError("select requires --selector", 2)

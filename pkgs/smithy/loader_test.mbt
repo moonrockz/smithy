@@ -133,6 +133,26 @@ test "mixins and apply flatten with inherited member traits and local precedence
 }
 
 ///|
+test "metadata arrays merge in input order across IDL and JSON" {
+  let json = "{\"smithy\":\"2.0\",\"metadata\":{\"files\":[\"json\"]}}"
+  let idl = "$version: \"2\"\nmetadata files = [\"idl\"]\nnamespace example"
+  let first = loaded(
+    @smithy.Loader::new().add_json("a.json", json).add_idl("b.smithy", idl),
+  )
+  assert_eq(
+    first.metadata.get("files"),
+    Some(@smithy.Array([@smithy.String("json"), @smithy.String("idl")])),
+  )
+  let second = loaded(
+    @smithy.Loader::new().add_idl("a.smithy", idl).add_json("b.json", json),
+  )
+  assert_eq(
+    second.metadata.get("files"),
+    Some(@smithy.Array([@smithy.String("idl"), @smithy.String("json")])),
+  )
+}
+
+///|
 test "metadata and list-valued traits merge across files" {
   let model = loaded(
     @smithy.Loader::new()
