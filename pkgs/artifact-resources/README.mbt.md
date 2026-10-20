@@ -267,8 +267,11 @@ must enforce byte and total transfer time limits during I/O, follow at most five
 redirects, reject credentials and non-HTTP schemes, and verify TLS certificates.
 HTTPS requests must not redirect to HTTP.
 
-The `moonrockz/artifact-resources/http` package supplies `transport` using curl
-on PATH. It invokes curl directly without a shell, disables curl configuration
+The `moonrockz/artifact-resources/http` package supplies `transport` using curl.
+On Linux and macOS it uses the host's trusted PATH. On Windows it uses the
+OS-installed `System32/curl.exe` through an absolute application path, so a
+checkout-local `curl.exe` cannot take precedence. The Node.js Windows adapter
+uses the trusted host `SystemRoot` environment variable to locate this copy. It invokes curl directly without a shell, disables curl configuration
 files and URL globbing, and leaves certificate verification enabled. curl 7.61+
 with HTTP/HTTPS support is required. It uses the host trust store and honors
 curl's proxy and certificate environment settings. See curl's
@@ -276,8 +279,9 @@ curl's proxy and certificate environment settings. See curl's
 
 | Backend / host | Archive reading | Default public acquisition |
 |---|---|---|
-| Native Linux, macOS, Windows | Yes | curl on PATH |
-| JS in Node.js 24+ | Yes | curl on PATH via Node child processes |
+| Native Linux, macOS | Yes | curl on trusted PATH |
+| Native Windows | Yes | OS-installed curl |
+| JS in Node.js 24+ | Yes | Host curl via Node child processes |
 | Wasm / Wasm GC filesystem hosts | Yes | `unsupported-transport` |
 | Browser JS | In-memory readers | Supply a host transport |
 

@@ -192,8 +192,9 @@ before archive parsing or model loading. The actual digest is always computed
 and retained with requested URL, resolved URL and physical entry provenance.
 Source filenames exported by the sources plugin remain root-relative.
 
-Native Linux/macOS/Windows and Node.js 24+ builds require curl 7.61+ on PATH
-with HTTPS support. TLS certificates are verified with the host trust store.
+Native and Node.js 24+ builds require curl 7.61+ with HTTPS support. Linux
+and macOS use the trusted host PATH; Windows uses the OS-installed
+`System32/curl.exe` by absolute path, excluding checkout-local executables. TLS certificates are verified with the host trust store.
 At most five redirects are followed; HTTPS cannot downgrade to HTTP.
 Acquisition defaults to 64 MiB and a 30-second total transfer timeout.
 Existing archive expansion and resource limits still apply. Missing assets,

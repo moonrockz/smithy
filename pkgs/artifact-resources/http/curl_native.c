@@ -5,6 +5,7 @@
 #include <string.h>
 #ifdef _WIN32
 #include <windows.h>
+#include <wchar.h>
 #else
 #include <spawn.h>
 #include <signal.h>
@@ -40,7 +41,13 @@ MOONBIT_FFI_EXPORT moonbit_bytes_t smithy_resource_curl(
   HANDLE reader = NULL, writer = NULL, null_device = INVALID_HANDLE_VALUE;
   SECURITY_ATTRIBUTES security = {sizeof(security), NULL, TRUE};
   PROCESS_INFORMATION child = {0};
-  STARTUPINFOA startup = {0};
+  STARTUPINFOW startup = {0};
+  wchar_t curl_path[MAX_PATH], wide_command[10000];
+  /* A bare executable name makes CreateProcess search the working directory.
+   * Use Windows' installed curl, with an explicit application path. */
+  UINT system_length = GetSystemDirectoryW(curl_path, MAX_PATH);
+  if (!system_length || system_length + 10 >= MAX_PATH) goto finish;
+  wcscat(curl_path, L"\\curl.exe");
   char command[10000];
   /* HttpUrl admits only printable ASCII and excludes quotes/backslashes.
    * Quoting the URL also preserves spaces if the validator ever permits them. */
@@ -49,6 +56,8 @@ MOONBIT_FFI_EXPORT moonbit_bytes_t smithy_resource_curl(
     "--proto =http,https --proto-redir %s --disallow-username-in-url "
     "--max-time %s --max-filesize %s --write-out \"\\n%%{http_code}\\n%%{url_effective}\" --url \"%s\"",
     protocols, time_text, max_text, url);
+  if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, command, -1,
+                           wide_command, 10000)) goto finish;
   if (!CreatePipe(&reader, &writer, &security, 0)) goto finish;
   SetHandleInformation(reader, HANDLE_FLAG_INHERIT, 0);
   null_device = CreateFileA("NUL", GENERIC_READ | GENERIC_WRITE,
@@ -57,7 +66,7 @@ MOONBIT_FFI_EXPORT moonbit_bytes_t smithy_resource_curl(
   startup.dwFlags = STARTF_USESTDHANDLES;
   startup.hStdOutput = writer;
   startup.hStdError = startup.hStdInput = null_device;
-  if (!CreateProcessA(NULL, command, NULL, NULL, TRUE, CREATE_NO_WINDOW,
+  if (!CreateProcessW(curl_path, wide_command, NULL, NULL, TRUE, CREATE_NO_WINDOW,
                       NULL, NULL, &startup, &child)) goto finish;
   CloseHandle(writer); writer = NULL;
 #else

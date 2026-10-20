@@ -163,6 +163,10 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
       |> ignore
       let stem = root +
         "/_build/\{target}/release/build/moonrockz/smithy-cli/smithy-cli"
+      if target == "native" && @env.get_env_var("OS") == Some("Windows_NT") {
+        // This executable must never be mistaken for curl by Windows lookup.
+        @fs.write_file(dir + "/curl.exe", @fs.read_file(stem + ".exe"))
+      }
       let executable = if target == "native" {
         stem + ".exe"
       } else if target == "js" {
@@ -224,6 +228,19 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
             extra_env={ "PATH": "" },
           )
           |> ignore
+          if @env.get_env_var("OS") != Some("Windows_NT") {
+            let missing_curl = command(
+              dir,
+              executable,
+              prefix + ["build", "--config", dir + "/native-remote.json"],
+              extra_env={ "PATH": "" },
+              expected=1,
+            )
+            assert_true(
+              missing_curl.contains("transport-failure"),
+              msg=missing_curl,
+            )
+          }
         }
         @fs.write_file(
           dir + "/diagnostic.json",

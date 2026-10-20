@@ -8,7 +8,8 @@ mise exec -- moon run apps/smithy --target js -- build --config examples/public-
 mise exec -- moon run pkgs/artifact-resources/examples/public --target native
 ```
 
-Both commands need network access and curl on PATH with HTTPS support.
+Both commands need network access and curl with HTTPS support. Linux/macOS
+use the trusted host PATH; Windows uses its OS-installed curl.
 The build loads sources, global imports and projection imports from the same
 pinned URL. The `extra` projection additionally contains
 `example.resources#ProjectionOnly`. Output is under `.dev/out/public-archive`.
