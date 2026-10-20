@@ -328,7 +328,8 @@ and `register_public_http` accept the same optional `cache` and `mode` settings.
 The library defaults to `Online` without a cache. Set `mode=Offline` explicitly
 to forbid transport calls, even when no cache was supplied.
 
-Create a filesystem cache with `moonrockz/artifact-resources/cache::open(location)`
+Create a filesystem cache with `moonrockz/artifact-resources/cache::open(directory)`
+using a validated `CacheDirectory::parse(path)` value
 and pass `cache=Some(cache)`. This host adapter supports native Linux, macOS,
 Windows and Node.js 24+. Wasm and Wasm GC return `unsupported-transport` when
 filesystem cache I/O is requested. The core cache policy and archive readers run
@@ -369,3 +370,16 @@ The [public archive example](../../examples/public-archive/README.md) demonstrat
 online reuse and explicit offline builds. Controlled fixtures assert request
 counts, identical output, corruption failures and shared cache behavior across
 sources, global imports and projection imports.
+
+
+`CacheDirectory` is distinct from a provider's `RepositoryLocation`. Its boundary
+constructor validates a portable filesystem-path subset before I/O. It accepts
+relative paths, POSIX absolute paths, absolute Windows drive paths and UNC share
+paths. Empty/control-containing paths, Windows reserved characters, drive-relative
+paths, reserved device components and trailing dots/spaces are rejected on every
+backend. Existence, permissions and filesystem-specific size limits remain host
+I/O checks. Cache diagnostic locations retain the typed directory through
+`Location::FilesystemDirectory`; paths render only for host I/O and diagnostics.
+
+API migration: exhaustive `Location` matches must handle the new
+`FilesystemDirectory(CacheDirectory)` case.

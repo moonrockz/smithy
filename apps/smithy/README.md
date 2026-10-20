@@ -205,7 +205,9 @@ Remote inputs share a verified cache across sources, global imports and projecti
 imports. By default it lives at `.smithy/cache` relative to the configuration file.
 Set top-level `"cacheDirectory":"/path/to/cache"` or pass `--cache-dir PATH` to
 choose another location. CLI paths are also relative to the configuration file;
-the CLI setting overrides the JSON setting. Build output and cache directories
+the CLI setting overrides the JSON setting. Cache paths must use portable filesystem
+syntax; reserved characters such as `*`, reserved device names such as `NUL`,
+and trailing dots/spaces are rejected before acquisition. Build output and cache directories
 must not overlap. `clean` removes build output and retains the cache.
 
 Use `smithy build --offline --config smithy-build.json`, or top-level

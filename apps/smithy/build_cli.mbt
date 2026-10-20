@@ -548,8 +548,10 @@ fn run_build(
     }
   }
   let cache_text = cache_dir.unwrap_or(config.cache_directory.to_string())
-  guard @resources.RepositoryLocation::parse(cache_text) is Some(_) else {
-    raise CliError("cache directory must be a nonempty, control-free path", 2)
+  guard @resources.CacheDirectory::parse(cache_text) is Some(_) else {
+    raise CliError(
+      "cache directory must be a portable filesystem directory path", 2,
+    )
   }
   let cache_path = build_path(base, cache_text)
   if build_path_contains(output, cache_path) ||
@@ -558,8 +560,10 @@ fn run_build(
       "build output directory must not overlap the artifact cache", 2,
     )
   }
-  guard @resources.RepositoryLocation::parse(cache_path) is Some(cache_location) else {
-    raise CliError("cache directory must be a nonempty, control-free path", 2)
+  guard @resources.CacheDirectory::parse(cache_path) is Some(cache_location) else {
+    raise CliError(
+      "cache directory must be a portable filesystem directory path", 2,
+    )
   }
   let cache = Some(@resource_cache.open(cache_location))
   let mode = if offline || config.offline {

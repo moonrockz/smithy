@@ -98,3 +98,33 @@ test "composition retains configuration origins before physical acquisition" {
     @resources.RepositoryReferenceStep(repository),
   )
 }
+
+///|
+test "cache directories validate physical path syntax independently of repository locations" {
+  for
+    text in [
+      "", " ", "a\n", "cache:*", "C:relative", "cache?", "cache<dir", "cache>dir",
+      "cache|dir", "cache\"dir", "NUL", "cache/CON.txt", "cache/aux", "cache/COM1",
+      "cache/lpt9.txt", "cache/COM²", "cache/trailing.", "cache/trailing ", "//server",
+    ] {
+    assert_eq(@resources.CacheDirectory::parse(text), None, msg=text)
+  }
+  for
+    text in [
+      ".", "..", "cache", "./.smithy/cache", "../cache", "/tmp/cache", "C:/cache",
+      "C:\\cache", "\\\\server\\share\\cache", "cache with spaces", "caché", "cache/COM10",
+    ] {
+    let directory = @resources.CacheDirectory::parse(text).unwrap()
+    assert_eq(directory.to_string(), text)
+    assert_eq(directory.location(), @resources.FilesystemDirectory(directory))
+    assert_eq(directory.location().to_string(), text)
+  }
+  assert_true(
+    @resources.RepositoryLocation::parse("https://example.test/cache?x=1")
+    is Some(_),
+  )
+  assert_eq(
+    @resources.CacheDirectory::parse("https://example.test/cache?x=1"),
+    None,
+  )
+}

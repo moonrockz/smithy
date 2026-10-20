@@ -1,11 +1,9 @@
 ///|
 /// Filesystem cache on native hosts and Node.js. The directory is owned by the
 /// caller. Keys are validated domain values and cannot traverse out of it.
-pub fn open(
-  location : @resources.RepositoryLocation,
-) -> @resources.VerifiedCache {
+pub fn open(location : @resources.CacheDirectory) -> @resources.VerifiedCache {
   let root : @path.Path = location.to_string()
-  let origin = @resources.Provenance::new(@resources.Location::Source(location))
+  let origin = @resources.Provenance::new(location.location())
   @resources.VerifiedCache::new({
     read: (key, bound) => {
       let result = read(

@@ -321,7 +321,14 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
         )
         assert_true(bad_metadata.contains("cache-corrupt"), msg=bad_metadata)
         @fs.write_file(metadata_path, metadata)
-        for cache_path in ["", target + "-remote"] {
+        for
+          cache_path in [
+            "",
+            "cache:*",
+            "cache/NUL",
+            "cache/trailing.",
+            target + "-remote",
+          ] {
           let invalid_path = command(
             dir,
             executable,

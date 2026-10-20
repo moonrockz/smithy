@@ -23,7 +23,7 @@ pub(all) struct BuildConfig {
   version : String
   sources : Array[BuildInput]
   imports : Array[BuildInput]
-  cache_directory : @resources.RepositoryLocation
+  cache_directory : @resources.CacheDirectory
   offline : Bool
   output_directory : String
   projections : Array[ProjectionConfig]
@@ -368,13 +368,13 @@ pub fn BuildConfig::parse(
 ///|
 fn config_cache_directory(
   document : Json,
-) -> @resources.RepositoryLocation raise BuildError {
+) -> @resources.CacheDirectory raise BuildError {
   let text = config_optional_string(document, "cacheDirectory").unwrap_or(
     ".smithy/cache",
   )
-  guard @resources.RepositoryLocation::parse(text) is Some(location) else {
+  guard @resources.CacheDirectory::parse(text) is Some(location) else {
     raise InvalidBuildConfig(
-      "Expected `cacheDirectory` to be a nonempty, control-free path",
+      "Expected `cacheDirectory` to be a portable filesystem directory path",
     )
   }
   location

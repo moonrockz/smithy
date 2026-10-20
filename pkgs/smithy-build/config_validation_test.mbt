@@ -126,3 +126,20 @@ test "cache and offline configuration validates boundary values" {
     assert_true(rejected, msg=setting)
   }
 }
+
+///|
+test "cache directory rejects invalid physical paths before acquisition" {
+  for
+    text in [
+      "cache:*", "cache?", "cache<dir", "cache|dir", "NUL", "cache/CON.txt", "cache/trailing.",
+      "cache/trailing ",
+    ] {
+    let json : Json = { "version": "2.0", "cacheDirectory": text }
+    let rejected = try @build.BuildConfig::parse(json.stringify()) catch {
+      @build.InvalidBuildConfig(_) => true
+    } noraise {
+      _ => false
+    }
+    assert_true(rejected, msg=text)
+  }
+}

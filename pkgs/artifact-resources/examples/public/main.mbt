@@ -20,7 +20,7 @@ fn main raise {
     abort("usage: public [--offline]")
   }
   let cache = @cache.open(
-    @resources.RepositoryLocation::parse(".dev/cache/public-archive").unwrap(),
+    @resources.CacheDirectory::parse(".dev/cache/public-archive").unwrap(),
   )
   let tree = archive.open(
     @http.transport,

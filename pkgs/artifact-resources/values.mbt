@@ -214,6 +214,7 @@ pub(all) enum PathStyle {
 /// Physical location relationships remain data until a presentation boundary.
 pub(all) enum Location {
   Source(RepositoryLocation)
+  FilesystemDirectory(CacheDirectory)
   DirectoryEntry(Location, EntryPath, PathStyle)
   ArchiveEntry(Location, EntryPath)
 } derive(Eq, Debug)
@@ -245,7 +246,7 @@ fn Location::within(self : Location, parent : Location) -> Bool {
       return true
     }
     match current {
-      Source(_) => return false
+      Source(_) | FilesystemDirectory(_) => return false
       DirectoryEntry(container, _, _) | ArchiveEntry(container, _) =>
         current = container
     }
@@ -262,6 +263,10 @@ pub fn Location::to_string(self : Location) -> String {
     match current {
       Source(location) => {
         base = location.to_string()
+        break
+      }
+      FilesystemDirectory(directory) => {
+        base = directory.to_string()
         break
       }
       DirectoryEntry(container, path, style) => {
@@ -486,4 +491,71 @@ pub fn ContentDigest::to_string(self : ContentDigest) -> String {
 ///|
 pub impl Show for ContentDigest with fn output(self, logger) {
   logger.write_string(self.to_string())
+}
+
+///|
+/// A physical cache directory in the portable filesystem-path subset. This
+/// validates syntax, not existence, permissions or filesystem-specific limits.
+pub struct CacheDirectory {
+  priv value : String
+} derive(Eq, Debug)
+
+///|
+pub fn CacheDirectory::parse(text : String) -> CacheDirectory? {
+  if !valid_value(text) {
+    return None
+  }
+  let drive = text.length() >= 3 &&
+    ((text[0] >= 65 && text[0] <= 90) || (text[0] >= 97 && text[0] <= 122)) &&
+    text[1] == 58 &&
+    (text[2] == 47 || text[2] == 92)
+  for i in 0..<text.length() {
+    let c = text[i]
+    if (c == 58 && !(drive && i == 1)) ||
+      c == 60 ||
+      c == 62 ||
+      c == 34 ||
+      c == 124 ||
+      c == 63 ||
+      c == 42 {
+      return None
+    }
+  }
+  let path = if drive { text[3:].to_owned() } else { text }
+  let parts = path.replace_all(old="\\", new="/").split("/").to_array()
+  if path.has_prefix("//") || path.has_prefix("\\\\") {
+    if parts.length() < 4 || parts[2].is_empty() || parts[3].is_empty() {
+      return None
+    }
+  }
+  for part in parts {
+    if part == "" || part == "." || part == ".." {
+      continue
+    }
+    if part.has_suffix(".") || part.has_suffix(" ") {
+      return None
+    }
+    let stem = part.split(".").next().unwrap().to_upper()
+    if ["CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"].contains(
+        stem.to_owned(),
+      ) {
+      return None
+    }
+    if stem.length() == 4 &&
+      (stem.has_prefix("COM") || stem.has_prefix("LPT")) &&
+      "123456789¹²³".contains(stem[3:].to_owned()) {
+      return None
+    }
+  }
+  Some({ value: text, })
+}
+
+///|
+pub fn CacheDirectory::to_string(self : CacheDirectory) -> String {
+  self.value
+}
+
+///|
+pub fn CacheDirectory::location(self : CacheDirectory) -> Location {
+  FilesystemDirectory(self)
 }
