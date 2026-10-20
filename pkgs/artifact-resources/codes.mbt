@@ -1,5 +1,8 @@
 ///|
 pub(all) enum ResourceCode {
+  OfflineMiss
+  CacheCorrupt
+  CacheIo
   UnsupportedTransport
   TransportFailure
   AcquisitionTimeout
@@ -29,6 +32,9 @@ pub(all) enum ResourceCode {
 ///|
 pub fn ResourceCode::to_string(self : ResourceCode) -> String {
   match self {
+    OfflineMiss => "offline-miss"
+    CacheCorrupt => "cache-corrupt"
+    CacheIo => "cache-io"
     UnsupportedTransport => "unsupported-transport"
     TransportFailure => "transport-failure"
     AcquisitionTimeout => "acquisition-timeout"

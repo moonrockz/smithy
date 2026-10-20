@@ -76,3 +76,6 @@ lefthook-local.yml
 # Release outputs
 
 dist/
+
+# Verified remote artifact cache, relative to a build configuration.
+.smithy/

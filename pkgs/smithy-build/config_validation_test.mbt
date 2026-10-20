@@ -99,3 +99,47 @@ test "duplicate source filenames from separate roots fail before plugins run" {
   assert_true(result.errors.iter().any(message => message.contains("a.smithy")))
   assert_true(calls.is_empty())
 }
+
+///|
+test "cache and offline configuration validates boundary values" {
+  let defaults = @build.BuildConfig::parse("{\"version\":\"2.0\"}")
+  assert_eq(defaults.cache_directory.to_string(), ".smithy/cache")
+  assert_false(defaults.offline)
+  let configured = @build.BuildConfig::parse(
+    "{\"version\":\"2.0\",\"cacheDirectory\":\"${CACHE}\",\"offline\":true}",
+    environment={ "CACHE": "artifacts" },
+  )
+  assert_eq(configured.cache_directory.to_string(), "artifacts")
+  assert_true(configured.offline)
+  for
+    setting in [
+      "\"offline\":1", "\"offline\":\"true\"", "\"cacheDirectory\":false", "\"cacheDirectory\":\"\"",
+      "\"cacheDirectory\":\"a\\n\"",
+    ] {
+    let rejected = try
+      @build.BuildConfig::parse("{\"version\":\"2.0\"," + setting + "}")
+    catch {
+      @build.InvalidBuildConfig(_) => true
+    } noraise {
+      _ => false
+    }
+    assert_true(rejected, msg=setting)
+  }
+}
+
+///|
+test "cache directory rejects invalid physical paths before acquisition" {
+  for
+    text in [
+      "cache:*", "cache?", "cache<dir", "cache|dir", "NUL", "cache/CON.txt", "cache/trailing.",
+      "cache/trailing ",
+    ] {
+    let json : Json = { "version": "2.0", "cacheDirectory": text }
+    let rejected = try @build.BuildConfig::parse(json.stringify()) catch {
+      @build.InvalidBuildConfig(_) => true
+    } noraise {
+      _ => false
+    }
+    assert_true(rejected, msg=text)
+  }
+}

@@ -162,6 +162,8 @@ pub fn PublicArchive::open(
   transport : HttpTransport,
   acquisition_limits~ : AcquisitionLimits = AcquisitionLimits::new().unwrap(),
   limits~ : Limits = Limits::new(),
+  cache~ : VerifiedCache? = None,
+  mode~ : AcquisitionMode = Online,
 ) -> EntryTree raise ResourceError {
   check_limits(limits, self.url.location())
   let origin = Provenance::new(self.url.location())
@@ -175,38 +177,22 @@ pub fn PublicArchive::open(
       limits.max_archive_bytes,
     ),
   }
-  let response = transport(self.url, acquisition_limits)
-  if response.body.length() > acquisition_limits.max_bytes {
-    raise ResourceError(
-      ResourceLimit,
-      Provenance::new(response.resolved.location()).through(origin),
-      "Download exceeds archive byte limit",
-    )
-  }
-  let digest = ContentDigest::sha256(response.body)
-  let acquisition = {
-    requested: self.url,
-    resolved: response.resolved,
-    digest,
+  let acquired = acquire(
+    self.url,
+    transport,
+    expected_digest=self.expected_digest,
+    limits=acquisition_limits,
+    cache~,
+    mode~,
+  )
+  let response : HttpResponse = {
+    resolved: acquired.metadata.resolved,
+    status: 200,
+    body: acquired.body,
   }
   let provenance = Provenance::new(response.resolved.location()).acquired(
-    acquisition,
+    acquired.metadata,
   )
-  if response.status != 200 {
-    let code = match response.status {
-      401 | 403 => AuthenticationRequired
-      404 | 410 => MissingAsset
-      _ => HttpStatus
-    }
-    raise ResourceError(code, provenance, "HTTP status \{response.status}")
-  }
-  if self.expected_digest is Some(expected) && expected != digest {
-    raise ResourceError(
-      IntegrityFailure,
-      provenance,
-      "Expected \{expected}, received \{digest}",
-    )
-  }
   let tree = try {
     match self.format {
       Zip =>
@@ -232,6 +218,8 @@ pub fn register_public_http(
   expected_digest~ : ContentDigest? = None,
   acquisition_limits~ : AcquisitionLimits = AcquisitionLimits::new().unwrap(),
   limits~ : Limits = Limits::new(),
+  cache~ : VerifiedCache? = None,
+  mode~ : AcquisitionMode = Online,
 ) -> Registry raise ResourceError {
   registry.register_provider(ProviderId::parse("public-http").unwrap(), (
     repository,
@@ -250,6 +238,8 @@ pub fn register_public_http(
       transport,
       acquisition_limits~,
       limits~,
+      cache~,
+      mode~,
     )
     {
       reference,

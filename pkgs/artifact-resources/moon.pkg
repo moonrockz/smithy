@@ -1,5 +1,6 @@
 import {
   "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/json",
   "moonbitlang/x/crypto",
   "moonbit-community/zipc",
   "moonbit-community/flate",

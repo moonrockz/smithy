@@ -48,8 +48,29 @@ fn selection(
 }
 
 ///|
+async fn snapshot(dir : String) -> Map[String, String] {
+  let out = Map([])
+  let pending = [""]
+  while !pending.is_empty() {
+    let relative = pending.pop().unwrap()
+    for name in @fs.readdir(dir + "/" + relative) {
+      let child = if relative == "" { name } else { relative + "/" + name }
+      if @fs.kind(dir + "/" + child) is Directory {
+        pending.push(child)
+      } else {
+        out[child] = @fs.read_file(dir + "/" + child).text()
+      }
+    }
+  }
+  out
+}
+
+///|
 async fn exercise(root : String, targets : Array[String]) -> Unit {
   let dir = root + "/.dev/out/public-http"
+  if @fs.exists(dir) {
+    @fs.rmdir(dir, recursive=true)
+  }
   @fs.mkdir(dir, recursive=true, allow_exist=true)
   let zip = @zipc.Archive::empty()
   for
@@ -82,11 +103,19 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
   let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
   defer server.close()
   let base = "http://\{server.addr}"
+  let requests : Array[String] = []
+  let denied = Ref(false)
   @async.with_task_group(group => {
     group.spawn_bg(no_wait=true, () => {
       server.run_forever(allow_failure=true, (request, _, conn) => {
         defer conn.close()
         let path = request.path
+        requests.push(path)
+        if denied.val {
+          conn.send_response(503, "Network disabled")
+          conn.end_response()
+          return
+        }
         if path == "/disconnect" {
           return
         }
@@ -181,6 +210,7 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
       } else {
         [stem + ".wasm", "--"]
       }
+      let initial_requests = requests.length()
       for remote in [false, true] {
         let field = if remote { "url" } else { "path" }
         let location = if remote { base + "/archive" } else { "models.zip" }
@@ -194,7 +224,8 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
           "]}},\"outputDirectory\":\"\{target}-\{label}\"}"
         let config_path = dir + "/\{target}-\{label}.json"
         @fs.write_file(config_path, config)
-        let args = prefix + ["build", "--config", config_path]
+        let args = prefix +
+          ["build", "--config", config_path, "--cache-dir", "cache-" + target]
         let output = command(
           dir,
           executable,
@@ -206,6 +237,128 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
         }
       }
       if supported {
+        // Three input positions share one acquisition, including the redirect.
+        assert_eq(requests.length() - initial_requests, 2)
+        let config_path = dir + "/\{target}-remote.json"
+        let args = prefix +
+          ["build", "--config", config_path, "--cache-dir", "cache-" + target]
+        let before = snapshot(dir + "/\{target}-remote")
+        let request_count = requests.length()
+        command(dir, executable, args) |> ignore
+        assert_eq(requests.length(), request_count)
+        denied.val = true
+        command(
+          dir,
+          executable,
+          args + ["--offline"],
+          extra_env=if target == "native" { { "PATH": "" } } else { Map([]) },
+        )
+        |> ignore
+        assert_eq(snapshot(dir + "/\{target}-remote"), before)
+        assert_eq(requests.length(), request_count)
+        let miss = command(
+          dir,
+          executable,
+          prefix +
+          [
+            "build",
+            "--config",
+            config_path,
+            "--offline",
+            "--cache-dir",
+            "missing-" + target,
+          ],
+          expected=1,
+        )
+        assert_true(miss.contains("offline-miss"), msg=miss)
+        let cache_dir = dir + "/cache-" + target
+        let content_path = cache_dir + "/sha256-" + digest[7:].to_owned()
+        // An orphan temporary write cannot turn a missing mapping into a hit.
+        @fs.mkdir(dir + "/interrupted-" + target, recursive=true)
+        @fs.write_file(
+          dir + "/interrupted-" + target + "/sha256-partial.tmp",
+          b"partial",
+        )
+        let interrupted = command(
+          dir,
+          executable,
+          prefix +
+          [
+            "build",
+            "--config",
+            config_path,
+            "--offline",
+            "--cache-dir",
+            "interrupted-" + target,
+          ],
+          expected=1,
+        )
+        assert_true(interrupted.contains("offline-miss"), msg=interrupted)
+        @fs.write_file(content_path, b"corrupted")
+        for offline in [false, true] {
+          let corrupt = command(
+            dir,
+            executable,
+            args + (if offline { ["--offline"] } else { [] }),
+            expected=1,
+          )
+          assert_true(corrupt.contains("cache-corrupt"), msg=corrupt)
+        }
+        @fs.remove(content_path)
+        let absent = command(dir, executable, args + ["--offline"], expected=1)
+        assert_true(absent.contains("cache-corrupt"), msg=absent)
+        @fs.write_file(content_path, bytes)
+        let metadata_path = cache_dir +
+          "/" +
+          @fs.readdir(cache_dir).filter(name => name.has_prefix("ref-v1-"))[0]
+        let metadata = @fs.read_file(metadata_path)
+        @fs.write_file(metadata_path, b"partial metadata")
+        let bad_metadata = command(
+          dir,
+          executable,
+          args + ["--offline"],
+          expected=1,
+        )
+        assert_true(bad_metadata.contains("cache-corrupt"), msg=bad_metadata)
+        @fs.write_file(metadata_path, metadata)
+        for
+          cache_path in [
+            "",
+            "cache:*",
+            "cache/NUL",
+            "cache/trailing.",
+            target + "-remote",
+          ] {
+          let invalid_path = command(
+            dir,
+            executable,
+            prefix +
+            ["build", "--config", config_path, "--cache-dir", cache_path],
+            expected=2,
+          )
+          assert_true(invalid_path.contains("cache"), msg=invalid_path)
+        }
+        command(dir, executable, prefix + ["clean", "--config", config_path])
+        |> ignore
+        assert_true(@fs.exists(content_path))
+        command(dir, executable, args + ["--offline"]) |> ignore
+        assert_eq(snapshot(dir + "/\{target}-remote"), before)
+        // Configuration settings use the same cache and policy as CLI flags.
+        let config_text = @fs.read_file(config_path).text()
+        @fs.write_file(
+          config_path,
+          @utf8.encode(
+            "{\"offline\":true,\"cacheDirectory\":\"cache-" +
+            target +
+            "\"," +
+            config_text[1:].to_owned(),
+          ),
+        )
+        command(dir, executable, prefix + ["build", "--config", config_path])
+        |> ignore
+        @fs.write_file(config_path, @utf8.encode(config_text))
+        assert_eq(requests.length(), request_count)
+        denied.val = false
         for projection in ["source", "extra"] {
           let local_model = @fs.read_file(
             dir + "/\{target}-local/\{projection}/model/model.json",
@@ -232,7 +385,14 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
             let missing_curl = command(
               dir,
               executable,
-              prefix + ["build", "--config", dir + "/native-remote.json"],
+              prefix +
+              [
+                "build",
+                "--config",
+                dir + "/native-remote.json",
+                "--cache-dir",
+                "cold-missing-curl",
+              ],
               extra_env={ "PATH": "" },
               expected=1,
             )
@@ -261,6 +421,13 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
         )
         assert_true(diagnostic.contains(digest), msg=diagnostic)
         assert_true(diagnostic.contains("!/broken/bad.smithy"), msg=diagnostic)
+        let offline_diagnostic = command(
+          dir,
+          executable,
+          prefix + ["build", "--config", dir + "/diagnostic.json", "--offline"],
+          expected=1,
+        )
+        assert_eq(offline_diagnostic, diagnostic)
         for
           (endpoint, code) in [
             ("missing", "missing-asset"),

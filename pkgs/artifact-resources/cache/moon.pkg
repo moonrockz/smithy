@@ -1,0 +1,15 @@
+import {
+  "moonrockz/artifact-resources" @resources,
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x/fs",
+  "moonbitlang/x/path",
+}
+
+options(
+  "native-stub": [ "store_native.c" ],
+  targets: {
+    "store_native.mbt": [ "native" ],
+    "store_js.mbt": [ "js" ],
+    "store_unsupported.mbt": [ "wasm", "wasm-gc" ],
+  },
+)

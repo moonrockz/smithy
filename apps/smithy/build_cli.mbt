@@ -93,6 +93,8 @@ fn build_add_input(
   runner : @build.BuildRunner,
   input : @build.BuildInput,
   base : String,
+  cache~ : @resources.VerifiedCache? = None,
+  mode~ : @resources.AcquisitionMode = @resources.Online,
   source~ : Bool = false,
   projection~ : String? = None,
 ) -> Unit raise {
@@ -101,6 +103,8 @@ fn build_add_input(
       let registry = @resources.register_public_http(
         @resources.Registry::new(),
         @http_resources.transport,
+        cache~,
+        mode~,
         format=archive.format,
         expected_digest=archive.expected_digest,
       ).add_repository({
@@ -500,7 +504,12 @@ fn json_schema_plugin(
 }
 
 ///|
-fn run_build(config_path : String, clean : Bool) -> Int32 raise {
+fn run_build(
+  config_path : String,
+  clean : Bool,
+  offline~ : Bool = false,
+  cache_dir~ : String? = None,
+) -> Int32 raise {
   let environment = @env.get_env_vars()
   let current : @path.Path = "."
   environment["SMITHY_ROOT_DIR"] = current.resolve().to_string()
@@ -538,6 +547,30 @@ fn run_build(config_path : String, clean : Bool) -> Int32 raise {
       )
     }
   }
+  let cache_text = cache_dir.unwrap_or(config.cache_directory.to_string())
+  guard @resources.CacheDirectory::parse(cache_text) is Some(_) else {
+    raise CliError(
+      "cache directory must be a portable filesystem directory path", 2,
+    )
+  }
+  let cache_path = build_path(base, cache_text)
+  if build_path_contains(output, cache_path) ||
+    build_path_contains(cache_path, output) {
+    raise CliError(
+      "build output directory must not overlap the artifact cache", 2,
+    )
+  }
+  guard @resources.CacheDirectory::parse(cache_path) is Some(cache_location) else {
+    raise CliError(
+      "cache directory must be a portable filesystem directory path", 2,
+    )
+  }
+  let cache = Some(@resource_cache.open(cache_location))
+  let mode = if offline || config.offline {
+    @resources.Offline
+  } else {
+    @resources.Online
+  }
   if clean {
     build_check_output_owner(output, owner)
     build_remove_tree(output)
@@ -548,10 +581,10 @@ fn run_build(config_path : String, clean : Bool) -> Int32 raise {
     "jsonSchema", json_schema_plugin,
   )
   for input in config.sources {
-    build_add_input(loader, runner, input, base, source=true)
+    build_add_input(loader, runner, input, base, cache~, mode~, source=true)
   }
   for input in config.imports {
-    build_add_input(loader, runner, input, base)
+    build_add_input(loader, runner, input, base, cache~, mode~)
   }
   for projection in config.projections {
     for input in projection.imports {
@@ -560,6 +593,8 @@ fn run_build(config_path : String, clean : Bool) -> Int32 raise {
         runner,
         input,
         base,
+        cache~,
+        mode~,
         projection=Some(projection.name),
       )
     }

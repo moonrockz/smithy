@@ -105,3 +105,21 @@ directory of its own. Artifact names must be unique within a projection,
 including the default `model`, `sources` and `build-info` artifacts. Registered
 plugins return relative filenames; absolute paths and parent traversal are
 rejected.
+
+
+## Acquisition settings
+
+`BuildConfig::parse` accepts top-level `cacheDirectory`, a portable filesystem
+directory path defaulting to `.smithy/cache`, and `offline`, a boolean defaulting
+to false. The CLI resolves cache paths relative to the configuration file and
+shares the cache across sources, imports and projection imports. Library consumers
+receive these settings in `cache_directory: CacheDirectory` and `offline` and supply acquisition
+through `artifact-resources`; parsing configuration performs no I/O.
+See [CLI cache behavior](../../apps/smithy/README.md) and the
+[cache contract](../artifact-resources/README.mbt.md#verified-cache-and-offline-acquisition).
+
+Code constructing `BuildConfig` directly must initialize the new
+`cache_directory` and `offline` fields. `BuildConfig::parse` supplies their defaults.
+
+`cacheDirectory` rejects invalid filesystem syntax such as `cache:*` and reserved
+Windows device components such as `NUL`, including when parsed on another host.

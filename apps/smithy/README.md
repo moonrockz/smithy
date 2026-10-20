@@ -199,8 +199,31 @@ At most five redirects are followed; HTTPS cannot downgrade to HTTP.
 Acquisition defaults to 64 MiB and a 30-second total transfer timeout.
 Existing archive expansion and resource limits still apply. Missing assets,
 authentication-required responses, transport errors and digest mismatches fail
-with distinct stable resource codes. Credentials, caching and offline reuse
-are separate capabilities. Each URL input downloads on every build.
+with distinct stable resource codes. Credentials are a separate capability.
+
+Remote inputs share a verified cache across sources, global imports and projection
+imports. By default it lives at `.smithy/cache` relative to the configuration file.
+Set top-level `"cacheDirectory":"/path/to/cache"` or pass `--cache-dir PATH` to
+choose another location. CLI paths are also relative to the configuration file;
+the CLI setting overrides the JSON setting. Cache paths must use portable filesystem
+syntax; reserved characters such as `*`, reserved device names such as `NUL`,
+and trailing dots/spaces are rejected before acquisition. Build output and cache directories
+must not overlap. `clean` removes build output and retains the cache.
+
+Use `smithy build --offline --config smithy-build.json`, or top-level
+`"offline":true`, to prohibit network calls. Either setting enables offline mode.
+An online build downloads each exact URL once, then reuses verified content.
+Every hit checks SHA-256 and the input's expected digest before archive parsing.
+The cache records the original requested and resolved URLs, preserving source
+provenance and identical generated artifacts during offline builds.
+
+Missing offline references fail with `offline-miss`; damaged metadata, missing
+content and corrupted bytes fail with `cache-corrupt`. Expected digest mismatches
+fail with `integrity-failure`. Corruption fails without a network fallback in
+both modes. Remove damaged entries or the cache directory and build online to
+recover. URLs are treated as pinned references with no expiry; remove the reference
+mapping or choose a fresh cache to refresh a mutable URL. Cache data has no
+automatic eviction. Local-only builds do not read or create cache files.
 
 Wasm and Wasm GC CLI builds reject URL acquisition with `unsupported-transport`.
 Local inputs continue to work without curl or network access on all existing
