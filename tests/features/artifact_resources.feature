@@ -55,3 +55,16 @@ Feature: Reusable local artifact resources
     Then the artifact model contains "example.resources#Message"
     And the artifact model contains "example.resources#SharedName"
     And the artifact model excludes "example.resources#ProjectionOnly"
+
+  Scenario: Resolve a pinned public GitHub asset and assemble it offline
+    Given the declared artifact model:
+      """smithy
+      $version: "2"
+      namespace example.resources
+      string Message
+      """
+    When I explicitly select resources from a "github" source tree
+    Then the artifact model contains "example.resources#Message"
+    And the artifact model excludes "example.resources#Unlisted"
+    And the artifact model source is "https://cdn.fixture.test/models.zip!/module/models/nested/message.smithy"
+    And the resource logical name is "nested/message.smithy"

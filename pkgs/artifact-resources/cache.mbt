@@ -179,6 +179,7 @@ pub fn acquire(
   let at = Provenance::new(response.resolved.location()).acquired(metadata)
   if response.status != 200 {
     let code = match response.status {
+      429 => RateLimited
       401 | 403 => AuthenticationRequired
       404 | 410 => MissingAsset
       _ => HttpStatus

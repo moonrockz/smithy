@@ -1,0 +1,9 @@
+pkgtype(kind: "executable")
+
+import {
+  "moonrockz/artifact-resources" @resources,
+  "moonrockz/artifact-resources/http",
+  "moonrockz/artifact-resources/cache",
+  "moonbitlang/core/env",
+  "moonbitlang/x/sys",
+}

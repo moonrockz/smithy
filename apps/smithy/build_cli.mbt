@@ -98,6 +98,38 @@ fn build_add_input(
   source~ : Bool = false,
   projection~ : String? = None,
 ) -> Unit raise {
+  if input is @build.GitHub(archive, selection, api) {
+    let tree = @resources.register_github(
+        @resources.Registry::new(),
+        @http_resources.transport,
+        api~,
+        format=archive.format,
+        expected_digest=archive.expected_digest,
+        cache~,
+        mode~,
+      )
+      .add_repository({
+        id: @resources.RepositoryId::parse("input").unwrap(),
+        provider: @resources.ProviderId::parse("github").unwrap(),
+        location: input.location(),
+      })
+      .resolve({
+        repository: @resources.RepositoryId::parse("input").unwrap(),
+        key: archive.reference.key(),
+      }).tree catch {
+        @resources.ResourceError(code, origin, message) =>
+          raise @build.InvalidBuildConfig(
+            "Could not acquire resource `" +
+            origin.to_string() +
+            "` [" +
+            code.to_string() +
+            "]: " +
+            message,
+          )
+      }
+    build_add_selected(loader, runner, tree, selection, source~, projection~)
+    return
+  }
   if input is @build.Remote(archive, selection) {
     let tree = try {
       let registry = @resources.register_public_http(
@@ -133,8 +165,9 @@ fn build_add_input(
   let path = build_path(base, input.location().to_string())
   let selection = match input {
     @build.Local(_) => None
-    @build.Selected(_, selection) | @build.Remote(_, selection) =>
-      Some(selection)
+    @build.Selected(_, selection)
+    | @build.Remote(_, selection)
+    | @build.GitHub(_, selection, _) => Some(selection)
   }
   build_add_files(
     loader,
@@ -537,7 +570,7 @@ fn run_build(
     protected_paths.append(projection.imports)
   }
   for path in protected_paths {
-    if path is @build.Remote(_, _) {
+    if path is @build.Remote(_, _) || path is @build.GitHub(_, _, _) {
       continue
     }
     let input = build_path(base, path.location().to_string())

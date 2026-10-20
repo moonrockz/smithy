@@ -234,3 +234,44 @@ Run the pinned [public archive example](../../examples/public-archive/README.md)
 ```shell
 mise exec -- moon run apps/smithy --target js -- build --config examples/public-archive/smithy-build.json
 ```
+
+
+## Public GitHub release assets
+
+Use a selected GitHub input anywhere a build accepts sources or imports:
+
+```json
+{
+  "version": "2.0",
+  "sources": [{
+    "github": {
+      "repository": "owner/models",
+      "tag": "v1.2.3",
+      "asset": "models.zip"
+    },
+    "format": "zip",
+    "root": "models",
+    "globs": ["**/*.smithy"]
+  }]
+}
+```
+
+Replace the coordinate, tag, asset and resource selection with your public
+release. Asset names match exactly. `github` cannot be combined with `path` or
+`url`. ZIP/JAR, tar and tar/gzip use the same selectors; set `format` to `tgz` for
+`.tar.gz`/`.tgz`. An optional `digest` pins SHA-256. `github.api` defaults to
+`https://api.github.com`; a compatible public API base can be set explicitly.
+Latest-release selection, inferred matches and credentials are unsupported.
+
+The initial build caches release metadata, asset pages and verified content.
+Run `smithy build --config smithy-build.json --offline` afterward to resolve the
+same reference without network access. `--cache-dir` and JSON `cacheDirectory`
+control the shared cache. Provenance reports the requested tag/name, resolved
+release/asset IDs, download redirects and content digest. Failures use stable
+codes such as `missing-release`, `missing-asset`, `ambiguous-asset`, `rate-limited`,
+`authentication-required` and `integrity-failure`.
+
+Native Linux/macOS/Windows and Node.js hosts use curl; Wasm and Wasm GC support
+portable readers but require a custom library transport for acquisition. Local
+builds remain usable offline. See the [provider contract](../../pkgs/artifact-resources/README.mbt.md#pinned-github-release-assets)
+and [runnable release-resource example](../../examples/github-release/README.md).

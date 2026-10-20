@@ -123,3 +123,38 @@ Code constructing `BuildConfig` directly must initialize the new
 
 `cacheDirectory` rejects invalid filesystem syntax such as `cache:*` and reserved
 Windows device components such as `NUL`, including when parsed on another host.
+
+
+## GitHub release inputs
+
+A selected input can use `github` instead of `path` or `url` in sources, global
+imports and projection imports:
+
+```json
+{
+  "github": {
+    "repository": "owner/models",
+    "tag": "v1.2.3",
+    "asset": "models.tar.gz"
+  },
+  "format": "tgz",
+  "root": "package/models",
+  "globs": ["**/*.smithy"]
+}
+```
+
+An exact tag and exact asset name are required. `format` defaults to `zip` and
+accepts `zip`, `jar`, `tar`, `tgz` or `tar.gz`; add `digest` with an expected
+`sha256:` value to pin the bytes. An optional `github.api` selects a compatible
+public API base, defaulting to `https://api.github.com`. Source fields are
+exclusive and unknown fields fail validation. Resource roots, path/glob
+selection and logical name validation are unchanged.
+
+The library case is `GitHub(GitHubArchive, Selection, HttpUrl)`, where the URL is
+the API base. Exhaustive `BuildInput` matches must handle it. `location()` returns
+the repository coordinate; `with_location()` validates and replaces that
+coordinate. `to_json()` preserves all reference, API, format, digest and selection
+settings. The CLI handles acquisition before calling the common model selector.
+The same cache/offline settings apply to metadata and archive bytes.
+See the [provider contract](../artifact-resources/README.mbt.md#pinned-github-release-assets)
+and [runnable example](../../examples/github-release/README.md).
