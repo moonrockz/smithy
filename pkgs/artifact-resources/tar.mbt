@@ -107,13 +107,6 @@ fn tar_tree(
         origin, "Unsupported tar variant; expected V7 or POSIX ustar/pax",
       )
     }
-    let name = tar_string(data[offset:offset + 100], origin)
-    let prefix = if posix {
-      tar_string(data[offset + 345:offset + 500], origin)
-    } else {
-      ""
-    }
-    let header_path = if prefix == "" { name } else { prefix + "/" + name }
     let kind = data[offset + 156]
     let header_size = tar_octal(data[offset + 124:offset + 136], origin)
     let extension = kind == b'x'
@@ -135,19 +128,33 @@ fn tar_tree(
     } else {
       pending.unwrap_or(Map([]))
     }
-    let path = attributes.get("path").unwrap_or(header_path)
     let directory = kind == b'5'
-    let checked = if directory && path.has_suffix("/") {
-      path[:path.length() - 1].to_owned()
+    // Extension headers carry metadata, not container entries. Their names
+    // commonly contain ./ components and never become physical entry paths.
+    let entry = if extension {
+      None
     } else {
-      path
-    }
-    guard EntryPath::parse(checked) is Some(entry) else {
-      raise ResourceError(
-        UnsafePath,
-        Provenance::new(origin),
-        "Unsafe tar entry `" + path + "`",
-      )
+      let name = tar_string(data[offset:offset + 100], origin)
+      let prefix = if posix {
+        tar_string(data[offset + 345:offset + 500], origin)
+      } else {
+        ""
+      }
+      let header_path = if prefix == "" { name } else { prefix + "/" + name }
+      let path = attributes.get("path").unwrap_or(header_path)
+      let checked = if directory && path.has_suffix("/") {
+        path[:path.length() - 1].to_owned()
+      } else {
+        path
+      }
+      guard EntryPath::parse(checked) is Some(entry) else {
+        raise ResourceError(
+          UnsafePath,
+          Provenance::new(origin),
+          "Unsafe tar entry `" + path + "`",
+        )
+      }
+      Some(entry)
     }
     let size = match attributes.get("size") {
       Some(value) => tar_decimal(@utf8.encode(value)[:], origin)
@@ -156,7 +163,9 @@ fn tar_tree(
     if size > limits.max_entry_bytes || size > limits.max_total_bytes - total {
       raise ResourceError(
         ResourceLimit,
-        Provenance::new(origin.archive_entry(entry)),
+        Provenance::new(
+          entry.map(path => origin.archive_entry(path)).unwrap_or(origin),
+        ),
         "Tar entries exceed byte limit",
       )
     }
@@ -170,6 +179,8 @@ fn tar_tree(
       pending = Some(tar_pax(data[offset:offset + size], origin))
     } else {
       pending = None
+      let entry = entry.unwrap()
+      let checked = entry.to_string()
       if seen.contains(entry) {
         raise ResourceError(
           DuplicateEntry,

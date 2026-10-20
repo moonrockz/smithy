@@ -211,7 +211,9 @@ Recognized non-content metadata is ignored: `uid`, `gid`, `uname`, `gname`,
 `mtime`, `atime`, `ctime`, `comment`. Other pax keywords fail explicitly.
 Global pax headers, GNU long-name/long-link/sparse extensions, base-256 sizes,
 links, devices, FIFOs and all other entry types are unsupported, even when
-unselected. Only one pax header may precede a file or directory.
+unselected. Only one pax header may precede a file or directory. Its placeholder
+name is metadata, never an entry path; path validation applies to the effective
+file or directory path that follows it.
 
 Tar requires valid unsigned header checksums, octal sizes, complete entry data
 and padding, two zero end blocks and only whole zero blocks after them.

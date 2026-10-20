@@ -419,3 +419,25 @@ test "gzip streaming output stops before allocating an entire compression bomb" 
   let tree = @resources.EntryTree::tgz(compressed, location("large.tgz"))
   assert_eq(tree.read(entry("large")), Bytes::make(65536, b'a'))
 }
+
+///|
+test "pax metadata placeholder names are not physical resource paths" {
+  let metadata = tar_record(
+    "././@PaxHeader",
+    pax_record("path", "package/model.smithy"),
+    kind=b'x',
+  )
+  let data = metadata + tar_record("placeholder", b"model") + tar_end()
+  let tree = @resources.EntryTree::tar(data, location("pax.tar"))
+  assert_eq(tree.entries(), [entry("package/model.smithy")])
+  assert_eq(tree.text(entry("package/model.smithy")), "model")
+  let unsafe_metadata = tar_record(
+    "././@PaxHeader",
+    pax_record("path", "../escape"),
+    kind=b'x',
+  )
+  assert_eq(
+    tar_code(unsafe_metadata + tar_record("placeholder", b"model") + tar_end()),
+    "unsafe-path",
+  )
+}
