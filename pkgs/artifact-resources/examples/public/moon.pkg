@@ -1,0 +1,6 @@
+pkgtype(kind: "executable")
+
+import {
+  "moonrockz/artifact-resources" @resources,
+  "moonrockz/artifact-resources/http",
+}

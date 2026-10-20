@@ -1,5 +1,11 @@
 ///|
 pub(all) enum ResourceCode {
+  UnsupportedTransport
+  TransportFailure
+  AcquisitionTimeout
+  AuthenticationRequired
+  MissingAsset
+  HttpStatus
   InvalidArchive
   IntegrityFailure
   UnsafePath
@@ -23,6 +29,12 @@ pub(all) enum ResourceCode {
 ///|
 pub fn ResourceCode::to_string(self : ResourceCode) -> String {
   match self {
+    UnsupportedTransport => "unsupported-transport"
+    TransportFailure => "transport-failure"
+    AcquisitionTimeout => "acquisition-timeout"
+    AuthenticationRequired => "authentication-required"
+    MissingAsset => "missing-asset"
+    HttpStatus => "http-status"
     InvalidArchive => "invalid-archive"
     IntegrityFailure => "integrity-failure"
     UnsafePath => "unsafe-path"

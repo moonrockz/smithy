@@ -1,6 +1,7 @@
 ///|
 /// Legacy local discovery or explicitly selected resources in a local container.
 pub(all) enum BuildInput {
+  Remote(@resources.PublicArchive, @resources.Selection)
   Local(@resources.RepositoryLocation)
   Selected(@resources.RepositoryLocation, @resources.Selection)
 } derive(Eq, Debug)
@@ -16,6 +17,8 @@ pub fn BuildInput::from_path(path : String) -> BuildInput raise BuildError {
 ///|
 pub fn BuildInput::location(self : BuildInput) -> @resources.RepositoryLocation {
   match self {
+    Remote(archive, _) =>
+      @resources.RepositoryLocation::parse(archive.url.to_string()).unwrap()
     Local(location) | Selected(location, _) => location
   }
 }
@@ -24,8 +27,16 @@ pub fn BuildInput::location(self : BuildInput) -> @resources.RepositoryLocation 
 pub fn BuildInput::with_location(
   self : BuildInput,
   location : @resources.RepositoryLocation,
-) -> BuildInput {
+) -> BuildInput raise BuildError {
   match self {
+    Remote(archive, selection) => {
+      guard @resources.HttpUrl::parse(location.to_string()) is Some(url) else {
+        raise InvalidBuildConfig(
+          "Expected an absolute credential-free HTTP(S) URL",
+        )
+      }
+      Remote({ ..archive, url, }, selection)
+    }
     Local(_) => Local(location)
     Selected(_, selection) => Selected(location, selection)
   }
@@ -34,6 +45,23 @@ pub fn BuildInput::with_location(
 ///|
 pub fn BuildInput::to_json(self : BuildInput) -> Json {
   match self {
+    Remote(archive, selection) => {
+      let json = Selected(self.location(), selection).to_json()
+      guard json is Object(fields) else { abort("selection serialization") }
+      ignore(fields.remove("path"))
+      fields["url"] = Json::string(archive.url.to_string())
+      fields["format"] = Json::string(
+        match archive.format {
+          @resources.Zip => "zip"
+          @resources.Tar => "tar"
+          @resources.Tgz => "tgz"
+        },
+      )
+      if archive.expected_digest is Some(digest) {
+        fields["digest"] = Json::string(digest.to_string())
+      }
+      Json::object(fields)
+    }
     Local(location) => Json::string(location.to_string())
     Selected(location, selection) => {
       let paths = []
@@ -79,12 +107,19 @@ fn config_input(value : Json) -> BuildInput raise BuildError {
       "Expected a local input string or resource selection object",
     )
   }
+  let remote = fields.contains("url")
+  let allowed = if remote {
+    ["url", "format", "digest", "root", "paths", "globs"]
+  } else {
+    ["path", "root", "paths", "globs"]
+  }
   for key, _ in fields {
-    if !["path", "root", "paths", "globs"].contains(key) {
+    if !allowed.contains(key) {
       raise InvalidBuildConfig("Unknown resource selection field `" + key + "`")
     }
   }
-  guard config_optional_string(value, "path") is Some(path) &&
+  guard config_optional_string(value, if remote { "url" } else { "path" })
+    is Some(path) &&
     @resources.RepositoryLocation::parse(path) is Some(location) else {
     raise InvalidBuildConfig("Expected a resource selection `path`")
   }
@@ -136,7 +171,37 @@ fn config_input(value : Json) -> BuildInput raise BuildError {
       "A resource selection requires between 1 and 256 paths or globs",
     )
   }
-  Selected(location, selection)
+  if remote {
+    guard @resources.HttpUrl::parse(path) is Some(url) else {
+      raise InvalidBuildConfig(
+        "Expected an absolute credential-free HTTP(S) URL without a fragment",
+      )
+    }
+    let format = match
+      config_optional_string(value, "format").unwrap_or("zip") {
+      "zip" | "jar" => @resources.Zip
+      "tar" => @resources.Tar
+      "tgz" | "tar.gz" => @resources.Tgz
+      _ =>
+        raise InvalidBuildConfig(
+          "Expected URL archive format zip, jar, tar, tgz or tar.gz",
+        )
+    }
+    let expected_digest = match config_optional_string(value, "digest") {
+      None => None
+      Some(text) => {
+        guard @resources.ContentDigest::parse(text) is Some(digest) else {
+          raise InvalidBuildConfig(
+            "Expected digest sha256: followed by 64 hexadecimal digits",
+          )
+        }
+        Some(digest)
+      }
+    }
+    Remote({ url, format, expected_digest, }, selection)
+  } else {
+    Selected(location, selection)
+  }
 }
 
 ///|

@@ -19,7 +19,7 @@ converts and builds IDL and JSON models. See [CLI usage](apps/smithy/README.md).
 
 | Path | Module | Purpose |
 |------|--------|---------|
-| `pkgs/artifact-resources` | `moonrockz/artifact-resources` | Portable directory, ZIP/JAR and tar/gzip entry trees, resource loading and provider registry |
+| `pkgs/artifact-resources` | `moonrockz/artifact-resources` | Portable entry trees, resource loading, public HTTP archive acquisition and provider registry |
 | `pkgs/jmespath` | `moonrockz/jmespath` | JMESPath parser, inspectable AST and JSON evaluator |
 | `pkgs/smithy` | `moonrockz/smithy` | Semantic model and multi-file IDL/JSON loader |
 | `pkgs/smithy-build` | `moonrockz/smithy-build` | Build configuration, projections and plugins |
@@ -122,6 +122,7 @@ mise run validate              # package structure against moon.work
 mise run test                  # all targets; the tests module runs on js and native only
 mise run test -- js native     # some targets
 mise run test:cli              # built CLI behavior on native, wasm, js and wasm-gc
+mise run test:http             # controlled public archive transport and CLI fixtures
 mise run test:bdd              # moonspec acceptance features (tests/bdd, js target)
 mise run tck:vendor:json -- REF # refresh the vendored JSON AST reference corpus
 mise run prelude:vendor -- REF # refresh the embedded prelude and contract traits

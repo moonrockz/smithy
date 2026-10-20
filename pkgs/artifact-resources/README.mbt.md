@@ -249,3 +249,67 @@ bytes and cached public dependencies, then runs the unchanged pinned script
 against the unpacked module and ZIP. It leaves the user's registry untouched.
 This verifies ordinary source inclusion and script imports without publishing
 a special version. The task-script test suite runs this check in CI.
+
+## Public HTTP archives
+
+`PublicArchive` combines a validated `HttpUrl`, an explicit `ArchiveFormat`
+and an optional expected `ContentDigest`. `PublicArchive::open(transport)`
+acquires bytes, accepts only HTTP 200, computes SHA-256 and verifies any expected
+digest before opening the archive. ZIP/JAR, tar and tar/gzip reuse the portable
+readers and selectors. URLs require lowercase `http://` or `https://`, an
+authority, printable ASCII, no user information and no fragment. Percent-encode
+non-ASCII path and query characters.
+
+`HttpTransport` is a synchronous callback from `HttpUrl` and `AcquisitionLimits`
+to `HttpResponse`, with `resolved`, `status` and binary `body` fields. Hosts can
+provide their own transport without changing discovery. Transport implementers
+must enforce byte and total transfer time limits during I/O, follow at most five
+redirects, reject credentials and non-HTTP schemes, and verify TLS certificates.
+HTTPS requests must not redirect to HTTP.
+
+The `moonrockz/artifact-resources/http` package supplies `transport` using curl
+on PATH. It invokes curl directly without a shell, disables curl configuration
+files and URL globbing, and leaves certificate verification enabled. curl 7.61+
+with HTTP/HTTPS support is required. It uses the host trust store and honors
+curl's proxy and certificate environment settings. See curl's
+[transport options](https://curl.se/docs/manpage.html).
+
+| Backend / host | Archive reading | Default public acquisition |
+|---|---|---|
+| Native Linux, macOS, Windows | Yes | curl on PATH |
+| JS in Node.js 24+ | Yes | curl on PATH via Node child processes |
+| Wasm / Wasm GC filesystem hosts | Yes | `unsupported-transport` |
+| Browser JS | In-memory readers | Supply a host transport |
+
+Local inputs never invoke the HTTP adapter. Reading and selecting existing
+bytes remains portable and works offline. The synchronous default adapter is
+for command-line hosts; it blocks the calling thread during acquisition.
+
+`AcquisitionLimits::new()` defaults to 64 MiB and 30 seconds across all redirects.
+The constructor returns `None` for nonpositive limits, bytes over 1 GiB or time
+over 3600 seconds. `PublicArchive::open` uses the smaller acquisition/archive
+byte budget. The curl adapter also bounds its captured output to that budget
+plus 16 KiB of response metadata, including unknown-length responses on older
+curl versions. Archive expansion, entry and selection limits apply independently.
+No archive files are extracted and acquisition does not execute bundled code.
+
+`register_public_http(registry, transport, format~, expected_digest~,
+acquisition_limits~, limits~)` registers provider ID `public-http` in the common
+registry. Each repository location is a complete public URL and its artifact
+key is `.`. The returned identity is the resolved URL, `tree.digest` is the
+acquired bytes' SHA-256, and `AcquisitionStep(Acquisition)` records requested URL,
+resolved URL and digest in tree and per-resource provenance. Registry resolution
+adds the original structured artifact reference. Physical entry origins use the
+resolved URL followed by `!/entry/path`.
+
+Stable acquisition codes are `unsupported-transport`, `transport-failure`,
+`acquisition-timeout`, `resource-limit`, `authentication-required` for 401/403,
+`missing-asset` for 404/410, `http-status` for other non-200 responses, and
+`integrity-failure` for a mismatched expected digest. HTTP failures stop before
+archive discovery. Redirect exhaustion and invalid TLS certificates are
+transport failures. There are no credentials, automatic retries or cache reuse.
+
+Run the [public URL example](../../examples/public-archive/README.md) for a
+complete build and independent library consumer. `mise run test:http` exercises
+the real adapters against loopback fixtures; portable policy and provenance
+tests run in the normal four-backend package suite.

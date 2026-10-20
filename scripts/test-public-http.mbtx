@@ -1,0 +1,294 @@
+///|
+/// Controlled HTTP fixtures for the public archive provider and built CLI.
+/// No live public services. Usage: moonx scripts/test-public-http.mbtx [targets]
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/http",
+  "moonbitlang/async@0.22.5/socket",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbit-community/zipc@0.2.2",
+}
+
+///|
+async fn command(
+  root : String,
+  executable : String,
+  args : Array[String],
+  extra_env~ : Map[String, String] = Map([]),
+  expected~ : Int32 = 0,
+) -> String {
+  let (code, out, err) = @process.collect_output(
+    executable,
+    args,
+    cwd=root,
+    extra_env~,
+  )
+  assert_eq(
+    code,
+    expected,
+    msg=args.join(" ") + "\n" + out.text() + "\n" + err.text(),
+  )
+  out.text() + err.text()
+}
+
+///|
+fn selection(
+  field : String,
+  location : String,
+  root : String,
+  digest : String,
+) -> String {
+  "{\"\{field}\":\"\{location}\",\"root\":\"\{root}\",\"globs\":[\"*.smithy\"]" +
+  (if field == "url" { ",\"digest\":\"\{digest}\"" } else { "" }) +
+  "}"
+}
+
+///|
+async fn exercise(root : String, targets : Array[String]) -> Unit {
+  let dir = root + "/.dev/out/public-http"
+  @fs.mkdir(dir, recursive=true, allow_exist=true)
+  let zip = @zipc.Archive::empty()
+  for
+    (path, text) in [
+      (
+        "models/service.smithy", "$version: \"2\"\nnamespace example\nstructure Service { value: Shared }",
+      ),
+      (
+        "imports/shared.smithy", "$version: \"2\"\nnamespace example\nstring Shared",
+      ),
+      (
+        "projection/extra.smithy", "$version: \"2\"\nnamespace example\nstring Extra",
+      ),
+      (
+        "broken/bad.smithy", "$version: \"2\"\nnamespace example\nstructure Bad { value: Missing }",
+      ),
+    ] {
+    ignore(
+      zip.add(
+        @zipc.Member::make(
+          path,
+          @zipc.File(@zipc.File::stored_from_bytes(@utf8.encode(text))),
+        ),
+      ),
+    )
+  }
+  let bytes = zip.to_bytes()
+  let digest = "sha256:" + @crypto.bytes_to_hex_string(@crypto.sha256(bytes))
+  @fs.write_file(dir + "/models.zip", bytes)
+  let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+  defer server.close()
+  let base = "http://\{server.addr}"
+  @async.with_task_group(group => {
+    group.spawn_bg(no_wait=true, () => {
+      server.run_forever(allow_failure=true, (request, _, conn) => {
+        defer conn.close()
+        let path = request.path
+        if path == "/disconnect" {
+          return
+        }
+        if path == "/slow" {
+          @async.sleep(2000)
+        }
+        let redirect = match path {
+          "/relative" => Some("/bytes")
+          "/fragment" => Some("/bytes#download")
+          "/absolute" => Some(base + "/bytes")
+          "/archive" => Some("/models.zip?version=1")
+          "/loop" => Some("/loop")
+          "/file-redirect" => Some("file:///etc/passwd")
+          "/credential-redirect" =>
+            Some(
+              base.replace(old="http://", new="http://user:password@") +
+              "/bytes",
+            )
+          _ => None
+        }
+        if redirect is Some(location) {
+          conn.send_response(302, "Redirect", extra_headers={
+            "Location": location,
+          })
+        } else {
+          let status = match path {
+            "/missing" => 404
+            "/auth" => 401
+            "/forbidden" => 403
+            "/failure" => 500
+            _ => 200
+          }
+          if path == "/large" {
+            conn.send_response(status, "Fixture", extra_headers={
+              "Content-Length": "32768",
+            })
+            conn.write(Bytes::make(32768, 65))
+          } else if path == "/stream" {
+            conn.send_response(status, "Fixture")
+            for _ in 0..<32 {
+              conn.write(Bytes::make(1024, 65))
+              conn.flush()
+            }
+          } else {
+            conn.send_response(status, "Fixture")
+            if path.has_prefix("/models.zip") {
+              conn.write(bytes)
+            } else {
+              conn.write(b"fixture\n200\nhttps://fake.invalid/a\x00")
+            }
+          }
+        }
+        conn.end_response()
+      })
+    })
+    for target in targets {
+      let supported = target == "native" || target == "js"
+      command(
+        root,
+        "moon",
+        [
+          "test", "pkgs/artifact-resources/http", "--target", target, "--deny-warn",
+        ],
+        extra_env=if supported {
+          { "SMITHY_HTTP_FIXTURE": base }
+        } else {
+          { "SMITHY_UNSUPPORTED_HTTP_TEST": "1" }
+        },
+      )
+      |> ignore
+      command(root, "moon", [
+        "build", "apps/smithy", "--target", target, "--release", "--deny-warn",
+      ])
+      |> ignore
+      let stem = root +
+        "/_build/\{target}/release/build/moonrockz/smithy-cli/smithy-cli"
+      let executable = if target == "native" {
+        stem + ".exe"
+      } else if target == "js" {
+        "node"
+      } else {
+        "moonrun"
+      }
+      let prefix = if target == "native" {
+        []
+      } else if target == "js" {
+        [stem + ".js"]
+      } else {
+        [stem + ".wasm", "--"]
+      }
+      for remote in [false, true] {
+        let field = if remote { "url" } else { "path" }
+        let location = if remote { base + "/archive" } else { "models.zip" }
+        let label = if remote { "remote" } else { "local" }
+        let config = "{\"version\":\"2.0\",\"sources\":[" +
+          selection(field, location, "models", digest) +
+          "],\"imports\":[" +
+          selection(field, location, "imports", digest) +
+          "],\"projections\":{\"extra\":{\"imports\":[" +
+          selection(field, location, "projection", digest) +
+          "]}},\"outputDirectory\":\"\{target}-\{label}\"}"
+        let config_path = dir + "/\{target}-\{label}.json"
+        @fs.write_file(config_path, config)
+        let args = prefix + ["build", "--config", config_path]
+        let output = command(
+          dir,
+          executable,
+          args,
+          expected=if remote && !supported { 1 } else { 0 },
+        )
+        if remote && !supported {
+          assert_true(output.contains("unsupported-transport"))
+        }
+      }
+      if supported {
+        for projection in ["source", "extra"] {
+          let local_model = @fs.read_file(
+            dir + "/\{target}-local/\{projection}/model/model.json",
+          ).text()
+          let remote = @fs.read_file(
+            dir + "/\{target}-remote/\{projection}/model/model.json",
+          ).text()
+          assert_eq(remote, local_model)
+          assert_eq(remote.contains("example#Extra"), projection == "extra")
+        }
+        assert_eq(
+          @fs.read_file(dir + "/\{target}-remote/source/sources/service.smithy").text(),
+          @fs.read_file(dir + "/\{target}-local/source/sources/service.smithy").text(),
+        )
+        if target == "native" {
+          command(
+            dir,
+            executable,
+            prefix + ["build", "--config", dir + "/native-local.json"],
+            extra_env={ "PATH": "" },
+          )
+          |> ignore
+        }
+        @fs.write_file(
+          dir + "/diagnostic.json",
+          "{\"version\":\"2.0\",\"sources\":[" +
+          selection("url", base + "/archive", "broken", digest) +
+          "]}",
+        )
+        let diagnostic = command(
+          dir,
+          executable,
+          prefix + ["build", "--config", dir + "/diagnostic.json"],
+          expected=1,
+        )
+        assert_true(diagnostic.contains(base + "/archive"), msg=diagnostic)
+        assert_true(
+          diagnostic.contains(base + "/models.zip?version=1"),
+          msg=diagnostic,
+        )
+        assert_true(diagnostic.contains(digest), msg=diagnostic)
+        assert_true(diagnostic.contains("!/broken/bad.smithy"), msg=diagnostic)
+        for
+          (endpoint, code) in [
+            ("missing", "missing-asset"),
+            ("auth", "authentication-required"),
+            ("failure", "http-status"),
+            ("disconnect", "transport-failure"),
+            ("models.zip", "integrity-failure"),
+          ] {
+          let config = "{\"version\":\"2.0\",\"sources\":[" +
+            selection(
+              "url",
+              base + "/" + endpoint,
+              "models",
+              "sha256:" + "0".repeat(64),
+            ) +
+            "]}"
+          @fs.write_file(dir + "/error.json", config)
+          let output = command(
+            dir,
+            executable,
+            prefix + ["build", "--config", dir + "/error.json"],
+            expected=1,
+          )
+          assert_true(output.contains(code), msg=output)
+        }
+      }
+      println("Public HTTP fixtures passed: \{target}")
+    }
+  })
+}
+
+///|
+async fn main {
+  let args = @env.args()[1:].to_owned()
+  exercise(
+    @fs.realpath("."),
+    if args.is_empty() {
+      ["native", "js", "wasm", "wasm-gc"]
+    } else {
+      args
+    },
+  )
+}
+
+///|
+async test "controlled public HTTP acquisition and CLI builds" {
+  exercise(@fs.realpath(".."), ["native", "js", "wasm", "wasm-gc"])
+}

@@ -8,7 +8,7 @@ CLI writes them to the configured output directory.
 An invalid projected model writes build information, while plugins that require
 a valid model are skipped. `run` raises when any projection fails.
 
-Local sources and imports are loaded by the CLI. Maven dependencies are
+Local and public URL sources and imports are loaded by the CLI. Maven dependencies are
 reported as unsupported. The runner includes the `source` projection and the
 model, sources and build-info plugins for each concrete projection.
 
@@ -67,6 +67,29 @@ For library callers, `BuildConfig.sources`, `BuildConfig.imports` and
 `Selected(RepositoryLocation, Selection)` for explicit resources. JSON string
 configuration remains compatible. `selected_models(tree, selection)` exposes
 the Smithy format checks over the generic resource API.
+
+Public archive objects replace `path` with `url` and retain the same explicit
+selection in sources, global imports and projection imports:
+
+```json
+{"url":"https://example.org/models.zip","format":"zip","root":"models","paths":["service.smithy"]}
+```
+
+`format` defaults to `zip`; `jar`, `tar`, `tgz` and `tar.gz` are also accepted.
+The optional `digest` is `sha256:` plus 64 hexadecimal digits. It verifies the
+whole downloaded archive before loading. URLs are never resolved as local paths,
+and `url` and `path` cannot be combined. String inputs remain local discovery;
+use an object for public acquisition. Remote JARs use explicit selection too.
+Model diagnostics retain the requested and resolved URLs, digest and physical
+archive entry. Selected source artifacts keep their logical names.
+
+Library configurations use `Remote(PublicArchive, Selection)`. Existing exhaustive
+`BuildInput` matches need this new case. `with_location` now raises `BuildError`
+when a replacement location is not a valid URL for a remote input. The build
+library does not initiate I/O. Use `register_public_http` and a transport to
+obtain a tree, then `selected_models` and the usual loader/runner methods.
+See the [acquisition limits and host matrix](../artifact-resources/README.mbt.md#public-http-archives)
+and [runnable example](../../examples/public-archive/README.md).
 
 Call `add_projection_import` to supply inputs for a projection when using the
 runner directly. `add_source` marks files for source artifacts; its optional

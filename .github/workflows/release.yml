@@ -134,6 +134,9 @@ jobs:
       - name: Build smithy natively for Windows
         run: moon build apps/smithy --target native --release
 
+      - name: Test public archive acquisition on Windows
+        run: moonx scripts/test-public-http.mbtx native
+
       - name: Upload the executable
         uses: actions/upload-artifact@v4
         with:
