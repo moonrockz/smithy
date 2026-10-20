@@ -176,3 +176,38 @@ Gzip checks header and payload integrity and bounds expanded output, including
 headers and padding, to 256 MiB by default. Tar validates header checksums and
 bounds payload sizes. See the [complete support policy](../../pkgs/artifact-resources/README.mbt.md#tar-and-gzip-support).
 No registry access, installation, extraction or package-hook execution occurs.
+
+### Public archive URLs
+
+Use a `url` selection object in `sources`, global `imports` or projection
+`imports` to download public ZIP/JAR, tar or tar/gzip archives:
+
+```json
+{"url":"https://example.org/models.zip","format":"zip","root":"models","globs":["**/*.smithy"]}
+```
+
+`format` defaults to `zip`; `jar`, `tar`, `tgz` and `tar.gz` are supported.
+Add `"digest":"sha256:<64 hexadecimal digits>"` to verify expected content
+before archive parsing or model loading. The actual digest is always computed
+and retained with requested URL, resolved URL and physical entry provenance.
+Source filenames exported by the sources plugin remain root-relative.
+
+Native and Node.js 24+ builds require curl 7.61+ with HTTPS support. Linux
+and macOS use the trusted host PATH; Windows uses the OS-installed
+`System32/curl.exe` by absolute path, excluding checkout-local executables. TLS certificates are verified with the host trust store.
+At most five redirects are followed; HTTPS cannot downgrade to HTTP.
+Acquisition defaults to 64 MiB and a 30-second total transfer timeout.
+Existing archive expansion and resource limits still apply. Missing assets,
+authentication-required responses, transport errors and digest mismatches fail
+with distinct stable resource codes. Credentials, caching and offline reuse
+are separate capabilities. Each URL input downloads on every build.
+
+Wasm and Wasm GC CLI builds reject URL acquisition with `unsupported-transport`.
+Local inputs continue to work without curl or network access on all existing
+filesystem hosts. See the [full library contract](../../pkgs/artifact-resources/README.mbt.md#public-http-archives).
+
+Run the pinned [public archive example](../../examples/public-archive/README.md):
+
+```shell
+mise exec -- moon run apps/smithy --target js -- build --config examples/public-archive/smithy-build.json
+```

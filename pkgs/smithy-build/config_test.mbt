@@ -12,6 +12,51 @@ test "build config parses local sources and ordered projections" {
 }
 
 ///|
+test "public URL selections roundtrip in every build scope" {
+  let selected = "{\"url\":\"https://example.test/package?id=1\",\"format\":\"jar\",\"digest\":\"sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\",\"root\":\"models\",\"paths\":[\"a.smithy\"]}"
+  let config = @build.BuildConfig::parse(
+    "{\"version\":\"2.0\",\"sources\":[" +
+    selected +
+    "],\"imports\":[" +
+    selected +
+    "],\"projections\":{\"extra\":{\"imports\":[" +
+    selected +
+    "]}}}",
+  )
+  assert_eq(config.sources, config.imports)
+  assert_eq(config.sources, config.projections[0].imports)
+  let roundtrip = @build.BuildConfig::parse(
+    "{\"version\":\"2.0\",\"sources\":[" +
+    config.sources[0].to_json().stringify() +
+    "]}",
+  )
+  assert_eq(roundtrip.sources, config.sources)
+}
+
+///|
+test "public URL config rejects invalid acquisition and ambiguous input fields" {
+  for
+    fields in [
+      "\"url\":\"file:///a\"", "\"url\":\"https://user:pass@host/a\"", "\"url\":\"https://host/a#fragment\"",
+      "\"url\":\"https://host/a\",\"path\":\"a\"", "\"url\":\"https://host/a\",\"digest\":\"bad\"",
+      "\"url\":\"https://host/a\",\"digest\":false", "\"url\":\"https://host/a\",\"format\":\"rar\"",
+    ] {
+    let rejected = try
+      @build.BuildConfig::parse(
+        "{\"version\":\"2.0\",\"sources\":[{" +
+        fields +
+        ",\"root\":\".\",\"paths\":[\"a.smithy\"]}]}",
+      )
+    catch {
+      @build.InvalidBuildConfig(_) => true
+    } noraise {
+      _ => false
+    }
+    assert_true(rejected, msg=fields)
+  }
+}
+
+///|
 test "build config rejects unsupported dependency sources" {
   let input =
     #|{"version":"1.0","maven":{"dependencies":["foo:bar:1"]}}

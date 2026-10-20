@@ -217,3 +217,7 @@ run = "moonx scripts/test-resource-consumer.mbtx"
 [tasks."fixtures:npm"]
 description = "Regenerate the local npm archive fixture without package hooks or network"
 run = "moonx scripts/vendor-tar-fixtures.mbtx"
+
+[tasks."test:http"]
+description = "Test public archive acquisition and CLI builds against controlled loopback HTTP fixtures"
+run = "moonx scripts/test-public-http.mbtx"

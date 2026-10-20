@@ -1,0 +1,41 @@
+{
+  "version": "2.0",
+  "sources": [
+    {
+      "url": "https://codeload.github.com/moonrockz/smithy/zip/f66a4a77685902ffed964c63ecbabd0fd2465ab4",
+      "format": "zip",
+      "digest": "sha256:7a191fd47666fd9cb0ef3b4e1cd4561e31d412fcb7205f1a0fb742b723d3faa2",
+      "root": "smithy-f66a4a77685902ffed964c63ecbabd0fd2465ab4/examples/local-resources/models",
+      "globs": [
+        "*.smithy"
+      ]
+    }
+  ],
+  "imports": [
+    {
+      "url": "https://codeload.github.com/moonrockz/smithy/zip/f66a4a77685902ffed964c63ecbabd0fd2465ab4",
+      "format": "zip",
+      "digest": "sha256:7a191fd47666fd9cb0ef3b4e1cd4561e31d412fcb7205f1a0fb742b723d3faa2",
+      "root": "smithy-f66a4a77685902ffed964c63ecbabd0fd2465ab4/examples/local-resources/imports",
+      "globs": [
+        "*.smithy"
+      ]
+    }
+  ],
+  "projections": {
+    "extra": {
+      "imports": [
+        {
+          "url": "https://codeload.github.com/moonrockz/smithy/zip/f66a4a77685902ffed964c63ecbabd0fd2465ab4",
+          "format": "zip",
+          "digest": "sha256:7a191fd47666fd9cb0ef3b4e1cd4561e31d412fcb7205f1a0fb742b723d3faa2",
+          "root": "smithy-f66a4a77685902ffed964c63ecbabd0fd2465ab4/examples/local-resources/projection-imports",
+          "globs": [
+            "*.smithy"
+          ]
+        }
+      ]
+    }
+  },
+  "outputDirectory": "../../.dev/out/public-archive"
+}

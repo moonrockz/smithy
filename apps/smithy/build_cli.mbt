@@ -96,10 +96,41 @@ fn build_add_input(
   source~ : Bool = false,
   projection~ : String? = None,
 ) -> Unit raise {
+  if input is @build.Remote(archive, selection) {
+    let tree = try {
+      let registry = @resources.register_public_http(
+        @resources.Registry::new(),
+        @http_resources.transport,
+        format=archive.format,
+        expected_digest=archive.expected_digest,
+      ).add_repository({
+        id: @resources.RepositoryId::parse("input").unwrap(),
+        provider: @resources.ProviderId::parse("public-http").unwrap(),
+        location: input.location(),
+      })
+      registry.resolve({
+        repository: @resources.RepositoryId::parse("input").unwrap(),
+        key: @resources.ArtifactKey::parse(".").unwrap(),
+      }).tree
+    } catch {
+      @resources.ResourceError(code, origin, message) =>
+        raise @build.InvalidBuildConfig(
+          "Could not acquire resource `" +
+          origin.to_string() +
+          "` [" +
+          code.to_string() +
+          "]: " +
+          message,
+        )
+    }
+    build_add_selected(loader, runner, tree, selection, source~, projection~)
+    return
+  }
   let path = build_path(base, input.location().to_string())
   let selection = match input {
     @build.Local(_) => None
-    @build.Selected(_, selection) => Some(selection)
+    @build.Selected(_, selection) | @build.Remote(_, selection) =>
+      Some(selection)
   }
   build_add_files(
     loader,
@@ -183,29 +214,14 @@ fn build_add_files_impl(
   })
   let tree = artifact.tree
   if selection is Some(selection) {
-    let added : Set[@resources.EntryPath] = Set([])
-    for resource in @build.selected_models(tree, selection) {
-      let text = resource.text()
-      if !added.contains(resource.path) {
-        build_add_model(
-          loader,
-          runner,
-          resource.origin.to_string(),
-          text,
-          projection~,
-        )
-        added.add(resource.path)
-      }
-      if projection is None && source_root is Some(_) {
-        ignore(
-          runner.add_source(
-            resource.name.to_string(),
-            text,
-            source_file=Some(resource.origin.to_string()),
-          ),
-        )
-      }
-    }
+    build_add_selected(
+      loader,
+      runner,
+      tree,
+      selection,
+      source=source_root is Some(_),
+      projection~,
+    )
     return
   }
   if path.has_suffix(".jar") && !@fs.is_dir(path) {
@@ -247,6 +263,41 @@ fn build_add_files_impl(
       if projection is None {
         build_record_source(runner, origin.to_string(), source_root, text)
       }
+    }
+  }
+}
+
+///|
+fn build_add_selected(
+  loader : @smithy.Loader,
+  runner : @build.BuildRunner,
+  tree : @resources.EntryTree,
+  selection : @resources.Selection,
+  source~ : Bool,
+  projection~ : String?,
+) -> Unit raise {
+  let added : Set[@resources.EntryPath] = Set([])
+  for resource in @build.selected_models(tree, selection) {
+    let text = resource.text()
+    let origin = if resource.provenance
+      .steps()
+      .any(step => step is @resources.AcquisitionStep(_)) {
+      resource.provenance.to_string()
+    } else {
+      resource.origin.to_string()
+    }
+    if !added.contains(resource.path) {
+      build_add_model(loader, runner, origin, text, projection~)
+      added.add(resource.path)
+    }
+    if projection is None && source {
+      ignore(
+        runner.add_source(
+          resource.name.to_string(),
+          text,
+          source_file=Some(origin),
+        ),
+      )
     }
   }
 }
@@ -477,6 +528,9 @@ fn run_build(config_path : String, clean : Bool) -> Int32 raise {
     protected_paths.append(projection.imports)
   }
   for path in protected_paths {
+    if path is @build.Remote(_, _) {
+      continue
+    }
     let input = build_path(base, path.location().to_string())
     if build_path_contains(output, input) || build_path_contains(input, output) {
       raise CliError(

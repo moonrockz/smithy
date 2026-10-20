@@ -307,6 +307,7 @@ pub(all) struct Resolution {
 
 ///|
 pub(all) enum ProvenanceStep {
+  AcquisitionStep(Acquisition)
   ResolutionStep(Resolution)
   ContainerStep(Location)
   ProviderRegistrationStep(ProviderId)
@@ -357,6 +358,16 @@ pub fn Provenance::steps(self : Provenance) -> Array[ProvenanceStep] {
 }
 
 ///|
+pub fn Provenance::acquired(
+  self : Provenance,
+  acquisition : Acquisition,
+) -> Provenance {
+  let history = [AcquisitionStep(acquisition)]
+  history.append(self.history)
+  { ..self, history, }
+}
+
+///|
 pub fn Provenance::resolved(
   self : Provenance,
   reference : ArtifactRef,
@@ -398,6 +409,11 @@ pub fn Provenance::to_string(self : Provenance) -> String {
   let parts = []
   for step in self.history {
     match step {
+      AcquisitionStep(acquisition) => {
+        parts.push(acquisition.requested.to_string())
+        parts.push(acquisition.resolved.to_string())
+        parts.push(acquisition.digest.to_string())
+      }
       ResolutionStep(resolution) => {
         parts.push(resolution.reference.to_string())
         if resolution.identity is Some(identity) {

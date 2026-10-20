@@ -1,0 +1,19 @@
+import {
+  "moonrockz/artifact-resources" @resources,
+  "moonbitlang/core/encoding/utf8",
+}
+
+import {
+  "moonrockz/artifact-resources/http",
+  "moonrockz/artifact-resources" @resources,
+  "moonbitlang/core/env",
+} for "test"
+
+options(
+  "native-stub": [ "curl_native.c" ],
+  targets: {
+    "curl_native.mbt": [ "native" ],
+    "curl_js.mbt": [ "js" ],
+    "curl_unsupported.mbt": [ "wasm", "wasm-gc" ],
+  },
+)
