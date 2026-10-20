@@ -15,7 +15,18 @@ fn main raise {
     ).unwrap(),
     [@resources.Exact(@resources.EntryPath::parse("shared.smithy").unwrap())],
   ).unwrap()
-  let tree = archive.open(@http.transport)
+  let args = @env.args()[1:].to_owned()
+  guard args.is_empty() || args == ["--offline"] else {
+    abort("usage: public [--offline]")
+  }
+  let cache = @cache.open(
+    @resources.RepositoryLocation::parse(".dev/cache/public-archive").unwrap(),
+  )
+  let tree = archive.open(
+    @http.transport,
+    cache=Some(cache),
+    mode=if args.is_empty() { @resources.Online } else { @resources.Offline },
+  )
   for resource in @resources.select_resources(tree, selection) {
     println(resource.provenance)
     println(resource.text())

@@ -8,7 +8,7 @@ mise exec -- moon run apps/smithy --target js -- build --config examples/public-
 mise exec -- moon run pkgs/artifact-resources/examples/public --target native
 ```
 
-Both commands need network access and curl with HTTPS support. Linux/macOS
+The first online run needs network access and curl with HTTPS support. Linux/macOS
 use the trusted host PATH; Windows uses its OS-installed curl.
 The build loads sources, global imports and projection imports from the same
 pinned URL. The `extra` projection additionally contains
@@ -20,7 +20,23 @@ The archive digest is
 `sha256:7a191fd47666fd9cb0ef3b4e1cd4561e31d412fcb7205f1a0fb742b723d3faa2`.
 Each acquisition verifies it before archive parsing or model loading. An upstream
 change to the ZIP bytes fails integrity verification even at the same URL.
-The next build downloads again. Caching and offline reuse are separate work.
+The build and library example reuse `.dev/cache/public-archive` on later runs.
+Rebuild explicitly offline after the first successful run:
+
+```shell
+mise exec -- moon run apps/smithy --target js -- build --config examples/public-archive/smithy-build.json --offline
+mise exec -- moon run pkgs/artifact-resources/examples/public --target native -- --offline
+```
+
+These runs read and verify cached bytes without invoking curl or making a network
+request. Models, sources and acquisition provenance remain identical. The library
+example accepts only the optional `--offline` argument. The build configuration
+sets `cacheDirectory` relative to its own file; other builds default to
+`.smithy/cache`. Override it with `--cache-dir PATH`, or set `"offline":true` in
+JSON for offline operation by default. Missing entries produce `offline-miss`;
+corrupt entries produce `cache-corrupt`; unexpected digests produce
+`integrity-failure`. Remove the cache and rebuild online to recover corruption.
+Cache entries have no expiry or automatic eviction. `smithy clean` retains them.
 
 For tar/gzip archives, set `format` to `tar` or `tgz` and select the appropriate
 root. The public URL

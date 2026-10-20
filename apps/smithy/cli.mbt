@@ -59,7 +59,17 @@ fn command_line() -> @argparse.Command {
       @argparse.Command(
         "build",
         about="Run projections from smithy-build.json.",
+        flags=[
+          @argparse.FlagArg(
+            "offline",
+            about="Use only verified cached remote artifacts.",
+          ),
+        ],
         options=[
+          @argparse.OptionArg(
+            "cache-dir",
+            about="Artifact cache directory, relative to the configuration file.",
+          ),
           @argparse.OptionArg(
             "config",
             short='c',
@@ -133,6 +143,8 @@ struct Options {
   from : String?
   to : String?
   selector : String?
+  offline : Bool
+  cache_dir : String?
   config : String?
   output : String?
   output_dir : String?
@@ -184,6 +196,8 @@ fn options(args : Array[String]) -> Options raise CliError {
     raise CliError("use --check or --write when formatting multiple files", 2)
   }
   {
+    offline: matches.flags.get("offline") == Some(true),
+    cache_dir: value("cache-dir"),
     command,
     files,
     from,
@@ -273,6 +287,8 @@ fn run(args : Array[String]) -> Int32 raise {
     return run_build(
       opts.config.unwrap_or("smithy-build.json"),
       opts.command == "clean",
+      offline=opts.offline,
+      cache_dir=opts.cache_dir,
     ) catch {
       @build.InvalidBuildConfig(message) => raise CliError(message, 1)
       error => raise error

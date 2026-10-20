@@ -311,9 +311,61 @@ Stable acquisition codes are `unsupported-transport`, `transport-failure`,
 `missing-asset` for 404/410, `http-status` for other non-200 responses, and
 `integrity-failure` for a mismatched expected digest. HTTP failures stop before
 archive discovery. Redirect exhaustion and invalid TLS certificates are
-transport failures. There are no credentials, automatic retries or cache reuse.
+transport failures. There are no credentials or automatic retries.
 
 Run the [public URL example](../../examples/public-archive/README.md) for a
 complete build and independent library consumer. `mise run test:http` exercises
 the real adapters against loopback fixtures; portable policy and provenance
 tests run in the normal four-backend package suite.
+
+
+## Verified cache and offline acquisition
+
+`acquire(url, transport, expected_digest~, limits~, cache~, mode~)` is the shared
+byte acquisition boundary beneath archive parsing. It returns `AcquiredBytes`
+with structured `Acquisition` metadata and verified bytes. `PublicArchive::open`
+and `register_public_http` accept the same optional `cache` and `mode` settings.
+The library defaults to `Online` without a cache. Set `mode=Offline` explicitly
+to forbid transport calls, even when no cache was supplied.
+
+Create a filesystem cache with `moonrockz/artifact-resources/cache::open(location)`
+and pass `cache=Some(cache)`. This host adapter supports native Linux, macOS,
+Windows and Node.js 24+. Wasm and Wasm GC return `unsupported-transport` when
+filesystem cache I/O is requested. The core cache policy and archive readers run
+on all four targets. Other hosts can supply a `CacheStore` to `VerifiedCache::new`.
+A store must bound reads, return `None` only for absent keys and atomically publish
+complete values. Failed storage operations raise `cache-io`.
+
+The filesystem layout is versioned reference metadata in `ref-v1-<sha256>` and
+content in `sha256-<hex>`. Reference keys hash a structured pair of provider ID
+and exact reference, including URL query parameters. `CacheKey::reference` leaves
+room for provider-specific pinned-reference mappings. `CacheKey::content` names
+content independently, so distinct references may share identical bytes.
+Metadata stores the requested URL, resolved URL and SHA-256. Local cache paths
+never replace remote resource origins or acquisition history.
+
+Every hit rehashes the full content and enforces the current expected digest and
+byte limits before archive parsing. Online hits make no HTTP request. URLs are
+treated as pinned references; there is no TTL or refresh request. Use expected
+digests for reproducibility. To refresh a mutable URL, remove its reference file
+or select a fresh cache directory. A changed expected digest fails rather than
+silently replacing cached bytes.
+
+`offline-miss` means no reference metadata exists. `cache-corrupt` means malformed
+metadata, missing referenced content or a content digest mismatch. These fail in
+both modes without a network fallback. `integrity-failure` identifies an expected
+digest mismatch. Oversized cache values fail with `resource-limit`. Remove the
+damaged entry or cache directory and run online again to recover.
+
+Population verifies response status and expected digest first, publishes content,
+then publishes reference metadata. The host writes to unique temporary files in
+the destination filesystem and renames only after a complete write and close.
+Concurrent readers see complete values; interrupted writes can leave unreferenced
+content or temporary files, which lookups ignore. There is no automatic eviction
+or temporary-file cleanup. This is a reusable local cache, not a power-loss-durable
+artifact database or a substitute for an externally trusted expected digest.
+
+The [public archive example](../../examples/public-archive/README.md) demonstrates
+online reuse and explicit offline builds. Controlled fixtures assert request
+counts, identical output, corruption failures and shared cache behavior across
+sources, global imports and projection imports.
