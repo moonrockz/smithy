@@ -19,6 +19,7 @@ converts and builds IDL and JSON models. See [CLI usage](apps/smithy/README.md).
 
 | Path | Module | Purpose |
 |------|--------|---------|
+| `pkgs/artifact-resources` | `moonrockz/artifact-resources` | Portable directory/JAR entry trees, resource loading and provider registry |
 | `pkgs/jmespath` | `moonrockz/jmespath` | JMESPath parser, inspectable AST and JSON evaluator |
 | `pkgs/smithy` | `moonrockz/smithy` | Semantic model and multi-file IDL/JSON loader |
 | `pkgs/smithy-build` | `moonrockz/smithy-build` | Build configuration, projections and plugins |
@@ -158,6 +159,7 @@ smithy/
 ├── pkgs/smithy/               # library (moonrockz/smithy)
 ├── pkgs/smithy-build/         # build projections and plugins
 ├── pkgs/smithy-jsonschema/    # JSON Schema converter
+├── pkgs/artifact-resources/   # reusable local artifact/resource library
 ├── pkgs/jmespath/             # JMESPath parser and evaluator (moonrockz/jmespath)
 ├── pkgs/smithy-syntax/        # IDL syntax (moonrockz/smithy-syntax)
 ├── docs/cookbook/             # tested cookbook articles (moonrockz/smithy_cookbook)

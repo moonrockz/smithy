@@ -18,8 +18,11 @@ loading; `\${NAME}` keeps a literal placeholder. The CLI uses process variables
 and sets `SMITHY_ROOT_DIR` to its current working directory.
 
 Local JAR inputs load the IDL and JSON files listed in
-`META-INF/smithy/manifest`. `archive_models` decodes stored and deflated entries
-without extracting files. Source artifacts retain their manifest paths under
+`META-INF/smithy/manifest`. `archive_models` remains the compatible bytes-to-model
+entry point. `declared_models(tree)` applies the same manifest rules to a
+`moonrockz/artifact-resources` entry tree and returns logical resources with
+physical origins. Generic ZIP and filesystem access live in that independent
+module. Stored and deflated entries are read without extracting files. Source artifacts retain their manifest paths under
 the JAR filename without its extension.
 
 Call `add_projection_import` to supply inputs for a projection when using the

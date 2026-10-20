@@ -140,3 +140,21 @@ Feature: One version across the workspace
       inspect("1.0.0", content="1.0.0")
       inspect(@syntax.version(), content="0.0.1")
       """
+
+
+  Scenario: The independent resource module participates in sibling version checks
+    Given a file "pkgs/artifact-resources/moon.mod" with the text:
+      """
+      name = "moonrockz/artifact-resources"
+      version = "0.3.0"
+      """
+    And a file "pkgs/smithy-build/moon.mod" with the text:
+      """
+      name = "moonrockz/smithy-build"
+      version = "0.3.0"
+      import {
+        "moonrockz/artifact-resources@0.2.0",
+      }
+      """
+    When I look for versions other than "0.3.0"
+    Then the mismatches are "pkgs/smithy-build/moon.mod: found 0.2.0, expected 0.3.0"

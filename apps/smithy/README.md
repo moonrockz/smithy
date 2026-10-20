@@ -64,6 +64,30 @@ projection. `clean` removes that configured output directory.
 Build sources and imports also accept local JAR files with a
 `META-INF/smithy/manifest`. Configuration strings and keys expand `${NAME}`
 from environment variables; `\${NAME}` escapes a placeholder.
+Directories, individual model files and JARs use the independent
+[artifact resource library](../../pkgs/artifact-resources/README.mbt.md).
+The same inputs work in `sources`, global `imports` and projection `imports`.
+JARs load only manifest entries; repeated manifest lines are ignored and
+unlisted models stay excluded. Nested JAR source artifacts retain paths such
+as `nested/models.jar/models/a.smithy`. Loading errors include the physical
+origin and resource diagnostic code; unsafe paths, duplicate ZIP entries,
+corrupt content and resource limit failures stop the build.
+
+For a working directory example with both import scopes, run from the root:
+
+```shell
+mise exec -- moon run apps/smithy --target js -- build --config examples/local-resources/smithy-build.json
+```
+
+The output is under `.dev/out/local-resources`. For the vendored real-JAR
+example, set `sources` to `tests/tck/build/plugins/sources/jar-import.jar`
+in a root-level build configuration. Local builds require no network.
+The default resource limits are 64 MiB per archive, 10,000 entries,
+16 MiB per entry and 256 MiB total expanded ZIP bytes. The library API
+allows callers to configure these limits. Node.js, native hosts and MoonBit
+Wasm filesystem hosts support local acquisition. Credentials and remote
+repository acquisition are not part of local loading.
+
 `${SMITHY_ROOT_DIR}` always expands to the CLI's working directory.
 
 Use a dedicated output directory. Builds replace their previous artifacts,

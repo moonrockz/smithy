@@ -2,8 +2,7 @@ import {
   "moonrockz/smithy",
   "moonrockz/smithy-syntax" @syntax,
   "moonbitlang/core/json",
-  "moonbitlang/core/encoding/utf8",
-  "moonbit-community/zipc",
+  "moonrockz/artifact-resources" @resources,
 }
 
 import {

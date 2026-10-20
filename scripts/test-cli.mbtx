@@ -8,6 +8,7 @@ import {
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
+  "moonbit-community/zipc@0.2.2",
   "moonbitlang/x@0.5.5/sys",
 }
 
@@ -218,6 +219,40 @@ async fn exercise(
   runner.command(["build", "--config", "jar-projection.json"], 0) |> ignore
   assert_false(@fs.read_file("\{dir}/jar-projection-output/source/model/model.json").text().contains("foo.baz#A"))
   assert_true(@fs.read_file("\{dir}/jar-projection-output/withJar/model/model.json").text().contains("foo.baz#A"))
+  @fs.write_file("\{dir}/broken.jar", b"not a ZIP")
+  @fs.write_file("\{dir}/broken-jar.json", "{\"version\":\"2.0\",\"sources\":[\"broken.jar\"],\"outputDirectory\":\"broken-jar-output\"}")
+  let (archive_out, archive_err) = runner.command(["build", "--config", "broken-jar.json"], 1)
+  // moonrun's wasm-gc print host routes eprintln through stdout.
+  let archive_error = archive_out + archive_err
+  assert_true(archive_error.contains("broken.jar") && archive_error.contains("invalid-archive"))
+  let broken_models = @zipc.Archive::empty()
+  ignore(broken_models.add(@zipc.Member::make("META-INF/smithy/manifest", @zipc.File(@zipc.File::stored_from_bytes(b"nested/broken.smithy\n")))))
+  ignore(broken_models.add(@zipc.Member::make("META-INF/smithy/nested/broken.smithy", @zipc.File(@zipc.File::stored_from_bytes(b"$version: \"2\"\nnamespace example\nstructure Broken { x: Missing }")))))
+  @fs.write_file("\{dir}/broken.jar", broken_models.to_bytes())
+  let (model_out, model_err) = runner.command(["build", "--config", "broken-jar.json"], 1)
+  let model_error = model_out + model_err
+  assert_true(model_error.contains("broken.jar!/META-INF/smithy/nested/broken.smithy"))
+  @fs.write_file("\{dir}/jar-global.json", "{\"version\":\"2.0\",\"imports\":[\"jar-import.jar\"],\"outputDirectory\":\"jar-global-output\"}")
+  runner.command(["build", "--config", "jar-global.json"], 0) |> ignore
+  assert_true(@fs.read_file("\{dir}/jar-global-output/source/model/model.json").text().contains("foo.baz#A"))
+  assert_false(@fs.exists("\{dir}/jar-global-output/source/sources/jar-import/a.smithy"))
+  // The checked-in example covers directory acquisition in all three scopes.
+  @fs.mkdir("\{dir}/local-example", allow_exist=true)
+  for (folder, file) in [("models", "service.smithy"), ("imports", "shared.smithy"), ("projection-imports", "extra.smithy")] {
+    @fs.mkdir("\{dir}/local-example/\{folder}", allow_exist=true)
+    @fs.write_file("\{dir}/local-example/\{folder}/\{file}", @fs.read_file("\{root}/examples/local-resources/\{folder}/\{file}"))
+  }
+  let example_config = @fs.read_file("\{root}/examples/local-resources/smithy-build.json").text().replace_all(old="../../.dev/out/local-resources", new="output")
+  @fs.write_file("\{dir}/local-example/smithy-build.json", example_config)
+  runner.command(["build", "--config", "local-example/smithy-build.json"], 0) |> ignore
+  let example_output = "\{dir}/local-example/output"
+  let example_source = @fs.read_file("\{example_output}/source/model/model.json").text()
+  let example_extra = @fs.read_file("\{example_output}/extra/model/model.json").text()
+  assert_true(example_source.contains("example.resources#Message"))
+  assert_true(example_source.contains("example.resources#SharedName"))
+  assert_false(example_source.contains("example.resources#ProjectionOnly"))
+  assert_true(example_extra.contains("example.resources#ProjectionOnly"))
+  assert_eq(@fs.read_file("\{example_output}/source/sources/manifest").text(), "service.smithy\n")
   assert_true(@fs.exists("\{dir}/input.smithy"))
   @fs.mkdir("\{dir}/nested", allow_exist=true)
   @fs.write_file("\{dir}/nested/keep.smithy", input)

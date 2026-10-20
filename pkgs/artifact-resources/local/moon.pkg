@@ -1,0 +1,5 @@
+import {
+  "moonrockz/artifact-resources" @resources,
+  "moonbitlang/x/fs",
+  "moonbitlang/x/path",
+}
