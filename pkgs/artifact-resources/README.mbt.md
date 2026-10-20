@@ -90,7 +90,7 @@ rules below. `ContentDigest::parse` checks the algorithm and 32-byte hex value.
 
 `Location::directory_entry` retains the host path style;
 `archive_entry` retains archive nesting. `Provenance::steps()` returns typed
-resolution and container steps. Its origin distinguishes physical locations
+resolution, container and configuration steps. Its origin distinguishes physical locations
 from provider registrations and repository references before acquisition.
 `location()` returns an optional physical location. `through` composes history using structural
 ancestry, even when unrelated locations have similar rendered text. The returned

@@ -309,6 +309,8 @@ pub(all) struct Resolution {
 pub(all) enum ProvenanceStep {
   ResolutionStep(Resolution)
   ContainerStep(Location)
+  ProviderRegistrationStep(ProviderId)
+  RepositoryReferenceStep(RepositoryId)
 } derive(Eq, Debug)
 
 ///|
@@ -372,9 +374,15 @@ pub fn Provenance::through(
   parent : Provenance,
 ) -> Provenance {
   let history = parent.history.copy()
-  if parent.location() is Some(container) &&
-    !(self.location() is Some(location) && location.within(container)) {
-    history.push(ContainerStep(container))
+  match parent.origin {
+    Physical(container) =>
+      if !(self.location() is Some(location) && location.within(container)) {
+        history.push(ContainerStep(container))
+      }
+    ProviderRegistration(provider) =>
+      history.push(ProviderRegistrationStep(provider))
+    RepositoryReference(repository) =>
+      history.push(RepositoryReferenceStep(repository))
   }
   history.append(self.history)
   { ..self, history, }
@@ -397,6 +405,8 @@ pub fn Provenance::to_string(self : Provenance) -> String {
         }
       }
       ContainerStep(location) => parts.push(location.to_string())
+      ProviderRegistrationStep(provider) => parts.push(provider.to_string())
+      RepositoryReferenceStep(repository) => parts.push(repository.to_string())
     }
   }
   parts.push(

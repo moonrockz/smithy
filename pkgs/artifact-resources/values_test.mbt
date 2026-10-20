@@ -78,3 +78,23 @@ test "provenance composition uses structural ancestry rather than rendered prefi
     2,
   )
 }
+
+///|
+test "composition retains configuration origins before physical acquisition" {
+  let provider = @resources.ProviderId::parse("local").unwrap()
+  let repository = @resources.RepositoryId::parse("models").unwrap()
+  let physical = @resources.Provenance::new(location("tree/file"))
+  let registration = @resources.Provenance::provider_registration(provider)
+  let configured = physical.through(registration)
+  assert_eq(configured.to_string(), "local -> tree/file")
+  assert_eq(configured.steps(), [@resources.ProviderRegistrationStep(provider)])
+  let reference = @resources.Provenance::repository_reference(repository)
+  assert_eq(
+    configured.through(reference).to_string(),
+    "models -> local -> tree/file",
+  )
+  assert_eq(
+    configured.through(reference).steps()[0],
+    @resources.RepositoryReferenceStep(repository),
+  )
+}
