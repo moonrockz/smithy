@@ -327,7 +327,7 @@ fn build_info(model : @smithy.Model, projection : ProjectionConfig) -> String {
   })
   let projection_fields : Map[String, Json] = {
     "abstract": Json::boolean(projection.is_abstract),
-    "imports": Json::array(projection.imports.map(Json::string)),
+    "imports": Json::array(projection.imports.map(input => input.to_json())),
     "transforms": Json::array(transforms),
     "plugins": Json::object(projection.plugins),
   }

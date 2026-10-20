@@ -1,11 +1,35 @@
 {
   "version": "2.0",
-  "sources": ["models"],
-  "imports": ["imports"],
+  "sources": [
+    {
+      "path": "models",
+      "root": ".",
+      "globs": [
+        "**/*.smithy"
+      ]
+    }
+  ],
+  "imports": [
+    {
+      "path": "imports",
+      "root": ".",
+      "paths": [
+        "shared.smithy"
+      ]
+    }
+  ],
   "outputDirectory": "../../.dev/out/local-resources",
   "projections": {
     "extra": {
-      "imports": ["projection-imports"]
+      "imports": [
+        {
+          "path": "projection-imports",
+          "root": ".",
+          "globs": [
+            "*.smithy"
+          ]
+        }
+      ]
     }
   }
 }

@@ -3,12 +3,16 @@
 /// before decoding. Stored and deflated file contents are read on demand.
 pub fn EntryTree::zip(
   data : Bytes,
-  origin : String,
+  origin : Location,
   limits~ : Limits = Limits::new(),
 ) -> EntryTree raise ResourceError {
   check_limits(limits, origin)
   if data.length() > limits.max_archive_bytes {
-    raise ResourceError("resource-limit", origin, "Archive exceeds byte limit")
+    raise ResourceError(
+      ResourceLimit,
+      Provenance::new(origin),
+      "Archive exceeds byte limit",
+    )
   }
   archive_validate_bounds(data, origin, limits)
   let archive = @zipc.Archive::from_bytes(data) catch {
@@ -19,16 +23,16 @@ pub fn EntryTree::zip(
     if member_.is_dir() {
       None
     } else {
-      Some(member_.path())
+      Some(EntryPath::parse(member_.path()).unwrap())
     }
   })
   paths.sort()
-  let read = fn(path : String) -> Bytes raise ResourceError {
-    guard archive.find(path) is Some(member_) &&
+  let read = fn(path : EntryPath) -> Bytes raise ResourceError {
+    guard archive.find(path.to_string()) is Some(member_) &&
       member_.kind() is @zipc.File(file) else {
       raise ResourceError(
-        "missing-resource",
-        origin + "!/" + path,
+        MissingResource,
+        Provenance::new(origin.archive_entry(path)),
         "Expected a file",
       )
     }
@@ -38,19 +42,19 @@ pub fn EntryTree::zip(
         inflate_bounded(
           file.data,
           file.decompressed_size(),
-          origin + "!/" + path,
+          origin.archive_entry(path),
         )
       _ =>
         raise archive_error(
-          origin + "!/" + path,
+          origin.archive_entry(path),
           "Unsupported compression method",
         )
     }
     if bytes.length() != file.decompressed_size() ||
       @checksum.crc32(bytes).reinterpret_as_int() != file.decompressed_crc32() {
       raise ResourceError(
-        "integrity-failure",
-        origin + "!/" + path,
+        IntegrityFailure,
+        Provenance::new(origin.archive_entry(path)),
         "ZIP size or CRC-32 mismatch",
       )
     }
@@ -58,13 +62,13 @@ pub fn EntryTree::zip(
   }
   {
     origin,
-    provenance: origin,
+    provenance: Provenance::new(origin),
     paths,
     members: Set(members.map(member_ => member_.path())),
     read_entry: read,
     limits,
-    locate_entry: path => origin + "!/" + path,
-    digest: Some("sha256:" + @crypto.bytes_to_hex_string(@crypto.sha256(data))),
+    locate_entry: path => origin.archive_entry(path),
+    digest: Some(ContentDigest::sha256(data)),
   }
 }
 
@@ -74,7 +78,7 @@ pub fn EntryTree::zip(
 fn inflate_bounded(
   data : Bytes,
   expected : Int32,
-  origin : String,
+  origin : Location,
 ) -> Bytes raise ResourceError {
   let inflater = @flate.Inflater::new()
   let buffer : FixedArray[Byte] = FixedArray::make(8192, b'\x00')
@@ -89,7 +93,9 @@ fn inflate_bounded(
     }
     if written > expected - output.length() {
       raise ResourceError(
-        "integrity-failure", origin, "ZIP entry exceeds declared size",
+        IntegrityFailure,
+        Provenance::new(origin),
+        "ZIP entry exceeds declared size",
       )
     }
     for i in 0..<written {
@@ -112,7 +118,7 @@ fn inflate_bounded(
 // outside their bounds. Contents use bounded streaming inflation and CRC checks.
 fn archive_validate_bounds(
   data : Bytes,
-  origin : String,
+  origin : Location,
   limits : Limits,
 ) -> Unit raise ResourceError {
   fn range(start : Int32, size : Int32) -> Unit raise ResourceError {
@@ -164,7 +170,11 @@ fn archive_validate_bounds(
   range(end + 22, u16(end + 20))
   let count = u16(end + 10)
   if count > limits.max_entries {
-    raise ResourceError("resource-limit", origin, "Too many ZIP entries")
+    raise ResourceError(
+      ResourceLimit,
+      Provenance::new(origin),
+      "Too many ZIP entries",
+    )
   }
   let seen : Set[String] = Set([])
   let mut total = 0
@@ -188,7 +198,9 @@ fn archive_validate_bounds(
     if expanded > limits.max_entry_bytes ||
       expanded > limits.max_total_bytes - total {
       raise ResourceError(
-        "resource-limit", origin, "ZIP entries exceed byte limit",
+        ResourceLimit,
+        Provenance::new(origin),
+        "ZIP entries exceed byte limit",
       )
     }
     total += expanded
@@ -206,15 +218,15 @@ fn archive_validate_bounds(
     }
     if !valid_path(checked) {
       raise ResourceError(
-        "unsafe-path",
-        origin,
+        UnsafePath,
+        Provenance::new(origin),
         "Unsafe ZIP entry `" + name + "`",
       )
     }
     if seen.contains(name) {
       raise ResourceError(
-        "duplicate-entry",
-        origin,
+        DuplicateEntry,
+        Provenance::new(origin),
         "Duplicate ZIP entry `" + name + "`",
       )
     }
@@ -235,6 +247,6 @@ fn archive_validate_bounds(
 }
 
 ///|
-fn archive_error(origin : String, message : String) -> ResourceError {
-  ResourceError("invalid-archive", origin, message)
+fn archive_error(origin : Location, message : String) -> ResourceError {
+  ResourceError(InvalidArchive, Provenance::new(origin), message)
 }

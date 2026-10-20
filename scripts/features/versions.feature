@@ -158,3 +158,24 @@ Feature: One version across the workspace
       """
     When I look for versions other than "0.3.0"
     Then the mismatches are "pkgs/smithy-build/moon.mod: found 0.2.0, expected 0.3.0"
+
+  Scenario: The standalone consumer pins root and subpackage imports together
+    Given a file "examples/resource-consumer/main.mbtx" with the text:
+      """
+      import {
+        "moonrockz/artifact-resources@0.2.0" @resources,
+        "moonrockz/artifact-resources@0.2.0/local" @local_resources,
+        "moonbitlang/x@0.5.5/sys",
+      }
+      """
+    When I look for versions other than "0.3.0"
+    Then the mismatches are "examples/resource-consumer/main.mbtx: found 0.2.0, expected 0.3.0|examples/resource-consumer/main.mbtx: found 0.2.0, expected 0.3.0"
+    When I set the versions of the files to "0.3.0"
+    Then the result is:
+      """
+      import {
+        "moonrockz/artifact-resources@0.3.0" @resources,
+        "moonrockz/artifact-resources@0.3.0/local" @local_resources,
+        "moonbitlang/x@0.5.5/sys",
+      }
+      """

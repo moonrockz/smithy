@@ -54,7 +54,9 @@ test "projection imports merge only into their projection" {
   let config = @build.BuildConfig::parse(
     "{\"version\":\"1.0\",\"projections\":{\"extra\":{\"imports\":[\"extra.smithy\"]},\"plain\":{}}}",
   )
-  assert_eq(config.projections[0].imports, ["extra.smithy"])
+  assert_eq(config.projections[0].imports, [
+    @build.BuildInput::from_path("extra.smithy"),
+  ])
   let runner = @build.BuildRunner::new(config).add_projection_import(
     "extra",
     @smithy.ModelInput::Idl(

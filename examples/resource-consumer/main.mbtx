@@ -1,0 +1,36 @@
+/// A standalone consumer of an ordinary MoonBit module source tree or ZIP.
+/// Run after the module's normal release, or through test-resource-consumer.mbtx locally.
+import {
+  "moonrockz/artifact-resources@0.3.0" @resources,
+  "moonrockz/artifact-resources@0.3.0/local" @local_resources,
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+fn main {
+  let args = @env.args()
+  if args.length() != 2 {
+    eprintln("Usage: moonx examples/resource-consumer/main.mbtx MODULE_DIRECTORY_OR_ZIP")
+    @sys.exit(2)
+  }
+  guard @resources.RepositoryLocation::parse(args[1]) is Some(location) else {
+    eprintln("Expected a module directory or ZIP location")
+    @sys.exit(2)
+  }
+  try {
+    let tree = @local_resources.open(location)
+    let selection = @resources.Selection::new(
+      @resources.ResourceRoot::parse("examples/local/data").unwrap(),
+      [@resources.Matching(@resources.GlobPattern::parse("**/*.txt").unwrap())],
+    ).unwrap()
+    for resource in @resources.select_resources(tree, selection) {
+      println(resource.name.to_string() + ": " + resource.text().trim().to_owned())
+    }
+  } catch {
+    @resources.ResourceError(code, at, detail) => {
+      eprintln("[" + code.to_string() + "] " + at.to_string() + ": " + detail)
+      @sys.exit(1)
+    }
+  }
+}

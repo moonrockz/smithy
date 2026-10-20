@@ -11,14 +11,17 @@ and host-supplied directory entries without filesystem or network access.
 ///|
 test {
   let tree = @resources.EntryTree::directory(
-    ["messages/hello.txt"],
+    [@resources.EntryPath::parse("messages/hello.txt").unwrap()],
     _ => b"hello",
-    "memory-directory",
+    @resources.Location::parse("memory-directory").unwrap(),
   )
   let loaded = @resources.load_resources(tree, [
-    { name: "greeting", path: "messages/hello.txt", },
+    {
+      name: @resources.ResourceName::parse("greeting").unwrap(),
+      path: @resources.EntryPath::parse("messages/hello.txt").unwrap(),
+    },
   ])
-  assert_eq(loaded[0].name, "greeting")
+  assert_eq(loaded[0].name.to_string(), "greeting")
   assert_eq(loaded[0].text(), "hello")
 }
 ```
@@ -29,16 +32,75 @@ records `digest` as `sha256:<hex>` over the complete archive bytes. ZIP64,
 encrypted and multi-disk archives are unsupported. `open_zip(path)` opens a
 nested archive while retaining its parent's provenance.
 
-`entries()` lists physical file paths in sorted order. `contains(path)` also
-recognizes explicit ZIP directory entries, while reading requires a file.
+`entries()` lists physical file paths in lexical order. `contains(path)` checks
+exact safe entry names, while reading requires a file. ZIP directory markers
+are retained for root checks and manifest discovery.
 `read(path)` returns
-bytes, and `text(path)` additionally requires UTF-8. The directory constructor accepts an optional `entry_origin` callback so hosts
-can retain native physical filenames while entry paths use logical slashes.
+bytes, and `text(path)` additionally requires UTF-8. The directory constructor accepts `style=Slash` or `style=Backslash` to retain
+native physical filenames while entry paths use portable slashes.
 `Declaration` maps a
 logical resource name to a physical entry path. `load_resources` preserves
 declaration order and rejects repeated logical names. It never discovers or
 executes code. Consumers own their discovery rules. Smithy retains its
 `META-INF/smithy/manifest` discovery in `smithy-build::declared_models`.
+
+## Explicit selection
+
+`Selection::new(root, selectors)` requires 1 through 256 selectors. Choose
+`ResourceRoot::ContainerRoot` for the whole tree or `Subtree(EntryPath)` for a
+subdirectory. `ResourceRoot::parse(".")` chooses the container root.
+`Exact(path)` selects one root-relative file. `Named(path, name)` assigns an
+explicit logical name. `Matching(GlobPattern)` selects matching files.
+`select_resources(tree, selection)` returns resources in lexical logical-name
+order. `tree.select(selection)` returns declarations without reading content.
+
+Glob matching is case sensitive. `*` matches zero or more characters and `?`
+one character within a component. A whole-component `**` matches zero or more
+directories. For example `**/*.txt` includes both `hello.txt` and
+`nested/hello.txt`. Embedded `**`, escaping, character classes and brace
+expansion are rejected. Patterns are limited to 1024 UTF-16 code units.
+Matching shares the tree's configurable `max_match_steps` budget.
+
+Each selector must match at least one file. Missing roots and unmatched
+selectors have distinct errors. A directory is never a selected file.
+Overlapping selectors deduplicate identical logical/physical pairs. One logical
+name selecting different files fails. Explicit aliases may export one file
+under different names. Default names are relative to the chosen root, and
+physical locations retain the complete path. Selection never follows or executes
+bundled source code, scripts or nested archives.
+
+## Domain values
+
+| Value | Meaning |
+|---|---|
+| `RepositoryId`, `ProviderId` | Distinct configured repository and registered provider identifiers |
+| `ArtifactKey`, `ArtifactIdentity` | Requested key and provider-resolved exact identity |
+| `RepositoryLocation` | Provider-interpreted source address |
+| `EntryPath` | Portable path inside a container |
+| `ResourceName` | Consumer-facing logical name, independent of the physical path |
+| `Location` | Source address with structured directory or archive entry relationships |
+| `Provenance` | Physical location and typed acquisition history |
+| `ContentDigest` | SHA-256 content identity, independent of repository keys |
+
+String constructors return `None` for invalid values. Identifiers, identities
+and addresses must be nonempty, contain a non-space character and contain no
+control characters. Entry paths and resource names enforce the portable path
+rules below. `ContentDigest::parse` checks the algorithm and 32-byte hex value.
+`ResourceCode` is an enum with stable text from `to_string()`.
+
+`Location::directory_entry` retains the host path style;
+`archive_entry` retains archive nesting. `Provenance::steps()` returns typed
+resolution, container and configuration steps. Its origin distinguishes physical locations
+from provider registrations and repository references before acquisition.
+`location()` returns an optional physical location. `through` composes history using structural
+ancestry, even when unrelated locations have similar rendered text. The returned
+step array is a copy. Use `to_string()` at diagnostics, filesystem and Smithy
+filename boundaries.
+
+This replaces the initial string metadata API. Parse boundary strings into the
+appropriate types, use typed declarations and repository references, and render
+only when presenting output. Provider errors use `ResourceCode::ProviderFailure`
+with a structured `Provenance` and free-form detail.
 
 ## Repositories and providers
 
@@ -52,7 +114,7 @@ in-memory tree using the same API as the local provider.
 
 The local adapter's `register(registry, limits~)` installs provider `local`.
 Its location is a filesystem root. Key `.` selects that root; other keys are
-relative paths. It opens directories, individual files and `.jar` archives.
+relative paths. It opens directories, individual files and `.jar` or `.zip` archives.
 Directory enumeration uses an explicit stack. File contents are read lazily,
 so directories have no immutable digest. A caller needing a snapshot must
 supply a stable directory reader or retain the returned resource bytes.
@@ -72,14 +134,17 @@ Run the independent consumer from the repository root:
 mise exec -- moon run pkgs/artifact-resources/examples/local --target js
 ```
 
-It reads `examples/local/data/greeting.txt` inside this module through the
-registered local provider. An optional argument selects another directory
-containing `greeting.txt`.
+It selects `examples/local/data/**/*.txt` from the module root through the
+registered local provider. An optional argument selects another module source
+directory or ZIP with that layout. Normal `moon package` inclusion keeps this
+data in the published source archive; no additional resource manifest is needed.
+The repository identity stays `moonrockz/artifact-resources`.
 
 ## Limits and diagnostics
 
 `Limits::new` defaults to 64 MiB archive bytes, 10,000 entries, 16 MiB per
-entry and 256 MiB total expanded ZIP bytes or selected resource bytes.
+entry, 256 MiB total expanded ZIP bytes or selected resource bytes, and
+16 million estimated glob matching steps.
 Negative limits fail. ZIP sizes and paths are checked before content decoding;
 streaming inflation rejects content exceeding its declared size. Directory
 readers check per-entry limits after the host returns bytes. Directory limits
@@ -110,6 +175,8 @@ Smithy's manifest consumer retains its stricter rules.
 | `duplicate-provider`, `duplicate-repository` | Repeated registration |
 | `unknown-provider`, `unknown-repository` | Missing registration |
 | `invalid-resolution` | A provider returned a different reference |
+| `missing-root`, `missing-selection` | Missing subtree or selector matching no files |
+| `provider-failure` | Provider-specific acquisition failure |
 
 ## Backend support
 
@@ -122,5 +189,17 @@ The pure contracts run on all four targets. Filesystem acquisition requires
 the corresponding host filesystem implementation. Raw Wasm files need the
 MoonBit filesystem imports. Local loading makes no network requests.
 Remote repositories, caching, tar/gzip and credential support are later
-slices. Explicit selection configuration and glob discovery are also later
-work. This module joins the repository's next normal shared release.
+slices. This module joins the repository's next normal shared release.
+
+## Standalone script consumer
+
+`examples/resource-consumer/main.mbtx` at the repository root pins this module's
+shared release version and imports the same public API. After the next normal
+release, run it with `moonx examples/resource-consumer/main.mbtx MODULE_DIRECTORY_OR_ZIP`.
+
+Before publication, `mise run test:resources` packages the module with
+`moon package`, seeds an isolated local index and archive cache with those exact
+bytes and cached public dependencies, then runs the unchanged pinned script
+against the unpacked module and ZIP. It leaves the user's registry untouched.
+This verifies ordinary source inclusion and script imports without publishing
+a special version. The task-script test suite runs this check in CI.

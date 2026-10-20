@@ -88,17 +88,58 @@ fn build_remove_tree(path : String) -> Unit raise {
 }
 
 ///|
+fn build_add_input(
+  loader : @smithy.Loader,
+  runner : @build.BuildRunner,
+  input : @build.BuildInput,
+  base : String,
+  source~ : Bool = false,
+  projection~ : String? = None,
+) -> Unit raise {
+  let path = build_path(base, input.location().to_string())
+  let selection = match input {
+    @build.Local(_) => None
+    @build.Selected(_, selection) => Some(selection)
+  }
+  build_add_files(
+    loader,
+    runner,
+    path,
+    if source {
+      Some(path)
+    } else {
+      None
+    },
+    selection~,
+    projection~,
+  )
+}
+
+///|
 fn build_add_files(
   loader : @smithy.Loader,
   runner : @build.BuildRunner,
   path : String,
   source_root : String?,
   projection~ : String? = None,
+  selection~ : @resources.Selection? = None,
 ) -> Unit raise {
-  build_add_files_impl(loader, runner, path, source_root, projection~) catch {
+  build_add_files_impl(
+    loader,
+    runner,
+    path,
+    source_root,
+    projection~,
+    selection~,
+  ) catch {
     @resources.ResourceError(code, origin, message) =>
       raise @build.InvalidBuildConfig(
-        "Could not load resource `" + origin + "` [" + code + "]: " + message,
+        "Could not load resource `" +
+        origin.to_string() +
+        "` [" +
+        code.to_string() +
+        "]: " +
+        message,
       )
     error => raise error
   }
@@ -111,15 +152,55 @@ fn build_add_files_impl(
   path : String,
   source_root : String?,
   projection~ : String?,
+  selection~ : @resources.Selection?,
 ) -> Unit raise {
+  guard @resources.RepositoryLocation::parse(path) is Some(location) else {
+    raise @build.InvalidBuildConfig(
+      "Expected a nonempty, control-free local input location",
+    )
+  }
+  if selection is None && path.has_suffix(".zip") && !@fs.is_dir(path) {
+    raise @build.InvalidBuildConfig(
+      "ZIP input `" + path + "` requires an explicit resource selection",
+    )
+  }
   let registry = @local_resources.register(@resources.Registry::new()).add_repository({
-      id: "input",
-      provider: "local",
-      location: path,
+      id: @resources.RepositoryId::parse("input").unwrap(),
+      provider: @resources.ProviderId::parse("local").unwrap(),
+      location,
     },
   )
-  let artifact = registry.resolve({ repository: "input", key: ".", })
+  let artifact = registry.resolve({
+    repository: @resources.RepositoryId::parse("input").unwrap(),
+    key: @resources.ArtifactKey::parse(".").unwrap(),
+  })
   let tree = artifact.tree
+  if selection is Some(selection) {
+    let added : Set[@resources.EntryPath] = Set([])
+    for resource in @build.selected_models(tree, selection) {
+      let text = resource.text()
+      if !added.contains(resource.path) {
+        build_add_model(
+          loader,
+          runner,
+          resource.origin.to_string(),
+          text,
+          projection~,
+        )
+        added.add(resource.path)
+      }
+      if projection is None && source_root is Some(_) {
+        ignore(
+          runner.add_source(
+            resource.name.to_string(),
+            text,
+            source_file=Some(resource.origin.to_string()),
+          ),
+        )
+      }
+    }
+    return
+  }
   if path.has_suffix(".jar") && !@fs.is_dir(path) {
     build_add_archive(loader, runner, tree, path, source_root, projection~)
     return
@@ -127,33 +208,37 @@ fn build_add_files_impl(
   let declarations = tree
     .entries()
     .filter_map(entry => {
-      if entry.has_suffix(".smithy") || entry.has_suffix(".json") {
-        Some(@resources.Declaration::{ name: entry, path: entry, })
+      if entry.to_string().has_suffix(".smithy") ||
+        entry.to_string().has_suffix(".json") {
+        Some(@resources.Declaration::{
+          name: entry.resource_name(),
+          path: entry,
+        })
       } else {
         None
       }
     })
-  let models : Map[String, @resources.Resource] = Map([])
+  let models : Map[@resources.EntryPath, @resources.Resource] = Map([])
   for resource in @resources.load_resources(tree, declarations) {
     models[resource.path] = resource
   }
   for entry in tree.entries() {
     let origin = tree.entry_origin(entry)
-    if entry.has_suffix(".jar") {
+    if entry.to_string().has_suffix(".jar") {
       let archive = tree.open_zip(entry)
       build_add_archive(
         loader,
         runner,
         archive,
-        origin,
+        origin.to_string(),
         source_root,
         projection~,
       )
     } else if models.get(entry) is Some(resource) {
       let text = resource.text()
-      build_add_model(loader, runner, origin, text, projection~)
+      build_add_model(loader, runner, origin.to_string(), text, projection~)
       if projection is None {
-        build_record_source(runner, origin, source_root, text)
+        build_record_source(runner, origin.to_string(), source_root, text)
       }
     }
   }
@@ -205,13 +290,19 @@ fn build_add_archive(
   }
   for resource in @build.declared_models(tree) {
     let text = resource.text()
-    build_add_model(loader, runner, resource.origin, text, projection~)
+    build_add_model(
+      loader,
+      runner,
+      resource.origin.to_string(),
+      text,
+      projection~,
+    )
     if projection is None && source_root is Some(_) {
       ignore(
         runner.add_source(
-          prefix + "/" + resource.name,
+          prefix + "/" + resource.name.to_string(),
           text,
-          source_file=Some(resource.origin),
+          source_file=Some(resource.origin.to_string()),
         ),
       )
     }
@@ -379,7 +470,7 @@ fn run_build(config_path : String, clean : Bool) -> Int32 raise {
     protected_paths.append(projection.imports)
   }
   for path in protected_paths {
-    let input = build_path(base, path)
+    let input = build_path(base, path.location().to_string())
     if build_path_contains(output, input) || build_path_contains(input, output) {
       raise CliError(
         "build output directory must not overlap model sources or imports", 2,
@@ -395,24 +486,19 @@ fn run_build(config_path : String, clean : Bool) -> Int32 raise {
   let runner = @build.BuildRunner::new(config).register_plugin(
     "jsonSchema", json_schema_plugin,
   )
-  for name in config.sources {
-    let path = build_path(base, name)
-    if @fs.is_dir(path) {
-      build_add_files(loader, runner, path, Some(path))
-    } else {
-      build_add_files(loader, runner, path, Some(path))
-    }
+  for input in config.sources {
+    build_add_input(loader, runner, input, base, source=true)
   }
-  for name in config.imports {
-    build_add_files(loader, runner, build_path(base, name), None)
+  for input in config.imports {
+    build_add_input(loader, runner, input, base)
   }
   for projection in config.projections {
-    for name in projection.imports {
-      build_add_files(
+    for input in projection.imports {
+      build_add_input(
         loader,
         runner,
-        build_path(base, name),
-        None,
+        input,
+        base,
         projection=Some(projection.name),
       )
     }
