@@ -27,7 +27,7 @@ pub struct EntryTree {
   origin : String
   priv provenance : String
   priv paths : Array[String]
-  priv files : Set[String]
+  priv members : Set[String]
   priv read_entry : (String) -> Bytes raise ResourceError
   priv limits : Limits
   priv archive : Bool
@@ -97,7 +97,7 @@ pub fn EntryTree::directory(
     origin,
     provenance: origin,
     paths,
-    files: seen,
+    members: seen,
     read_entry: read,
     limits,
     archive: false,
@@ -112,7 +112,7 @@ pub fn EntryTree::entries(self : EntryTree) -> Array[String] {
 
 ///|
 pub fn EntryTree::contains(self : EntryTree, path : String) -> Bool {
-  self.files.contains(path)
+  self.members.contains(path)
 }
 
 ///|

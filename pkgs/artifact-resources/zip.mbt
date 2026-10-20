@@ -14,15 +14,14 @@ pub fn EntryTree::zip(
   let archive = @zipc.Archive::from_bytes(data) catch {
     @zipc.ZipError(message) => raise archive_error(origin, message)
   }
-  let paths = archive
-    .to_array()
-    .filter_map(member_ => {
-      if member_.is_dir() {
-        None
-      } else {
-        Some(member_.path())
-      }
-    })
+  let members = archive.to_array()
+  let paths = members.filter_map(member_ => {
+    if member_.is_dir() {
+      None
+    } else {
+      Some(member_.path())
+    }
+  })
   paths.sort()
   let read = fn(path : String) -> Bytes raise ResourceError {
     guard archive.find(path) is Some(member_) &&
@@ -61,7 +60,7 @@ pub fn EntryTree::zip(
     origin,
     provenance: origin,
     paths,
-    files: Set(paths),
+    members: Set(members.map(member_ => member_.path())),
     read_entry: read,
     limits,
     archive: true,

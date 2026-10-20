@@ -29,7 +29,9 @@ records `digest` as `sha256:<hex>` over the complete archive bytes. ZIP64,
 encrypted and multi-disk archives are unsupported. `open_zip(path)` opens a
 nested archive while retaining its parent's provenance.
 
-`entries()` lists physical file paths in sorted order. `read(path)` returns
+`entries()` lists physical file paths in sorted order. `contains(path)` also
+recognizes explicit ZIP directory entries, while reading requires a file.
+`read(path)` returns
 bytes, and `text(path)` additionally requires UTF-8. `Declaration` maps a
 logical resource name to a physical entry path. `load_resources` preserves
 declaration order and rejects repeated logical names. It never discovers or
@@ -96,7 +98,7 @@ Smithy's manifest consumer retains its stricter rules.
 | `invalid-archive` | Malformed or unsupported ZIP data |
 | `integrity-failure` | Content size or CRC-32 mismatch |
 | `unsafe-path` | Unsafe physical path, logical name or local artifact key |
-| `missing-resource` | A declared entry does not exist |
+| `missing-resource` | A declared file is missing or is a directory |
 | `duplicate-entry` | Repeated physical entry path |
 | `duplicate-resource` | Repeated logical name |
 | `resource-limit` | An entry, archive or total exceeds its limit |
