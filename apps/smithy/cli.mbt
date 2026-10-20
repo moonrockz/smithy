@@ -273,7 +273,10 @@ fn run(args : Array[String]) -> Int32 raise {
     return run_build(
       opts.config.unwrap_or("smithy-build.json"),
       opts.command == "clean",
-    )
+    ) catch {
+      @build.InvalidBuildConfig(message) => raise CliError(message, 1)
+      error => raise error
+    }
   }
   let loader = @smithy.Loader::new()
   let inputs : Map[String, String] = Map([])

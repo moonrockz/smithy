@@ -1,0 +1,11 @@
+{
+  "version": "2.0",
+  "sources": ["models"],
+  "imports": ["imports"],
+  "outputDirectory": "../../.dev/out/local-resources",
+  "projections": {
+    "extra": {
+      "imports": ["projection-imports"]
+    }
+  }
+}

@@ -1,4 +1,9 @@
 ///|
+fn build_archive_models(path : String) -> Map[String, String] raise {
+  @build.archive_models(@fs.read_file_to_bytes(path), path)
+}
+
+///|
 fn archive_test_bytes(
   manifest : String?,
   files : Map[String, String],
@@ -143,4 +148,33 @@ test "malformed ZIP directory offsets fail without indexing outside the archive"
       _ => false
     },
   )
+}
+
+///|
+test "a directory at the manifest path fails instead of hiding model discovery" {
+  let bytes = archive_test_bytes(Some(""), Map([]))
+  let mut central = 0
+  for i in 0..<(bytes.length() - 3) {
+    if bytes[i] == 0x50 &&
+      bytes[i + 1] == 0x4b &&
+      bytes[i + 2] == 1 &&
+      bytes[i + 3] == 2 {
+      central = i
+      break
+    }
+  }
+  // Set the central directory's DOS directory attribute on the manifest.
+  let directory = Bytes::makei(bytes.length(), i => {
+    if i == central + 38 {
+      (bytes[i].to_int() | 0x10).to_byte()
+    } else {
+      bytes[i]
+    }
+  })
+  try @build.archive_models(directory, "directory-manifest.jar") catch {
+    @build.InvalidBuildConfig(message) =>
+      assert_true(message.contains("directory-manifest.jar"))
+  } noraise {
+    _ => fail("expected a manifest file error")
+  }
 }

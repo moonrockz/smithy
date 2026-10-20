@@ -1,0 +1,33 @@
+Feature: Reusable local artifact resources
+  Smithy manifest discovery consumes directory and JAR entry trees supplied by
+  the independent resource library. Providers can supply those trees without
+  changes to Smithy parsing.
+
+  Scenario Outline: Assemble the same declared model from each container
+    Given the declared artifact model:
+      """smithy
+      $version: "2"
+      namespace example.resources
+      string Message
+      """
+    When I discover Smithy resources from a "<container>" container
+    Then the artifact model contains "example.resources#Message"
+    And the artifact model excludes "example.resources#Unlisted"
+    And the artifact model source is "<source>"
+    And the resource logical name is "nested/message.smithy"
+
+    Examples:
+      | container | source                                                |
+      | directory | fixture-directory/META-INF/smithy/nested/message.smithy |
+      | jar       | fixture.jar!/META-INF/smithy/nested/message.smithy      |
+      | provider  | fixture.jar!/META-INF/smithy/nested/message.smithy      |
+
+  Scenario: Keep the provider chain distinct from physical source names
+    Given the declared artifact model:
+      """smithy
+      $version: "2"
+      namespace example.resources
+      string Message
+      """
+    When I discover Smithy resources from a "provider" container
+    Then the resource provenance includes "fixtures[models@1] -> models@1 -> fixture.jar!/META-INF/smithy/nested/message.smithy"

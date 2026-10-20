@@ -15,6 +15,7 @@ preferred_target = "wasm"
 keywords = [ "smithy", "command-line", "moonx", "idl", "json" ]
 
 import {
+  "moonrockz/artifact-resources@0.3.0",
   "moonrockz/smithy@0.3.0",
   "moonrockz/smithy-build@0.3.0",
   "moonrockz/smithy-jsonschema@0.3.0",

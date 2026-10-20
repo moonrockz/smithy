@@ -1,5 +1,6 @@
 members = [
   ".",
+  "./pkgs/artifact-resources",
   "./pkgs/jmespath",
   "./pkgs/smithy",
   "./pkgs/smithy-build",

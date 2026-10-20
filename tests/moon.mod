@@ -13,6 +13,8 @@ source = "."
 warnings = "-implicit_impl_as_method"
 
 import {
+  "moonrockz/artifact-resources@0.3.0",
+  "moonbit-community/zipc@0.2.2",
   "moonrockz/smithy@0.3.0",
   "moonrockz/smithy-build@0.3.0",
   "moonrockz/smithy-syntax@0.3.0",

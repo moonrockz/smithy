@@ -1,4 +1,8 @@
 import {
+  "moonrockz/artifact-resources" @resources,
+  "moonrockz/smithy-build" @build,
+  "moonbit-community/zipc",
+  "moonbitlang/core/encoding/utf8",
   "moonrockz/smithy-syntax" @syntax,
   "moonrockz/smithy_tests/tck",
   "moonbitlang/x/fs" @xfs,

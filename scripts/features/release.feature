@@ -640,3 +640,27 @@ Feature: Release tooling
       ]
       """
     Then the publication modules are "moonrockz/a-very-long-module-name, moonrockz/smithy-cli"
+
+
+  Scenario: An old release keeps its contract after the resource library is added
+    Given the publication script is:
+      """moonbit
+      let publish_list : Array[(String, String)] = [
+        ("pkgs/smithy-build", "moonrockz/smithy-build"),
+        ("apps/smithy", "moonrockz/smithy-cli"),
+      ]
+      """
+    Then status for version "0.3.0" tagged "yes" reads "v0.3.0:scripts/publish.mbtx"
+    And the publication modules are "moonrockz/smithy-build, moonrockz/smithy-cli"
+
+  Scenario: The next release includes the independent resource library
+    Given the publication script is:
+      """moonbit
+      let publish_list : Array[(String, String)] = [
+        ("pkgs/artifact-resources", "moonrockz/artifact-resources"),
+        ("pkgs/smithy-build", "moonrockz/smithy-build"),
+        ("apps/smithy", "moonrockz/smithy-cli"),
+      ]
+      """
+    Then status for version "0.4.0" tagged "no" reads "origin/main:scripts/publish.mbtx"
+    And the publication modules are "moonrockz/artifact-resources, moonrockz/smithy-build, moonrockz/smithy-cli"

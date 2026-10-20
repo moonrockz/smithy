@@ -1,6 +1,8 @@
 pkgtype(kind: "executable")
 
 import {
+  "moonrockz/artifact-resources" @resources,
+  "moonrockz/artifact-resources/local" @local_resources,
   "moonrockz/smithy",
   "moonrockz/smithy-build" @build,
   "moonrockz/smithy-jsonschema" @jsonschema,

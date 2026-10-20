@@ -95,83 +95,125 @@ fn build_add_files(
   source_root : String?,
   projection~ : String? = None,
 ) -> Unit raise {
-  if @fs.is_dir(path) {
-    for name in @fs.read_dir(path) {
-      build_add_files(
+  build_add_files_impl(loader, runner, path, source_root, projection~) catch {
+    @resources.ResourceError(code, origin, message) =>
+      raise @build.InvalidBuildConfig(
+        "Could not load resource `" + origin + "` [" + code + "]: " + message,
+      )
+    error => raise error
+  }
+}
+
+///|
+fn build_add_files_impl(
+  loader : @smithy.Loader,
+  runner : @build.BuildRunner,
+  path : String,
+  source_root : String?,
+  projection~ : String?,
+) -> Unit raise {
+  let registry = @local_resources.register(@resources.Registry::new()).add_repository({
+      id: "input",
+      provider: "local",
+      location: path,
+    },
+  )
+  let artifact = registry.resolve({ repository: "input", key: ".", })
+  let tree = artifact.tree
+  if path.has_suffix(".jar") && !@fs.is_dir(path) {
+    build_add_archive(loader, runner, tree, path, source_root, projection~)
+    return
+  }
+  let declarations = tree
+    .entries()
+    .filter_map(entry => {
+      if entry.has_suffix(".smithy") || entry.has_suffix(".json") {
+        Some(@resources.Declaration::{ name: entry, path: entry, })
+      } else {
+        None
+      }
+    })
+  let models : Map[String, @resources.Resource] = Map([])
+  for resource in @resources.load_resources(tree, declarations) {
+    models[resource.path] = resource
+  }
+  for entry in tree.entries() {
+    let origin = tree.entry_origin(entry)
+    if entry.has_suffix(".jar") {
+      let archive = tree.open_zip(entry)
+      build_add_archive(
         loader,
         runner,
-        build_path(path, name),
+        archive,
+        origin,
         source_root,
         projection~,
       )
-    }
-  } else if path.has_suffix(".jar") {
-    let archive_path : @path.Path = path
-    let archive_name = archive_path.basename().to_owned()
-    let stem = archive_name[:archive_name.length() - 4].to_owned()
-    let prefix = match source_root {
-      Some(root) if root != path => {
-        let root_path : @path.Path = root
-        archive_path
-        .relative(base=root_path)
-        .to_string()
-        .replace_all(old="\\", new="/") +
-        "/" +
-        stem
-      }
-      _ => stem
-    }
-    for entry, text in build_archive_models(path) {
-      let origin = path + "!/META-INF/smithy/" + entry
-      let input = if entry.has_suffix(".smithy") {
-        @smithy.ModelInput::Idl(name=origin, text~)
-      } else {
-        @smithy.ModelInput::Json(name=origin, text~)
-      }
-      if projection is Some(name) {
-        ignore(runner.add_projection_import(name, input))
-      } else {
-        ignore(loader.add(input))
-        if source_root is Some(_) {
-          ignore(
-            runner.add_source(
-              prefix + "/" + entry,
-              text,
-              source_file=Some(origin),
-            ),
-          )
-        }
+    } else if models.get(entry) is Some(resource) {
+      let text = resource.text()
+      build_add_model(loader, runner, origin, text, projection~)
+      if projection is None {
+        build_record_source(runner, origin, source_root, text)
       }
     }
-  } else if path.has_suffix(".smithy") {
-    let text = @fs.read_file_to_string(path)
-    if projection is Some(name) {
+  }
+}
+
+///|
+fn build_add_model(
+  loader : @smithy.Loader,
+  runner : @build.BuildRunner,
+  origin : String,
+  text : String,
+  projection~ : String?,
+) -> Unit {
+  let input = if origin.has_suffix(".smithy") {
+    @smithy.ModelInput::Idl(name=origin, text~)
+  } else {
+    @smithy.ModelInput::Json(name=origin, text~)
+  }
+  if projection is Some(name) {
+    ignore(runner.add_projection_import(name, input))
+  } else {
+    ignore(loader.add(input))
+  }
+}
+
+///|
+fn build_add_archive(
+  loader : @smithy.Loader,
+  runner : @build.BuildRunner,
+  tree : @resources.EntryTree,
+  path : String,
+  source_root : String?,
+  projection~ : String?,
+) -> Unit raise {
+  let archive_path : @path.Path = path
+  let archive_name = archive_path.basename().to_owned()
+  let stem = archive_name[:archive_name.length() - 4].to_owned()
+  let prefix = match source_root {
+    Some(root) if root != path => {
+      let root_path : @path.Path = root
+      archive_path
+      .relative(base=root_path)
+      .to_string()
+      .replace_all(old="\\", new="/") +
+      "/" +
+      stem
+    }
+    _ => stem
+  }
+  for resource in @build.declared_models(tree) {
+    let text = resource.text()
+    build_add_model(loader, runner, resource.origin, text, projection~)
+    if projection is None && source_root is Some(_) {
       ignore(
-        runner.add_projection_import(
-          name,
-          @smithy.ModelInput::Idl(name=path, text~),
+        runner.add_source(
+          prefix + "/" + resource.name,
+          text,
+          source_file=Some(resource.origin),
         ),
       )
-    } else {
-      ignore(loader.add_idl(path, text))
-    }
-    if projection is None {
-      build_record_source(runner, path, source_root, text)
-    }
-  } else if path.has_suffix(".json") {
-    let text = @fs.read_file_to_string(path)
-    if projection is Some(name) {
-      ignore(
-        runner.add_projection_import(
-          name,
-          @smithy.ModelInput::Json(name=path, text~),
-        ),
-      )
-    } else {
-      ignore(loader.add_json(path, text))
-    }
-    if projection is None {
-      build_record_source(runner, path, source_root, text)
     }
   }
 }
@@ -376,8 +418,8 @@ fn run_build(config_path : String, clean : Bool) -> Int32 raise {
     }
   }
   let loaded = loader.assemble()
-  for diagnostic in loaded.diagnostics {
-    eprintln(diagnostic.message)
+  for d in loaded.diagnostics {
+    eprintln(diagnostic(d, Map([])))
   }
   guard loaded.model is Some(model) else { return 1 }
   let built = runner.run_result(model)
