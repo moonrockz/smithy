@@ -32,7 +32,9 @@ nested archive while retaining its parent's provenance.
 `entries()` lists physical file paths in sorted order. `contains(path)` also
 recognizes explicit ZIP directory entries, while reading requires a file.
 `read(path)` returns
-bytes, and `text(path)` additionally requires UTF-8. `Declaration` maps a
+bytes, and `text(path)` additionally requires UTF-8. The directory constructor accepts an optional `entry_origin` callback so hosts
+can retain native physical filenames while entry paths use logical slashes.
+`Declaration` maps a
 logical resource name to a physical entry path. `load_resources` preserves
 declaration order and rejects repeated logical names. It never discovers or
 executes code. Consumers own their discovery rules. Smithy retains its

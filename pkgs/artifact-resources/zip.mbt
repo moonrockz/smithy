@@ -63,7 +63,7 @@ pub fn EntryTree::zip(
     members: Set(members.map(member_ => member_.path())),
     read_entry: read,
     limits,
-    archive: true,
+    locate_entry: path => origin + "!/" + path,
     digest: Some("sha256:" + @crypto.bytes_to_hex_string(@crypto.sha256(data))),
   }
 }

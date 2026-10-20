@@ -61,6 +61,7 @@ fn open_host(
       _ => read_file(path),
       parent,
       limits~,
+      entry_origin=Some(_ => path),
     )
   }
   let paths = []
@@ -102,6 +103,7 @@ fn open_host(
     relative => read_file(root.join(relative).to_string()),
     path,
     limits~,
+    entry_origin=Some(relative => root.join(relative).to_string()),
   )
 }
 

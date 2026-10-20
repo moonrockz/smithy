@@ -392,3 +392,49 @@ test "registry rejects missing duplicate and mismatched registrations" {
     "duplicate-provider",
   )
 }
+
+///|
+test "text preserves acquisition limit missing and integrity errors" {
+  let missing = @resources.EntryTree::directory([], _ => b"", "tree")
+  assert_eq(
+    error_code(() => ignore(missing.text("missing"))),
+    "missing-resource",
+  )
+  let unreadable = @resources.EntryTree::directory(
+    ["file"],
+    _ => raise @resources.ResourceError("local-io", "tree/file", "unreadable"),
+    "tree",
+  )
+  assert_eq(error_code(() => ignore(unreadable.text("file"))), "local-io")
+  let limited = @resources.EntryTree::directory(
+    ["file"],
+    _ => b"abc",
+    "tree",
+    limits=@resources.Limits::new(max_entry_bytes=1),
+  )
+  assert_eq(error_code(() => ignore(limited.text("file"))), "resource-limit")
+  let bytes = archive({ "file": b"hello" })
+  let at = central_offsets(bytes)[0] + 16
+  let corrupt = changed(bytes, Map([(at, (bytes[at].to_int() ^ 1).to_byte())]))
+  let tree = @resources.EntryTree::zip(corrupt, "corrupt.jar")
+  assert_eq(error_code(() => ignore(tree.text("file"))), "integrity-failure")
+}
+
+///|
+test "hosts preserve physical filenames independently of logical separators" {
+  let tree = @resources.EntryTree::directory(
+    ["nested/file.txt"],
+    _ => b"hello",
+    "C:\\models",
+    entry_origin=Some(path => {
+      "C:\\models\\" + path.replace_all(old="/", new="\\")
+    }),
+  )
+  let loaded = @resources.load_resources(tree, [
+    { name: "greeting", path: "nested/file.txt", },
+  ])
+  assert_eq(loaded[0].name, "greeting")
+  assert_eq(loaded[0].path, "nested/file.txt")
+  assert_eq(loaded[0].origin, "C:\\models\\nested\\file.txt")
+  assert_eq(loaded[0].provenance, "C:\\models\\nested\\file.txt")
+}

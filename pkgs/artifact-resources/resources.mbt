@@ -30,7 +30,7 @@ pub struct EntryTree {
   priv members : Set[String]
   priv read_entry : (String) -> Bytes raise ResourceError
   priv limits : Limits
-  priv archive : Bool
+  priv locate_entry : (String) -> String
   digest : String?
 }
 
@@ -68,6 +68,7 @@ pub fn EntryTree::directory(
   read : (String) -> Bytes raise ResourceError,
   origin : String,
   limits~ : Limits = Limits::new(),
+  entry_origin~ : ((String) -> String)? = None,
 ) -> EntryTree raise ResourceError {
   check_limits(limits, origin)
   if paths.length() > limits.max_entries {
@@ -100,7 +101,7 @@ pub fn EntryTree::directory(
     members: seen,
     read_entry: read,
     limits,
-    archive: false,
+    locate_entry: entry_origin.unwrap_or(path => origin + "/" + path),
     digest: None,
   }
 }
@@ -117,7 +118,7 @@ pub fn EntryTree::contains(self : EntryTree, path : String) -> Bool {
 
 ///|
 pub fn EntryTree::entry_origin(self : EntryTree, path : String) -> String {
-  self.origin + (if self.archive { "!/" } else { "/" }) + path
+  (self.locate_entry)(path)
 }
 
 ///|
@@ -159,7 +160,8 @@ pub fn EntryTree::text(
   self : EntryTree,
   path : String,
 ) -> String raise ResourceError {
-  @utf8.decode(self.read(path)) catch {
+  let bytes = self.read(path)
+  @utf8.decode(bytes) catch {
     _ =>
       raise ResourceError(
         "invalid-utf8",
