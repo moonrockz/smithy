@@ -138,3 +138,19 @@ portable command-line pipelines.
 
 Run `mise run test:cli` to check the built CLI on every backend, or pass target
 names to select backends. The root [README](../../README.md) lists release assets.
+
+### Explicit directory and ZIP resources
+
+Build `sources`, `imports` and projection `imports` accept resource selection
+objects as well as legacy strings. For example:
+
+```json
+{"path":"module.zip","root":"models","paths":["service.smithy"],"globs":["shared/**/*.json"]}
+```
+
+The path is relative to the build configuration. Use `root: "."` for the whole
+container. Selectors are root-relative and must each match a file. Logical
+names default to those relative paths; `{"path":"a.smithy","name":"public/a.smithy"}`
+assigns an alias. Conflicting logical names fail. Plain ZIPs require an explicit
+selection; legacy JAR strings retain Smithy manifest discovery.
+See [build configuration](../../pkgs/smithy-build/README.mbt.md) for the full contract.

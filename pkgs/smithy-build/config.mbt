@@ -13,7 +13,7 @@ pub(all) struct TransformConfig {
 pub(all) struct ProjectionConfig {
   name : String
   is_abstract : Bool
-  imports : Array[String]
+  imports : Array[BuildInput]
   transforms : Array[TransformConfig]
   plugins : Map[String, Json]
 } derive(Eq, Debug)
@@ -21,8 +21,8 @@ pub(all) struct ProjectionConfig {
 ///|
 pub(all) struct BuildConfig {
   version : String
-  sources : Array[String]
-  imports : Array[String]
+  sources : Array[BuildInput]
+  imports : Array[BuildInput]
   output_directory : String
   projections : Array[ProjectionConfig]
   plugins : Map[String, Json]
@@ -341,7 +341,7 @@ pub fn BuildConfig::parse(
         )
     }
     let is_abstract = config_bool(value, "abstract")
-    let imports = config_strings(value, "imports")
+    let imports = config_inputs(value, "imports")
     let plugins = config_plugins(value)
     if is_abstract && (!imports.is_empty() || !plugins.is_empty()) {
       raise InvalidBuildConfig(
@@ -352,8 +352,8 @@ pub fn BuildConfig::parse(
   }
   {
     version,
-    sources: config_strings(document, "sources"),
-    imports: config_strings(document, "imports"),
+    sources: config_inputs(document, "sources"),
+    imports: config_inputs(document, "imports"),
     output_directory,
     projections,
     plugins: config_plugins(document),

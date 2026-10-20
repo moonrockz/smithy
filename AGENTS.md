@@ -39,6 +39,12 @@ and test. `mise run check` runs lint, validate, test and build, which is what CI
 - Run `mise run format` before you commit MoonBit code.
 - New packages go under `pkgs/` (libraries) or `apps/` (executables), and into `moon.work`.
 
+## Domain modeling
+
+- Give distinct domain concepts distinct types with validated boundary constructors.
+- Model relationships and acquisition history as structured data. Render strings only at filesystem, serialization and diagnostic boundaries.
+- Keep physical locations, container entry paths and logical resource names distinct. Prefer behavior on domain values over parsing or rewriting rendered text.
+
 ## Working documents
 
 `.dev/` is a gitignored area for AI-assisted work: specs, plans, brainstorming notes, scratch scripts and

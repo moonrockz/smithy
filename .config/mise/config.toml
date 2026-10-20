@@ -209,3 +209,7 @@ run = "moonx scripts/test-changelog.mbtx"
 [tasks."release:verify-cli"]
 description = "Run the published moonx CLI with bounded retries for registry asset availability (args: X.Y.Z)"
 run = "moonx scripts/publish.mbtx verify-cli"
+
+[tasks."test:resources"]
+description = "Test the pinned resource consumer against a locally packaged module"
+run = "moonx scripts/test-resource-consumer.mbtx"

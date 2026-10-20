@@ -1,15 +1,15 @@
 ///|
 /// A configured source. Its provider interprets location and artifact keys.
 pub(all) struct Repository {
-  id : String
-  provider : String
-  location : String
+  id : RepositoryId
+  provider : ProviderId
+  location : RepositoryLocation
 } derive(Debug, Eq)
 
 ///|
 pub(all) struct ArtifactRef {
-  repository : String
-  key : String
+  repository : RepositoryId
+  key : ArtifactKey
 } derive(Debug, Eq)
 
 ///|
@@ -17,15 +17,15 @@ pub(all) struct ArtifactRef {
 /// Archive trees expose a SHA-256 digest; mutable directories have no digest.
 pub(all) struct ResolvedArtifact {
   reference : ArtifactRef
-  identity : String
+  identity : ArtifactIdentity
   tree : EntryTree
 }
 
 ///|
 pub struct Registry {
-  priv repositories : Map[String, Repository]
+  priv repositories : Map[RepositoryId, Repository]
   priv providers : Map[
-    String,
+    ProviderId,
     (Repository, ArtifactRef) -> ResolvedArtifact raise ResourceError,
   ]
 }
@@ -38,12 +38,14 @@ pub fn Registry::new() -> Registry {
 ///|
 pub fn Registry::register_provider(
   self : Registry,
-  name : String,
+  name : ProviderId,
   provider : (Repository, ArtifactRef) -> ResolvedArtifact raise ResourceError,
 ) -> Registry raise ResourceError {
   if self.providers.contains(name) {
     raise ResourceError(
-      "duplicate-provider", name, "Provider already registered",
+      DuplicateProvider,
+      Provenance::provider_registration(name),
+      "Provider already registered",
     )
   }
   self.providers[name] = provider
@@ -57,9 +59,9 @@ pub fn Registry::add_repository(
 ) -> Registry raise ResourceError {
   if self.repositories.contains(repository.id) {
     raise ResourceError(
-      "duplicate-repository",
-      repository.id,
-      "Repository already registered",
+      DuplicateRepository,
+      Provenance::new(Location::Source(repository.location)),
+      "Repository `" + repository.id.to_string() + "` already registered",
     )
   }
   self.repositories[repository.id] = repository
@@ -73,30 +75,35 @@ pub fn Registry::resolve(
 ) -> ResolvedArtifact raise ResourceError {
   guard self.repositories.get(reference.repository) is Some(repository) else {
     raise ResourceError(
-      "unknown-repository",
-      reference.repository,
-      "Unknown repository for `" + reference.key + "`",
+      UnknownRepository,
+      Provenance::repository_reference(reference.repository).resolved(
+        reference,
+        None,
+      ),
+      "Unknown repository for `" + reference.key.to_string() + "`",
     )
   }
   guard self.providers.get(repository.provider) is Some(provider) else {
     raise ResourceError(
-      "unknown-provider",
-      repository.id,
-      "Unknown provider `" + repository.provider + "`",
+      UnknownProvider,
+      Provenance::new(Location::Source(repository.location)).resolved(
+        reference,
+        None,
+      ),
+      "Unknown provider `" + repository.provider.to_string() + "`",
     )
   }
   let artifact = provider(repository, reference) catch {
     ResourceError(code, origin, message) =>
-      raise ResourceError(
-        code,
-        repository.id + "[" + reference.key + "] -> " + origin,
-        message,
-      )
+      raise ResourceError(code, origin.resolved(reference, None), message)
   }
   if artifact.reference != reference {
     raise ResourceError(
-      "invalid-resolution",
-      repository.id,
+      InvalidResolution,
+      Provenance::new(Location::Source(repository.location)).resolved(
+        reference,
+        None,
+      ),
       "Provider returned a different artifact reference",
     )
   }
@@ -104,13 +111,15 @@ pub fn Registry::resolve(
     ..artifact,
     tree: {
       ..artifact.tree,
-      provenance: repository.id +
-      "[" +
-      reference.key +
-      "] -> " +
-      artifact.identity +
-      " -> " +
-      artifact.tree.provenance,
+      provenance: artifact.tree.provenance.resolved(
+        reference,
+        Some(artifact.identity),
+      ),
     },
   }
+}
+
+///|
+pub fn ArtifactRef::to_string(self : ArtifactRef) -> String {
+  self.repository.to_string() + "[" + self.key.to_string() + "]"
 }

@@ -29,9 +29,12 @@ impl @moonspec.World for ArtifactWorld with fn configure(self, setup) {
     }
     let tree = if kind == "directory" {
       @resources.EntryTree::directory(
-        files.keys().to_array(),
-        path => files[path],
-        "fixture-directory",
+        files
+        .keys()
+        .map(path => @resources.EntryPath::parse(path).unwrap())
+        .to_array(),
+        path => files[path.to_string()],
+        @resources.Location::parse("fixture-directory").unwrap(),
       )
     } else {
       let zip = @zipc.Archive::empty()
@@ -48,26 +51,92 @@ impl @moonspec.World for ArtifactWorld with fn configure(self, setup) {
       let bytes = zip.to_bytes()
       if kind == "provider" {
         let registry = @resources.Registry::new()
-          .register_provider("fixture", (_, reference) => {
+          .register_provider(@resources.ProviderId::parse("fixture").unwrap(), (
+            _,
             reference,
-            identity: "models@1",
-            tree: @resources.EntryTree::zip(bytes, "fixture.jar"),
+          ) => {
+            reference,
+            identity: @resources.ArtifactIdentity::parse("models@1").unwrap(),
+            tree: @resources.EntryTree::zip(
+              bytes,
+              @resources.Location::parse("fixture.jar").unwrap(),
+            ),
           })
           .add_repository({
-            id: "fixtures",
-            provider: "fixture",
-            location: "memory",
+            id: @resources.RepositoryId::parse("fixtures").unwrap(),
+            provider: @resources.ProviderId::parse("fixture").unwrap(),
+            location: @resources.RepositoryLocation::parse("memory").unwrap(),
           })
-        registry.resolve({ repository: "fixtures", key: "models@1", }).tree
+        registry.resolve({
+          repository: @resources.RepositoryId::parse("fixtures").unwrap(),
+          key: @resources.ArtifactKey::parse("models@1").unwrap(),
+        }).tree
       } else {
         assert_eq(kind, "jar")
-        @resources.EntryTree::zip(bytes, "fixture.jar")
+        @resources.EntryTree::zip(
+          bytes,
+          @resources.Location::parse("fixture.jar").unwrap(),
+        )
       }
     }
     self.resources = @build.declared_models(tree)
     let loader = @smithy.Loader::new()
     for resource in self.resources {
-      ignore(loader.add_idl(resource.origin, resource.text()))
+      ignore(loader.add_idl(resource.origin.to_string(), resource.text()))
+    }
+    let loaded = loader.assemble()
+    assert_false(loaded.has_errors())
+    self.model = loaded.model
+  })
+  setup.when1("I explicitly select resources from a {string} source tree", fn(
+    kind : String,
+  ) raise {
+    let files = {
+      "module/models/nested/message.smithy": @utf8.encode(self.text),
+      "module/unlisted.smithy": @utf8.encode(
+        "$version: \"2\"\nnamespace example.resources\nstring Unlisted",
+      ),
+      "module/main.mbt": b"source code is never executed",
+    }
+    let tree = if kind == "directory" {
+      @resources.EntryTree::directory(
+        files
+        .keys()
+        .map(path => @resources.EntryPath::parse(path).unwrap())
+        .to_array(),
+        path => files[path.to_string()],
+        @resources.Location::parse("fixture-directory").unwrap(),
+      )
+    } else {
+      assert_eq(kind, "zip")
+      let archive = @zipc.Archive::empty()
+      for path, bytes in files {
+        ignore(
+          archive.add(
+            @zipc.Member::make(
+              path,
+              @zipc.File(@zipc.File::deflate_from_bytes(bytes)),
+            ),
+          ),
+        )
+      }
+      @resources.EntryTree::zip(
+        archive.to_bytes(),
+        @resources.Location::parse("fixture.zip").unwrap(),
+      )
+    }
+    let selection = @resources.Selection::new(
+      @resources.ResourceRoot::parse("module/models").unwrap(),
+      [
+        @resources.Matching(
+          @resources.GlobPattern::parse("**/*.smithy").unwrap(),
+        ),
+      ],
+    ).unwrap()
+    self.resources = @build.selected_models(tree, selection)
+    let loader = @smithy.Loader::new()
+    for resource in self.resources {
+      ignore(loader.add_idl(resource.origin.to_string(), resource.text()))
     }
     let loaded = loader.assemble()
     assert_false(loaded.has_errors())
@@ -89,12 +158,12 @@ impl @moonspec.World for ArtifactWorld with fn configure(self, setup) {
   })
   setup.then1("the resource logical name is {string}", fn(name : String) raise {
     assert_eq(self.resources.length(), 1)
-    assert_eq(self.resources[0].name, name)
+    assert_eq(self.resources[0].name.to_string(), name)
   })
   setup.then1("the resource provenance includes {string}", fn(
     chain : String,
   ) raise {
-    assert_eq(self.resources[0].provenance, chain)
+    assert_eq(self.resources[0].provenance.to_string(), chain)
   })
 }
 

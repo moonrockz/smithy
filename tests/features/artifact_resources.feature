@@ -31,3 +31,21 @@ Feature: Reusable local artifact resources
       """
     When I discover Smithy resources from a "provider" container
     Then the resource provenance includes "fixtures[models@1] -> models@1 -> fixture.jar!/META-INF/smithy/nested/message.smithy"
+
+  Scenario Outline: Select models from an ordinary source tree without a manifest
+    Given the declared artifact model:
+      """smithy
+      $version: "2"
+      namespace example.resources
+      string Message
+      """
+    When I explicitly select resources from a "<container>" source tree
+    Then the artifact model contains "example.resources#Message"
+    And the artifact model excludes "example.resources#Unlisted"
+    And the artifact model source is "<source>"
+    And the resource logical name is "nested/message.smithy"
+
+    Examples:
+      | container | source                                                  |
+      | directory | fixture-directory/module/models/nested/message.smithy   |
+      | zip       | fixture.zip!/module/models/nested/message.smithy          |

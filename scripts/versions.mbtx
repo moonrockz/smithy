@@ -29,6 +29,7 @@ let usage : String = "Usage: versions.mbtx check [X.Y.Z] | set X.Y.Z"
 /// The text ends with the opening quote. Only a string with this text before it counts, so another
 /// version-like string in the same file (for example a specification version) is not touched.
 let version_files : Array[(String, String)] = [
+  ("examples/resource-consumer/main.mbtx", "\"moonrockz/artifact-resources@"),
   ("pkgs/smithy/smithy.mbt", "pub fn version() -> String {\n  \""),
   ("pkgs/smithy/smithy_test.mbt", "inspect(@smithy.version(), content=\""),
   ("pkgs/smithy-syntax/src/lib.mbt", "pub fn version() -> String {\n  \""),
@@ -74,9 +75,9 @@ fn versions_after(text : String, head : String) -> Array[(Int, Int, String)] {
     guard text[from:].find(head) is Some(at) else { break }
     let start = from + at + head.length()
     guard text[start:].find("\"") is Some(len) else { break }
-    let candidate = text[start:start + len].to_owned()
+    let candidate = text[start:start + len].split("/").next().unwrap().to_owned()
     if is_semver(candidate) {
-      found.push((start, start + len, candidate))
+      found.push((start, start + candidate.length(), candidate))
     }
     from = start
   }

@@ -70,7 +70,9 @@ fn build_case_config(value : Json) -> @build.BuildConfig raise {
     for projection in definition.projections {
       let projection = {
         ..projection,
-        imports: projection.imports.map(p => base + "/" + p),
+        imports: projection.imports.map(p => {
+          @build.BuildInput::from_path(base + "/" + p.location().to_string())
+        }),
       }
       let mut replaced = false
       for i = 0; i < projections.length(); i = i + 1 {
@@ -89,14 +91,24 @@ fn build_case_config(value : Json) -> @build.BuildConfig raise {
       plugins[name] = settings
     }
     let sources = config.sources.copy()
-    sources.append(definition.sources.map(p => base + "/" + p))
+    sources.append(
+      definition.sources.map(p => {
+        @build.BuildInput::from_path(base + "/" + p.location().to_string())
+      }),
+    )
     let imports = config.imports.copy()
-    imports.append(definition.imports.map(p => base + "/" + p))
+    imports.append(
+      definition.imports.map(p => {
+        @build.BuildInput::from_path(base + "/" + p.location().to_string())
+      }),
+    )
     config = { ..definition, sources, imports, projections, plugins, }
   }
   let sources = config.sources.copy()
   sources.append(
-    build_case_strings(value, "sources").map(p => "tck/build/" + p),
+    build_case_strings(value, "sources").map(p => {
+      @build.BuildInput::from_path("tck/build/" + p)
+    }),
   )
   { ..config, sources, }
 }
@@ -147,8 +159,8 @@ fn build_case_result(value : Json) -> Json {
     let loader = @smithy.Loader::new()
     let loaded : Set[String] = Set([])
     let paths = build_case_strings(value, "models").map(p => "tck/build/" + p)
-    paths.append(config.sources)
-    paths.append(config.imports)
+    paths.append(config.sources.map(input => input.location().to_string()))
+    paths.append(config.imports.map(input => input.location().to_string()))
     for path in paths {
       if loaded.contains(path) {
         continue
@@ -201,7 +213,8 @@ fn build_case_result(value : Json) -> Json {
     } else {
       stage = "$build"
       let runner = @build.BuildRunner::new(config)
-      for path in config.sources {
+      for input in config.sources {
+        let path = input.location().to_string()
         if path.has_suffix(".jar") {
           let filename = path.split("/").to_array().last().unwrap().to_owned()
           let prefix = filename[:filename.length() - 4].to_owned()
@@ -225,7 +238,8 @@ fn build_case_result(value : Json) -> Json {
         }
       }
       for projection in config.projections {
-        for path in projection.imports {
+        for input in projection.imports {
+          let path = input.location().to_string()
           ignore(
             runner.add_projection_import(
               projection.name,

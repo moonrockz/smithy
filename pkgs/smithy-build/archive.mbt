@@ -5,14 +5,18 @@ pub fn archive_models(
   data : Bytes,
   origin : String,
 ) -> Map[String, String] raise BuildError {
-  let tree = @resources.EntryTree::zip(data, origin) catch {
-    @resources.ResourceError(_, at, message) => raise archive_error(at, message)
+  guard @resources.Location::parse(origin) is Some(location) else {
+    raise archive_error(origin, "Expected a nonempty archive location")
+  }
+  let tree = @resources.EntryTree::zip(data, location) catch {
+    @resources.ResourceError(_, at, message) =>
+      raise archive_error(at.to_string(), message)
   }
   let out : Map[String, String] = Map([])
   for resource in declared_models(tree) {
-    out[resource.name] = resource.text() catch {
+    out[resource.name.to_string()] = resource.text() catch {
       @resources.ResourceError(_, at, message) =>
-        raise archive_error(at, message)
+        raise archive_error(at.to_string(), message)
     }
   }
   out
@@ -24,11 +28,17 @@ pub fn archive_models(
 pub fn declared_models(
   tree : @resources.EntryTree,
 ) -> Array[@resources.Resource] raise BuildError {
-  let origin = tree.provenance()
-  guard tree.contains("META-INF/smithy/manifest") else { return [] }
-  let manifest = (tree.text("META-INF/smithy/manifest") catch {
+  let origin = tree.provenance().to_string()
+  guard tree.contains(
+    @resources.EntryPath::parse("META-INF/smithy/manifest").unwrap(),
+  ) else {
+    return []
+  }
+  let manifest = (tree.text(
+      @resources.EntryPath::parse("META-INF/smithy/manifest").unwrap(),
+    ) catch {
       @resources.ResourceError(_, at, message) =>
-        raise archive_error(at, message)
+        raise archive_error(at.to_string(), message)
     })
     .replace_all(old="\r\n", new="\n")
     .replace_all(old="\r", new="\n")
@@ -51,7 +61,9 @@ pub fn declared_models(
         "Unrecognized model file `" + name + "` in Smithy manifest",
       )
     }
-    if !tree.contains("META-INF/smithy/" + name) {
+    if !tree.contains(
+        @resources.EntryPath::parse("META-INF/smithy/" + name).unwrap(),
+      ) {
       raise archive_error(
         origin,
         "Smithy manifest references missing entry `" + name + "`",
@@ -59,12 +71,13 @@ pub fn declared_models(
     }
     seen.add(name)
     declarations.push(@resources.Declaration::{
-      name,
-      path: "META-INF/smithy/" + name,
+      name: @resources.ResourceName::parse(name).unwrap(),
+      path: @resources.EntryPath::parse("META-INF/smithy/" + name).unwrap(),
     })
   }
   @resources.load_resources(tree, declarations) catch {
-    @resources.ResourceError(_, at, message) => raise archive_error(at, message)
+    @resources.ResourceError(_, at, message) =>
+      raise archive_error(at.to_string(), message)
   }
 }
 

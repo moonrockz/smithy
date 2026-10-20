@@ -1,0 +1,111 @@
+/// Test the unchanged pinned consumer against a private, local package cache.
+/// Uses `moon package` bytes and ordinary inclusion rules, without publishing.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/io",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbit-community/zipc@0.2.2",
+}
+
+///|
+async fn write(path : String, bytes : &@io.Data) -> Unit {
+  let parts = path.split("/").map(p => p.to_owned()).to_array()
+  parts.pop() |> ignore
+  @fs.mkdir(parts.join("/"), recursive=true, allow_exist=true)
+  @fs.write_file(path, bytes)
+}
+
+///|
+fn string_field(value : Json, field : String) -> String raise {
+  guard value is Object(fields) && fields.get(field) is Some(String(text)) else {
+    fail("Missing index field " + field)
+  }
+  text
+}
+
+///|
+async fn seed_dependency(home : String, fixture : String, name : String, version : String, seen : Set[String]) -> Unit {
+  let key = name + "@" + version
+  if seen.contains(key) { return }
+  seen.add(key)
+  let index = "registry/index/user/" + name + ".index"
+  let lines = @fs.read_file(home + "/" + index).text().split("\n")
+  let mut found = false
+  for line in lines {
+    if line.trim().is_empty() { continue }
+    let entry = @json.parse(line.to_owned())
+    if string_field(entry, "version") != version { continue }
+    found = true
+    // Only the required version is available in the isolated index.
+    write(fixture + "/" + index, line.to_owned() + "\n")
+    let archive = "registry/cache/" + name + "/" + version + ".zip"
+    write(fixture + "/" + archive, @fs.read_file(home + "/" + archive))
+    if entry is Object(fields) && fields.get("deps") is Some(Object(deps)) {
+      for dependency, value in deps {
+        guard value is String(pin) else { fail("Expected a pinned index dependency") }
+        seed_dependency(home, fixture, dependency, pin, seen)
+      }
+    }
+    break
+  }
+  assert_true(found, msg="Missing cached dependency " + key)
+}
+
+///|
+async fn exercise(root : String) -> Unit {
+  let dir = root + "/.dev/out/resource-consumer"
+  if @fs.exists(dir) { @fs.rmdir(dir, recursive=true) }
+  @fs.mkdir(dir, recursive=true)
+  let (code, _, err) = @process.collect_output("moon", ["-C", "pkgs/artifact-resources", "package"], cwd=root)
+  assert_eq(code, 0, msg=err.text())
+  let source = @fs.read_file(root + "/pkgs/artifact-resources/moon.mod").text()
+  let version_line = source.split("\n").filter(line => line.has_prefix("version = \"")).next().unwrap()
+  let version = version_line[11:].split("\"").next().unwrap().to_owned()
+  let bytes = @fs.read_file(root + "/_build/publish/moonrockz-artifact-resources-" + version + ".zip").binary()
+  let fixture = dir + "/moon"
+  let home = @env.get_env_var("MOON_HOME").unwrap_or_else(() => @env.get_env_var("HOME").unwrap() + "/.moon")
+  let deps : Map[String, Json] = Map([])
+  let seen = Set([])
+  for line in source.split("\n") {
+    let line = line.trim()
+    if !line.has_prefix("\"") { continue }
+    let coordinate = line[1:].split("\"").next().unwrap().to_owned()
+    let parts = coordinate.split("@").to_array()
+    if parts.length() != 2 { continue }
+    let name = parts[0].to_owned()
+    let pin = parts[1].to_owned()
+    deps[name] = Json::string(pin)
+    seed_dependency(home, fixture, name, pin, seen)
+  }
+  let index = Json::object({
+    "name": Json::string("moonrockz/artifact-resources"), "version": Json::string(version),
+    "deps": Json::object(deps), "checksum": Json::string(@crypto.bytes_to_hex_string(@crypto.sha256(bytes))),
+  })
+  write(fixture + "/registry/index/user/moonrockz/artifact-resources.index", index.stringify() + "\n")
+  write(fixture + "/registry/cache/moonrockz/artifact-resources/" + version + ".zip", bytes)
+  let packaged = dir + "/source"
+  let archive = @zipc.Archive::from_bytes(bytes)
+  for item in archive.to_array() {
+    if item.kind is @zipc.File(file) { write(packaged + "/" + item.path, file.to_bytes()) }
+  }
+  assert_true(@fs.exists(packaged + "/examples/local/data/greeting.txt"))
+  let consumer = dir + "/consumer.mbtx"
+  write(consumer, @fs.read_file(root + "/examples/resource-consumer/main.mbtx"))
+  let bundle = dir + "/module.zip"
+  write(bundle, bytes)
+  for input in [packaged, bundle] {
+    let (code, out, err) = @process.collect_output("moon", ["run", consumer, "--", input], cwd=dir, extra_env={ "MOON_HOME": fixture })
+    assert_eq(code, 0, msg=err.text())
+    assert_eq(out.text().trim().to_owned(), "greeting.txt: Hello from a local resource.")
+  }
+}
+
+///|
+async fn main { exercise(@fs.realpath(".")) }
+
+///|
+async test "pinned standalone consumer uses normally packaged directory and ZIP sources" { exercise(@fs.realpath("..")) }
