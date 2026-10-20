@@ -1,5 +1,5 @@
 ///|
-/// Register local directory, file and ZIP/JAR acquisition using the host FS.
+/// Register local directory, file, ZIP/JAR and tar/gzip acquisition using the host FS.
 pub fn register(
   registry : @resources.Registry,
   limits~ : @resources.Limits = @resources.Limits::new(),
@@ -67,6 +67,20 @@ fn open_host(
 ) -> @resources.EntryTree raise {
   let root : @path.Path = path
   if !@fs.is_dir(path) {
+    if path.has_suffix(".tar") {
+      return @resources.EntryTree::tar(
+        @fs.read_file_to_bytes(path),
+        origin,
+        limits~,
+      )
+    }
+    if path.has_suffix(".tgz") || path.has_suffix(".tar.gz") {
+      return @resources.EntryTree::tgz(
+        @fs.read_file_to_bytes(path),
+        origin,
+        limits~,
+      )
+    }
     if path.has_suffix(".jar") || path.has_suffix(".zip") {
       return @resources.EntryTree::zip(
         @fs.read_file_to_bytes(path),

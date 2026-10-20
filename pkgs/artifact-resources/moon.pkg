@@ -10,4 +10,6 @@ import {
   "moonrockz/artifact-resources" @resources,
   "moonbitlang/core/encoding/utf8",
   "moonbit-community/zipc",
+  "moonbit-community/flate/gzip",
+  "moonbit-community/flate/checksum",
 } for "test"

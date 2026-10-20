@@ -159,9 +159,16 @@ fn build_add_files_impl(
       "Expected a nonempty, control-free local input location",
     )
   }
-  if selection is None && path.has_suffix(".zip") && !@fs.is_dir(path) {
+  if selection is None &&
+    (
+      path.has_suffix(".zip") ||
+      path.has_suffix(".tar") ||
+      path.has_suffix(".tar.gz") ||
+      path.has_suffix(".tgz")
+    ) &&
+    !@fs.is_dir(path) {
     raise @build.InvalidBuildConfig(
-      "ZIP input `" + path + "` requires an explicit resource selection",
+      "Archive input `" + path + "` requires an explicit resource selection",
     )
   }
   let registry = @local_resources.register(@resources.Registry::new()).add_repository({

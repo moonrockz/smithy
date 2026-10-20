@@ -1,8 +1,8 @@
 # Artifact resources
 
 `moonrockz/artifact-resources` loads declared binary or text resources from
-entry trees. It has no Smithy dependency. The root package reads ZIP/JAR bytes
-and host-supplied directory entries without filesystem or network access.
+entry trees. It has no Smithy dependency. The root package reads ZIP/JAR and
+tar/gzip bytes and host-supplied directory entries without filesystem or network access.
 `moonrockz/artifact-resources/local` provides filesystem acquisition.
 
 ## Independent library use
@@ -115,6 +115,8 @@ in-memory tree using the same API as the local provider.
 The local adapter's `register(registry, limits~)` installs provider `local`.
 Its location is a filesystem root. Key `.` selects that root; other keys are
 relative paths. It opens directories, individual files and `.jar` or `.zip` archives.
+It also opens `.tar` with `EntryTree::tar` and `.tar.gz` or `.tgz` with
+`EntryTree::tgz`. Archive constructors take bytes and a physical `Location`.
 Directory enumeration uses an explicit stack. File contents are read lazily,
 so directories have no immutable digest. A caller needing a snapshot must
 supply a stable directory reader or retain the returned resource bytes.
@@ -144,7 +146,8 @@ The repository identity stays `moonrockz/artifact-resources`.
 
 `Limits::new` defaults to 64 MiB archive bytes, 10,000 entries, 16 MiB per
 entry, 256 MiB total expanded ZIP bytes or selected resource bytes, and
-16 million estimated glob matching steps.
+16 million estimated glob matching steps. `max_expanded_bytes` separately limits
+the complete tar envelope to 256 MiB, including metadata, headers and padding.
 Negative limits fail. ZIP sizes and paths are checked before content decoding;
 streaming inflation rejects content exceeding its declared size. Directory
 readers check per-entry limits after the host returns bytes. Directory limits
@@ -162,8 +165,8 @@ Smithy's manifest consumer retains its stricter rules.
 
 | Code | Meaning |
 |---|---|
-| `invalid-archive` | Malformed or unsupported ZIP data |
-| `integrity-failure` | Content size or CRC-32 mismatch |
+| `invalid-archive` | Malformed or unsupported ZIP, tar or gzip data |
+| `integrity-failure` | Content size, CRC or tar header checksum mismatch |
 | `unsafe-path` | Unsafe physical path, logical name or local artifact key |
 | `missing-resource` | A declared file is missing or is a directory |
 | `duplicate-entry` | Repeated physical entry path |
@@ -182,14 +185,57 @@ Smithy's manifest consumer retains its stricter rules.
 
 | Package | wasm | wasm-gc | JS | native |
 |---|---|---|---|---|
-| Entry trees, ZIP reader, resources, provider registry | Yes | Yes | Yes | Yes |
+| Entry trees, ZIP/tar/gzip readers, resources, provider registry | Yes | Yes | Yes | Yes |
 | Local filesystem adapter | MoonBit filesystem host | MoonBit filesystem host | Node.js | Host OS |
 
 The pure contracts run on all four targets. Filesystem acquisition requires
 the corresponding host filesystem implementation. Raw Wasm files need the
 MoonBit filesystem imports. Local loading makes no network requests.
-Remote repositories, caching, tar/gzip and credential support are later
+Remote repositories, caching and credential support are later
 slices. This module joins the repository's next normal shared release.
+
+## Tar and gzip support
+
+`EntryTree::tar(bytes, origin, limits~)` reads V7 and POSIX ustar archives.
+`EntryTree::tgz` reads gzip-compressed tar, including npm `.tgz` packages.
+Both retain physical entry paths and SHA-256 of the original input bytes.
+Use the existing `Selection` API with `ResourceRoot::parse("package/models")`
+to select models beneath npm's wrapper. No path prefix is stripped from origins.
+The [npm example](../../examples/npm-archive/README.md) includes an unchanged
+registry download and a runnable build with all three input positions.
+
+Regular files with type NUL or `0`, directories with type `5`, ustar path
+prefixes, UTF-8 names and per-file pax headers with type `x` are supported.
+Pax `path` and decimal `size` override the following file or directory.
+Recognized non-content metadata is ignored: `uid`, `gid`, `uname`, `gname`,
+`mtime`, `atime`, `ctime`, `comment`. Other pax keywords fail explicitly.
+Global pax headers, GNU long-name/long-link/sparse extensions, base-256 sizes,
+links, devices, FIFOs and all other entry types are unsupported, even when
+unselected. Only one pax header may precede a file or directory. Its placeholder
+name is metadata, never an entry path; path validation applies to the effective
+file or directory path that follows it.
+
+Tar requires valid unsigned header checksums, octal sizes, complete entry data
+and padding, two zero end blocks and only whole zero blocks after them.
+Directories have zero size. Unsafe paths and duplicate effective paths,
+including file/directory collisions, fail before selection. Tar has no file
+content checksum; its header checksum cannot detect changed payload bytes.
+Use a trusted archive digest when content authentication is needed.
+
+Gzip uses DEFLATE with bounded streaming output. It accepts optional extra,
+name and comment fields and verifies optional header CRC-16, payload CRC-32
+and ISIZE. Concatenated gzip members join into one tar stream and share the
+expanded-byte budget. Reserved flags, incomplete members and trailing bytes
+fail. This follows the member layout in [RFC 1952](https://www.rfc-editor.org/rfc/rfc1952).
+
+All tar headers, including directories and pax headers, count against
+`max_entries`. Every payload, including pax metadata and unselected files,
+counts against `max_entry_bytes` and `max_total_bytes`. Compressed input is
+bounded by `max_archive_bytes`, and inflation stops at `max_expanded_bytes`
+without trusting the trailer size. Readers work entirely in memory and never
+extract files or execute package code. The local adapter reads archive bytes
+through the host filesystem before checking their size; these limits do not
+bound the host read allocation or establish a filesystem sandbox.
 
 ## Standalone script consumer
 

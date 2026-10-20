@@ -213,3 +213,7 @@ run = "moonx scripts/publish.mbtx verify-cli"
 [tasks."test:resources"]
 description = "Test the pinned resource consumer against a locally packaged module"
 run = "moonx scripts/test-resource-consumer.mbtx"
+
+[tasks."fixtures:npm"]
+description = "Regenerate the local npm archive fixture without package hooks or network"
+run = "moonx scripts/vendor-tar-fixtures.mbtx"

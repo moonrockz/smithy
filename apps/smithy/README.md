@@ -139,7 +139,7 @@ portable command-line pipelines.
 Run `mise run test:cli` to check the built CLI on every backend, or pass target
 names to select backends. The root [README](../../README.md) lists release assets.
 
-### Explicit directory and ZIP resources
+### Explicit directory, ZIP and tar/gzip resources
 
 Build `sources`, `imports` and projection `imports` accept resource selection
 objects as well as legacy strings. For example:
@@ -154,3 +154,25 @@ names default to those relative paths; `{"path":"a.smithy","name":"public/a.smit
 assigns an alias. Conflicting logical names fail. Plain ZIPs require an explicit
 selection; legacy JAR strings retain Smithy manifest discovery.
 See [build configuration](../../pkgs/smithy-build/README.mbt.md) for the full contract.
+
+Local `.tar`, `.tar.gz` and npm `.tgz` inputs use the same selection objects in
+`sources`, `imports` and projection `imports`:
+
+```json
+{"path":"downloaded-package.tgz","root":"package/models","globs":["**/*.smithy","**/*.json"]}
+```
+
+Each archive requires explicit selection. Physical source paths retain the npm
+wrapper, for example `downloaded-package.tgz!/package/models/service.smithy`.
+Run the checked-in [npm archive example](../../examples/npm-archive/README.md):
+
+```shell
+mise exec -- moon run apps/smithy --target js -- build --config examples/npm-archive/smithy-build.json
+```
+
+The readers accept V7, POSIX ustar and per-file pax tar with regular files and
+directories. Links, special entries, GNU extensions and global pax headers fail.
+Gzip checks header and payload integrity and bounds expanded output, including
+headers and padding, to 256 MiB by default. Tar validates header checksums and
+bounds payload sizes. See the [complete support policy](../../pkgs/artifact-resources/README.mbt.md#tar-and-gzip-support).
+No registry access, installation, extraction or package-hook execution occurs.

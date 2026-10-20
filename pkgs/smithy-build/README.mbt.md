@@ -21,7 +21,7 @@ Local JAR inputs load the IDL and JSON files listed in
 `META-INF/smithy/manifest`. `archive_models` remains the compatible bytes-to-model
 entry point. `declared_models(tree)` applies the same manifest rules to a
 `moonrockz/artifact-resources` entry tree and returns logical resources with
-physical origins. Generic ZIP and filesystem access live in that independent
+physical origins. Generic ZIP, tar/gzip and filesystem access live in that independent
 module. Stored and deflated entries are read without extracting files. Source artifacts retain their manifest paths under
 the JAR filename without its extension.
 
@@ -42,7 +42,7 @@ projection `imports`:
 
 `path` is resolved relative to the configuration file. `root` is mandatory;
 use `.` for the container root. Paths and globs are relative to it. The same
-object works with a directory, an ordinary ZIP or a JAR, without a Smithy
+object works with a directory, ZIP/JAR, `.tar`, `.tar.gz` or npm `.tgz`, without a Smithy
 manifest. Selected models must be `.smithy` or `.json`, and aliases must retain
 the original format. Globs use case-sensitive `*`, `?` and whole-component `**`.
 Every selector must match a file. Results sort lexically by logical name;
@@ -56,8 +56,8 @@ Selecting one physical model under two aliases assembles it once and exports
 both names. Source artifact collisions across input objects still fail.
 
 String inputs retain directory/model discovery and JAR manifest behavior.
-Ordinary ZIP inputs require explicit selection. Nested ZIPs are not opened by
-legacy directory discovery. Explicit selection does not execute included code
+Ordinary ZIP and tar/gzip inputs require explicit selection. Nested ZIP and
+tar/gzip archives are not opened by legacy directory discovery. Explicit selection does not execute included code
 or recursively open archives. See the independent resource module for limits,
 path rules and backend acquisition requirements.
 

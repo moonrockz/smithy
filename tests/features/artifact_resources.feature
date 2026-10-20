@@ -49,3 +49,9 @@ Feature: Reusable local artifact resources
       | container | source                                                  |
       | directory | fixture-directory/module/models/nested/message.smithy   |
       | zip       | fixture.zip!/module/models/nested/message.smithy          |
+
+  Scenario: Load models beneath the npm wrapper without installing the package
+    When I load the local npm model package without installation
+    Then the artifact model contains "example.resources#Message"
+    And the artifact model contains "example.resources#SharedName"
+    And the artifact model excludes "example.resources#ProjectionOnly"
