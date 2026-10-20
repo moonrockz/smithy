@@ -3,3 +3,9 @@ import {
   "moonbitlang/x/fs",
   "moonbitlang/x/path",
 }
+
+import {
+  "moonrockz/artifact-resources/local",
+  "moonrockz/artifact-resources" @resources,
+  "moonbitlang/core/json",
+} for "test"

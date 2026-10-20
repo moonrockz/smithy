@@ -12,6 +12,33 @@ fn ArtifactWorld::new() -> ArtifactWorld {
 
 ///|
 impl @moonspec.World for ArtifactWorld with fn configure(self, setup) {
+  setup.when0("I load the local npm model package without installation", fn() raise {
+    let tree = @local_resources.open(
+      @resources.RepositoryLocation::parse(
+        "../examples/npm-archive/smithy-local-models-1.0.0.tgz",
+      ).unwrap(),
+    )
+    let selection = @resources.Selection::new(
+      @resources.ResourceRoot::parse("package").unwrap(),
+      [
+        @resources.Named(
+          @resources.EntryPath::parse("models/service.smithy").unwrap(),
+          @resources.ResourceName::parse("service.smithy").unwrap(),
+        ),
+        @resources.Exact(
+          @resources.EntryPath::parse("imports/shared.smithy").unwrap(),
+        ),
+      ],
+    ).unwrap()
+    self.resources = @build.selected_models(tree, selection)
+    let loader = @smithy.Loader::new()
+    for resource in self.resources {
+      ignore(loader.add_idl(resource.origin.to_string(), resource.text()))
+    }
+    let loaded = loader.assemble()
+    assert_false(loaded.has_errors())
+    self.model = loaded.model
+  })
   setup.given1("the declared artifact model:", fn(doc : @moonspec.DocString) {
     self.text = doc.content
   })

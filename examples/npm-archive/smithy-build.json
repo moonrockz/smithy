@@ -1,0 +1,7 @@
+{
+  "version": "2.0",
+  "sources": [{"path":"smithy-local-models-1.0.0.tgz","root":"package/models","globs":["**/*.smithy"]}],
+  "imports": [{"path":"smithy-local-models-1.0.0.tgz","root":"package/imports","paths":["shared.smithy"]}],
+  "projections": {"extra":{"imports":[{"path":"smithy-local-models-1.0.0.tgz","root":"package/projection-imports","paths":["extra.smithy"]}]}},
+  "outputDirectory": "../../.dev/out/npm-archive"
+}

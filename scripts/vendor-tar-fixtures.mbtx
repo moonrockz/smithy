@@ -1,0 +1,29 @@
+///|
+/// Regenerate the local npm package fixture without running package hooks.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let dir = root + "/.dev/out/npm-pack-fixture"
+  if @fs.exists(dir) { @fs.rmdir(dir, recursive=true) }
+  @fs.mkdir(dir, recursive=true, allow_exist=true)
+  @fs.write_file(dir + "/package.json", "{\"name\":\"smithy-local-models\",\"version\":\"1.0.0\",\"license\":\"Apache-2.0\",\"scripts\":{\"preinstall\":\"node hook.js\",\"postinstall\":\"node hook.js\"}}")
+  @fs.write_file(dir + "/hook.js", "throw new Error('Resource loading must never execute package hooks');\n")
+  for folder in ["models", "imports", "projection-imports"] {
+    @fs.mkdir(dir + "/" + folder, allow_exist=true)
+    let file = if folder == "models" { "service.smithy" } else if folder == "imports" { "shared.smithy" } else { "extra.smithy" }
+    @fs.write_file(dir + "/" + folder + "/" + file, @fs.read_file(root + "/examples/local-resources/" + folder + "/" + file))
+  }
+  @fs.write_file(dir + "/models/copy.json", "{\"smithy\":\"2.0\",\"metadata\":{\"values\":[9007199254740993]},\"shapes\":{\"example#Example\":{\"type\":\"structure\",\"members\":{\"name\":{\"target\":\"smithy.api#String\"}}}}}")
+  let npm = if @env.get_env_var("OS") == Some("Windows_NT") { "npm.cmd" } else { "npm" }
+  let (code, _, err) = @process.collect_output(npm, ["pack", "--ignore-scripts", "--offline", "--pack-destination", root + "/examples/npm-archive"], cwd=dir)
+  if code != 0 { eprintln(err.text()); @sys.exit(1) }
+  println("Regenerated local npm fixture")
+}

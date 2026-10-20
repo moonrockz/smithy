@@ -1,0 +1,8 @@
+import {
+  "moonrockz/artifact-resources" @resources,
+  "moonrockz/artifact-resources/local" @local_resources,
+  "moonbitlang/core/json",
+  "moonbitlang/x/sys",
+}
+
+pkgtype(kind: "executable")

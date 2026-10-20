@@ -11,6 +11,7 @@ pub(all) struct Limits {
   max_entry_bytes : Int32
   max_match_steps : Int32
   max_total_bytes : Int32
+  max_expanded_bytes : Int32
 }
 
 ///|
@@ -20,6 +21,7 @@ pub fn Limits::new(
   max_entry_bytes~ : Int32 = 16777216,
   max_total_bytes~ : Int32 = 268435456,
   max_match_steps~ : Int32 = 16000000,
+  max_expanded_bytes~ : Int32 = 268435456,
 ) -> Limits {
   {
     max_archive_bytes,
@@ -27,6 +29,7 @@ pub fn Limits::new(
     max_entry_bytes,
     max_total_bytes,
     max_match_steps,
+    max_expanded_bytes,
   }
 }
 
@@ -62,6 +65,7 @@ fn check_limits(limits : Limits, origin : Location) -> Unit raise ResourceError 
     limits.max_entries < 0 ||
     limits.max_entry_bytes < 0 ||
     limits.max_total_bytes < 0 ||
+    limits.max_expanded_bytes < 0 ||
     limits.max_match_steps < 0 {
     raise ResourceError(
       InvalidLimits,

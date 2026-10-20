@@ -9,6 +9,7 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbit-community/zipc@0.2.2",
+  "moonbit-community/flate@0.2.0/gzip",
   "moonbitlang/x@0.5.5/sys",
 }
 
@@ -265,7 +266,12 @@ async fn exercise(
   // Included source code is data and is never executed by selection.
   ignore(selected_zip.add(@zipc.Member::make("module/main.mbt", @zipc.File(@zipc.File::stored_from_bytes(b"not compiled")))))
   @fs.write_file("\{dir}/module.zip", selected_zip.to_bytes())
-  for (container, prefix, tag) in [("local-example", "", "directory"), ("module.zip", "module/", "zip")] {
+  let npm_bytes = @fs.read_file("\{root}/examples/npm-archive/smithy-local-models-1.0.0.tgz").binary()
+  @fs.write_file("\{dir}/module.tgz", npm_bytes)
+  @fs.write_file("\{dir}/module.tar.gz", npm_bytes)
+  @fs.write_file("\{dir}/module.tar", @gzip.gunzip(npm_bytes))
+  let mut expected_models : (String, String)? = None
+  for (container, prefix, tag) in [("local-example", "", "directory"), ("module.zip", "module/", "zip"), ("module.tar", "package/", "tar"), ("module.tar.gz", "package/", "tar.gz"), ("module.tgz", "package/", "tgz")] {
     let selected : Json = { "path": container, "root": prefix + "models", "paths": ["copy.json", { "path": "service.smithy", "name": "public/service.smithy" }], "globs": ["**/*.smithy"] }
     let imported : Json = { "path": container, "root": prefix + "imports", "globs": ["*.smithy"] }
     let projected : Json = { "path": container, "root": prefix + "projection-imports", "paths": ["extra.smithy"] }
@@ -279,10 +285,17 @@ async fn exercise(
     assert_true(source.contains("example#Example"))
     assert_false(source.contains("example.resources#ProjectionOnly"))
     assert_true(extra.contains("example.resources#ProjectionOnly"))
+    match expected_models {
+      None => expected_models = Some((source, extra))
+      Some((expected_source, expected_extra)) => {
+        assert_eq(source, expected_source)
+        assert_eq(extra, expected_extra)
+      }
+    }
     assert_eq(@fs.read_file("\{dir}/\{output}/source/sources/manifest").text(), "copy.json\nservice.smithy\npublic/service.smithy\n")
     assert_false(@fs.exists("\{dir}/\{output}/source/sources/shared.smithy"))
     // Invalid model diagnostics use the physical source rather than its alias.
-    let physical = if tag == "zip" { "module.zip!/module/models/service.smithy" } else { "local-example" + (if @env.get_env_var("OS") == Some("Windows_NT") { "\\models\\service.smithy" } else { "/models/service.smithy" }) }
+    let physical = if tag != "directory" { container + "!/" + prefix + "models/service.smithy" } else { "local-example" + (if @env.get_env_var("OS") == Some("Windows_NT") { "\\models\\service.smithy" } else { "/models/service.smithy" }) }
     // Omitting global imports leaves SharedName unresolved at that physical path.
     let broken : Json = { "version": "2.0", "sources": [selected], "outputDirectory": "selected-broken" }
     @fs.write_file("\{dir}/selected-broken.json", broken.stringify())
@@ -314,6 +327,18 @@ async fn exercise(
   @fs.write_file("\{dir}/plain-zip.json", "{\"version\":\"2.0\",\"sources\":[\"module.zip\"],\"outputDirectory\":\"plain-zip-output\"}")
   let (zip_out, zip_err) = runner.command(["build", "--config", "plain-zip.json"], 1)
   assert_true((zip_out + zip_err).contains("requires an explicit resource selection"))
+  for container in ["module.tar", "module.tar.gz", "module.tgz"] {
+    let config : Json = { "version": "2.0", "sources": [container], "outputDirectory": "plain-archive-output" }
+    @fs.write_file("\{dir}/plain-archive.json", config.stringify())
+    let (out, err) = runner.command(["build", "--config", "plain-archive.json"], 1)
+    assert_true((out + err).contains("requires an explicit resource selection"))
+    @fs.write_file("\{dir}/broken-" + container, b"truncated archive")
+    let config : Json = { "version": "2.0", "sources": [{ "path": "broken-" + container, "root": "package", "globs": ["**/*.smithy"] }], "outputDirectory": "broken-archive-output" }
+    @fs.write_file("\{dir}/broken-archive.json", config.stringify())
+    let (out, err) = runner.command(["build", "--config", "broken-archive.json"], 1)
+    assert_true((out + err).contains("invalid-archive") && (out + err).contains("input[.]"))
+    assert_false(@fs.exists("\{dir}/broken-archive-output"))
+  }
   assert_true(@fs.exists("\{dir}/input.smithy"))
   @fs.mkdir("\{dir}/nested", allow_exist=true)
   @fs.write_file("\{dir}/nested/keep.smithy", input)
