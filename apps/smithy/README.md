@@ -400,7 +400,7 @@ smithy validate rpc --version 2.0 --service example#Calculator --response reply.
 
 Invalid messages exit 1; invalid command options or service mappings exit 2. ID advisories
 alone still exit 0. JSON diagnostics include exact message paths, operation and member IDs,
-and parse offsets. Batches and exchanges remain unsupported by this command.
+and parse offsets. Explicit JSON-RPC 2.0 batches use `--batch`; exchanges remain a separate capability.
 See the [RPC library and runnable calculator examples](../../pkgs/smithy-validation/rpc/README.mbt.md)
 for trait definitions, version rules, parameter mapping, stdin and dependency isolation.
 
@@ -412,6 +412,18 @@ mode emits a `LimitedScope` advisory and does not check modeled payloads. JSON d
 one complete stdout report with `scope`, `kind`, `operation`, exact ID and structured findings.
 Version 1.0 errors remain opaque by default; `--legacy-errors code-message-data` opts into modeled
 application error data checks. Only one model/message/response/original-request input can use stdin.
+
+Add `--batch` to `--message` for request arrays, or to `--response` for response arrays.
+`--batch --response replies.json --request calls.json` checks the complete batch association,
+including unordered exact IDs, modeled payloads, missing/duplicate/unsolicited responses and
+notification omissions. Original array indices appear in structured findings. An invalid whole
+batch requires one error object. Invalid entries within a nonempty batch each require an error
+in the response array. A response batch may correctly report invalid requests and pass validation.
+
+`--batch --no-response --request notifications.json` checks absence for an all-notification batch.
+An empty response array always fails. Duplicate call IDs are advisory during request validation
+and fail ambiguous correlation. Version 1.0 batch arrays report `UnsupportedMessage`; its
+multi-message transport framing is separate. Batches introduce no handler execution or scheduling.
 
 ## Public GitHub release assets
 

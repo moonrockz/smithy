@@ -26,6 +26,7 @@ with exact numbers and structured findings. The CLI exposes it through `smithy v
 See [value validation](pkgs/smithy-validation/README.mbt.md).
 Its [RPC package](pkgs/smithy-validation/rpc/README.mbt.md) checks JSON-RPC 1.0 and 2.0 requests,
 notifications and contextual responses against modeled service methods through `smithy validate rpc`.
+Explicit JSON-RPC 2.0 batch checks preserve element paths and associate unordered replies by exact IDs.
 
 The [protocol test suite API](pkgs/smithy/protocoltests/README.mbt.md) loads standard
 HTTP request/response test cases and compares messages produced by supplied

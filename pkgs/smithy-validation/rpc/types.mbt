@@ -90,6 +90,9 @@ pub(all) enum FindingCode {
   UnexpectedResponse
   InvalidError
   UnknownError
+  AmbiguousId
+  DuplicateResponse
+  MissingResponse
   Value(@validation.FindingCode)
 } derive(Eq, Debug)
 
@@ -113,6 +116,9 @@ pub fn FindingCode::to_string(self : FindingCode) -> String {
     UnexpectedResponse => "UnexpectedResponse"
     InvalidError => "InvalidError"
     UnknownError => "UnknownError"
+    AmbiguousId => "AmbiguousId"
+    DuplicateResponse => "DuplicateResponse"
+    MissingResponse => "MissingResponse"
     Value(code) => code.to_string()
   }
 }

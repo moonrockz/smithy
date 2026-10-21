@@ -4,7 +4,7 @@ This is the shared design for Smithy value validation, JSON-RPC modeling/message
 validation and OpenRPC export. Direct JSON value validation is implemented in this module and the
 `validate value` CLI. The `rpc` package implements opt-in JSON-RPC trait definitions, prepared
 methods, request/notification and contextual response/error validation through `smithy validate rpc`.
-Batches, exchanges and the Ion adapter remain follow-on capabilities. The separate
+Explicit 2.0 batches are implemented; exchanges and the Ion adapter remain follow-on capabilities. The separate
 `moonrockz/smithy-openrpc` module implements description export through a library and build plugin.
 See the [message validator](rpc/README.mbt.md) for executable examples and implemented boundaries.
 
@@ -154,7 +154,13 @@ model.smithy`. Responses use `--response reply.json` with one of `--method subtr
 `--operation example#Subtract`, `--request call.json` or `--envelope-only`. Missing response
 context fails. JSON diagnostics are one complete stdout report. The scope is explicit; method-only
 checks cannot prove correlation. Legacy opaque errors remain distinct from the opt-in
-`--legacy-errors code-message-data` mapping. Transcript mode with explicit directions remains planned.
+`--legacy-errors code-message-data` mapping. Add `--batch` for explicit 2.0 request/response arrays.
+Original batch context declares the complete supplied batch association, with unordered exact-ID
+matching and notification omissions. `--batch --no-response --request` checks absence separately
+from an invalid empty response array. Duplicate call IDs remain request advisories but fail
+ambiguous correlation. Identical invalid-element errors form a multiset. See the RPC guide for
+typed batch contexts, indexed results, single invalid-whole-batch errors and resource policies.
+Transcript mode with explicit directions remains planned.
 
 ## Rule and original-example coverage
 

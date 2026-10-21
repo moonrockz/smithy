@@ -1,4 +1,4 @@
-Feature: JSON-RPC requests and notifications
+Feature: JSON-RPC requests notifications and batches
   A Smithy service defines the methods whose incoming JSON messages are checked.
 
   Scenario: Version 2 positional calls use the explicit input order
@@ -35,3 +35,34 @@ Feature: JSON-RPC requests and notifications
     Given the calculator API prepared for JSON-RPC "2.0"
     When I validate the RPC message "{\"jsonrpc\":\"2.0\",\"method\":\"subtract\"}"
     Then the RPC finding is "RequiredMember" at "/params/minuend" on "example#SubtractInput$minuend"
+
+  Scenario: Request batches retain original element paths
+    Given the calculator API prepared for JSON-RPC "2.0"
+    When I validate the RPC request batch "[{\"jsonrpc\":\"2.0\",\"method\":\"ping\"},{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,\"bad\"]}]"
+    Then the batch finding is "TypeMismatch" at "/1/params/1"
+
+  Scenario: Response batch order does not determine method association
+    Given the calculator API prepared for JSON-RPC "2.0"
+    When I validate the RPC request batch "[{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,23],\"id\":9007199254740993},{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":\"second\"}]"
+    And I validate its response batch "[{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":\"second\"},{\"jsonrpc\":\"2.0\",\"result\":19,\"id\":9007199254740993}]"
+    Then the response batch is valid
+
+  Scenario: Notifications require silence instead of an empty response array
+    Given the calculator API prepared for JSON-RPC "2.0"
+    When I validate the RPC request batch "[{\"jsonrpc\":\"2.0\",\"method\":\"ping\"}]"
+    And I validate its absent batch response
+    Then the response batch is valid
+    When I validate its response batch "[]"
+    Then the response batch is invalid
+
+  Scenario: Empty batches require one invalid-request error
+    Given the calculator API prepared for JSON-RPC "2.0"
+    When I validate the RPC request batch "[]"
+    Then the batch finding is "InvalidEnvelope" at ""
+    When I validate its response batch "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null}"
+    Then the response batch is valid
+
+  Scenario: Version 1 multiple messages are distinct from version 2 batches
+    Given the calculator API prepared for JSON-RPC "1.0"
+    When I validate the RPC request batch "[{\"method\":\"ping\",\"params\":[],\"id\":1}]"
+    Then the batch finding is "UnsupportedMessage" at ""

@@ -20,5 +20,14 @@ fn main raise {
   let wrong_reply = service.validate_response("{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":9007199254740992}", context=Some(@rpc.OriginalRequest("{\"jsonrpc\":\"2.0\",\"method\":\"count\",\"params\":[2],\"id\":9007199254740993}")))
   assert_false(wrong_reply.is_valid())
   assert_eq(wrong_reply.findings[0].code, @rpc.IdMismatch)
+  let batch = "[{\"jsonrpc\":\"2.0\",\"method\":\"count\",\"params\":[2],\"id\":9007199254740993},{\"jsonrpc\":\"2.0\",\"method\":\"count\",\"params\":[3],\"id\":\"next\"}]"
+  assert_true(service.validate_request_batch(batch).is_valid())
+  let batch_reply = service.validate_response_batch(Some("[{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":\"next\"},{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":9007199254740993}]"), context=Some(@rpc.OriginalBatch(batch)))
+  assert_true(batch_reply.is_valid())
+  assert_eq(batch_reply.entries[0].request_index, Some(1))
+  assert_eq(batch_reply.entries[1].request_index, Some(0))
+  let notification_batch = "[{\"jsonrpc\":\"2.0\",\"method\":\"count\",\"params\":[2]}]"
+  assert_true(service.validate_response_batch(None, context=Some(@rpc.OriginalBatch(notification_batch))).is_valid())
+  assert_false(service.validate_response_batch(Some("[]"), context=Some(@rpc.OriginalBatch(notification_batch))).is_valid())
   println("rpc valid=\{good.is_valid()} invalid=\{bad.findings[0].code.to_string()} at \{bad.findings[0].path.pointer()}")
 }
