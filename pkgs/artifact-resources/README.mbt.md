@@ -191,8 +191,8 @@ Smithy's manifest consumer retains its stricter rules.
 The pure contracts run on all four targets. Filesystem acquisition requires
 the corresponding host filesystem implementation. Raw Wasm files need the
 MoonBit filesystem imports. Local loading makes no network requests.
-Additional repository adapters and credential support are later
-slices. This module joins the repository's next normal shared release.
+Public HTTP, GitHub, npm and Maven acquisition and supplied credentials are
+implemented below. This module joins the repository's next normal shared release.
 
 ## Tar and gzip support
 
@@ -260,11 +260,12 @@ readers and selectors. URLs require lowercase `http://` or `https://`, an
 authority, printable ASCII, no user information and no fragment. Percent-encode
 non-ASCII path and query characters.
 
-`HttpTransport` is a synchronous callback from `HttpUrl` and `AcquisitionLimits`
+`HttpTransport` is a synchronous callback from `HttpRequest` and `AcquisitionLimits`
 to `HttpResponse`, with `resolved`, `status` and binary `body` fields. Hosts can
 provide their own transport without changing discovery. Transport implementers
 must enforce byte and total transfer time limits during I/O, follow at most five
-redirects, reject credentials and non-HTTP schemes, and verify TLS certificates.
+redirects, reject URL user information and non-HTTP schemes, strip authorization
+on origin changes, and verify TLS certificates.
 HTTPS requests must not redirect to HTTP.
 
 The `moonrockz/artifact-resources/http` package supplies `transport` using curl.
@@ -272,7 +273,11 @@ On Linux and macOS it uses the host's trusted PATH. On Windows it uses the
 OS-installed `System32/curl.exe` through an absolute application path, so a
 checkout-local `curl.exe` cannot take precedence. The Node.js Windows adapter
 uses the trusted host `SystemRoot` environment variable to locate this copy. It invokes curl directly without a shell, disables curl configuration
-files and URL globbing, and leaves certificate verification enabled. curl 7.61+
+files and URL globbing, and leaves certificate verification enabled. Authorization
+headers travel through a private stdin pipe, never argv or temporary files.
+The MoonBit adapter follows redirects explicitly and strips authorization before
+contacting another origin. It never introduces that destination's configured
+credential during a redirect. A monotonic deadline covers all hops. curl 7.61+
 with HTTP/HTTPS support is required. It uses the host trust store and honors
 curl's proxy and certificate environment settings. See curl's
 [transport options](https://curl.se/docs/manpage.html).
@@ -311,7 +316,7 @@ Stable acquisition codes are `unsupported-transport`, `transport-failure`,
 `missing-asset` for 404/410, `rate-limited` for 429, `http-status` for other non-200 responses, and
 `integrity-failure` for a mismatched expected digest. HTTP failures stop before
 archive discovery. Redirect exhaustion and invalid TLS certificates are
-transport failures. There are no credentials or automatic retries.
+transport failures. Credentials are explicit, as described below; there are no automatic retries.
 
 Run the [public URL example](../../examples/public-archive/README.md) for a
 complete build and independent library consumer. `mise run test:http` exercises
@@ -392,7 +397,7 @@ validated `GitHubRepository` in `owner/name` form, a `GitHubAssetRef` with disti
 `GitHubTag` and `GitHubAssetName` values, an explicit `ArchiveFormat` and an optional
 expected `ContentDigest`. Tags are URL-encoded as one path segment. Asset names
 match exactly, including case. There is no latest-release lookup, wildcard asset
-selection, dependency resolution or credential handling.
+selection or dependency resolution. Supplied credentials use the common boundary below.
 
 `GitHubArchive::open(transport, api~, acquisition_limits~, limits~, cache~, mode~)`
 uses the [release-by-tag API](https://docs.github.com/en/rest/releases/releases#get-a-release-by-tag-name)
@@ -409,9 +414,9 @@ No bundled code or package hooks run.
 
 The default API base is `https://api.github.com`. `api` can select a compatible
 public API endpoint, including a loopback fixture server. It must be a
-credential-free HTTP(S) base without query or fragment. GitHub.com is the
-supported public service; enterprise authentication and compatibility are outside
-this provider's current contract. The acquisition host matrix is the same as
+credential-free HTTP(S) base without query or fragment. GitHub.com is the supported service, including private repositories with supplied
+read tokens. Enterprise SSO and GitHub Enterprise Server compatibility have not
+been qualified. The acquisition host matrix is the same as
 public HTTP archives: native Linux/macOS/Windows and Node.js with curl; Wasm and
 Wasm GC need a supplied transport. Archive reading, provider policy and in-memory
 cache use work on all four targets. Local inputs need no network.
@@ -498,7 +503,7 @@ complete public model build and an independent library consumer. Default host
 support matches public HTTP: native Linux/macOS/Windows and Node.js with curl.
 Wasm and Wasm GC support the portable provider, integrity and archive code with a
 supplied transport/cache store. Public compatible registries can be configured;
-credentials and private registries remain a separate milestone.
+private registries use the explicit origin credentials described below.
 
 ## Pinned Maven JARs
 
@@ -548,8 +553,9 @@ package/version 404/410, `missing-artifact` for a Maven JAR or sidecar 404/410,
 `invalid-resolution` for mismatched or malformed metadata/coordinates,
 `unsupported-integrity` for unsupported npm integrity metadata, and the shared
 `authentication-required`, `rate-limited`, `integrity-failure`, cache, transport,
-archive and selection codes. Authentication-required responses do not trigger a
-credential lookup. Private repositories may conceal resources with 404 responses.
+archive and selection codes. Credentials are supplied before the request; a failed
+request does not trigger ambient lookup, login or a fallback identity. Private
+repositories may conceal resources with 404 responses.
 
 The generic `IntegrityVerifier` callback accepted by `acquire` and
 `PublicArchive::open` runs after shared SHA-256 verification and before fresh
@@ -561,3 +567,62 @@ API migration: exhaustive `ProvenanceStep` matches must handle
 `NpmRequestStep`, `NpmStep`, `MavenRequestStep` and `MavenStep`; `ResourceCode`
 matches must handle `MissingPackageVersion`, `MissingArtifact` and
 `UnsupportedIntegrity`.
+
+## Supplied repository credentials
+
+`HttpOrigin` validates an origin without path, query, fragment or URL user
+information. It normalizes host case and default ports. `Authorization::bearer`
+validates a token; `Authorization::basic` validates a username/password pair and
+encodes the Basic header. Both reject control characters, and Debug/Show output
+is redacted. `header_value()` is a host-adapter-only wire boundary and must never
+be logged. Secrets stay in memory; there is no automatic `.npmrc`, Maven settings,
+GitHub CLI, `.netrc`, interactive login or enterprise SSO discovery.
+
+Construct `Credentials::new(entries=[(origin, authorization)])` with at most 32
+unique origins. HTTPS is required except for `localhost`, `127.0.0.1` and `[::1]`
+loopback fixtures. A binding covers every path on that exact scheme/host/port;
+configure separate origins for separate trust domains. A separately hosted npm
+tarball needs its own explicit binding if it requires authentication. Redirects
+never introduce a destination credential or carry the original authorization to
+another origin.
+
+Pass `credentials~` to `acquire`, `PublicArchive::open`, `NpmArchive::open`,
+`MavenArchive::open`, `GitHubArchive::open` or their `register_*` functions. The
+default is anonymous. `HttpRequest` carries the URL, optional authorization and
+an `HttpAccept` value. Custom transports must preserve the same bounds, TLS and
+redirect rules. Migration from the former callback uses `request.url` where the
+callback previously received a `HttpUrl`; direct host calls wrap public URLs in
+`HttpRequest::anonymous(url)`.
+
+GitHub uses Bearer authorization for release metadata. When its API origin has a
+credential, the provider constructs `/repos/{owner}/{repo}/releases/assets/{id}`
+and requests `application/octet-stream`, accepting a direct response or a safe
+redirect. It does not send an API token to `browser_download_url`. Fine-grained
+GitHub tokens need repository Contents read permission, as documented by the
+[release asset API](https://docs.github.com/en/rest/releases/assets#get-a-release-asset).
+npm normally uses Bearer tokens; Maven repositories commonly use Basic credentials
+or a repository-issued Bearer token. The server decides the required permissions.
+
+Authenticated reference and content keys are isolated by origin and a one-way
+identity of the complete authorization value. Anonymous keys remain compatible.
+Changing the token, username/password or origin cannot reuse the old authenticated
+mapping. Raw authorization values are absent from keys, stored metadata,
+provenance, diagnostics and generated build summaries. Cached artifact bodies
+remain the exact downloaded bytes. This cache is private build data, not encrypted
+storage; native and Node publish files with owner-only POSIX permissions.
+Windows uses the host ACL policy. Protect the directory with host filesystem permissions.
+
+Online hits and offline builds require the same supplied credential and recheck
+content integrity. They do not contact the server to reauthorize, so server-side
+revocation is not checked on cache hits. Remove the relevant cache when revocation
+must take effect locally. `--offline` never performs a credential challenge or
+network request. A changed/missing identity produces `offline-miss`; 401/403
+produce `authentication-required` with the HTTP status, and concealed 404s retain
+the provider's missing-resource code. Response bodies and secret values are not
+included in authentication diagnostics.
+
+`mise run test:http` runs controlled authenticated npm, Maven and GitHub builds on
+native and Node, including all build input positions, same-origin and cross-origin
+redirects, missing/invalid/insufficient credentials, redaction and offline cache
+isolation. Portable policy tests run on all four backends. Wasm default acquisition
+remains `unsupported-transport`; supplied transports can use the portable policy.

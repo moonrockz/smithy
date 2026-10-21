@@ -198,7 +198,7 @@ Add `root` and `paths`/`globs` for explicit selection instead of manifest discov
 The same acquired tree and model-selection path serve every build position.
 
 Only one of `path`, `url`, `github`, `npm` or `maven` may select an input. Unknown
-coordinate fields, credentials, explicit format overrides, dependency ranges,
+coordinate fields, input-level credentials, explicit format overrides, dependency ranges,
 mutable snapshots and transitive resolution settings are rejected. The legacy
 root-level `maven.dependencies` configuration remains unsupported; these selected
 inputs acquire direct artifacts and do not resolve a dependency graph.
@@ -213,3 +213,22 @@ See the [provider contracts](../artifact-resources/README.mbt.md#public-npm-pack
 [npm example](../../examples/npm-registry/README.md) and
 [Maven example](../../examples/maven-repository/README.md). All remote inputs share
 `cacheDirectory`, `offline` and the CLI cache flags.
+
+## Credential bindings
+
+Root-level `credentials` is an array of `CredentialBinding` values. Each binding
+has an exact `HttpOrigin` and a `CredentialSource`: `BearerEnvironment` or
+`BasicEnvironment`, using validated `CredentialVariable` names. JSON uses
+`origin` plus `bearerTokenEnv`, or `origin` plus `usernameEnv` and `passwordEnv`.
+Literal secrets, mixed methods, duplicate origins and insecure remote HTTP
+origins are rejected. Credentials are parsed before general environment expansion;
+this section never expands `${NAME}` placeholders.
+
+`BuildConfig::resolve_credentials(environment)` resolves supplied values into the
+resource library's redacted `Credentials`. The configuration itself retains only
+references. The CLI resolves them once per build and passes them through every
+provider in sources and both import scopes. The library does not read ambient
+environment variables or initiate I/O. Missing/empty values and malformed
+credentials report generic errors without echoing secrets. See the
+[CLI setup](../../apps/smithy/README.md#repository-credentials) and
+[cache/redirect policy](../artifact-resources/README.mbt.md#supplied-repository-credentials).

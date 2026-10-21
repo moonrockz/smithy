@@ -1,6 +1,7 @@
 import {
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
+  "moonbitlang/core/debug",
   "moonbitlang/x/crypto",
   "moonbitlang/x/codec/base64",
   "moonbit-community/zipc",
@@ -10,6 +11,7 @@ import {
 
 import {
   "moonrockz/artifact-resources" @resources,
+  "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
   "moonbit-community/zipc",
   "moonbit-community/flate/gzip",

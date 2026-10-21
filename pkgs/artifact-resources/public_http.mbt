@@ -136,9 +136,10 @@ pub(all) struct HttpResponse {
 
 ///|
 /// A synchronous host boundary, independent of archive and resource discovery.
-/// Follow at most five redirects, prohibit credentials and non-HTTP schemes,
+/// Follow at most five redirects, prohibit URL user information and non-HTTP
+/// schemes, strip authorization on origin changes,
 /// preserve TLS certificate verification, and enforce the total time/byte bounds.
-pub type HttpTransport = (HttpUrl, AcquisitionLimits) -> HttpResponse raise ResourceError
+pub type HttpTransport = (HttpRequest, AcquisitionLimits) -> HttpResponse raise ResourceError
 
 ///|
 pub(all) struct PublicArchive {
@@ -165,6 +166,8 @@ pub fn PublicArchive::open(
   cache~ : VerifiedCache? = None,
   mode~ : AcquisitionMode = Online,
   verify~ : IntegrityVerifier = (_, _) => (),
+  credentials~ : Credentials = Credentials::new().unwrap(),
+  accept~ : HttpAccept = AnyContent,
 ) -> EntryTree raise ResourceError {
   check_limits(limits, self.url.location())
   let origin = Provenance::new(self.url.location())
@@ -186,6 +189,8 @@ pub fn PublicArchive::open(
     cache~,
     mode~,
     verify~,
+    credentials~,
+    accept~,
   )
   let response : HttpResponse = {
     resolved: acquired.metadata.resolved,
@@ -222,6 +227,7 @@ pub fn register_public_http(
   limits~ : Limits = Limits::new(),
   cache~ : VerifiedCache? = None,
   mode~ : AcquisitionMode = Online,
+  credentials~ : Credentials = Credentials::new().unwrap(),
 ) -> Registry raise ResourceError {
   registry.register_provider(ProviderId::parse("public-http").unwrap(), (
     repository,
@@ -242,6 +248,7 @@ pub fn register_public_http(
       limits~,
       cache~,
       mode~,
+      credentials~,
     )
     {
       reference,

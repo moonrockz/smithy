@@ -289,8 +289,16 @@ pub fn MavenArchive::open(
   limits~ : Limits = Limits::new(),
   cache~ : VerifiedCache? = None,
   mode~ : AcquisitionMode = Online,
+  credentials~ : Credentials = Credentials::new().unwrap(),
 ) -> EntryTree raise ResourceError {
-  self.open_resolved(transport, acquisition_limits~, limits~, cache~, mode~).1
+  self.open_resolved(
+    transport,
+    acquisition_limits~,
+    limits~,
+    cache~,
+    mode~,
+    credentials~,
+  ).1
 }
 
 ///|
@@ -301,6 +309,7 @@ fn MavenArchive::open_resolved(
   limits~ : Limits,
   cache~ : VerifiedCache?,
   mode~ : AcquisitionMode,
+  credentials~ : Credentials,
 ) -> (MavenResolution, EntryTree) raise ResourceError {
   let origin = Provenance::new(self.repository.location()).maven_requested(
     self.repository,
@@ -327,6 +336,7 @@ fn MavenArchive::open_resolved(
         },
         cache~,
         mode~,
+        credentials~,
       )
       let text = @utf8.decode(data.body) catch {
         _ =>
@@ -361,19 +371,24 @@ fn MavenArchive::open_resolved(
       url: artifact,
       format: Zip,
       expected_digest: self.expected_digest,
-    }.open(transport, acquisition_limits~, limits~, cache~, mode~, verify=(
-      body,
-      at,
-    ) => {
-      if verification is RepositoryChecksum(_, checksum) &&
-        !checksum.matches(body) {
-        raise ResourceError(
-          IntegrityFailure,
-          at,
-          "JAR does not match repository " + checksum.to_string(),
-        )
-      }
-    }) catch {
+    }.open(
+      transport,
+      acquisition_limits~,
+      limits~,
+      cache~,
+      mode~,
+      credentials~,
+      verify=(body, at) => {
+        if verification is RepositoryChecksum(_, checksum) &&
+          !checksum.matches(body) {
+          raise ResourceError(
+            IntegrityFailure,
+            at,
+            "JAR does not match repository " + checksum.to_string(),
+          )
+        }
+      },
+    ) catch {
       ResourceError(code, at, message) =>
         raise ResourceError(code, at.through(origin.maven(resolution)), message)
     }
@@ -396,6 +411,7 @@ pub fn register_maven(
   limits~ : Limits = Limits::new(),
   cache~ : VerifiedCache? = None,
   mode~ : AcquisitionMode = Online,
+  credentials~ : Credentials = Credentials::new().unwrap(),
 ) -> Registry raise ResourceError {
   registry.register_provider(ProviderId::parse("maven").unwrap(), (
     repository,
@@ -414,7 +430,14 @@ pub fn register_maven(
       coordinates,
       checksum,
       expected_digest,
-    }.open_resolved(transport, acquisition_limits~, limits~, cache~, mode~)
+    }.open_resolved(
+      transport,
+      acquisition_limits~,
+      limits~,
+      cache~,
+      mode~,
+      credentials~,
+    )
     {
       reference,
       identity: ArtifactIdentity::parse(resolution.to_string()).unwrap(),

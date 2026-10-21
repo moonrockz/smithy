@@ -77,7 +77,7 @@ test "public HTTP provider retains reference resolved URL digest and resource or
   let registry = @resources.register_public_http(
     @resources.Registry::new(),
     (seen, limits) => {
-      calls.push((seen, limits.max_bytes))
+      calls.push((seen.url, limits.max_bytes))
       { resolved, status: 200, body: bytes, }
     },
     expected_digest=Some(digest),

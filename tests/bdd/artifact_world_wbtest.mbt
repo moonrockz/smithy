@@ -67,7 +67,7 @@ impl @moonspec.World for ArtifactWorld with fn configure(self, setup) {
           },
         }
         {
-          resolved: url,
+          resolved: url.url,
           status: 200,
           body: if url.to_string().contains("registry.fixture.test") {
             @utf8.encode(metadata.stringify())
@@ -106,7 +106,20 @@ impl @moonspec.World for ArtifactWorld with fn configure(self, setup) {
     assert_false(assembled.has_errors())
     self.model = assembled.model
   })
-  setup.when0("I resolve the pinned Maven JAR offline", fn() raise {
+  setup.when1("I resolve the {string} Maven JAR offline", fn(
+    access : String,
+  ) raise {
+    assert_true(access == "public" || access == "authenticated")
+    let credentials = if access == "authenticated" {
+      @resources.Credentials::new(entries=[
+        (
+          @resources.HttpOrigin::parse("https://repo.fixture.test").unwrap(),
+          @resources.Authorization::bearer("fixture-private-token").unwrap(),
+        ),
+      ]).unwrap()
+    } else {
+      @resources.Credentials::new().unwrap()
+    }
     let archive = @zipc.Archive::empty()
     for
       (path, text) in [
@@ -145,12 +158,19 @@ impl @moonspec.World for ArtifactWorld with fn configure(self, setup) {
       publish: (key, data) => values[key] = data,
     })
     let online = request.open(
-      (url, _) => { resolved: url, status: 200, body: bytes, },
+      (request, _) => {
+        if request.authorization != credentials.for_url(request.url) {
+          abort("incorrect fixture authorization")
+        }
+        { resolved: request.url, status: 200, body: bytes, }
+      },
       cache=Some(cache),
+      credentials~,
     )
     let offline = request.open(
       (_, _) => abort("offline Maven called transport"),
       cache=Some(cache),
+      credentials~,
       mode=@resources.Offline,
     )
     assert_eq(online.provenance(), offline.provenance())
@@ -296,7 +316,7 @@ impl @moonspec.World for ArtifactWorld with fn configure(self, setup) {
             } else {
               bytes
             }
-            { resolved: url, status: 200, body, }
+            { resolved: url.url, status: 200, body, }
           },
           cache=Some(cache),
         )

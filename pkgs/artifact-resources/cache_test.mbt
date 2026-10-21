@@ -29,7 +29,7 @@ test "verified cache reuses remote identities online and offline without transpo
   let digest = @resources.ContentDigest::sha256(body)
   let calls = []
   let transport : @resources.HttpTransport = (seen, _) => {
-    calls.push(seen)
+    calls.push(seen.url)
     { resolved, status: 200, body, }
   }
   let request : @resources.PublicArchive = {

@@ -65,7 +65,7 @@ fn npm_transport(
     let is_metadata = requested.to_string().has_prefix("https://registry.test/")
     {
       resolved: if is_metadata {
-        metadata_resolved.unwrap_or(requested)
+        metadata_resolved.unwrap_or(requested.url)
       } else {
         url("https://cdn.test/pinned.tgz")
       },
@@ -122,7 +122,7 @@ fn maven_transport(
     } else {
       body
     }
-    { resolved: requested, status: 200, body: data, }
+    { resolved: requested.url, status: 200, body: data, }
   }
 }
 
@@ -366,7 +366,7 @@ test "npm repository error status and metadata bounds are deterministic" {
     assert_eq(
       repository_code(() => {
         npm_request().open((requested, _) => {
-          resolved: requested,
+          resolved: requested.url,
           status,
           body: b"invalid",
         })
@@ -378,7 +378,7 @@ test "npm repository error status and metadata bounds are deterministic" {
     repository_code(() => {
       npm_request().open(
         (requested, _) => {
-          resolved: requested,
+          resolved: requested.url,
           status: 200,
           body: Bytes::make(65, 65),
         },
@@ -473,7 +473,7 @@ test "Maven explicit SHA256 takes precedence and bad checksums never populate ar
     ] {
     let values = Map([])
     let transport : @resources.HttpTransport = (requested, _) => {
-      resolved: requested,
+      resolved: requested.url,
       status: 200,
       body: if requested.to_string().has_suffix(".sha1") {
         sidecar
@@ -509,7 +509,7 @@ test "Maven repository selection isolates identical coordinates and cache refere
       } else {
         b"two"
       }
-      { resolved: requested, status: 200, body, }
+      { resolved: requested.url, status: 200, body, }
     },
     expected_digest=Some(@resources.ContentDigest::sha256(b"one")),
     cache=Some(cache),
@@ -559,7 +559,7 @@ test "Maven statuses and all reference boundary constructors fail safely" {
     assert_eq(
       repository_code(() => {
         maven_request().open((requested, _) => {
-          resolved: requested,
+          resolved: requested.url,
           status,
           body: b"error",
         })

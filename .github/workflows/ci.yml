@@ -97,8 +97,15 @@ jobs:
       - name: Build smithy natively for Windows
         run: moon build apps/smithy --target native --release
 
-      - name: Test public archive acquisition on Windows
-        run: moonx scripts/test-public-http.mbtx native
+      # Keep this version aligned with the Node pin in .config/mise/config.toml.
+      - name: Install Node for Windows acquisition fixtures
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.14.1'
+          package-manager-cache: false
+
+      - name: Test public and authenticated acquisition on Windows
+        run: moonx scripts/test-public-http.mbtx native js
 
       - name: Upload the executable
         uses: actions/upload-artifact@v4

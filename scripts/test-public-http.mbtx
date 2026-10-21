@@ -8,6 +8,7 @@ import {
   "moonbitlang/async@0.22.5/socket",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/env",
+  "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/x@0.5.5/crypto",
   "moonbitlang/x@0.5.5/codec/base64",
@@ -503,6 +504,202 @@ async fn repository_builds(
 }
 
 ///|
+async fn credential_builds(
+  dir : String,
+  executable : String,
+  prefix : Array[String],
+  target : String,
+  base : String,
+  redirect_base : String,
+  jars : Map[String, Bytes],
+  digest : String,
+  requests : Array[String],
+  denied : Ref[Bool],
+) -> Unit {
+  let supported = target == "native" || target == "js"
+  for kind in ["npm-scoped", "maven", "github"] {
+    let stem = target + "-private-" + kind
+    fn selected(scope : String) -> Json raise {
+      let root = match scope {
+        "sources" => "models"
+        "imports" => "imports"
+        _ => "projection"
+      }
+      @json.parse(
+        if kind == "github" {
+          github_selection(base + "/private/github", "models.zip", root, digest)
+        } else {
+          repository_selection(base + "/private", kind, scope, jars)
+        },
+      )
+    }
+    let binding : Json = if kind == "maven" {
+      {
+        "origin": base,
+        "usernameEnv": "FIXTURE_USER",
+        "passwordEnv": "FIXTURE_PASSWORD",
+      }
+    } else {
+      { "origin": base, "bearerTokenEnv": "FIXTURE_TOKEN" }
+    }
+    let config : Json = {
+      "version": "2.0",
+      "sources": [selected("sources")],
+      "imports": [selected("imports")],
+      "projections": { "extra": { "imports": [selected("projection")] } },
+      "credentials": [
+        binding,
+        { "origin": redirect_base, "bearerTokenEnv": "REDIRECT_TOKEN" },
+      ],
+      "outputDirectory": stem,
+    }
+    let config_path = dir + "/" + stem + ".json"
+    @fs.write_file(config_path, config.stringify())
+    let environment = {
+      "FIXTURE_TOKEN": "fixture-token",
+      "FIXTURE_USER": "fixtures",
+      "FIXTURE_PASSWORD": "password",
+      "REDIRECT_TOKEN": "must-not-be-forwarded",
+    }
+    let args = prefix +
+      ["build", "--config", config_path, "--cache-dir", stem + "-cache"]
+    let output = command(
+      dir,
+      executable,
+      args,
+      extra_env=environment,
+      expected=if supported { 0 } else { 1 },
+    )
+    if !supported {
+      assert_true(output.contains("unsupported-transport"), msg=output)
+      continue
+    }
+    let before = snapshot(dir + "/" + stem)
+    let count = requests.length()
+    command(dir, executable, args, extra_env=environment) |> ignore
+    assert_eq(requests.length(), count)
+    denied.val = true
+    command(dir, executable, args + ["--offline"], extra_env=environment)
+    |> ignore
+    denied.val = false
+    assert_eq(requests.length(), count)
+    assert_eq(snapshot(dir + "/" + stem), before)
+    for projection in ["source", "extra"] {
+      assert_eq(
+        @fs.read_file(dir + "/" + stem + "/" + projection + "/model/model.json").text(),
+        @fs.read_file(
+          dir + "/" + target + "-local/" + projection + "/model/model.json",
+        ).text(),
+      )
+    }
+    guard config is Object(anonymous_fields) else { abort("fixture config") }
+    ignore(anonymous_fields.remove("credentials"))
+    let anonymous_path = dir + "/" + stem + "-anonymous.json"
+    @fs.write_file(anonymous_path, Json::object(anonymous_fields).stringify())
+    let missing = command(
+      dir,
+      executable,
+      prefix +
+      ["build", "--config", anonymous_path, "--cache-dir", stem + "-cache"],
+      expected=1,
+    )
+    assert_true(
+      missing.contains("authentication-required") &&
+      missing.contains("HTTP status 401"),
+      msg=missing,
+    )
+    // Changing credentials cannot reuse the warmed cache, even offline.
+    for mode in ["missing", "invalid", "insufficient", "changed-offline"] {
+      let failed_env = environment.copy()
+      if kind == "maven" {
+        failed_env["FIXTURE_PASSWORD"] = if mode == "missing" {
+          ""
+        } else if mode == "insufficient" {
+          "insufficient"
+        } else {
+          "invalid"
+        }
+      } else {
+        failed_env["FIXTURE_TOKEN"] = if mode == "missing" {
+          ""
+        } else if mode == "insufficient" {
+          "insufficient"
+        } else {
+          "invalid"
+        }
+      }
+      let failed = command(
+        dir,
+        executable,
+        args + (if mode == "changed-offline" { ["--offline"] } else { [] }),
+        extra_env=failed_env,
+        expected=1,
+      )
+      assert_true(
+        failed.contains(
+          if mode == "missing" {
+            "credential environment variable"
+          } else if mode == "changed-offline" {
+            "offline-miss"
+          } else {
+            "authentication-required"
+          },
+        ),
+        msg=failed,
+      )
+      if mode == "insufficient" {
+        assert_true(failed.contains("HTTP status 403"), msg=failed)
+      }
+      for
+        secret in [
+          "fixture-token", "password", "must-not-be-forwarded", "Bearer insufficient",
+          "Basic Zml4dHVyZXM6",
+        ] {
+        assert_false(failed.contains(secret), msg=failed)
+      }
+    }
+    // Generated files and every cache entry must exclude supplied secrets.
+    for folder in [stem] {
+      for name, text in snapshot(dir + "/" + folder) {
+        for
+          secret in [
+            "fixture-token", "must-not-be-forwarded", "Zml4dHVyZXM6cGFzc3dvcmQ=",
+          ] {
+          assert_false(name.contains(secret) || text.contains(secret), msg=name)
+        }
+      }
+    }
+    for name in @fs.readdir(dir + "/" + stem + "-cache") {
+      let data = @fs.read_file(dir + "/" + stem + "-cache/" + name).binary()
+      for
+        secret in [
+          "fixture-token", "must-not-be-forwarded", "Zml4dHVyZXM6cGFzc3dvcmQ=",
+        ] {
+        assert_false(
+          name.contains(secret) || data.find(@utf8.encode(secret)[:]) is Some(_),
+          msg=name,
+        )
+      }
+    }
+    if @env.get_env_var("OS") != Some("Windows_NT") {
+      command(dir, "node", [
+        "-e",
+        "const fs=require('node:fs');const dir=process.argv[1];for(const name of fs.readdirSync(dir)){if(fs.statSync(dir+'/'+name).mode & 0o077)process.exit(1)}",
+        stem + "-cache",
+      ])
+      |> ignore
+    }
+    command(dir, executable, prefix + ["clean", "--config", config_path], extra_env={
+      "FIXTURE_TOKEN": "",
+      "FIXTURE_USER": "",
+      "FIXTURE_PASSWORD": "",
+      "REDIRECT_TOKEN": "",
+    })
+    |> ignore
+  }
+}
+
+///|
 async fn exercise(root : String, targets : Array[String]) -> Unit {
   let dir = root + "/.dev/out/public-http"
   if @fs.exists(dir) {
@@ -585,18 +782,74 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
   let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
   defer server.close()
   let base = "http://\{server.addr}"
+  let redirect_server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+  defer redirect_server.close()
+  let redirect_base = "http://\{redirect_server.addr}"
+  let leaked_authorization = Ref(false)
   let requests : Array[String] = []
   let denied = Ref(false)
   @async.with_task_group(group => {
     group.spawn_bg(no_wait=true, () => {
+      redirect_server.run_forever(allow_failure=true, (request, _, conn) => {
+        defer conn.close()
+        if request.headers.get("authorization") is Some(_) {
+          leaked_authorization.val = true
+        }
+        conn.send_response(200, "Redirected asset")
+        conn.write(bytes)
+        conn.end_response()
+      })
+    })
+    group.spawn_bg(no_wait=true, () => {
       server.run_forever(allow_failure=true, (request, _, conn) => {
         defer conn.close()
-        let path = request.path
-        requests.push(path)
+        let wire_path = request.path
+        let private = wire_path.has_prefix("/private/")
+        let path = if wire_path.has_prefix("/private/github/") {
+          wire_path[15:].to_owned()
+        } else if private {
+          wire_path[8:].to_owned()
+        } else {
+          wire_path
+        }
+        requests.push(wire_path)
         if denied.val {
           conn.send_response(503, "Network disabled")
           conn.end_response()
           return
+        }
+        if private {
+          let auth = request.headers.get("authorization")
+          let expected = if path.has_prefix("/maven/") {
+            "Basic Zml4dHVyZXM6cGFzc3dvcmQ="
+          } else {
+            "Bearer fixture-token"
+          }
+          let insufficient = auth == Some("Bearer insufficient") ||
+            auth == Some("Basic Zml4dHVyZXM6aW5zdWZmaWNpZW50")
+          if auth != Some(expected) {
+            conn.send_response(
+              if insufficient {
+                403
+              } else {
+                401
+              },
+              "Credential rejected",
+            )
+            conn.end_response()
+            return
+          }
+          if path == "/repos/owner/models/releases/assets/42" {
+            if request.headers.get("accept") != Some("application/octet-stream") {
+              conn.send_response(403, "Asset media type required")
+            } else {
+              conn.send_response(302, "Asset download", extra_headers={
+                "Location": redirect_base + "/asset.zip",
+              })
+            }
+            conn.end_response()
+            return
+          }
         }
         if path.has_prefix("/maven/") {
           let scope = if path.contains("-sources.jar") {
@@ -637,7 +890,7 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
             "/npm/metadata/unscoped.json"
           }
           conn.send_response(302, "npm metadata redirect", extra_headers={
-            "Location": destination,
+            "Location": (if private { "/private" } else { "" }) + destination,
           })
           conn.end_response()
           return
@@ -653,7 +906,9 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
             "name": name,
             "version": "1.2.3",
             "dist": {
-              "tarball": base + "/npm/archive",
+              "tarball": base +
+              (if private { "/private" } else { "" }) +
+              "/npm/archive",
               "integrity": "sha512-" +
               @base64.encode(
                 Bytes::from_array(@crypto.sha512(npm_tgz).iter().to_array())[:],
@@ -677,7 +932,11 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
         if path == "/slow" {
           @async.sleep(2000)
         }
+        if path == "/slow-redirect" || path == "/slow-redirect-final" {
+          @async.sleep(650)
+        }
         let redirect = match path {
+          "/slow-redirect" => Some("/slow-redirect-final")
           "/relative" => Some("/bytes")
           "/fragment" => Some("/bytes#download")
           "/absolute" => Some(base + "/bytes")
@@ -1055,7 +1314,17 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
       repository_builds(
         dir, executable, prefix, target, base, jars, requests, denied,
       )
-      println("Public HTTP, GitHub, npm and Maven fixtures passed: \{target}")
+      credential_builds(
+        dir, executable, prefix, target, base, redirect_base, jars, digest, requests,
+        denied,
+      )
+      assert_false(
+        leaked_authorization.val,
+        msg="Authorization crossed redirect origin",
+      )
+      println(
+        "Public and authenticated HTTP, GitHub, npm and Maven fixtures passed: \{target}",
+      )
     }
   })
 }
