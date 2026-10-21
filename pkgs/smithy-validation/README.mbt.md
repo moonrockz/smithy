@@ -1,5 +1,8 @@
 # Direct value validation
 
+For JSON-RPC requests and notifications against a modeled service, see the
+[RPC package](rpc/README.mbt.md) and `smithy validate rpc`.
+
 Validate application values against assembled Smithy data shapes through a reusable library and the `smithy validate-value` command. This module depends on the Smithy model and core libraries; optional format integrations belong in separate modules.
 
 ## Library

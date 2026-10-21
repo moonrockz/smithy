@@ -1,0 +1,18 @@
+/// Validate JSON-RPC requests with the standalone library.
+import {
+  "moonrockz/smithy@0.5.0",
+  "moonrockz/smithy-validation@0.5.0/rpc",
+}
+
+///|
+fn main raise {
+  let loaded = @rpc.loader().add_idl("api.smithy",
+    "$version: \"2\"\nnamespace example\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#method\n@jsonRpc(versions: [\"1.0\",\"2.0\"])\nservice Api { version: \"1\", operations: [Count] }\n@method(name: \"count\", params: \"either\", positional: [\"value\"])\noperation Count { input: Input }\nstructure Input { @required @range(min: 1) value: Integer }\n").assemble()
+  let service = @rpc.PreparedService::prepare(loaded.model.unwrap(), @smithy.ShapeId::parse("example#Api").unwrap(), @rpc.V2_0)
+  let good = service.validate_request("{\"jsonrpc\":\"2.0\",\"method\":\"count\",\"params\":[2],\"id\":9007199254740993}")
+  let bad = service.validate_request("{\"jsonrpc\":\"2.0\",\"method\":\"count\",\"params\":[0]}")
+  assert_true(good.is_valid())
+  assert_false(bad.is_valid())
+  assert_eq(bad.findings[0].path.pointer(), "/params/0")
+  println("rpc valid=\{good.is_valid()} invalid=\{bad.findings[0].code.to_string()} at \{bad.findings[0].path.pointer()}")
+}

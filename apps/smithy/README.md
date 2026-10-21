@@ -41,6 +41,7 @@ Use `smithy --help` for the command list, and `smithy convert --help` or
 smithy ast model.smithy extra.json
 smithy validate model.smithy extra.json
 smithy validate-value --shape example#Input --value request.json model.smithy
+smithy validate rpc --version 2.0 --service example#Calculator --message call.json api.smithy
 smithy diff --old previous/ --new current/
 smithy build --config smithy-build.json
 smithy clean --config smithy-build.json
@@ -366,6 +367,22 @@ Invalid usage, missing/nondata targets and unsupported configurations exit 2. In
 Exact numeric tokens survive parsing, including decimals and integers above Double's safe range.
 The [library policies](../../pkgs/smithy-validation/README.mbt.md) document nulls, sparse collections,
 scalar formats, regex restrictions and unsupported runtime contract conditions.
+
+## Validate JSON-RPC requests
+
+`smithy validate rpc` checks a JSON-RPC 1.0 or 2.0 request or notification against a selected
+Smithy service. The command loads the optional `smithy.rpc` traits automatically.
+
+```shell
+smithy validate rpc --version 2.0 --service example#Calculator --message call.json api.smithy
+smithy validate rpc --version 2.0 --service example#Calculator --message invalid.json --diagnostics json api.smithy
+```
+
+Invalid messages exit 1; invalid command options or service mappings exit 2. ID advisories
+alone still exit 0. JSON diagnostics include exact message paths, operation and member IDs,
+and parse offsets. Responses, batches and exchanges remain unsupported by this command.
+See the [RPC library and runnable calculator examples](../../pkgs/smithy-validation/rpc/README.mbt.md)
+for trait definitions, version rules, parameter mapping, stdin and dependency isolation.
 
 ## Public GitHub release assets
 

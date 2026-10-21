@@ -55,7 +55,51 @@ fn command_line() -> @argparse.Command {
         "Assemble IDL/JSON files and print the Smithy JSON AST.",
         options=[output],
       ),
-      input_command("validate", "Assemble files and report model diagnostics."),
+      @argparse.Command(
+        "validate",
+        about="Validate model definitions or JSON-RPC messages with the rpc subcommand.",
+        options=[
+          @argparse.OptionArg("from", about="Model format: idl or json."),
+        ],
+        positionals=[
+          @argparse.PositionArg("file", num_args=@argparse.ValueRange(lower=0)),
+        ],
+        subcommands=[
+          input_command(
+            "rpc",
+            "Validate one JSON-RPC 1.0 or 2.0 request or notification.",
+            options=[
+              @argparse.OptionArg(
+                "version",
+                required=true,
+                about="Explicit JSON-RPC version: 1.0 or 2.0.",
+              ),
+              @argparse.OptionArg(
+                "service",
+                required=true,
+                about="Absolute Smithy service ID.",
+              ),
+              @argparse.OptionArg(
+                "message",
+                required=true,
+                about="JSON message file, or '-' for stdin.",
+              ),
+              @argparse.OptionArg(
+                "diagnostics",
+                about="Findings format: text or json; default text.",
+              ),
+              @argparse.OptionArg(
+                "unknown-members",
+                about="Payload unknown members: reject or ignore; default reject.",
+              ),
+              @argparse.OptionArg(
+                "member-names",
+                about="Payload member names: smithy or json; default smithy.",
+              ),
+            ],
+          ),
+        ],
+      ),
       input_command(
         "validate-value",
         "Validate a JSON value against a selected Smithy data shape.",
@@ -196,6 +240,7 @@ struct Options {
   new_model : String?
   diff_format : DiffFormat
   value_validation : ValueOptions?
+  rpc_version : @rpc.ProtocolVersion?
   offline : Bool
   cache_dir : String?
   config : String?
@@ -213,6 +258,12 @@ fn options(args : Array[String]) -> Options raise CliError {
   guard parsed.subcommand is Some((command, matches)) else {
     raise CliError("expected a command; use --help", 2)
   }
+  let rpc_mode = command == "validate" && matches.subcommand is Some(("rpc", _))
+  // Model inputs and RPC inputs belong to distinct argparse scopes.
+  if rpc_mode && !matches.values.get("file").unwrap_or([]).is_empty() {
+    raise CliError("place model inputs after validate rpc", 2)
+  }
+  let matches = if rpc_mode { matches.subcommand.unwrap().1 } else { matches }
   fn value(name : String) -> String? {
     match matches.values.get(name) {
       Some([value, ..]) => Some(value)
@@ -220,6 +271,9 @@ fn options(args : Array[String]) -> Options raise CliError {
     }
   }
   let files = matches.values.get("file").unwrap_or([])
+  if command == "validate" && files.is_empty() {
+    raise CliError("validate requires model inputs; use validate --help", 2)
+  }
   let from = value("from")
   let to = value("to")
   let selector = value("selector")
@@ -229,12 +283,25 @@ fn options(args : Array[String]) -> Options raise CliError {
   let diff_format = DiffFormat::parse(value("format").unwrap_or("text"))
   let check = matches.flags.get("check") == Some(true)
   let write = matches.flags.get("write") == Some(true)
-  let value_validation = if command == "validate-value" {
-    let raw_shape = value("shape").unwrap()
-    guard @smithy.ShapeId::parse(raw_shape) is Some(target) else {
-      raise CliError("expected an absolute Smithy shape ID after --shape", 2)
+  let rpc_version = if rpc_mode {
+    guard @rpc.ProtocolVersion::parse(value("version").unwrap())
+      is Some(version) else {
+      raise CliError("expected 1.0 or 2.0 after --version", 2)
     }
-    let file = value("value").unwrap()
+    Some(version)
+  } else {
+    None
+  }
+  let value_validation = if command == "validate-value" || rpc_mode {
+    let selector = if rpc_mode { "service" } else { "shape" }
+    let raw_shape = value(selector).unwrap()
+    guard @smithy.ShapeId::parse(raw_shape) is Some(target) else {
+      raise CliError(
+        "expected an absolute Smithy shape ID after --" + selector,
+        2,
+      )
+    }
+    let file = value(if rpc_mode { "message" } else { "value" }).unwrap()
     let diagnostics = match value("diagnostics").unwrap_or("text") {
       "text" => TextFindings
       "json" => JsonFindings
@@ -292,6 +359,7 @@ fn options(args : Array[String]) -> Options raise CliError {
     new_model: value("new"),
     diff_format,
     value_validation,
+    rpc_version,
     command,
     files,
     from,
@@ -396,7 +464,11 @@ fn run(args : Array[String]) -> Int32 raise {
       error => raise error
     }
   }
-  let loader = @smithy.Loader::new()
+  let loader = if opts.rpc_version is Some(_) {
+    @rpc.loader()
+  } else {
+    @smithy.Loader::new()
+  }
   let inputs : Map[String, String] = Map([])
   let formatted : Array[(String, String)] = []
   let mut failed = false
@@ -461,6 +533,9 @@ fn run(args : Array[String]) -> Int32 raise {
   }
   let result = loader.assemble()
   if opts.value_validation is Some(value_opts) {
+    if opts.rpc_version is Some(version) {
+      return run_rpc_validation(value_opts, version, result)
+    }
     return run_value_validation(value_opts, result)
   }
   if opts.command == "validate" {

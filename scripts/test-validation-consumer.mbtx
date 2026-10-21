@@ -121,11 +121,13 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
   let version = manifest_version(@fs.read_file(root + "/moon.mod").text())
   let seen : Set[String] = Set([])
   seed(root, registry_home, fixture, "moonrockz/smithy-validation", version, seen)
-  let consumer = dir + "/consumer"
+  for example_name in ["validation-consumer", "rpc-consumer"] {
+  let consumer = dir + "/" + example_name
   write(consumer + "/moon.work", "members = [\".\"]\n")
   write(consumer + "/moon.mod", "name = \"validation-consumer\"\nversion = \"0.0.0\"\nimport {\n  \"moonrockz/smithy@\{version}\",\n  \"moonrockz/smithy-validation@\{version}\",\n}\n")
-  write(consumer + "/moon.pkg", "pkgtype(kind: \"executable\")\nimport {\n  \"moonrockz/smithy\",\n  \"moonrockz/smithy-validation\" @validation,\n}\n")
-  let example = @fs.read_file(root + "/examples/validation-consumer/main.mbtx").text()
+  let validation_import = if example_name == "rpc-consumer" { "\"moonrockz/smithy-validation/rpc\"," } else { "\"moonrockz/smithy-validation\" @validation," }
+  write(consumer + "/moon.pkg", "pkgtype(kind: \"executable\")\nimport {\n  \"moonrockz/smithy\",\n  " + validation_import + "\n}\n")
+  let example = @fs.read_file(root + "/examples/" + example_name + "/main.mbtx").text()
   guard example.find("///|\nfn main") is Some(start) else { fail("Missing standalone example body") }
   write(consumer + "/main.mbt", example[start:].to_owned())
   let extra_env = { "MOON_HOME": fixture }
@@ -133,12 +135,13 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
     assert_true(["native", "wasm", "js", "wasm-gc"].contains(target), msg="Unknown consumer target")
     let (code, out, err) = @process.collect_output("moon", ["-C", consumer, "run", ".", "--target", target, "--deny-warn"], cwd=dir, extra_env~)
     assert_eq(code, 0, msg=err.text())
-    assert_eq(out.text().trim().to_owned(), "valid=true invalid=Range at /count")
-    println("Isolated consumer passed: " + target)
+    assert_eq(out.text().trim().to_owned(), if example_name == "rpc-consumer" { "rpc valid=true invalid=Range at /params/0" } else { "valid=true invalid=Range at /count" })
+    println("Isolated " + example_name + " passed: " + target)
   }
   let audited = audit_manifests(consumer + "/.mooncakes")
   assert_true(audited >= 4, msg="Expected the full resolved model/validation module graph")
   println("Audited " + audited.to_string() + " resolved manifests without optional integrations")
+  }
 }
 
 ///|

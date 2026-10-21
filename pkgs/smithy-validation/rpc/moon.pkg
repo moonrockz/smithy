@@ -1,0 +1,12 @@
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-validation" @validation,
+  "moonbitlang/core/json",
+}
+
+import {
+  "moonrockz/smithy-validation/rpc",
+  "moonrockz/smithy-validation" @validation,
+  "moonrockz/smithy",
+  "moonbitlang/core/json",
+} for "test"

@@ -1,4 +1,33 @@
 ///|
+test "JSON grammar errors retain the parser location instead of preflight EOF" {
+  for
+    (text, expected) in [
+      ("{\"a\":truX}", 8),
+      ("{\n  \"🐟\": truX\n}", 13),
+      ("[1 2]", 3),
+      ("[1e+, 2]", 4),
+    ] {
+    let mut offset = -1
+    ignore(@validation.parse_json_value(text)) catch {
+      @validation.InvalidJson(at, _) => offset = at
+      _ => fail("Expected a JSON grammar error")
+    }
+    assert_true(offset >= 0 && offset < text.length(), msg=text)
+    assert_eq(offset, expected)
+  }
+}
+
+///|
+test "JSON end-of-input errors retain the EOF offset" {
+  let mut offset = -1
+  ignore(@validation.parse_json_value("{\"a\":")) catch {
+    @validation.InvalidJson(at, _) => offset = at
+    _ => fail("Expected an incomplete JSON value")
+  }
+  assert_eq(offset, 5)
+}
+
+///|
 test "JSON input rejects duplicate names after decoding key escapes" {
   for
     text in [
