@@ -260,8 +260,12 @@ fn options(args : Array[String]) -> Options raise CliError {
   }
   let rpc_mode = command == "validate" && matches.subcommand is Some(("rpc", _))
   // Model inputs and RPC inputs belong to distinct argparse scopes.
-  if rpc_mode && !matches.values.get("file").unwrap_or([]).is_empty() {
-    raise CliError("place model inputs after validate rpc", 2)
+  if rpc_mode &&
+    (
+      !matches.values.get("file").unwrap_or([]).is_empty() ||
+      matches.values.contains("from")
+    ) {
+    raise CliError("place model inputs and options after validate rpc", 2)
   }
   let matches = if rpc_mode { matches.subcommand.unwrap().1 } else { matches }
   fn value(name : String) -> String? {

@@ -1,4 +1,29 @@
 ///|
+test "serialized JSON AST APIs reload without duplicate optional trait definitions" {
+  let original = contract_model(
+    "name: \"op\", params: \"either\", positional: [\"a\",\"b\"]",
+  )
+  let loaded = @rpc.loader()
+    .add_ast("api.json", original.to_json_ast())
+    .assemble()
+  guard loaded.model is Some(model) else {
+    fail(loaded.diagnostics.map(d => d.message).join("\n"))
+  }
+  let service = @rpc.PreparedService::prepare(
+    model,
+    @smithy.ShapeId::parse("test#Api").unwrap(),
+    @rpc.V2_0,
+  )
+  assert_true(
+    service
+    .validate_request(
+      "{\"jsonrpc\":\"2.0\",\"method\":\"op\",\"params\":[1,2]}",
+    )
+    .is_valid(),
+  )
+}
+
+///|
 fn contract_model(
   method_ : String,
   service~ : String = "[\"1.0\",\"2.0\"]",
