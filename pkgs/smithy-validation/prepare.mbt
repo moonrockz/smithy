@@ -19,6 +19,7 @@ priv struct PreparedShape {
   body : @smithy.ShapeBody
   constraints : Constraints
   members : Array[PreparedMember]
+  by_name : Map[String, PreparedMember]
   enum_values : Array[@smithy.NodeValue]
   sparse : Bool
 } derive(Debug)
@@ -36,6 +37,22 @@ fn data_shape(shape : @smithy.Shape) -> Bool {
   match shape.body {
     Operation(..) | Service(..) | Resource(..) => false
     _ => shape.trait_value("smithy.api#mixin") is None
+  }
+}
+
+///|
+fn collection_member(
+  model : @smithy.Model,
+  container : @smithy.ShapeId,
+  member_id : @smithy.ShapeId,
+  name : String,
+) -> Unit raise PreparationError {
+  guard container.with_member(name) == Some(member_id) &&
+    model.shapes.get(member_id) is Some(member_) &&
+    member_.body is Member(_) else {
+    raise InvalidModel(
+      container, "I expected a declared collection member belonging to its containing shape.",
+    )
   }
 }
 
@@ -128,14 +145,26 @@ pub fn PreparedValidator::prepare(
           stack.push(member_id)
         }
       }
-      List(member_id) => stack.push(member_id)
+      List(member_id) => {
+        collection_member(model, effective.id, member_id, "member")
+        stack.push(member_id)
+      }
       Map(key~, value~) => {
+        collection_member(model, effective.id, key, "key")
+        collection_member(model, effective.id, value, "value")
         stack.push(key)
         stack.push(value)
       }
-      Enum(ids) | IntEnum(ids) =>
+      Enum(ids) | IntEnum(ids) => {
+        guard !ids.is_empty() else {
+          raise InvalidModel(
+            id, "I expected at least one declared enum member.",
+          )
+        }
         for member_id in ids {
-          guard model.shapes.get(member_id) is Some(member_shape) else {
+          guard member_id.root() == effective.id &&
+            member_id.member_name() is Some(_) &&
+            model.shapes.get(member_id) is Some(member_shape) else {
             raise InvalidModel(id, "I expected a declared enum member.")
           }
           let value = member_shape.trait_value("smithy.api#enumValue")
@@ -150,6 +179,7 @@ pub fn PreparedValidator::prepare(
               )
           }
         }
+      }
       _ => ()
     }
     if effective_trait(shape, effective, "smithy.api#enum") is Some(value) {
@@ -164,10 +194,15 @@ pub fn PreparedValidator::prepare(
         enum_values.push(@smithy.String(text))
       }
     }
+    let by_name : Map[String, PreparedMember] = Map([])
+    for member_ in members {
+      by_name[member_.name] = member_
+    }
     shapes[id] = {
       id,
       body,
       members,
+      by_name,
       enum_values,
       constraints: prepare_constraints(shape, effective, config),
       sparse: annotation(

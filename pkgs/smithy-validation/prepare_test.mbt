@@ -127,3 +127,28 @@ test "prepare rejects mixin values malformed bounds and runtime conditions" {
   }
   assert_true(unsupported)
 }
+
+///|
+test "prepare rejects empty enums and collection references that are not members" {
+  let enum_model = model("enum Value {\n A\n}")
+  let shape = enum_model.shapes.get(target("Value")).unwrap()
+  enum_model.shapes[target("Value")] = { ..shape, body: @smithy.Enum([]), }
+  let mut rejected = false
+  ignore(@validation.PreparedValidator::prepare(enum_model, target("Value"))) catch {
+    @validation.InvalidModel(_, _) => rejected = true
+    _ => fail("Expected invalid enum rejection")
+  }
+  assert_true(rejected)
+  let list_model = model("list Value { member: String }")
+  let shape = list_model.shapes.get(target("Value")).unwrap()
+  list_model.shapes[target("Value")] = {
+    ..shape,
+    body: @smithy.List(@smithy.ShapeId::parse("smithy.api#String").unwrap()),
+  }
+  rejected = false
+  ignore(@validation.PreparedValidator::prepare(list_model, target("Value"))) catch {
+    @validation.InvalidModel(_, _) => rejected = true
+    _ => fail("Expected invalid collection member rejection")
+  }
+  assert_true(rejected)
+}
