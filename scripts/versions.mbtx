@@ -183,20 +183,25 @@ fn replace_quoted(text : String, old : String, new : String) -> String {
 }
 
 ///|
-/// The text that comes right before the version in a file of `version_files`.
-fn head_of(path : String) -> String {
+/// All registered version prefixes in this file, in source order.
+fn source_places(path : String, text : String) -> Array[(Int, Int, String)] {
+  let places = []
+  let mut registered = false
   for entry in version_files {
     if entry.0 == path {
-      return entry.1
+      registered = true
+      for place in versions_after(text, entry.1) { places.push(place) }
     }
   }
-  "\""
+  if !registered { return versions_after(text, "\"") }
+  places.sort_by((a, b) => a.0.compare(b.0))
+  places
 }
 
 ///|
 /// The text of a file of `version_files` with its version set to `version`.
 fn set_source_version(path : String, text : String, version : String) -> String {
-  splice(text, versions_after(text, head_of(path)), version)
+  splice(text, source_places(path, text), version)
 }
 
 ///|
@@ -224,7 +229,7 @@ fn mismatches(files : Array[(String, String)], expected : String) -> Array[Strin
       }
       versions
     } else {
-      versions_after(text, head_of(path)).map(place => place.2)
+      source_places(path, text).map(place => place.2)
     }
     for v in found {
       if v != expected {
@@ -279,8 +284,12 @@ async fn workspace_files() -> Array[(String, String)] {
     let path = mod_path(dir)
     files.push((path, read_text(path)))
   }
+  let sources : Set[String] = Set([])
   for entry in version_files {
-    files.push((entry.0, read_text(entry.0)))
+    if !sources.contains(entry.0) {
+      sources.add(entry.0)
+      files.push((entry.0, read_text(entry.0)))
+    }
   }
   files
 }
@@ -431,4 +440,14 @@ async test "versions feature" {
     ]),
   )
   |> ignore
+}
+
+///|
+test "all package pins in a standalone source are checked and rewritten" {
+  let path = "examples/validation-consumer/main.mbtx"
+  let source = "import {\n  \"moonrockz/smithy@0.4.0\",\n  \"moonrockz/smithy-validation@0.4.0\" @validation,\n}\n"
+  assert_eq(mismatches([(path, source)], "0.5.0").length(), 2)
+  let updated = set_source_version(path, source, "0.5.0")
+  assert_eq(updated, source.replace_all(old="@0.4.0", new="@0.5.0"))
+  assert_eq(mismatches([(path, updated)], "0.5.0"), [])
 }

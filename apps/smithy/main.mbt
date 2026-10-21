@@ -2,11 +2,11 @@
 fn main {
   let status = run(program_args()) catch {
     CliError(message, code) => {
-      eprintln("smithy: \{message}")
+      cli_stderr("smithy: \{message}")
       code
     }
     error => {
-      eprintln("smithy: \{error}")
+      cli_stderr("smithy: \{error}")
       1
     }
   }

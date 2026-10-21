@@ -2,6 +2,25 @@ Feature: One version across the workspace
   All modules share one version. The check lists each place that has another version. The set command
   changes the version of each module, the imports between modules and the version strings in the sources.
 
+  Scenario: Every distinct package pin in a standalone consumer participates
+    Given a file "examples/validation-consumer/main.mbtx" with the text:
+      """
+      import {
+        "moonrockz/smithy@0.4.0",
+        "moonrockz/smithy-validation@0.4.0" @validation,
+      }
+      """
+    When I look for versions other than "0.5.0"
+    Then the mismatches are "examples/validation-consumer/main.mbtx: found 0.4.0, expected 0.5.0|examples/validation-consumer/main.mbtx: found 0.4.0, expected 0.5.0"
+    When I set the versions of the files to "0.5.0"
+    Then the result is:
+      """
+      import {
+        "moonrockz/smithy@0.5.0",
+        "moonrockz/smithy-validation@0.5.0" @validation,
+      }
+      """
+
   Scenario: Read the version
     Given the text:
       """
