@@ -7,6 +7,7 @@ import {
   "moonrockz/smithy-syntax" @syntax,
   "moonrockz/smithy_tests/tck",
   "moonbitlang/x/fs" @xfs,
+  "moonbitlang/x/crypto",
   "moonrockz/moonspec",
   "moonrockz/expect",
   "moonbitlang/async",

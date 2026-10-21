@@ -10,6 +10,7 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/codec/base64",
   "moonbit-community/zipc@0.2.2",
   "moonbit-community/flate@0.2.0/gzip",
 }
@@ -274,6 +275,234 @@ async fn github_builds(
 }
 
 ///|
+fn repository_selection(
+  base : String,
+  kind : String,
+  scope : String,
+  jars : Map[String, Bytes],
+) -> String {
+  let root = match scope {
+    "sources" => "models"
+    "imports" => "imports"
+    _ => "projection"
+  }
+  let file = match scope {
+    "sources" => "service.smithy"
+    "imports" => "shared.smithy"
+    _ => "extra.smithy"
+  }
+  let value : Json = if kind.has_prefix("npm") {
+    {
+      "npm": {
+        "registry": base + "/npm",
+        "package": if kind == "npm-scoped" {
+          "@fixture/models"
+        } else {
+          "models"
+        },
+        "version": "1.2.3",
+      },
+      "root": "package/" + root,
+      "globs": ["*.smithy"],
+    }
+  } else {
+    let fields : Map[String, Json] = {
+      "maven": {
+        "repository": base + "/maven",
+        "group": "org.example",
+        "artifact": "models",
+        "version": "1.0.0",
+        "classifier": scope,
+        "checksum": if scope == "imports" {
+          "sha256"
+        } else {
+          "sha1"
+        },
+      },
+    }
+    // Explicit pins take precedence over repository sidecar retrieval.
+    if scope == "projection" {
+      fields["digest"] = Json::string(
+        "sha256:" + @crypto.bytes_to_hex_string(@crypto.sha256(jars[scope])),
+      )
+    }
+    if kind == "maven-selected" {
+      fields["root"] = Json::string("META-INF/smithy")
+      fields["paths"] = Json::array([Json::string(file)])
+    }
+    Json::object(fields)
+  }
+  value.stringify()
+}
+
+///|
+async fn repository_builds(
+  dir : String,
+  executable : String,
+  prefix : Array[String],
+  target : String,
+  base : String,
+  jars : Map[String, Bytes],
+  requests : Array[String],
+  denied : Ref[Bool],
+) -> Unit {
+  let supported = target == "native" || target == "js"
+  let initial = requests.length()
+  for kind in ["npm-unscoped", "npm-scoped", "maven", "maven-selected"] {
+    let stem = target + "-" + kind
+    for remote in [false, true] {
+      let label = if remote { "remote" } else { "local" }
+      fn selected(scope : String) -> String {
+        if remote {
+          repository_selection(base, kind, scope, jars)
+        } else if kind.has_prefix("npm") {
+          let root = match scope {
+            "sources" => "models"
+            "imports" => "imports"
+            _ => "projection"
+          }
+          selection("path", "npm-models.tgz", "package/" + root, "")
+        } else {
+          Json::string("maven-" + scope + ".jar").stringify()
+        }
+      }
+      let config = "{\"version\":\"2.0\",\"sources\":[" +
+        selected("sources") +
+        "],\"imports\":[" +
+        selected("imports") +
+        "],\"projections\":{\"extra\":{\"imports\":[" +
+        selected("projection") +
+        "]}},\"outputDirectory\":\"" +
+        stem +
+        "-" +
+        label +
+        "\"}"
+      let config_path = dir + "/" + stem + "-" + label + ".json"
+      @fs.write_file(config_path, config)
+      let args = prefix +
+        [
+          "build",
+          "--config",
+          config_path,
+          "--cache-dir",
+          "repository-cache-" + target,
+        ]
+      let output = command(
+        dir,
+        executable,
+        args,
+        expected=if remote && !supported { 1 } else { 0 },
+      )
+      if remote && !supported {
+        assert_true(output.contains("unsupported-transport"), msg=output)
+      }
+      if remote && supported {
+        let before = snapshot(dir + "/" + stem + "-remote")
+        let request_count = requests.length()
+        command(dir, executable, args) |> ignore
+        assert_eq(requests.length(), request_count)
+        denied.val = true
+        command(
+          dir,
+          executable,
+          args + ["--offline"],
+          extra_env=if target == "native" { { "PATH": "" } } else { Map([]) },
+        )
+        |> ignore
+        denied.val = false
+        assert_eq(snapshot(dir + "/" + stem + "-remote"), before)
+        assert_eq(requests.length(), request_count)
+        for projection in ["source", "extra"] {
+          let model = @fs.read_file(
+            dir + "/" + stem + "-remote/" + projection + "/model/model.json",
+          ).text()
+          assert_eq(
+            model,
+            @fs.read_file(
+              dir + "/" + stem + "-local/" + projection + "/model/model.json",
+            ).text(),
+          )
+          assert_eq(
+            model,
+            @fs.read_file(
+              dir + "/" + target + "-local/" + projection + "/model/model.json",
+            ).text(),
+          )
+          assert_eq(model.contains("example#Extra"), projection == "extra")
+          assert_false(model.contains("Unlisted"))
+        }
+        let miss = command(
+          dir,
+          executable,
+          prefix +
+          [
+            "build",
+            "--config",
+            config_path,
+            "--offline",
+            "--cache-dir",
+            "repository-missing-" + target,
+          ],
+          expected=1,
+        )
+        assert_true(miss.contains("offline-miss"), msg=miss)
+      }
+      assert_false(@fs.exists(dir + "/PACKAGE_HOOK_RAN"))
+    }
+  }
+  // Two redirected metadata requests share one redirected tarball; three Maven
+  // JARs need two sidecars, while the third uses its caller-provided digest.
+  assert_eq(requests.length() - initial, if supported { 11 } else { 0 })
+  if supported {
+    for kind in ["npm-scoped", "maven"] {
+      let fields = repository_selection(base, kind, "sources", jars)
+      let config = "{\"version\":\"2.0\",\"sources\":[{\"digest\":\"sha256:" +
+        "0".repeat(64) +
+        "\"," +
+        fields[1:].to_owned() +
+        "]}"
+      let config_path = dir + "/" + target + "-" + kind + "-mismatch.json"
+      @fs.write_file(config_path, config)
+      let output = command(
+        dir,
+        executable,
+        prefix +
+        [
+          "build",
+          "--config",
+          config_path,
+          "--offline",
+          "--cache-dir",
+          "repository-cache-" + target,
+        ],
+        expected=1,
+      )
+      assert_true(output.contains("integrity-failure"), msg=output)
+      if kind.has_prefix("npm") {
+        assert_true(
+          output.contains(base + "/npm/%40fixture%2Fmodels/1.2.3"),
+          msg=output,
+        )
+        assert_true(
+          output.contains(base + "/npm/metadata/scoped.json"),
+          msg=output,
+        )
+      }
+      assert_true(
+        output.contains(
+          if kind.has_prefix("npm") {
+            "@fixture/models@1.2.3"
+          } else {
+            "org.example:models:1.0.0:sources"
+          },
+        ),
+        msg=output,
+      )
+    }
+  }
+}
+
+///|
 async fn exercise(root : String, targets : Array[String]) -> Unit {
   let dir = root + "/.dev/out/public-http"
   if @fs.exists(dir) {
@@ -282,6 +511,8 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
   @fs.mkdir(dir, recursive=true, allow_exist=true)
   let zip = @zipc.Archive::empty()
   let mut tar = b""
+  let mut npm_tar = b""
+  let jars : Map[String, Bytes] = Map([])
   for
     (path, text) in [
       (
@@ -298,6 +529,36 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
       ),
     ] {
     tar = tar + tar_member(path, @utf8.encode(text))
+    npm_tar = npm_tar + tar_member("package/" + path, @utf8.encode(text))
+    if !path.has_prefix("broken/") {
+      let parts = path.split("/").to_array()
+      let scope = match parts[0] {
+        "models" => "sources"
+        "imports" => "imports"
+        _ => "projection"
+      }
+      let name = parts[1].to_owned()
+      let jar = @zipc.Archive::empty()
+      for
+        (entry, content) in [
+          ("META-INF/smithy/manifest", name + "\n"),
+          ("META-INF/smithy/" + name, text),
+          (
+            "META-INF/smithy/unlisted.smithy", "$version: \"2\"\nnamespace example\nstring Unlisted",
+          ),
+        ] {
+        ignore(
+          jar.add(
+            @zipc.Member::make(
+              entry,
+              @zipc.File(@zipc.File::stored_from_bytes(@utf8.encode(content))),
+            ),
+          ),
+        )
+      }
+      jars[scope] = jar.to_bytes()
+      @fs.write_file(dir + "/maven-" + scope + ".jar", jars[scope])
+    }
     ignore(
       zip.add(
         @zipc.Member::make(
@@ -307,6 +568,15 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
       ),
     )
   }
+  npm_tar = npm_tar +
+    tar_member(
+      "package/package.json", b"{\"name\":\"fixture\",\"version\":\"1.2.3\",\"scripts\":{\"install\":\"node hook.js\"}}",
+    ) +
+    tar_member(
+      "package/hook.js", b"require('fs').writeFileSync('PACKAGE_HOOK_RAN','bad'); throw new Error('package hooks must never run');",
+    )
+  let npm_tgz = @gzip.gzip_compress(npm_tar + Bytes::make(1024, 0))
+  @fs.write_file(dir + "/npm-models.tgz", npm_tgz)
   let tgz = @gzip.gzip_compress(tar + Bytes::make(1024, 0))
   @fs.write_file(dir + "/models.tgz", tgz)
   let bytes = zip.to_bytes()
@@ -328,6 +598,79 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
           conn.end_response()
           return
         }
+        if path.has_prefix("/maven/") {
+          let scope = if path.contains("-sources.jar") {
+            "sources"
+          } else if path.contains("-imports.jar") {
+            "imports"
+          } else {
+            "projection"
+          }
+          let expected = "/maven/org/example/models/1.0.0/models-1.0.0-" +
+            scope +
+            ".jar"
+          let body = jars[scope]
+          if path == expected {
+            conn.send_response(200, "JAR")
+            conn.write(body)
+          } else if path == expected + ".sha1" {
+            conn.send_response(200, "Checksum")
+            conn.write(
+              @utf8.encode(@crypto.bytes_to_hex_string(@crypto.sha1(body))),
+            )
+          } else if path == expected + ".sha256" {
+            conn.send_response(200, "Checksum")
+            conn.write(
+              @utf8.encode(@crypto.bytes_to_hex_string(@crypto.sha256(body))),
+            )
+          } else {
+            conn.send_response(404, "Missing artifact")
+          }
+          conn.end_response()
+          return
+        }
+        if path == "/npm/models/1.2.3" ||
+          path == "/npm/%40fixture%2Fmodels/1.2.3" {
+          let destination = if path.contains("%40") {
+            "/npm/metadata/scoped.json"
+          } else {
+            "/npm/metadata/unscoped.json"
+          }
+          conn.send_response(302, "npm metadata redirect", extra_headers={
+            "Location": destination,
+          })
+          conn.end_response()
+          return
+        }
+        if path == "/npm/metadata/scoped.json" ||
+          path == "/npm/metadata/unscoped.json" {
+          let name = if path == "/npm/metadata/scoped.json" {
+            "@fixture/models"
+          } else {
+            "models"
+          }
+          let metadata : Json = {
+            "name": name,
+            "version": "1.2.3",
+            "dist": {
+              "tarball": base + "/npm/archive",
+              "integrity": "sha512-" +
+              @base64.encode(
+                Bytes::from_array(@crypto.sha512(npm_tgz).iter().to_array())[:],
+              ),
+            },
+            "scripts": { "install": "node hook.js" },
+          }
+          conn.send_response(200, "npm metadata")
+          conn.write(@utf8.encode(metadata.stringify()))
+          conn.end_response()
+          return
+        }
+        if path.has_prefix("/npm/") && path != "/npm/archive" {
+          conn.send_response(404, "Missing package/version")
+          conn.end_response()
+          return
+        }
         if path == "/disconnect" {
           return
         }
@@ -341,6 +684,7 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
           "/archive" => Some("/models.zip?version=1")
           "/github/models.zip" => Some("/models.zip?github=1")
           "/github/models.tgz" => Some("/models.tgz")
+          "/npm/archive" => Some("/npm-models.tgz")
           "/loop" => Some("/loop")
           "/file-redirect" => Some("file:///etc/passwd")
           "/credential-redirect" =>
@@ -397,6 +741,8 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
                 },
               ]
               conn.write(@utf8.encode(assets.stringify()))
+            } else if path == "/npm-models.tgz" {
+              conn.write(npm_tgz)
             } else if path == "/models.tgz" {
               conn.write(tgz)
             } else if path.has_prefix("/models.zip") {
@@ -706,7 +1052,10 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
         requests,
         denied,
       )
-      println("Public HTTP and GitHub fixtures passed: \{target}")
+      repository_builds(
+        dir, executable, prefix, target, base, jars, requests, denied,
+      )
+      println("Public HTTP, GitHub, npm and Maven fixtures passed: \{target}")
     }
   })
 }

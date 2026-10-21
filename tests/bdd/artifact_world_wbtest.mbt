@@ -39,6 +39,130 @@ impl @moonspec.World for ArtifactWorld with fn configure(self, setup) {
     assert_false(loaded.has_errors())
     self.model = loaded.model
   })
+  setup.when0("I resolve the pinned npm model package offline", fn() raise {
+    let bytes = @xfs.read_file_to_bytes(
+      "../examples/npm-archive/smithy-local-models-1.0.0.tgz",
+    )
+    let request : @resources.NpmArchive = {
+      registry: @resources.RepositoryUrl::parse("https://registry.fixture.test").unwrap(),
+      reference: {
+        name: @resources.NpmPackageName::parse("@fixture/models").unwrap(),
+        version: @resources.NpmVersion::parse("1.0.0").unwrap(),
+      },
+      expected_digest: Some(@resources.ContentDigest::sha256(bytes)),
+    }
+    let values : Map[@resources.CacheKey, Bytes] = Map([])
+    let cache = @resources.VerifiedCache::new({
+      read: (key, _) => values.get(key),
+      publish: (key, data) => values[key] = data,
+    })
+    let online = request.open(
+      (url, _) => {
+        let metadata : Json = {
+          "name": "@fixture/models",
+          "version": "1.0.0",
+          "dist": {
+            "tarball": "https://cdn.fixture.test/models.tgz",
+            "shasum": @crypto.bytes_to_hex_string(@crypto.sha1(bytes)),
+          },
+        }
+        {
+          resolved: url,
+          status: 200,
+          body: if url.to_string().contains("registry.fixture.test") {
+            @utf8.encode(metadata.stringify())
+          } else {
+            bytes
+          },
+        }
+      },
+      cache=Some(cache),
+    )
+    let offline = request.open(
+      (_, _) => abort("offline npm called transport"),
+      cache=Some(cache),
+      mode=@resources.Offline,
+    )
+    assert_eq(online.provenance(), offline.provenance())
+    self.resources = @build.selected_models(
+      offline,
+      @resources.Selection::new(
+        @resources.ResourceRoot::parse("package").unwrap(),
+        [
+          @resources.Exact(
+            @resources.EntryPath::parse("models/service.smithy").unwrap(),
+          ),
+          @resources.Exact(
+            @resources.EntryPath::parse("imports/shared.smithy").unwrap(),
+          ),
+        ],
+      ).unwrap(),
+    )
+    let loader = @smithy.Loader::new()
+    for resource in self.resources {
+      ignore(loader.add_idl(resource.origin.to_string(), resource.text()))
+    }
+    let assembled = loader.assemble()
+    assert_false(assembled.has_errors())
+    self.model = assembled.model
+  })
+  setup.when0("I resolve the pinned Maven JAR offline", fn() raise {
+    let archive = @zipc.Archive::empty()
+    for
+      (path, text) in [
+        ("META-INF/smithy/manifest", "nested/message.smithy\n"),
+        ("META-INF/smithy/nested/message.smithy", self.text),
+        (
+          "META-INF/smithy/unlisted.smithy", "$version: \"2\"\nnamespace example.resources\nstring Unlisted",
+        ),
+      ] {
+      ignore(
+        archive.add(
+          @zipc.Member::make(
+            path,
+            @zipc.File(@zipc.File::stored_from_bytes(@utf8.encode(text))),
+          ),
+        ),
+      )
+    }
+    let bytes = archive.to_bytes()
+    let request : @resources.MavenArchive = {
+      repository: @resources.RepositoryUrl::parse(
+        "https://repo.fixture.test/maven",
+      ).unwrap(),
+      coordinates: {
+        group: @resources.MavenGroupId::parse("org.example").unwrap(),
+        artifact: @resources.MavenArtifactId::parse("models").unwrap(),
+        version: @resources.MavenVersion::parse("1.0.0").unwrap(),
+        classifier: None,
+      },
+      checksum: @resources.Sha1Sidecar,
+      expected_digest: Some(@resources.ContentDigest::sha256(bytes)),
+    }
+    let values : Map[@resources.CacheKey, Bytes] = Map([])
+    let cache = @resources.VerifiedCache::new({
+      read: (key, _) => values.get(key),
+      publish: (key, data) => values[key] = data,
+    })
+    let online = request.open(
+      (url, _) => { resolved: url, status: 200, body: bytes, },
+      cache=Some(cache),
+    )
+    let offline = request.open(
+      (_, _) => abort("offline Maven called transport"),
+      cache=Some(cache),
+      mode=@resources.Offline,
+    )
+    assert_eq(online.provenance(), offline.provenance())
+    self.resources = @build.declared_models(offline)
+    let loader = @smithy.Loader::new()
+    for resource in self.resources {
+      ignore(loader.add_idl(resource.origin.to_string(), resource.text()))
+    }
+    let assembled = loader.assemble()
+    assert_false(assembled.has_errors())
+    self.model = assembled.model
+  })
   setup.given1("the declared artifact model:", fn(doc : @moonspec.DocString) {
     self.text = doc.content
   })

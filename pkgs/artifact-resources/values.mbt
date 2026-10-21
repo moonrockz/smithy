@@ -312,6 +312,10 @@ pub(all) struct Resolution {
 
 ///|
 pub(all) enum ProvenanceStep {
+  NpmRequestStep(RepositoryUrl, NpmPackageRef)
+  NpmStep(NpmResolution)
+  MavenRequestStep(RepositoryUrl, MavenCoordinates)
+  MavenStep(MavenResolution)
   GitHubRequestStep(GitHubRepository, GitHubAssetRef)
   GitHubStep(GitHubResolution)
   AcquisitionStep(Acquisition)
@@ -416,6 +420,19 @@ pub fn Provenance::to_string(self : Provenance) -> String {
   let parts = []
   for step in self.history {
     match step {
+      NpmRequestStep(registry, reference) =>
+        parts.push(
+          "npm:" + reference.to_string() + " registry=" + registry.to_string(),
+        )
+      NpmStep(resolution) => parts.push(resolution.to_string())
+      MavenRequestStep(repository, coordinates) =>
+        parts.push(
+          "maven:" +
+          coordinates.to_string() +
+          " repository=" +
+          repository.to_string(),
+        )
+      MavenStep(resolution) => parts.push(resolution.to_string())
       GitHubRequestStep(repository, reference) =>
         parts.push(
           "github:" +

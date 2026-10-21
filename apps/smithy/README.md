@@ -275,3 +275,60 @@ Native Linux/macOS/Windows and Node.js hosts use curl; Wasm and Wasm GC support
 portable readers but require a custom library transport for acquisition. Local
 builds remain usable offline. See the [provider contract](../../pkgs/artifact-resources/README.mbt.md#pinned-github-release-assets)
 and [runnable release-resource example](../../examples/github-release/README.md).
+
+
+## Public npm and Maven repositories
+
+Build inputs can resolve exact public npm versions and Maven JARs. They work in
+`sources`, global `imports` and projection `imports` alongside local, URL and
+GitHub inputs:
+
+```json
+{
+  "version": "2.0",
+  "sources": [{
+    "npm": { "package": "@scope/models", "version": "1.2.3" },
+    "root": "package/models",
+    "globs": ["**/*.smithy"]
+  }],
+  "imports": [{
+    "maven": {
+      "group": "org.example",
+      "artifact": "model-traits",
+      "version": "1.2.3"
+    }
+  }]
+}
+```
+
+Replace these example coordinates with your artifacts. npm defaults to
+`https://registry.npmjs.org`, overridden by `npm.registry`. Maven defaults to
+`https://repo.maven.apache.org/maven2`, overridden by `maven.repository`.
+npm requires explicit resource selection from its tgz. Maven uses
+`META-INF/smithy/manifest` unless explicit `root` and `paths`/`globs` are supplied.
+An optional `maven.classifier` selects a classified JAR.
+
+A top-level input `digest` pins SHA-256. npm also verifies registry SRI metadata
+or legacy shasum. Maven uses caller SHA-256 when supplied, otherwise the selected
+`.sha1` sidecar by default or `.sha256` with `maven.checksum` set to `sha256`.
+Missing or invalid integrity data fails explicitly. See the
+[full integrity policy](../../pkgs/artifact-resources/README.mbt.md#public-npm-packages).
+
+Use `--offline` after the first successful online build. Registry metadata,
+repository sidecars and verified content use the same cache; every hit rechecks
+integrity. `--cache-dir` or `cacheDirectory` selects a cache location. Local
+builds continue to work without network access. Credentials, npm dist-tags/ranges,
+Maven snapshots, POM/transitive resolution and package lifecycle hooks are outside
+this public acquisition slice. Root-level `maven.dependencies` remains rejected.
+
+Runnable public examples:
+
+```shell
+mise exec -- moon run apps/smithy --target js -- build --config examples/npm-registry/smithy-build.json
+mise exec -- moon run apps/smithy --target js -- build --config examples/maven-repository/smithy-build.json
+```
+
+Repeat either command with `--offline`. Native Linux/macOS/Windows and Node.js
+hosts use curl. Wasm and Wasm GC retain portable archive/provider behavior with a
+custom library transport/cache store. Normal tests use controlled HTTP fixtures,
+not live registry availability.

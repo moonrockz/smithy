@@ -164,6 +164,7 @@ pub fn PublicArchive::open(
   limits~ : Limits = Limits::new(),
   cache~ : VerifiedCache? = None,
   mode~ : AcquisitionMode = Online,
+  verify~ : IntegrityVerifier = (_, _) => (),
 ) -> EntryTree raise ResourceError {
   check_limits(limits, self.url.location())
   let origin = Provenance::new(self.url.location())
@@ -184,6 +185,7 @@ pub fn PublicArchive::open(
     limits=acquisition_limits,
     cache~,
     mode~,
+    verify~,
   )
   let response : HttpResponse = {
     resolved: acquired.metadata.resolved,

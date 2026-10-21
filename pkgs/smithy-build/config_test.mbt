@@ -188,3 +188,103 @@ test "GitHub configuration requires explicit valid references and exclusive sour
     assert_true(rejected)
   }
 }
+
+///|
+test "npm and Maven inputs roundtrip in all build positions" {
+  let inputs = [
+    (
+      #|{"npm":{"package":"@scope/models","version":"1.2.3-beta.1+build.1"},"root":"package/models","paths":["a.smithy"]}
+    ),
+    (
+      #|{"maven":{"repository":"https://repo.test/maven2","group":"org.example","artifact":"models","version":"1.0.Final","classifier":"models","checksum":"sha256"}}
+    ),
+    (
+      #|{"maven":{"group":"org.example","artifact":"models","version":"1.0"},"root":"META-INF/smithy","globs":["*.smithy"]}
+    ),
+  ]
+  for input in inputs {
+    let config = @build.BuildConfig::parse(
+      "{\"version\":\"2.0\",\"sources\":[" +
+      input +
+      "],\"imports\":[" +
+      input +
+      "],\"projections\":{\"extra\":{\"imports\":[" +
+      input +
+      "]}}}",
+    )
+    assert_eq(config.sources, config.imports)
+    assert_eq(config.sources, config.projections[0].imports)
+    let encoded = config.sources[0].to_json().stringify()
+    let roundtrip = @build.BuildConfig::parse(
+      "{\"version\":\"2.0\",\"sources\":[" + encoded + "]}",
+    )
+    assert_eq(config.sources, roundtrip.sources)
+    let replaced = config.sources[0].with_location(
+      @resources.RepositoryLocation::parse("https://other.test/public").unwrap(),
+    )
+    assert_eq(replaced.location().to_string(), "https://other.test/public")
+  }
+}
+
+///|
+test "repository inputs reject ambiguous sources unsupported resolutions and malformed settings" {
+  let inputs = [
+    (
+      #|{"npm":{"package":"models","version":"latest"},"root":"package","paths":["a.smithy"]}
+    ),
+    (
+      #|{"npm":{"package":"../models","version":"1.2.3"},"root":"package","paths":["a.smithy"]}
+    ),
+    (
+      #|{"npm":{"package":"models","version":"1.2.3","registry":"https://user:pass@host"},"root":"package","paths":["a.smithy"]}
+    ),
+    (
+      #|{"npm":{"package":"models","version":"1.2.3"},"url":"https://host/a","root":"package","paths":["a.smithy"]}
+    ),
+    (
+      #|{"npm":{"package":"models","version":"1.2.3"},"format":"zip","root":"package","paths":["a.smithy"]}
+    ),
+    (
+      #|{"npm":{"package":"models","version":"1.2.3"}}
+    ),
+    (
+      #|{"maven":{"group":"org.example","artifact":"models","version":"1.0-SNAPSHOT"}}
+    ),
+    (
+      #|{"maven":{"group":"org.example","artifact":"models","version":"[1,2)"}}
+    ),
+    (
+      #|{"maven":{"group":"org.example","artifact":"models","version":"1.0","extension":"pom"}}
+    ),
+    (
+      #|{"maven":{"group":"org.example","artifact":"models","version":"1.0","transitive":true}}
+    ),
+    (
+      #|{"maven":{"group":"org.example","artifact":"models","version":"1.0","checksum":"md5"}}
+    ),
+    (
+      #|{"maven":{"group":"org.example","artifact":"models","version":"1.0","classifier":"../models"}}
+    ),
+    (
+      #|{"maven":{"group":"org.example","artifact":"models","version":"1.0"},"path":"models.jar"}
+    ),
+    (
+      #|{"maven":{"group":"org.example","artifact":"models","version":"1.0"},"root":"META-INF/smithy"}
+    ),
+    (
+      #|{"maven":false}
+    ),
+  ]
+  for input in inputs {
+    let rejected = try
+      @build.BuildConfig::parse(
+        "{\"version\":\"2.0\",\"sources\":[" + input + "]}",
+      )
+    catch {
+      @build.InvalidBuildConfig(_) => true
+    } noraise {
+      _ => false
+    }
+    assert_true(rejected, msg=input)
+  }
+}

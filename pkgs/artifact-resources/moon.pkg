@@ -2,6 +2,7 @@ import {
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
   "moonbitlang/x/crypto",
+  "moonbitlang/x/codec/base64",
   "moonbit-community/zipc",
   "moonbit-community/flate",
   "moonbit-community/flate/checksum",
@@ -13,4 +14,6 @@ import {
   "moonbit-community/zipc",
   "moonbit-community/flate/gzip",
   "moonbit-community/flate/checksum",
+  "moonbitlang/x/crypto",
+  "moonbitlang/x/codec/base64",
 } for "test"
