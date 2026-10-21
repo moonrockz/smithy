@@ -79,7 +79,7 @@ The two wasm files are not WASI programs. They import MoonBit host functions fro
 to run the file.
 
 - Both wasm files import WASI `fd_write`, `path_open` and `fd_close` for record-oriented
-  output, and export `memory` and `_start`. `smithy.wasm` also imports `fd_read`.
+  output, and export `memory` and `_start`. `smithy.wasm` also imports `fd_read` and `proc_exit`.
 - `smithy-gc.wasm` needs a runtime with WebAssembly GC. It also imports
   `spectest.print_char`, a test host function.
 
