@@ -1,6 +1,6 @@
 name = "moonrockz/smithy"
 
-version = "0.3.0"
+version = "0.4.0"
 
 description = "Smithy model library for MoonBit"
 
@@ -15,6 +15,6 @@ readme = "README.mbt.md"
 warnings = "-implicit_impl_as_method"
 
 import {
-  "moonrockz/jmespath@0.3.0",
-  "moonrockz/smithy-syntax@0.3.0",
+  "moonrockz/jmespath@0.4.0",
+  "moonrockz/smithy-syntax@0.4.0",
 }

@@ -1,6 +1,6 @@
 name = "moonrockz/smithy_tests"
 
-version = "0.3.0"
+version = "0.4.0"
 
 description = "Test module for moonrockz/smithy-syntax: reference corpus parity and moonspec acceptance features; not published"
 
@@ -13,11 +13,11 @@ source = "."
 warnings = "-implicit_impl_as_method"
 
 import {
-  "moonrockz/artifact-resources@0.3.0",
+  "moonrockz/artifact-resources@0.4.0",
   "moonbit-community/zipc@0.2.2",
-  "moonrockz/smithy@0.3.0",
-  "moonrockz/smithy-build@0.3.0",
-  "moonrockz/smithy-syntax@0.3.0",
+  "moonrockz/smithy@0.4.0",
+  "moonrockz/smithy-build@0.4.0",
+  "moonrockz/smithy-syntax@0.4.0",
   "moonrockz/expect@0.6.1",
   "moonrockz/moonspec@0.11.0",
   "moonbitlang/async@0.22.5",
