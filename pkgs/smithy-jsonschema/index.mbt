@@ -21,7 +21,7 @@ pub fn SchemaIndex::new(
   guard ast is { "shapes": Object(shapes), .. } else {
     raise InvalidConfiguration("Model has no shape table")
   }
-  let names = schema_names(shapes, service)
+  let names = schema_names(shapes, service, config)
   let connected = connected_shapes(service, shapes)
   if service == "" {
     for id, _ in shapes {

@@ -509,6 +509,7 @@ fn connected_shapes(
 fn schema_names(
   shapes : Map[String, Json],
   service : String,
+  config : Config,
 ) -> Map[String, String] {
   let names : Map[String, String] = Map([])
   let renames = match shapes.get(service) {
@@ -522,9 +523,22 @@ fn schema_names(
   for id, _ in shapes {
     let parts = id.split("#").to_array()
     if parts.length() == 2 {
-      names[id] = match renames.get(id) {
+      let name = match renames.get(id) {
         Some(String(name)) => name
         _ => parts[1].to_owned()
+      }
+      names[id] = if config.alphanumeric_only_refs {
+        let out = StringBuilder()
+        for ch in name {
+          if (ch >= 'a' && ch <= 'z') ||
+            (ch >= 'A' && ch <= 'Z') ||
+            (ch >= '0' && ch <= '9') {
+            out.write_char(ch)
+          }
+        }
+        out.to_string()
+      } else {
+        name
       }
     }
   }
@@ -575,7 +589,15 @@ fn deconflict_names(
 ) -> Unit raise JsonSchemaError {
   let claimed : Map[String, String] = Map([])
   let ids = shapes.keys().to_array()
-  ids.sort()
+  // ShapeId.compareTo in the reference compares ASCII IDs without case first.
+  ids.sort_by((a, b) => {
+    let order = a.to_lower().lexical_compare(b.to_lower())
+    if order == 0 {
+      a.lexical_compare(b)
+    } else {
+      order
+    }
+  })
   for id in ids {
     if service != "" && connected.get(id) is None {
       continue
@@ -654,7 +676,7 @@ pub fn convert(
   let definitions : Map[String, Json] = Map([])
   let mut unit_targeted = false
   let connected = connected_shapes(service, shapes)
-  let names = schema_names(shapes, service)
+  let names = schema_names(shapes, service, config)
   deconflict_names(shapes, connected, names, service, config)
   for id, shape in shapes {
     if service != "" && connected.get(id) is None {

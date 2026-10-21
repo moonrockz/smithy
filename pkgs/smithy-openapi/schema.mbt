@@ -80,13 +80,7 @@ fn Context::adapt_schema(
     ignore(out.remove("propertyNames"))
     ignore(out.remove("contentMediaType"))
   }
-  if out.get("$ref") is Some(String(reference)) {
-    let prefix = "#/components/schemas/"
-    if self.config.alphanumeric_only_refs && reference.has_prefix(prefix) {
-      out["$ref"] = Json::string(
-        prefix + self.component_name(reference[prefix.length():].to_owned()),
-      )
-    }
+  if out.get("$ref") is Some(String(_)) {
     return Json::object(out)
   }
   if source.trait_value("smithy.api#deprecated") is Some(_) ||
@@ -232,7 +226,7 @@ fn Context::prepare_schemas(self : Context) -> Unit {
     return
   }
   for name, schema in schemas {
-    self.schemas[self.component_name(name)] = match
+    self.schemas[name] = match
       self.index.definition(name).bind(id => self.model.shapes.get(id)) {
       Some(shape) => self.adapt_schema(schema, shape)
       None => schema

@@ -1,0 +1,19 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Selected",
+        "version": "1"
+    },
+    "paths": {
+        "/selected": {
+            "get": {
+                "operationId": "Get",
+                "responses": {
+                    "200": {
+                        "description": "Get 200 response"
+                    }
+                }
+            }
+        }
+    }
+}

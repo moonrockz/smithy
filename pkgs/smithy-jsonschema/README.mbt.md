@@ -67,6 +67,7 @@ The document is written to `build/smithy/schema/jsonSchema/schema.json`.
 | `disableDefaultValues` | `disable_default_values` | `false` |
 | `disableIntEnums` | `disable_int_enums` | `false` |
 | `useIntegerType` | `use_integer_type` | `false` |
+| `alphanumericOnlyRefs` | `alphanumeric_only_refs` | `false`; sanitize names before collision detection |
 
 `definitionPointer` starts with `#/` and supports nested paths such as
 `#/components/schemas`. As in the reference, pointer escaping is unsupported.

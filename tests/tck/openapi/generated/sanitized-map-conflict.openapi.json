@@ -1,0 +1,53 @@
+{
+    "openapi": "3.0.2",
+    "info": {
+        "title": "Maps",
+        "version": "1"
+    },
+    "paths": {
+        "/maps": {
+            "get": {
+                "operationId": "GetMaps",
+                "responses": {
+                    "200": {
+                        "description": "GetMaps 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetMapsResponseContent"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "GetMapsResponseContent": {
+                "type": "object",
+                "properties": {
+                    "first": {
+                        "$ref": "#/components/schemas/MapFoo"
+                    },
+                    "second": {
+                        "$ref": "#/components/schemas/MapFooExampleReview"
+                    }
+                }
+            },
+            "MapFoo": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "string"
+                }
+            },
+            "MapFooExampleReview": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "number"
+                }
+            }
+        }
+    }
+}

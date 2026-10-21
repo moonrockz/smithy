@@ -612,6 +612,7 @@ fn json_schema_plugin(
     disable_default_values=build_setting_bool(settings, "disableDefaultValues"),
     disable_int_enums=build_setting_bool(settings, "disableIntEnums"),
     use_integer_type=build_setting_bool(settings, "useIntegerType"),
+    alphanumeric_only_refs=build_setting_bool(settings, "alphanumericOnlyRefs"),
   )
   let service = build_setting_string(settings, "service", "")
   let document = @jsonschema.convert(model, service~, config~) catch {

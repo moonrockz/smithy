@@ -987,6 +987,106 @@
         "version": "3.1.0"
       },
       "expected": "generated/core-default-errors-31.openapi.json"
+    },
+    {
+      "id": "sanitized-structure-conflict",
+      "model": "local/sanitized-names.smithy",
+      "settings": {
+        "service": "example.review#Structures",
+        "version": "3.0.2",
+        "alphanumericOnlyRefs": true
+      },
+      "error": "schema"
+    },
+    {
+      "id": "sanitized-map-conflict",
+      "model": "local/sanitized-names.smithy",
+      "settings": {
+        "service": "example.review#Maps",
+        "version": "3.0.2",
+        "alphanumericOnlyRefs": true
+      },
+      "expected": "generated/sanitized-map-conflict.openapi.json"
+    },
+    {
+      "id": "unrelated-prefix-fail",
+      "model": "local/unrelated-prefix.smithy",
+      "settings": {
+        "service": "example.review#Selected",
+        "version": "3.0.2"
+      },
+      "error": "prefix-headers"
+    },
+    {
+      "id": "unrelated-prefix-warn",
+      "model": "local/unrelated-prefix.smithy",
+      "settings": {
+        "service": "example.review#Selected",
+        "version": "3.0.2",
+        "onHttpPrefixHeaders": "WARN"
+      },
+      "warnings": 1,
+      "expected": "generated/unrelated-prefix-warn.openapi.json"
+    },
+    {
+      "id": "synthetic-error-collision",
+      "model": "local/synthetic-error-collision.smithy",
+      "settings": {
+        "service": "example.review#Collision",
+        "version": "3.0.2",
+        "onErrorStatusConflict": "oneOf"
+      },
+      "expected": "generated/synthetic-error-collision.openapi.json"
+    },
+    {
+      "id": "sanitized-structure-conflict-31",
+      "model": "local/sanitized-names.smithy",
+      "settings": {
+        "service": "example.review#Structures",
+        "version": "3.1.0",
+        "alphanumericOnlyRefs": true
+      },
+      "error": "schema"
+    },
+    {
+      "id": "sanitized-map-conflict-31",
+      "model": "local/sanitized-names.smithy",
+      "settings": {
+        "service": "example.review#Maps",
+        "version": "3.1.0",
+        "alphanumericOnlyRefs": true
+      },
+      "expected": "generated/sanitized-map-conflict-31.openapi.json"
+    },
+    {
+      "id": "unrelated-prefix-fail-31",
+      "model": "local/unrelated-prefix.smithy",
+      "settings": {
+        "service": "example.review#Selected",
+        "version": "3.1.0"
+      },
+      "error": "prefix-headers"
+    },
+    {
+      "id": "unrelated-prefix-warn-31",
+      "model": "local/unrelated-prefix.smithy",
+      "settings": {
+        "service": "example.review#Selected",
+        "version": "3.1.0",
+        "onHttpPrefixHeaders": "WARN"
+      },
+      "warnings": 1,
+      "expected": "generated/unrelated-prefix-warn-31.openapi.json"
+    },
+    {
+      "id": "synthetic-error-collision-31",
+      "model": "local/synthetic-error-collision.smithy",
+      "settings": {
+        "service": "example.review#Collision",
+        "version": "3.1.0",
+        "onErrorStatusConflict": "oneOf"
+      },
+      "expected": "generated/synthetic-error-collision-31.openapi.json"
     }
   ],
   "excludedUpstreamOutputs": [

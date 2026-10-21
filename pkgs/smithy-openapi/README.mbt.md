@@ -130,6 +130,16 @@ The pinned Java plugin's serialized output is the compatibility contract,
 including its `externalDocumentation` key at service level (`externalDocs` on
 operations/schemas), omission of empty `paths`, and same-status error handling.
 
+Two reference behaviors affect models with several services or unusual names.
+Unsupported endpoint/host-label checks inspect the entire assembled model;
+prefix-header checks inspect every operation's bindings, including operations
+outside the selected service. Use projections to remove unrelated constructs
+before conversion when needed. With `onErrorStatusConflict: "oneOf"`, Java's model
+transform replaces existing shapes whose IDs match its synthesized
+`<Operation><status>Error` or `<Operation><status>ErrorContent` names. Avoid those
+names for modeled shapes when enabling that strategy. The compatibility tests
+preserve these behaviors explicitly.
+
 ## Reference verification
 
 Normal tests compare committed expectations without Java or network access.

@@ -1,0 +1,110 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Collision",
+        "version": "1"
+    },
+    "paths": {
+        "/": {
+            "get": {
+                "operationId": "Get",
+                "responses": {
+                    "200": {
+                        "description": "Get 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Get400Error 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Get400ErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "First": {
+                "type": "object",
+                "properties": {
+                    "first": {
+                        "type": "string"
+                    }
+                }
+            },
+            "Get400Error": {
+                "type": "object",
+                "properties": {
+                    "errorUnion": {
+                        "$ref": "#/components/schemas/Get400ErrorContent"
+                    }
+                }
+            },
+            "Get400ErrorContent": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "title": "First",
+                        "properties": {
+                            "First": {
+                                "$ref": "#/components/schemas/First"
+                            }
+                        },
+                        "required": [
+                            "First"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "title": "Second",
+                        "properties": {
+                            "Second": {
+                                "$ref": "#/components/schemas/Second"
+                            }
+                        },
+                        "required": [
+                            "Second"
+                        ]
+                    }
+                ]
+            },
+            "Get400ErrorResponseContent": {
+                "oneOf": [
+                    {
+                        "$ref": "#/components/schemas/First"
+                    },
+                    {
+                        "$ref": "#/components/schemas/Second"
+                    }
+                ]
+            },
+            "GetResponseContent": {
+                "type": "object",
+                "properties": {
+                    "modeled": {
+                        "$ref": "#/components/schemas/Get400Error"
+                    }
+                }
+            },
+            "Second": {
+                "type": "object",
+                "properties": {
+                    "second": {
+                        "type": "number"
+                    }
+                }
+            }
+        }
+    }
+}

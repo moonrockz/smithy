@@ -97,6 +97,7 @@ fn Context::new(
   let schema_config = {
     ..config.schema,
     definition_pointer: "#/components/schemas",
+    alphanumeric_only_refs: config.alphanumeric_only_refs,
     use_json_name: if protocol == RestJson1 {
       true
     } else {
