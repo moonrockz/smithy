@@ -1,6 +1,6 @@
 name = "moonrockz/jmespath"
 
-version = "0.4.0"
+version = "0.5.0"
 
 description = "JMESPath expressions, parsing and JSON evaluation for MoonBit"
 
