@@ -8,7 +8,7 @@ is 0.x, a minor release can contain breaking changes.
 
 ## [0.4.0] - 2026-10-21
 
-<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+The new `moonrockz/artifact-resources` package loads selected resource trees from directories, ZIP/JAR, tar/gzip and npm archives, with validated paths, logical aliases and structured provenance. Smithy build sources, global imports and projection imports can now acquire public archive URLs, pinned GitHub release assets, exact npm versions and pinned Maven JARs with integrity verification, shared caching and explicit offline builds. Private repositories accept supplied Bearer or Basic credentials bound to exact origins through environment references; redirects strip authorization across origins and authenticated cache entries are isolated. Existing JSON string inputs and JAR manifest discovery remain compatible. Library callers must migrate resource metadata to domain types, wrap path inputs with `BuildInput::from_path`, initialize the added cache/offline/credential configuration fields, handle the new input/provenance/diagnostic variants, and update custom HTTP transports to receive `HttpRequest` as detailed below.
 
 ### ⚠️ Breaking changes
 
@@ -16,8 +16,8 @@ is 0.x, a minor release can contain breaking changes.
 - *(resources)* BuildInput adds Remote(PublicArchive, Selection), and with_location can raise BuildError for invalid remote replacement URLs. Exhaustive ResourceCode and ProvenanceStep matches need acquisition cases. ([#30](https://github.com/moonrockz/smithy/pull/30))
 - *(resources)* Direct BuildConfig constructors must initialize cache_directory: CacheDirectory and offline. Parsed configuration supplies defaults. Exhaustive Location matches must handle FilesystemDirectory. ([#31](https://github.com/moonrockz/smithy/pull/31))
 - *(resources)* Exhaustive matches must handle BuildInput::GitHub, GitHubRequestStep/GitHubStep provenance, and MissingRelease, AmbiguousAsset and RateLimited resource codes. ([#32](https://github.com/moonrockz/smithy/pull/32))
-- *(resources)* Load npm and Maven artifacts ([#33](https://github.com/moonrockz/smithy/pull/33))
-- *(resources)* HttpTransport receives HttpRequest instead of HttpUrl. Use request.url inside callbacks and HttpRequest::anonymous(url) for public host calls. BuildConfig adds credential environment bindings. ([#34](https://github.com/moonrockz/smithy/pull/34))
+- *(resources)* Exhaustive `BuildInput` matches must handle `Npm(NpmArchive, Selection)` and `Maven(MavenArchive, Selection?)`; `None` selects Maven manifest discovery. Exhaustive `ProvenanceStep` matches must handle `NpmRequestStep`, `NpmStep`, `MavenRequestStep` and `MavenStep`; `ResourceCode` matches must handle `MissingPackageVersion`, `MissingArtifact` and `UnsupportedIntegrity`. Repository input `location()` values are registry/repository bases and `with_location()` validates replacements. ([#33](https://github.com/moonrockz/smithy/pull/33))
+- *(resources)* `HttpTransport` receives `HttpRequest` instead of `HttpUrl`. Use `request.url` inside callbacks and `HttpRequest::anonymous(url)` for public host calls. Direct `BuildConfig` constructors must initialize `credentials: Array[CredentialBinding]`; use `[]` for anonymous acquisition. Parsed configuration supplies the default. ([#34](https://github.com/moonrockz/smithy/pull/34))
 
 ### 🚀 Features
 
