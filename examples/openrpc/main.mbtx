@@ -1,0 +1,36 @@
+///|
+/// Export an API without a network service or optional Ion/WIT dependencies.
+import {
+  "moonrockz/smithy@0.5.0",
+  "moonrockz/smithy-validation@0.5.0/rpc",
+  "moonrockz/smithy-openrpc@0.5.0" @openrpc,
+}
+
+///|
+fn main {
+  let loaded : @smithy.LoadResult = @rpc.loader()
+    .add_idl(
+      "calculator.smithy",
+      (
+        #|$version: "2"
+        #|namespace example
+        #|use smithy.rpc#jsonRpc
+        #|use smithy.rpc#method
+        #|@jsonRpc(versions: ["2.0"])
+        #|service Calculator { version: "1", operations: [Subtract] }
+        #|@method(name: "subtract", params: "either", positional: ["left", "right"], resultMember: "value")
+        #|operation Subtract { input: Arguments, output: Answer }
+        #|structure Arguments { @required left: Integer, right: Integer }
+        #|structure Answer { @range(min: -20, max: 20) value: Integer }
+      ),
+    )
+    .assemble()
+  guard loaded.model is Some(model) else {
+    abort(loaded.diagnostics.map(d => d.message).join("\n"))
+  }
+  let service = @openrpc.ServiceId::parse("example#Calculator").unwrap()
+  let converted = @openrpc.convert_result(model, @openrpc.Config::new(service)) catch {
+    error => abort(error.message())
+  }
+  println(converted.document.stringify(indent=2))
+}

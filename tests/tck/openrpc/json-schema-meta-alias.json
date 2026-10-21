@@ -1,0 +1,5 @@
+{
+  "$id": "https://meta.json-schema.tools",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "https://meta.json-schema.tools/"
+}

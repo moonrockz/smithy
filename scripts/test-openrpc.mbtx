@@ -1,0 +1,495 @@
+///|
+/// Qualify actual OpenRPC artifacts with official schemas and independent Ajv.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/crypto",
+}
+
+///|
+async fn command(
+  executable : String,
+  args : Array[String],
+  dir : String,
+  expected~ : Int32 = 0,
+) -> String {
+  let (code, out, err) = @process.collect_output(executable, args, cwd=dir)
+  assert_eq(
+    code,
+    expected,
+    msg=executable + " " + args.join(" ") + "\n" + out.text() + err.text(),
+  )
+  out.text()
+}
+
+///|
+fn fields(value : Json) -> Map[String, Json] raise {
+  guard value is Object(fields) else { fail("Expected JSON object") }
+  fields
+}
+
+///|
+fn schemas(document : Json) -> Array[Json] raise {
+  let out = []
+  let root = fields(document)
+  if root.get("components") is Some({ "schemas": Object(values), .. }) {
+    for _, schema in values {
+      out.push(schema)
+    }
+  }
+  guard root.get("methods") is Some(Array(methods)) else {
+    fail("Expected methods")
+  }
+  for method_ in methods {
+    let method_ = fields(method_)
+    guard method_.get("params") is Some(Array(params)) else {
+      fail("Expected params")
+    }
+    for param in params {
+      out.push(fields(param)["schema"])
+    }
+    if method_.get("result") is Some(result) {
+      out.push(fields(result)["schema"])
+    }
+    if method_.get("x-smithy-error-data") is Some(Array(errors)) {
+      for error in errors {
+        out.push(fields(error)["schema"])
+      }
+    }
+  }
+  out
+}
+
+///|
+fn check_references(document : Json) -> Unit raise {
+  let available = match fields(document).get("components") {
+    Some({ "schemas": Object(values), .. }) => values
+    _ => Map([])
+  }
+  let pending = schemas(document)
+  while pending.pop() is Some(value) {
+    match value {
+      Object(entries) => {
+        if entries.get("$ref") is Some(String(reference)) {
+          let prefix = "#/components/schemas/"
+          assert_true(
+            reference.has_prefix(prefix),
+            msg="Unexpected reference " + reference,
+          )
+          assert_true(
+            available.contains(reference[prefix.length():].to_owned()),
+            msg="Unresolved reference " + reference,
+          )
+        }
+        for _, value in entries {
+          pending.push(value)
+        }
+      }
+      Array(values) => pending.append(values)
+      _ => ()
+    }
+  }
+}
+
+///|
+struct Cli {
+  executable : String
+  prefix : Array[String]
+  dir : String
+}
+
+///|
+async fn Cli::run(
+  self : Cli,
+  args : Array[String],
+  expected~ : Int32 = 0,
+) -> String {
+  command(self.executable, self.prefix + args, self.dir, expected~)
+}
+
+///|
+async fn ajv(root : String, dir : String, args : Array[String]) -> Unit {
+  command(
+    "node",
+    [dir + "/validator/node_modules/ajv-cli/dist/index.js"] +
+    args +
+    ["--spec=draft7", "--strict=false", "--all-errors", "-c", "ajv-formats"],
+    root,
+  )
+  |> ignore
+}
+
+///|
+async fn official(
+  root : String,
+  dir : String,
+  path : String,
+  valid : Bool,
+) -> Unit {
+  let tck = root + "/tests/tck/openrpc/"
+  ajv(root, dir, [
+    "test",
+    "-s",
+    tck + "open-rpc-meta-schema.json",
+    "-m",
+    tck + "json-schema-meta.json",
+    "-r",
+    tck + "json-schema-meta-alias.json",
+    "-d",
+    path,
+    if valid {
+      "--valid"
+    } else {
+      "--invalid"
+    },
+  ])
+}
+
+///|
+async fn value_case(
+  root : String,
+  dir : String,
+  cli : Cli,
+  document : Json,
+  schema : Json,
+  data : String,
+  message : String,
+  response : Bool,
+  method_ : String,
+  valid : Bool,
+) -> Unit {
+  let wrapper = Json::object({
+    "$schema": Json::string("http://json-schema.org/draft-07/schema#"),
+    "allOf": Json::array([schema]),
+    "components": fields(document)
+    .get("components")
+    .unwrap_or(Json::object(Map([]))),
+  })
+  @fs.write_file(cli.dir + "/value-schema.json", wrapper.stringify())
+  @fs.write_file(cli.dir + "/value.json", data)
+  ajv(root, dir, [
+    "test",
+    "-s",
+    cli.dir + "/value-schema.json",
+    "-d",
+    cli.dir + "/value.json",
+    if valid {
+      "--valid"
+    } else {
+      "--invalid"
+    },
+  ])
+  @fs.write_file(cli.dir + "/message.json", message)
+  let args = [
+    "validate",
+    "rpc",
+    "--version",
+    "2.0",
+    "--service",
+    "example.rpc#Calculator",
+    if response {
+      "--response"
+    } else {
+      "--message"
+    },
+    "message.json",
+    "model.smithy",
+    "--diagnostics",
+    "json",
+  ]
+  let args = if response { args + ["--method", method_] } else { args }
+  let checked = @json.parse(cli.run(args, expected=if valid { 0 } else { 1 }))
+  assert_eq(fields(checked)["valid"], Json::boolean(valid))
+}
+
+///|
+async fn exercise(root : String, targets : Array[String]) -> Unit {
+  let dir = root + "/.dev/out/openrpc-qualification"
+  @fs.mkdir(dir, recursive=true, allow_exist=true)
+  for
+    (file, digest) in [
+      (
+        "open-rpc-meta-schema.json", "e5f534fb0dd9dd3598d26414e278a8c96e923ee7b54bef7009c499f4c71d0f82",
+      ),
+      (
+        "json-schema-meta.json", "c60549433ca5726bb3ff8959bbcdb3013b6b17fd8c3f99ae0c9604088c714738",
+      ),
+    ] {
+    assert_eq(
+      @crypto.bytes_to_hex_string(
+        @crypto.sha256(
+          @fs.read_file(root + "/tests/tck/openrpc/" + file).binary(),
+        ),
+      ),
+      digest,
+    )
+  }
+  let npm = if @env.get_env_var("OS") == Some("Windows_NT") {
+    "npm.cmd"
+  } else {
+    "npm"
+  }
+  command(
+    npm,
+    [
+      "install",
+      "--prefix",
+      dir + "/validator",
+      "--no-save",
+      "--no-package-lock",
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
+      "ajv-cli@5.0.0",
+      "ajv-formats@2.1.1",
+    ],
+    root,
+  )
+  |> ignore
+  @fs.write_file(
+    dir + "/invalid.json",
+    "{\"openrpc\":\"2.0\",\"info\":{},\"methods\":[]}",
+  )
+  official(root, dir, dir + "/invalid.json", false)
+  command(
+    "moonx",
+    ["scripts/test-validation-consumer.mbtx", "--openrpc"] + targets,
+    root,
+  )
+  |> ignore
+  for target in targets {
+    assert_true(["native", "wasm", "js", "wasm-gc"].contains(target))
+    official(
+      root,
+      dir,
+      root + "/.dev/out/openrpc-consumer/" + target + ".json",
+      true,
+    )
+    command(
+      "moon",
+      ["build", "apps/smithy", "--target", target, "--release", "--deny-warn"],
+      root,
+    )
+    |> ignore
+    let stem = root +
+      "/_build/" +
+      target +
+      "/release/build/moonrockz/smithy-cli/smithy-cli"
+    let work = dir + "/" + target
+    @fs.mkdir(work, recursive=true, allow_exist=true)
+    @fs.write_file(
+      work + "/model.smithy",
+      @fs.read_file(root + "/examples/openrpc/model.smithy"),
+    )
+    @fs.write_file(
+      work + "/smithy-build.json",
+      "{\"version\":\"1.0\",\"sources\":[\"model.smithy\"],\"outputDirectory\":\"output\",\"plugins\":{\"openrpc\":{\"service\":\"example.rpc#Calculator\"}},\"projections\":{\"public\":{\"plugins\":{\"openrpc::description\":{\"service\":\"example.rpc#Calculator\"}}}}}",
+    )
+    let cli : Cli = {
+      executable: if target == "native" {
+        stem + ".exe"
+      } else if target == "js" {
+        "node"
+      } else {
+        "moonrun"
+      },
+      prefix: if target == "native" {
+        []
+      } else if target == "js" {
+        [stem + ".js"]
+      } else {
+        [stem + ".wasm", "--"]
+      },
+      dir: work,
+    }
+    cli.run(["build"]) |> ignore
+    let output = work + "/output/source/openrpc/openrpc.json"
+    let before = @fs.read_file(output).text()
+    let document = @json.parse(before)
+    check_references(document)
+    official(root, dir, output, true)
+    let aliased_output = work + "/output/public/description/openrpc.json"
+    assert_eq(@fs.read_file(aliased_output).text(), before)
+    official(root, dir, aliased_output, true)
+    cli.run(["build"]) |> ignore
+    assert_eq(@fs.read_file(output).text(), before)
+    for i, schema in schemas(document) {
+      let wrapper = Json::object({
+        "allOf": Json::array([schema]),
+        "components": fields(document)
+        .get("components")
+        .unwrap_or(Json::object(Map([]))),
+      })
+      let path = work + "/schema-" + i.to_string() + ".json"
+      @fs.write_file(path, wrapper.stringify())
+      ajv(root, dir, ["compile", "-s", path])
+    }
+    guard document is { "methods": Array(methods), .. } else {
+      fail("Expected methods")
+    }
+    for method_ in methods {
+      let fields_ = fields(method_)
+      let name = match fields_["name"] {
+        String(name) => name
+        _ => ""
+      }
+      let result = fields(fields_["result"])["schema"]
+      if name == "subtract" {
+        for (data, valid) in [("19", true), ("101", false), ("\"19\"", false)] {
+          value_case(
+            root,
+            dir,
+            cli,
+            document,
+            result,
+            data,
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":" + data + "}",
+            true,
+            name,
+            valid,
+          )
+        }
+        guard fields_["params"] is Array(params) else {
+          fail("Expected parameter descriptors")
+        }
+        for
+          (data, valid) in [
+            ("42", true),
+            ("-1", false),
+            ("1.5", false),
+            ("2147483648", false),
+          ] {
+          value_case(
+            root,
+            dir,
+            cli,
+            document,
+            fields(params[0])["schema"],
+            data,
+            "{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[" +
+            data +
+            "]}",
+            false,
+            name,
+            valid,
+          )
+        }
+        guard fields_["x-smithy-error-data"] is Array(errors) else {
+          fail("Expected error schema extension")
+        }
+        for
+          (data, valid) in [
+            ("\"detail\"", true),
+            ("1", false),
+            ("\"x\"", false),
+          ] {
+          value_case(
+            root,
+            dir,
+            cli,
+            document,
+            fields(errors[0])["schema"],
+            data,
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":1001,\"message\":\"bad\",\"data\":" +
+            data +
+            "}}",
+            true,
+            name,
+            valid,
+          )
+        }
+      } else if name == "clear" {
+        for (data, valid) in [("null", true), ("{}", false)] {
+          value_case(
+            root,
+            dir,
+            cli,
+            document,
+            result,
+            data,
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":" + data + "}",
+            true,
+            name,
+            valid,
+          )
+        }
+      } else if name == "history" {
+        for
+          (data, valid) in [
+            ("[{\"value\":1}]", true),
+            ("[{\"value\":\"x\"}]", false),
+            ("[{\"value\":1,\"unknown\":2}]", false),
+          ] {
+          value_case(
+            root,
+            dir,
+            cli,
+            document,
+            result,
+            data,
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":" + data + "}",
+            true,
+            name,
+            valid,
+          )
+        }
+      }
+    }
+    for
+      (setting, expected_shape) in [
+        ("{\"service\":\"example.rpc#Missing\"}", "example.rpc#Missing"),
+        (
+          "{\"service\":\"example.rpc#Calculator\",\"protocolVersion\":\"1.0\"}",
+          "example.rpc#Calculator",
+        ),
+      ] {
+      @fs.write_file(
+        work + "/bad-build.json",
+        "{\"version\":\"1.0\",\"sources\":[\"model.smithy\"],\"outputDirectory\":\"bad-output\",\"plugins\":{\"openrpc\":" +
+        setting +
+        "}}",
+      )
+      let (code, out, err) = @process.collect_output(
+        cli.executable,
+        cli.prefix + ["build", "--config", "bad-build.json"],
+        cwd=work,
+      )
+      assert_eq(code, 1)
+      assert_true((out.text() + err.text()).contains(expected_shape))
+      assert_false(@fs.exists(work + "/bad-output/source/openrpc/openrpc.json"))
+    }
+    let bad_reference = @json.parse(
+      "{\"methods\":[{\"params\":[{\"schema\":{\"$ref\":\"#/components/schemas/Missing\"}}]}]}",
+    )
+    let mut rejected = false
+    check_references(bad_reference) catch {
+      _ => rejected = true
+    }
+    assert_true(rejected)
+    println(
+      "OpenRPC document, references, runtime/schema agreement and dependency isolation passed: " +
+      target,
+    )
+  }
+}
+
+///|
+async fn main {
+  let targets = @env.args()[1:].to_owned()
+  exercise(
+    @fs.realpath("."),
+    if targets.is_empty() {
+      ["native", "wasm", "js", "wasm-gc"]
+    } else {
+      targets
+    },
+  )
+}
+
+///|
+async test "OpenRPC built artifacts and isolated library qualify on all four targets" {
+  exercise(@fs.realpath(".."), ["native", "wasm", "js", "wasm-gc"])
+}
