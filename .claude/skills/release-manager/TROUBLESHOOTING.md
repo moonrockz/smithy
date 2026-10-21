@@ -12,6 +12,13 @@ Add an entry for every new failure. Keep the newest entries at the end of their 
 
 ## release:prepare
 
+**One standalone consumer package pin keeps the previous version**
+Cause: the old version script used only the first registered prefix for each file, so a consumer
+importing two different workspace modules left its second pin unchecked and unchanged.
+Fix: use the updated script, which checks and rewrites every registered prefix and reads each source
+file once. Run `moonx scripts/versions.mbtx set X.Y.Z` again on the release branch and verify the
+standalone example imports before refreshing its PR.
+
 **`the working tree has changes; commit them or set them aside first`**
 Cause: `prepare` switches to `origin/main` and needs a clean tree.
 Fix: commit the work on its branch, or set it aside with a WIP commit.
