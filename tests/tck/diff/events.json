@@ -1,0 +1,2180 @@
+{
+    "referenceSha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef",
+    "cases": [
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Add.smithy.api#length",
+                    "shape": "example.constraints#LengthMax",
+                    "severity": "NOTE",
+                    "message": "Added trait `smithy.api#length` with value \n```\n{\n    \"max\": 10\n}\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Add.smithy.api#length",
+                    "shape": "example.constraints#LengthMin",
+                    "severity": "NOTE",
+                    "message": "Added trait `smithy.api#length` with value \n```\n{\n    \"min\": 1\n}\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Add.smithy.api#range",
+                    "shape": "example.constraints#RangeMax",
+                    "severity": "NOTE",
+                    "message": "Added trait `smithy.api#range` with value \n```\n{\n    \"max\": 10\n}\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Add.smithy.api#range",
+                    "shape": "example.constraints#RangeMin",
+                    "severity": "NOTE",
+                    "message": "Added trait `smithy.api#range` with value \n```\n{\n    \"min\": -10\n}\n```\n"
+                }
+            ],
+            "old": "local/constraints-added.a.smithy",
+            "new": "local/constraints-added.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#range",
+                    "shape": "example.constraints#Negative",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#range` from \n```\n{\n    \"max\": 100\n}\n```\n to \n```\n{\n    \"min\": -10,\n    \"max\": 100\n}\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#range",
+                    "shape": "example.constraints#Zero",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#range` from \n```\n{\n    \"max\": 100\n}\n```\n to \n```\n{\n    \"min\": 0,\n    \"max\": 100\n}\n```\n"
+                }
+            ],
+            "old": "local/range-min-nonpositive.a.smithy",
+            "new": "local/range-min-nonpositive.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ChangedRangeTrait",
+                    "shape": "example.constraints#Positive",
+                    "severity": "ERROR",
+                    "message": "smithy.api#range trait value `min` was made more restrictive by raising from 0 to 1"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#range",
+                    "shape": "example.constraints#Positive",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#range` from \n```\n{\n    \"max\": 100\n}\n```\n to \n```\n{\n    \"min\": 1,\n    \"max\": 100\n}\n```\n"
+                }
+            ],
+            "old": "local/range-min-positive.a.smithy",
+            "new": "local/range-min-positive.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ChangedRangeTrait",
+                    "shape": "example.constraints#Removed",
+                    "severity": "ERROR",
+                    "message": "smithy.api#range trait value `min` was made more restrictive by raising from -10 to 0"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#range",
+                    "shape": "example.constraints#Removed",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#range` from \n```\n{\n    \"min\": -10,\n    \"max\": 100\n}\n```\n to \n```\n{\n    \"max\": 100\n}\n```\n"
+                }
+            ],
+            "old": "local/range-min-removed-negative.a.smithy",
+            "new": "local/range-min-removed-negative.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedMetadata",
+                    "shape": "-",
+                    "severity": "NOTE",
+                    "message": "Metadata key `added` was added with the following value: [\n    true\n]"
+                },
+                {
+                    "id": "AddedOperationBinding.ToResource.Op3",
+                    "shape": "example.diff#Parent",
+                    "severity": "NOTE",
+                    "message": "Operation binding of `example.diff#Op3` was added to the resource shape, `example.diff#Parent`"
+                },
+                {
+                    "id": "AddedOperationError.NewError",
+                    "shape": "example.diff#Op",
+                    "severity": "WARNING",
+                    "message": "The `example.diff#NewError` error was added to the `example.diff#Op` operation. This is backward-compatible if the error is only encountered as a result of a change in behavior of the client (for example, the client sends a new parameter to an operation)."
+                },
+                {
+                    "id": "AddedResourceBinding.ToResource.Child",
+                    "shape": "example.diff#Parent",
+                    "severity": "NOTE",
+                    "message": "Resource binding of `example.diff#Child` was added to the resource shape, `example.diff#Parent`"
+                },
+                {
+                    "id": "AddedServiceError",
+                    "shape": "example.diff#Api",
+                    "severity": "WARNING",
+                    "message": "The `example.diff#NewServiceError` error was added to the `example.diff#Api` service, making this error common to all operations within the service. This is backward-compatible if the error is only encountered as a result of a change in behavior of the client (for example, the client sends a new parameter to an operation)."
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "example.diff#NewTrait",
+                    "severity": "NOTE",
+                    "message": "Added structure `example.diff#NewTrait`"
+                },
+                {
+                    "id": "AddedTraitDefinition",
+                    "shape": "example.diff#NewTrait",
+                    "severity": "NOTE",
+                    "message": "Trait definition `example.diff#NewTrait` was added"
+                },
+                {
+                    "id": "ChangedDefault",
+                    "shape": "example.diff#Default",
+                    "severity": "ERROR",
+                    "message": "Changing the @default value of a root-level shape will break previously generated code. Old value: 0. New value: 1"
+                },
+                {
+                    "id": "ChangedDefault",
+                    "shape": "example.diff#Value$defaulted",
+                    "severity": "ERROR",
+                    "message": "The @default trait of this member changed from the zero value of the target shape, `0`, to a value that is not the zero value, `1`. This will break previously generated code."
+                },
+                {
+                    "id": "ChangedLengthTrait",
+                    "shape": "example.diff#Text",
+                    "severity": "ERROR",
+                    "message": "smithy.api#length trait value `max` was made more restrictive by lowering from 100 to 50"
+                },
+                {
+                    "id": "ChangedLengthTrait",
+                    "shape": "example.diff#Text",
+                    "severity": "ERROR",
+                    "message": "smithy.api#length trait value `min` was made more restrictive by raising from 0 to 1"
+                },
+                {
+                    "id": "ChangedMetadata",
+                    "shape": "-",
+                    "severity": "WARNING",
+                    "message": "Metadata key `changed` was changed from \"old\" to \"new\""
+                },
+                {
+                    "id": "ChangedNullability.AddedClientOptionalTrait",
+                    "shape": "example.diff#Value$client",
+                    "severity": "ERROR",
+                    "message": "Member `client` changed from non-nullable to nullable: The `@clientOptional` trait was added to a `@required` member."
+                },
+                {
+                    "id": "ChangedNullability.AddedRequiredTrait",
+                    "shape": "example.diff#Value$optional",
+                    "severity": "ERROR",
+                    "message": "Member `optional` changed from nullable to non-nullable: The `@required` trait was added to a member."
+                },
+                {
+                    "id": "ChangedNullability.RemovedRequiredTrait",
+                    "shape": "example.diff#Value$required",
+                    "severity": "ERROR",
+                    "message": "Member `required` changed from non-nullable to nullable: The @required trait was removed and not replaced with the @default trait and @addedDefault trait."
+                },
+                {
+                    "id": "ChangedOperationInput.From.example.diff#In.To.example.diff#In2",
+                    "shape": "example.diff#Op",
+                    "severity": "ERROR",
+                    "message": "Changed operation input of `example.diff#Op` from `example.diff#In` to `example.diff#In2`"
+                },
+                {
+                    "id": "ChangedOperationOutput.From.example.diff#Out.To.example.diff#Out2",
+                    "shape": "example.diff#Op",
+                    "severity": "ERROR",
+                    "message": "Changed operation output of `example.diff#Op` from `example.diff#Out` to `example.diff#Out2`"
+                },
+                {
+                    "id": "ChangedRangeTrait",
+                    "shape": "example.diff#Number",
+                    "severity": "ERROR",
+                    "message": "smithy.api#range trait value `max` was made more restrictive by lowering from 100 to 50"
+                },
+                {
+                    "id": "ChangedRangeTrait",
+                    "shape": "example.diff#Number",
+                    "severity": "ERROR",
+                    "message": "smithy.api#range trait value `min` was made more restrictive by raising from -100 to -50"
+                },
+                {
+                    "id": "ModifiedTrait.Add.smithy.api#clientOptional",
+                    "shape": "example.diff#Value$client",
+                    "severity": "NOTE",
+                    "message": "Added trait `smithy.api#clientOptional` with value `{}`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#default",
+                    "shape": "example.diff#Default",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#default` from `0` to `1`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#default",
+                    "shape": "example.diff#Value$defaulted",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#default` from `0` to `1`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#length",
+                    "shape": "example.diff#Text",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#length` from \n```\n{\n    \"min\": 0,\n    \"max\": 100\n}\n```\n to \n```\n{\n    \"min\": 1,\n    \"max\": 50\n}\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#range",
+                    "shape": "example.diff#Number",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#range` from \n```\n{\n    \"min\": -100,\n    \"max\": 100\n}\n```\n to \n```\n{\n    \"min\": -50,\n    \"max\": 50\n}\n```\n"
+                },
+                {
+                    "id": "RemovedMetadata.removed",
+                    "shape": "-",
+                    "severity": "DANGER",
+                    "message": "Metadata key `removed` was removed with the following value: {\n    \"x\": 1\n}"
+                },
+                {
+                    "id": "RemovedOperationBinding.FromResource.Op2",
+                    "shape": "example.diff#Parent",
+                    "severity": "ERROR",
+                    "message": "Operation binding of `example.diff#Op2` was removed from resource shape, `example.diff#Parent`"
+                },
+                {
+                    "id": "RemovedOperationError.OldError",
+                    "shape": "example.diff#Op",
+                    "severity": "WARNING",
+                    "message": "The `example.diff#OldError` error was removed from the `example.diff#Op` operation."
+                },
+                {
+                    "id": "RemovedServiceError",
+                    "shape": "example.diff#Api",
+                    "severity": "WARNING",
+                    "message": "The `example.diff#OldServiceError` error was removed from the `example.diff#Api` service. This means that it is no longer considered an error common to all operations within the service."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "example.diff#OldTrait",
+                    "severity": "ERROR",
+                    "message": "Removed structure `example.diff#OldTrait`"
+                },
+                {
+                    "id": "RemovedTraitDefinition",
+                    "shape": "example.diff#OldTrait",
+                    "severity": "ERROR",
+                    "message": "Trait definition `example.diff#OldTrait` was removed"
+                },
+                {
+                    "id": "ServiceRename",
+                    "shape": "example.diff#Api",
+                    "severity": "ERROR",
+                    "message": "Service rename of `example.diff#Number` to `NewNumber` was added to an old shape"
+                },
+                {
+                    "id": "ServiceRename",
+                    "shape": "example.diff#Api",
+                    "severity": "ERROR",
+                    "message": "Service rename of `example.diff#Text` to `OldText` was removed"
+                },
+                {
+                    "id": "ServiceRename",
+                    "shape": "example.diff#Api",
+                    "severity": "ERROR",
+                    "message": "Service rename of `example.diff#Value` was changed from `OldValue` to `NewValue`"
+                }
+            ],
+            "old": "local/toolchain.a.smithy",
+            "new": "local/toolchain.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Update.smithy.api#jsonName",
+                    "shape": "ns.foo#Test$member",
+                    "severity": "ERROR",
+                    "message": "Changed trait `smithy.api#jsonName` from `a` to `b`"
+                }
+            ],
+            "old": "upstream/diffs/jsonName/change-jsonName-value.a.smithy",
+            "new": "upstream/diffs/jsonName/change-jsonName-value.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedRequiredMember",
+                    "shape": "smithy.example#GaIn$addedRequiredPreviewMember",
+                    "severity": "ERROR",
+                    "message": "Adding a new member with the `required` trait but not the `default` trait or the `clientOptional` trait is backwards-incompatible."
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#GaIn$addedRequiredPreviewMember",
+                    "severity": "NOTE",
+                    "message": "Added member `smithy.example#GaIn$addedRequiredPreviewMember`"
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/added-required-member-preview-member.a.smithy",
+            "new": "upstream/diffs/previewFeatures/added-required-member-preview-member.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "AddedRequiredMember",
+                    "shape": "smithy.example#PreviewIn$extra",
+                    "severity": "WARNING",
+                    "message": "Adding a new member with the `required` trait but not the `default` trait or the `clientOptional` trait is backwards-incompatible. This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#PreviewIn$extra",
+                    "severity": "NOTE",
+                    "message": "Added member `smithy.example#PreviewIn$extra`"
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/added-required-member.a.smithy",
+            "new": "upstream/diffs/previewFeatures/added-required-member.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ChangedDefault",
+                    "shape": "smithy.example#PreviewIn$data",
+                    "severity": "WARNING",
+                    "message": "Changing the @default value of a member is dangerous and could break previously generated code or lead to subtle errors. Do this only when strictly necessary. Old value: 1. New value: 2 This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#default",
+                    "shape": "smithy.example#PreviewIn$data",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#default` from `1` to `2`"
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-default.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-default.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ChangedEnumTrait.Removed.1",
+                    "shape": "smithy.example#En",
+                    "severity": "WARNING",
+                    "message": "Enum value `B` was removed This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#En$B",
+                    "severity": "WARNING",
+                    "message": "Removed member `smithy.example#En$B` This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-enum-trait.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-enum-trait.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ChangedLengthTrait",
+                    "shape": "smithy.example#AsymStr",
+                    "severity": "ERROR",
+                    "message": "smithy.api#length trait value `min` was made more restrictive by raising from 1 to 5"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#length",
+                    "shape": "smithy.example#AsymStr",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#length` from \n```\n{\n    \"min\": 1\n}\n```\n to \n```\n{\n    \"min\": 5\n}\n```\n"
+                },
+                {
+                    "id": "RemovedOperationBinding.FromService.GaAsymOp",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Operation binding of `smithy.example#GaAsymOp` was removed from service shape, `smithy.example#Example`"
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#GaAsymIn",
+                    "severity": "ERROR",
+                    "message": "Removed structure `smithy.example#GaAsymIn`"
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#GaAsymOp",
+                    "severity": "ERROR",
+                    "message": "Removed operation `smithy.example#GaAsymOp`"
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-length-trait-shared-ga-removed.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-length-trait-shared-ga-removed.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ChangedLengthTrait",
+                    "shape": "smithy.example#SharedStr",
+                    "severity": "ERROR",
+                    "message": "smithy.api#length trait value `min` was made more restrictive by raising from 1 to 5"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#length",
+                    "shape": "smithy.example#SharedStr",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#length` from \n```\n{\n    \"min\": 1\n}\n```\n to \n```\n{\n    \"min\": 5\n}\n```\n"
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-length-trait-shared.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-length-trait-shared.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ChangedLengthTrait",
+                    "shape": "smithy.example#LenStr",
+                    "severity": "WARNING",
+                    "message": "smithy.api#length trait value `min` was made more restrictive by raising from 1 to 5 This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#length",
+                    "shape": "smithy.example#LenStr",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#length` from \n```\n{\n    \"min\": 1\n}\n```\n to \n```\n{\n    \"min\": 5\n}\n```\n"
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-length-trait.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-length-trait.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ChangedMemberOrder",
+                    "shape": "smithy.example#PreviewIn",
+                    "severity": "WARNING",
+                    "message": "structure shape members were reordered. This can cause ABI compatibility issues in languages like C and C++ where the layout and alignment of a data structure matters. This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-member-order.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-member-order.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#NoReasonIn$data",
+                    "severity": "ERROR",
+                    "message": "The shape targeted by the member `smithy.example#NoReasonIn$data` changed from `smithy.api#String` (string) to `smithy.api#Integer` (integer). The type of the targeted shape changed from string to integer."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-member-target-no-reason.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-member-target-no-reason.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#GaIn$targetChange",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#GaIn$targetChange` changed from `smithy.api#String` (string) to `smithy.api#Integer` (integer). The type of the targeted shape changed from string to integer. This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-member-target-preview-member.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-member-target-preview-member.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#SvcMemberIn$data",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#SvcMemberIn$data` changed from `smithy.api#String` (string) to `smithy.api#Integer` (integer). The type of the targeted shape changed from string to integer. This event is downgraded to WARNING because this shape is part of preview feature `PREVIEWSVC`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-member-target-preview-service.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-member-target-preview-service.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#InputStruct$targetChange",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#InputStruct$targetChange` changed from `smithy.api#String` (string) to `smithy.api#Integer` (integer). The type of the targeted shape changed from string to integer. This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`, `EXAMPLE_PREVIEW_TWO`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-member-target-shared-different-preview-features.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-member-target-shared-different-preview-features.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#PreviewIn$data",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#PreviewIn$data` changed from `smithy.api#String` (string) to `smithy.api#Integer` (integer). The type of the targeted shape changed from string to integer. This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-member-target.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-member-target.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ChangedNullability.RemovedRequiredTrait",
+                    "shape": "smithy.example#GaIn$previewMember",
+                    "severity": "ERROR",
+                    "message": "Member `previewMember` changed from non-nullable to nullable: The @required trait was removed and not replaced with the @default trait and @addedDefault trait."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-nullability-preview-member.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-nullability-preview-member.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ChangedNullability.RemovedRequiredTrait",
+                    "shape": "smithy.example#PreviewIn$data",
+                    "severity": "WARNING",
+                    "message": "Member `data` changed from non-nullable to nullable: The @required trait was removed and not replaced with the @default trait and @addedDefault trait. This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-nullability.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-nullability.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#OpInputInB",
+                    "severity": "NOTE",
+                    "message": "Added structure `smithy.example#OpInputInB`"
+                },
+                {
+                    "id": "ChangedOperationInput.From.smithy.example#OpInputInA.To.smithy.example#OpInputInB",
+                    "shape": "smithy.example#OpInputOp",
+                    "severity": "WARNING",
+                    "message": "Changed operation input of `smithy.example#OpInputOp` from `smithy.example#OpInputInA` to `smithy.example#OpInputInB` This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#OpInputInA",
+                    "severity": "WARNING",
+                    "message": "Removed structure `smithy.example#OpInputInA` This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-operation-input.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-operation-input.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ChangedResourceIdentifiers",
+                    "shape": "smithy.example#IdResource",
+                    "severity": "WARNING",
+                    "message": "Identifiers of resource `smithy.example#IdResource` changed from {id=smithy.api#String} to {id=smithy.api#String, extra=smithy.api#String}. This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-resource-identifiers.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-resource-identifiers.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#Thing$member",
+                    "severity": "NOTE",
+                    "message": "Added member `smithy.example#Thing$member`"
+                },
+                {
+                    "id": "ChangedShapeType",
+                    "shape": "smithy.example#Thing",
+                    "severity": "WARNING",
+                    "message": "Shape `smithy.example#Thing` type was changed from `structure` to `list`. This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/changed-shape-type.a.smithy",
+            "new": "upstream/diffs/previewFeatures/changed-shape-type.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#customConst",
+                    "shape": "smithy.example#PreviewIn$data",
+                    "severity": "WARNING",
+                    "message": "Changed trait `smithy.example#customConst` from `v1` to `v2` This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/modified-trait-preview.a.smithy",
+            "new": "upstream/diffs/previewFeatures/modified-trait-preview.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "RemovedOperationBinding.FromResource.PreviewBoundOp",
+                    "shape": "smithy.example#GaHostResource",
+                    "severity": "ERROR",
+                    "message": "Operation binding of `smithy.example#PreviewBoundOp` was removed from resource shape, `smithy.example#GaHostResource`"
+                },
+                {
+                    "id": "RemovedOperationBinding.FromService.GaGoneOp",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Operation binding of `smithy.example#GaGoneOp` was removed from service shape, `smithy.example#Example`"
+                },
+                {
+                    "id": "RemovedOperationBinding.FromService.PreviewGoneOp",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Operation binding of `smithy.example#PreviewGoneOp` was removed from service shape, `smithy.example#Example`"
+                },
+                {
+                    "id": "RemovedResourceBinding.FromService.PreviewGoneResource",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Resource binding of `smithy.example#PreviewGoneResource` was removed from service shape, `smithy.example#Example`"
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#GaGoneOp",
+                    "severity": "ERROR",
+                    "message": "Removed operation `smithy.example#GaGoneOp`"
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#PreviewBoundOpInput",
+                    "severity": "WARNING",
+                    "message": "Removed structure `smithy.example#PreviewBoundOpInput` This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#PreviewBoundOp",
+                    "severity": "WARNING",
+                    "message": "Removed operation `smithy.example#PreviewBoundOp` This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#PreviewGoneIn",
+                    "severity": "WARNING",
+                    "message": "Removed structure `smithy.example#PreviewGoneIn` This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#PreviewGoneOp",
+                    "severity": "WARNING",
+                    "message": "Removed operation `smithy.example#PreviewGoneOp` This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#PreviewGoneResource",
+                    "severity": "WARNING",
+                    "message": "Removed resource `smithy.example#PreviewGoneResource` This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/removed-entity-binding-ga-parent.a.smithy",
+            "new": "upstream/diffs/previewFeatures/removed-entity-binding-ga-parent.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "RemovedOperationBinding.FromService.SvcGoneOp",
+                    "shape": "smithy.example#PreviewSvc",
+                    "severity": "WARNING",
+                    "message": "Operation binding of `smithy.example#SvcGoneOp` was removed from service shape, `smithy.example#PreviewSvc` This event is downgraded to WARNING because this shape is part of preview feature `PREVIEWSVC`."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#SvcGoneOp",
+                    "severity": "WARNING",
+                    "message": "Removed operation `smithy.example#SvcGoneOp` This event is downgraded to WARNING because this shape is part of preview feature `PREVIEWSVC`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/removed-entity-binding-preview-parent.a.smithy",
+            "new": "upstream/diffs/previewFeatures/removed-entity-binding-preview-parent.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#GaIn$goingAway",
+                    "severity": "WARNING",
+                    "message": "Removed member `smithy.example#GaIn$goingAway` This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/removed-shape-preview-member.a.smithy",
+            "new": "upstream/diffs/previewFeatures/removed-shape-preview-member.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#PreviewIn$gone",
+                    "severity": "WARNING",
+                    "message": "Removed member `smithy.example#PreviewIn$gone` This event is downgraded to WARNING because this shape is part of preview feature `EXAMPLE_PREVIEW`."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/removed-shape.a.smithy",
+            "new": "upstream/diffs/previewFeatures/removed-shape.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedOperationBinding.ToService.GuardNewOp",
+                    "shape": "smithy.example#Example",
+                    "severity": "NOTE",
+                    "message": "Operation binding of `smithy.example#GuardNewOp` was added to the service shape, `smithy.example#Example`"
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#GuardNewOp",
+                    "severity": "NOTE",
+                    "message": "Added operation `smithy.example#GuardNewOp`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#GuardIn$data",
+                    "severity": "ERROR",
+                    "message": "The shape targeted by the member `smithy.example#GuardIn$data` changed from `smithy.api#String` (string) to `smithy.api#Integer` (integer). The type of the targeted shape changed from string to integer."
+                },
+                {
+                    "id": "TraitBreakingChange.Add.smithy.api#unstable",
+                    "shape": "smithy.example#GuardFeatureIdOp",
+                    "severity": "ERROR",
+                    "message": "Added trait contents to `smithy.api#unstable` at path `/featureId` with value `EXAMPLE_PREVIEW`; The `@unstable` trait's `featureId` cannot be added to an existing shape. A preview feature must be declared when the shape is first introduced."
+                },
+                {
+                    "id": "TraitBreakingChange.Remove.smithy.api#unstable",
+                    "shape": "smithy.example#GuardRemoveOp",
+                    "severity": "ERROR",
+                    "message": "Removed trait contents from `smithy.api#unstable` at path `/featureId`. Removed value: `EXAMPLE_PREVIEW`; The `@unstable` trait's `featureId` cannot be removed after setting. Please remove the whole `unstable` trait if the shape is GA."
+                },
+                {
+                    "id": "TraitBreakingChange.Update.smithy.api#unstable",
+                    "shape": "smithy.example#GuardUpdateOp",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.api#unstable` at path `/featureId` from `EXAMPLE_PREVIEW` to `EXAMPLE_PREVIEW_TWO`; The `@unstable` trait's `featureId` cannot be changed after setting."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/trait-breaking-change.a.smithy",
+            "new": "upstream/diffs/previewFeatures/trait-breaking-change.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Update.smithy.api#unstableFeatures",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.api#unstableFeatures` at path `/UPDATED_PREVIEW/since` from `2026-01-01` to `2026-02-01`; The `since` date of an `@unstableFeatures` entry cannot be changed after setting."
+                },
+                {
+                    "id": "TraitBreakingChange.Update.smithy.api#unstableFeatures",
+                    "shape": "smithy.example#PreviewSvc",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.api#unstableFeatures` at path `/SERVICE_PREVIEW/since` from `2026-01-01` to `2026-02-01`; The `since` date of an `@unstableFeatures` entry cannot be changed after setting."
+                }
+            ],
+            "old": "upstream/diffs/previewFeatures/unstable-features-since.a.smithy",
+            "new": "upstream/diffs/previewFeatures/unstable-features-since.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedOperationBinding.ToService.Operation",
+                    "shape": "ns.foo#Service",
+                    "severity": "NOTE",
+                    "message": "Operation binding of `ns.foo#Operation` was added to the service shape, `ns.foo#Service`"
+                },
+                {
+                    "id": "RemovedOperationBinding.FromResource.Operation",
+                    "shape": "ns.foo#Resource",
+                    "severity": "ERROR",
+                    "message": "Operation binding of `ns.foo#Operation` was removed from resource shape, `ns.foo#Resource`"
+                }
+            ],
+            "old": "upstream/diffs/removedEntityBinding/move-operation-from-resource-to-service.a.smithy",
+            "new": "upstream/diffs/removedEntityBinding/move-operation-from-resource-to-service.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "AddedOperationBinding.ToResource.Operation",
+                    "shape": "ns.foo#Child",
+                    "severity": "NOTE",
+                    "message": "Operation binding of `ns.foo#Operation` was added to the resource shape, `ns.foo#Child`"
+                },
+                {
+                    "id": "RemovedOperationBinding.FromService.Operation",
+                    "shape": "ns.foo#Service",
+                    "severity": "NOTE",
+                    "message": "Operation binding of `ns.foo#Operation` was removed from service shape, `ns.foo#Service`, but the operation remains in the service closure through a resource"
+                }
+            ],
+            "old": "upstream/diffs/removedEntityBinding/move-operation-to-nested-resource.a.smithy",
+            "new": "upstream/diffs/removedEntityBinding/move-operation-to-nested-resource.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "AddedOperationBinding.ToResource.Operation",
+                    "shape": "ns.foo#Resource",
+                    "severity": "NOTE",
+                    "message": "Operation binding of `ns.foo#Operation` was added to the resource shape, `ns.foo#Resource`"
+                },
+                {
+                    "id": "RemovedOperationBinding.FromService.Operation",
+                    "shape": "ns.foo#Service",
+                    "severity": "NOTE",
+                    "message": "Operation binding of `ns.foo#Operation` was removed from service shape, `ns.foo#Service`, but the operation remains in the service closure through a resource"
+                }
+            ],
+            "old": "upstream/diffs/removedEntityBinding/move-operation-to-resource.a.smithy",
+            "new": "upstream/diffs/removedEntityBinding/move-operation-to-resource.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "RemovedOperationBinding.FromService.Operation",
+                    "shape": "ns.foo#Service",
+                    "severity": "ERROR",
+                    "message": "Operation binding of `ns.foo#Operation` was removed from service shape, `ns.foo#Service`"
+                }
+            ],
+            "old": "upstream/diffs/removedEntityBinding/remove-operation-from-service.a.smithy",
+            "new": "upstream/diffs/removedEntityBinding/remove-operation-from-service.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "RemovedResourceBinding.FromResource.Child",
+                    "shape": "ns.foo#Parent",
+                    "severity": "ERROR",
+                    "message": "Resource binding of `ns.foo#Child` was removed from resource shape, `ns.foo#Parent`"
+                }
+            ],
+            "old": "upstream/diffs/removedEntityBinding/remove-resource-from-resource.a.smithy",
+            "new": "upstream/diffs/removedEntityBinding/remove-resource-from-resource.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "RemovedResourceBinding.FromService.Resource",
+                    "shape": "ns.foo#Service",
+                    "severity": "ERROR",
+                    "message": "Resource binding of `ns.foo#Resource` was removed from service shape, `ns.foo#Service`"
+                }
+            ],
+            "old": "upstream/diffs/removedEntityBinding/remove-resource-from-service.a.smithy",
+            "new": "upstream/diffs/removedEntityBinding/remove-resource-from-service.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#tags",
+                    "shape": "ns.foo#TestA",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#tags` from \n```\n[\n    \"toAdd\"\n]\n```\n to \n```\n[\n    \"toAdd\",\n    \"added\"\n]\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#tags",
+                    "shape": "ns.foo#TestB",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#tags` from \n```\n[\n    \"toRemove\"\n]\n```\n to `[]`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#tags",
+                    "shape": "ns.foo#TestC",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#tags` from \n```\n[\n    \"to\",\n    \"switch\"\n]\n```\n to \n```\n[\n    \"switch\",\n    \"to\"\n]\n```\n"
+                }
+            ],
+            "old": "upstream/diffs/tags/change-tags-content.a.smithy",
+            "new": "upstream/diffs/tags/change-tags-content.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#NewB",
+                    "severity": "NOTE",
+                    "message": "Added list `smithy.example#NewB`"
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#NewC",
+                    "severity": "NOTE",
+                    "message": "Added list `smithy.example#NewC`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B` (list) to `smithy.example#NewB` (list). This was determined backward compatible. This will result in the following effective differences:\n\n- [WARNING] The shape targeted by the member `smithy.example#B$member` changed from `smithy.example#C` (list) to `smithy.example#NewC` (list). This was determined backward compatible. This will result in the following effective differences:\n  \n  - [WARNING] Added trait `smithy.api#pattern` with value `foo:.*`; The @pattern trait should only be added if the string already had adhered to the pattern."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B",
+                    "severity": "ERROR",
+                    "message": "Removed list `smithy.example#B`"
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#C",
+                    "severity": "ERROR",
+                    "message": "Removed list `smithy.example#C`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/double-nesting-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/double-nesting-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added list `smithy.example#B2`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (list) to `smithy.example#B2` (list). This was determined backward compatible. This will result in the following effective differences:\n\n- [WARNING] Added trait `smithy.api#pattern` with value `^[a-z]+$`; The @pattern trait should only be added if the string already had adhered to the pattern."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed list `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-list-added-compatible-member-trait-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-list-added-compatible-member-trait-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added list `smithy.example#B2`"
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#noAddingTrait",
+                    "severity": "NOTE",
+                    "message": "Added structure `smithy.example#noAddingTrait`"
+                },
+                {
+                    "id": "AddedTraitDefinition",
+                    "shape": "smithy.example#noAddingTrait",
+                    "severity": "NOTE",
+                    "message": "Trait definition `smithy.example#noAddingTrait` was added"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "ERROR",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (list) to `smithy.example#B2` (list). This will result in the following effective differences:\n\n- [ERROR] Added trait `smithy.example#noAddingTrait`"
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed list `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-list-added-incompatible-member-trait-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-list-added-incompatible-member-trait-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added list `smithy.example#B2`"
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#MyString2",
+                    "severity": "NOTE",
+                    "message": "Added string `smithy.example#MyString2`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (list) to `smithy.example#B2` (list). This was determined backward compatible. This will result in the following effective differences:\n\n- [WARNING] The shape targeted by the member `smithy.example#B1$member` changed from `smithy.example#MyString` (string) to `smithy.example#MyString2` (string). This was determined backward compatible."
+                },
+                {
+                    "id": "RemovedShape.ScalarShape",
+                    "shape": "smithy.example#MyString",
+                    "severity": "WARNING",
+                    "message": "Removed string `smithy.example#MyString`"
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed list `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-list-compatible-changed-member-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-list-compatible-changed-member-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added list `smithy.example#B2`"
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#MyInteger",
+                    "severity": "NOTE",
+                    "message": "Added integer `smithy.example#MyInteger`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "ERROR",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (list) to `smithy.example#B2` (list). This will result in the following effective differences:\n\n- [ERROR] The shape targeted by the member `smithy.example#B1$member` changed from `smithy.example#MyString` (string) to `smithy.example#MyInteger` (integer). The type of the targeted shape changed from string to integer."
+                },
+                {
+                    "id": "RemovedShape.ScalarShape",
+                    "shape": "smithy.example#MyString",
+                    "severity": "WARNING",
+                    "message": "Removed string `smithy.example#MyString`"
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed list `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-list-incompatible-changed-member-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-list-incompatible-changed-member-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added list `smithy.example#B2`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (list) to `smithy.example#B2` (list). This was determined backward compatible."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed list `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-list-unchanged-member-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-list-unchanged-member-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added map `smithy.example#B2`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (map) to `smithy.example#B2` (map). This was determined backward compatible. This will result in the following effective differences:\n\n- [WARNING] Added trait `smithy.api#pattern` with value `^[a-z]+$`; The @pattern trait should only be added if the string already had adhered to the pattern."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed map `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-map-key-added-compatible-trait-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-map-key-added-compatible-trait-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added map `smithy.example#B2`"
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#noAddingTrait",
+                    "severity": "NOTE",
+                    "message": "Added structure `smithy.example#noAddingTrait`"
+                },
+                {
+                    "id": "AddedTraitDefinition",
+                    "shape": "smithy.example#noAddingTrait",
+                    "severity": "NOTE",
+                    "message": "Trait definition `smithy.example#noAddingTrait` was added"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "ERROR",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (map) to `smithy.example#B2` (map). This will result in the following effective differences:\n\n- [ERROR] Added trait `smithy.example#noAddingTrait`"
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed map `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-map-key-added-incompatible-trait-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-map-key-added-incompatible-trait-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added map `smithy.example#B2`"
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#MyString2",
+                    "severity": "NOTE",
+                    "message": "Added string `smithy.example#MyString2`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (map) to `smithy.example#B2` (map). This was determined backward compatible. This will result in the following effective differences:\n\n- [WARNING] The shape targeted by the member `smithy.example#B1$key` changed from `smithy.example#MyString` (string) to `smithy.example#MyString2` (string). This was determined backward compatible."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed map `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-map-key-compatible-changed-target-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-map-key-compatible-changed-target-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added map `smithy.example#B2`"
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#MyEnum",
+                    "severity": "NOTE",
+                    "message": "Added enum `smithy.example#MyEnum`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "ERROR",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (map) to `smithy.example#B2` (map). This will result in the following effective differences:\n\n- [ERROR] The shape targeted by the member `smithy.example#B1$key` changed from `smithy.example#MyString` (string) to `smithy.example#MyEnum` (enum). The type of the targeted shape changed from string to enum."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed map `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-map-key-incompatible-changed-target-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-map-key-incompatible-changed-target-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added map `smithy.example#B2`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (map) to `smithy.example#B2` (map). This was determined backward compatible."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed map `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-map-unchanged-member-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-map-unchanged-member-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added map `smithy.example#B2`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (map) to `smithy.example#B2` (map). This was determined backward compatible. This will result in the following effective differences:\n\n- [WARNING] Added trait `smithy.api#pattern` with value `^[a-z]+$`; The @pattern trait should only be added if the string already had adhered to the pattern."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed map `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-map-value-added-compatible-trait-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-map-value-added-compatible-trait-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added map `smithy.example#B2`"
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#noAddingTrait",
+                    "severity": "NOTE",
+                    "message": "Added structure `smithy.example#noAddingTrait`"
+                },
+                {
+                    "id": "AddedTraitDefinition",
+                    "shape": "smithy.example#noAddingTrait",
+                    "severity": "NOTE",
+                    "message": "Trait definition `smithy.example#noAddingTrait` was added"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "ERROR",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (map) to `smithy.example#B2` (map). This will result in the following effective differences:\n\n- [ERROR] Added trait `smithy.example#noAddingTrait`"
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed map `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-map-value-added-incompatible-trait-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-map-value-added-incompatible-trait-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added map `smithy.example#B2`"
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#MyString2",
+                    "severity": "NOTE",
+                    "message": "Added string `smithy.example#MyString2`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "WARNING",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (map) to `smithy.example#B2` (map). This was determined backward compatible. This will result in the following effective differences:\n\n- [WARNING] The shape targeted by the member `smithy.example#B1$value` changed from `smithy.example#MyString` (string) to `smithy.example#MyString2` (string). This was determined backward compatible."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed map `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-map-value-compatible-changed-target-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-map-value-compatible-changed-target-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#B2",
+                    "severity": "NOTE",
+                    "message": "Added map `smithy.example#B2`"
+                },
+                {
+                    "id": "AddedShape",
+                    "shape": "smithy.example#MyInteger",
+                    "severity": "NOTE",
+                    "message": "Added integer `smithy.example#MyInteger`"
+                },
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#A$member",
+                    "severity": "ERROR",
+                    "message": "The shape targeted by the member `smithy.example#A$member` changed from `smithy.example#B1` (map) to `smithy.example#B2` (map). This will result in the following effective differences:\n\n- [ERROR] The shape targeted by the member `smithy.example#B1$value` changed from `smithy.example#MyString` (string) to `smithy.example#MyInteger` (integer). The type of the targeted shape changed from string to integer."
+                },
+                {
+                    "id": "RemovedShape",
+                    "shape": "smithy.example#B1",
+                    "severity": "ERROR",
+                    "message": "Removed map `smithy.example#B1`"
+                }
+            ],
+            "old": "upstream/evaluators/changed-member-target/nested-map-value-incompatible-changed-target-a.smithy",
+            "new": "upstream/evaluators/changed-member-target/nested-map-value-incompatible-changed-target-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Add.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "DANGER",
+                    "message": "Added trait contents to `smithy.example#aTrait` at path `/e` with value `a`"
+                },
+                {
+                    "id": "ModifiedTrait.Add.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "ERROR",
+                    "message": "Added trait contents to `smithy.example#aTrait` at path `/a` with value `a`"
+                },
+                {
+                    "id": "ModifiedTrait.Add.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "WARNING",
+                    "message": "Added trait contents to `smithy.example#aTrait` at path `/i` with value `a`"
+                },
+                {
+                    "id": "ModifiedTrait.Remove.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "DANGER",
+                    "message": "Removed trait contents from `smithy.example#aTrait` at path `/f`. Removed value: `a`"
+                },
+                {
+                    "id": "ModifiedTrait.Remove.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "ERROR",
+                    "message": "Removed trait contents from `smithy.example#aTrait` at path `/b`. Removed value: `a`"
+                },
+                {
+                    "id": "ModifiedTrait.Remove.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "WARNING",
+                    "message": "Removed trait contents from `smithy.example#aTrait` at path `/j`. Removed value: `a`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "DANGER",
+                    "message": "Changed trait contents of `smithy.example#aTrait` at path `/g` from `a` to `h`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "DANGER",
+                    "message": "Changed trait contents of `smithy.example#aTrait` at path `/h` from `a` to `h`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.example#aTrait` at path `/c` from `a` to `c`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.example#aTrait` at path `/d` from `a` to `d`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "WARNING",
+                    "message": "Changed trait contents of `smithy.example#aTrait` at path `/k` from `a` to `k`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "WARNING",
+                    "message": "Changed trait contents of `smithy.example#aTrait` at path `/l` from `a` to `l`"
+                }
+            ],
+            "old": "upstream/evaluators/trait-modified-all-severities-a.smithy",
+            "new": "upstream/evaluators/trait-modified-all-severities-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Add.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "WARNING",
+                    "message": "Added trait contents to `smithy.example#aTrait` at path `/bar` with value `no`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.example#aTrait` at path `/baz/foo` from `bye` to `adios`"
+                }
+            ],
+            "old": "upstream/evaluators/trait-modified-contents-a.smithy",
+            "new": "upstream/evaluators/trait-modified-contents-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Add.smithy.example#aTrait",
+                    "shape": "smithy.example#Qux",
+                    "severity": "DANGER",
+                    "message": "Added trait contents to `smithy.example#aTrait` at path `/foo/3` with value `4`"
+                },
+                {
+                    "id": "ModifiedTrait.Remove.smithy.example#aTrait",
+                    "shape": "smithy.example#Bam",
+                    "severity": "DANGER",
+                    "message": "Removed trait contents from `smithy.example#aTrait` at path `/foo/2`. Removed value: `3`"
+                },
+                {
+                    "id": "ModifiedTrait.Remove.smithy.example#aTrait",
+                    "shape": "smithy.example#Bar",
+                    "severity": "ERROR",
+                    "message": "Removed trait contents from `smithy.example#aTrait` at path `/foo`. Removed value: \n```\n[\n    \"1\",\n    \"2\",\n    \"3\"\n]\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "DANGER",
+                    "message": "Changed trait contents of `smithy.example#aTrait` at path `/foo/1` from `b` to `B`"
+                }
+            ],
+            "old": "upstream/evaluators/trait-modified-contents-list-a.smithy",
+            "new": "upstream/evaluators/trait-modified-contents-list-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Add.smithy.example#aTrait",
+                    "shape": "smithy.example#Bam",
+                    "severity": "WARNING",
+                    "message": "Added trait contents to `smithy.example#aTrait` at path `/foo/qux` with value `4`"
+                },
+                {
+                    "id": "ModifiedTrait.Remove.smithy.example#aTrait",
+                    "shape": "smithy.example#Bar",
+                    "severity": "WARNING",
+                    "message": "Removed trait contents from `smithy.example#aTrait` at path `/foo/boo`. Removed value: `3`"
+                },
+                {
+                    "id": "ModifiedTrait.Remove.smithy.example#aTrait",
+                    "shape": "smithy.example#Qux",
+                    "severity": "ERROR",
+                    "message": "Removed trait contents from `smithy.example#aTrait` at path `/foo`. Removed value: \n```\n{\n    \"baz\": \"1\",\n    \"bam\": \"2\",\n    \"boo\": \"3\"\n}\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "WARNING",
+                    "message": "Changed trait contents of `smithy.example#aTrait` at path `/foo/bam` from `b` to `B`"
+                }
+            ],
+            "old": "upstream/evaluators/trait-modified-contents-map-a.smithy",
+            "new": "upstream/evaluators/trait-modified-contents-map-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Add.smithy.example#aTrait",
+                    "shape": "smithy.example#Qux",
+                    "severity": "DANGER",
+                    "message": "Added trait contents to `smithy.example#aTrait` at path `/foo/3` with value `4`"
+                },
+                {
+                    "id": "ModifiedTrait.Remove.smithy.example#aTrait",
+                    "shape": "smithy.example#Bam",
+                    "severity": "DANGER",
+                    "message": "Removed trait contents from `smithy.example#aTrait` at path `/foo/2`. Removed value: `3`"
+                },
+                {
+                    "id": "ModifiedTrait.Remove.smithy.example#aTrait",
+                    "shape": "smithy.example#Bar",
+                    "severity": "ERROR",
+                    "message": "Removed trait contents from `smithy.example#aTrait` at path `/foo`. Removed value: \n```\n[\n    \"1\",\n    \"2\",\n    \"3\"\n]\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "DANGER",
+                    "message": "Changed trait contents of `smithy.example#aTrait` at path `/foo/1` from `b` to `B`"
+                }
+            ],
+            "old": "upstream/evaluators/trait-modified-contents-set-a.smithy",
+            "new": "upstream/evaluators/trait-modified-contents-set-b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#aTrait",
+                    "shape": "smithy.example#Boo",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.example#aTrait` at path `/baz/baz` from `a` to `b`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#aTrait",
+                    "shape": "smithy.example#Foo",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.example#aTrait` at path `/baz/foo` from `a` to `b`"
+                }
+            ],
+            "old": "upstream/evaluators/trait-modified-contents-union-a.smithy",
+            "new": "upstream/evaluators/trait-modified-contents-union-b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Add.smithy.example#c",
+                    "shape": "smithy.example#Foo",
+                    "severity": "NOTE",
+                    "message": "Added trait `smithy.example#c` with value `foo`"
+                },
+                {
+                    "id": "ModifiedTrait.Remove.smithy.example#a",
+                    "shape": "smithy.example#Foo",
+                    "severity": "WARNING",
+                    "message": "Removed trait `smithy.example#a`. Previous trait value: `{}`"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.example#b",
+                    "shape": "smithy.example#Foo",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.example#b` from `hello` to `hello!`"
+                }
+            ],
+            "old": "upstream/evaluators/trait-test-a.smithy",
+            "new": "upstream/evaluators/trait-test-b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ChangedMemberOrder",
+                    "shape": "smithy.example#Foo",
+                    "severity": "SUPPRESSED",
+                    "message": "structure shape members were reordered. This can cause ABI compatibility issues in languages like C and C++ where the layout and alignment of a data structure matters."
+                }
+            ],
+            "old": "upstream/suppressions-a.smithy",
+            "new": "upstream/suppressions-b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [],
+            "old": "upstream/testrunner/testrunner/invalid/diff1.a.smithy",
+            "new": "upstream/testrunner/testrunner/invalid/diff1.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#MyStructure$foo",
+                    "severity": "ERROR",
+                    "message": "The shape targeted by the member `smithy.example#MyStructure$foo` changed from `smithy.api#Integer` (integer) to `smithy.api#String` (string). The type of the targeted shape changed from integer to string."
+                }
+            ],
+            "old": "upstream/testrunner/testrunner/invalid/diff2.a.smithy",
+            "new": "upstream/testrunner/testrunner/invalid/diff2.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#MyStructure$foo",
+                    "severity": "ERROR",
+                    "message": "The shape targeted by the member `smithy.example#MyStructure$foo` changed from `smithy.api#Integer` (integer) to `smithy.api#String` (string). The type of the targeted shape changed from integer to string."
+                }
+            ],
+            "old": "upstream/testrunner/testrunner/invalid/nested/diff3.a.smithy",
+            "new": "upstream/testrunner/testrunner/invalid/nested/diff3.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [],
+            "old": "upstream/testrunner/testrunner/valid/diff1.a.smithy",
+            "new": "upstream/testrunner/testrunner/valid/diff1.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#MyStructure$foo",
+                    "severity": "ERROR",
+                    "message": "The shape targeted by the member `smithy.example#MyStructure$foo` changed from `smithy.api#Integer` (integer) to `smithy.api#String` (string). The type of the targeted shape changed from integer to string."
+                }
+            ],
+            "old": "upstream/testrunner/testrunner/valid/diff2.a.smithy",
+            "new": "upstream/testrunner/testrunner/valid/diff2.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ChangedMemberTarget",
+                    "shape": "smithy.example#MyStructure$foo",
+                    "severity": "ERROR",
+                    "message": "The shape targeted by the member `smithy.example#MyStructure$foo` changed from `smithy.api#Integer` (integer) to `smithy.api#String` (string). The type of the targeted shape changed from integer to string."
+                }
+            ],
+            "old": "upstream/testrunner/testrunner/valid/nested/diff3.a.smithy",
+            "new": "upstream/testrunner/testrunner/valid/nested/diff3.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Add.smithy.example#exampleTrait",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Added trait `smithy.example#exampleTrait`"
+                }
+            ],
+            "id": "trait-added",
+            "old": "upstream/evaluators/trait-breaking-change/trait-added.smithy",
+            "new": "upstream/evaluators/trait-breaking-change/trait-added.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#Example",
+                    "trait": "smithy.example#exampleTrait",
+                    "value": {}
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Remove.smithy.example#exampleTrait",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Removed trait `smithy.example#exampleTrait`"
+                }
+            ],
+            "id": "trait-any",
+            "old": "upstream/evaluators/trait-breaking-change/trait-any.smithy",
+            "new": "upstream/evaluators/trait-breaking-change/trait-any.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#Example",
+                    "trait": "smithy.example#exampleTrait"
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Update.smithy.example#exampleTrait",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.example#exampleTrait` at path `/1` from `b` to `B`"
+                }
+            ],
+            "id": "trait-list-members",
+            "old": "upstream/evaluators/trait-breaking-change/trait-list-members.smithy",
+            "new": "upstream/evaluators/trait-breaking-change/trait-list-members.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#Example",
+                    "trait": "smithy.example#exampleTrait",
+                    "value": [
+                        "a",
+                        "B",
+                        "c"
+                    ]
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Remove.smithy.example#exampleTrait",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Removed trait contents from `smithy.example#exampleTrait` at path `/b`. Removed value: `B`"
+                }
+            ],
+            "id": "trait-map-keys",
+            "old": "upstream/evaluators/trait-breaking-change/trait-map-keys.smithy",
+            "new": "upstream/evaluators/trait-breaking-change/trait-map-keys.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#Example",
+                    "trait": "smithy.example#exampleTrait",
+                    "value": {
+                        "a": "A"
+                    }
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Update.smithy.example#exampleTrait",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.example#exampleTrait` at path `/b` from `B` to `_B_`"
+                }
+            ],
+            "id": "trait-map-values",
+            "old": "upstream/evaluators/trait-breaking-change/trait-map-values.smithy",
+            "new": "upstream/evaluators/trait-breaking-change/trait-map-values.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#Example",
+                    "trait": "smithy.example#exampleTrait",
+                    "value": {
+                        "a": "A",
+                        "b": "_B_"
+                    }
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Remove.smithy.example#exampleTrait",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Removed trait `smithy.example#exampleTrait`; This is bad!"
+                }
+            ],
+            "id": "trait-message",
+            "old": "upstream/evaluators/trait-breaking-change/trait-message.smithy",
+            "new": "upstream/evaluators/trait-breaking-change/trait-message.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#Example",
+                    "trait": "smithy.example#exampleTrait"
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Remove.smithy.example#exampleTrait",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Removed trait `smithy.example#exampleTrait`"
+                }
+            ],
+            "id": "trait-presence",
+            "old": "upstream/evaluators/trait-breaking-change/trait-presence.smithy",
+            "new": "upstream/evaluators/trait-breaking-change/trait-presence.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#Example",
+                    "trait": "smithy.example#exampleTrait"
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Remove.smithy.example#exampleTrait",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Removed trait `smithy.example#exampleTrait`"
+                }
+            ],
+            "id": "trait-removed",
+            "old": "upstream/evaluators/trait-breaking-change/trait-removed.smithy",
+            "new": "upstream/evaluators/trait-breaking-change/trait-removed.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#Example",
+                    "trait": "smithy.example#exampleTrait"
+                }
+            ]
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Remove.smithy.example#exampleTrait",
+                    "shape": "smithy.example#Example",
+                    "severity": "WARNING",
+                    "message": "Removed trait `smithy.example#exampleTrait`"
+                }
+            ],
+            "id": "trait-severity",
+            "old": "upstream/evaluators/trait-breaking-change/trait-severity.smithy",
+            "new": "upstream/evaluators/trait-breaking-change/trait-severity.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#Example",
+                    "trait": "smithy.example#exampleTrait"
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Remove.smithy.example#exampleTrait",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Removed trait contents from `smithy.example#exampleTrait` at path `/foo/bar`. Removed value: `hi`"
+                }
+            ],
+            "id": "trait-structure-members",
+            "old": "upstream/evaluators/trait-breaking-change/trait-structure-members.smithy",
+            "new": "upstream/evaluators/trait-breaking-change/trait-structure-members.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#Example",
+                    "trait": "smithy.example#exampleTrait",
+                    "value": {}
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Update.smithy.example#exampleTrait",
+                    "shape": "smithy.example#Example",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.example#exampleTrait` at path `/foo` from `hi` to `bye`"
+                }
+            ],
+            "id": "trait-union-members",
+            "old": "upstream/evaluators/trait-breaking-change/trait-union-members.smithy",
+            "new": "upstream/evaluators/trait-breaking-change/trait-union-members.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#Example",
+                    "trait": "smithy.example#exampleTrait",
+                    "value": {
+                        "foo": "bye"
+                    }
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Remove.smithy.api#paginated",
+                    "shape": "smithy.example#ListThings",
+                    "severity": "ERROR",
+                    "message": "Removed trait `smithy.api#paginated`. Previous trait value: \n```\n{\n    \"inputToken\": \"token\",\n    \"outputToken\": \"token\",\n    \"items\": \"things\",\n    \"pageSize\": \"maxResults\"\n}\n```\n"
+                }
+            ],
+            "id": "paginated-removed",
+            "old": "upstream/evaluators/paginated-trait-tests.smithy",
+            "new": "upstream/evaluators/paginated-trait-tests.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#ListThings",
+                    "trait": "smithy.api#paginated"
+                }
+            ]
+        },
+        {
+            "breaking": false,
+            "events": [],
+            "id": "paginated-remove-inputToken",
+            "old": "upstream/evaluators/paginated-trait-tests.smithy",
+            "new": "upstream/evaluators/paginated-trait-tests.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#ListThings",
+                    "trait": "smithy.api#paginated",
+                    "value": {
+                        "outputToken": "token",
+                        "items": "things",
+                        "pageSize": "maxResults"
+                    }
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Update.smithy.api#paginated",
+                    "shape": "smithy.example#ListThings",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.api#paginated` at path `/inputToken` from `token` to `otherToken`"
+                }
+            ],
+            "id": "paginated-update-inputToken",
+            "old": "upstream/evaluators/paginated-trait-tests.smithy",
+            "new": "upstream/evaluators/paginated-trait-tests.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#ListThings",
+                    "trait": "smithy.api#paginated",
+                    "value": {
+                        "inputToken": "otherToken",
+                        "outputToken": "token",
+                        "items": "things",
+                        "pageSize": "maxResults"
+                    }
+                }
+            ]
+        },
+        {
+            "breaking": false,
+            "events": [],
+            "id": "paginated-remove-outputToken",
+            "old": "upstream/evaluators/paginated-trait-tests.smithy",
+            "new": "upstream/evaluators/paginated-trait-tests.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#ListThings",
+                    "trait": "smithy.api#paginated",
+                    "value": {
+                        "inputToken": "token",
+                        "items": "things",
+                        "pageSize": "maxResults"
+                    }
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Update.smithy.api#paginated",
+                    "shape": "smithy.example#ListThings",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.api#paginated` at path `/outputToken` from `token` to `otherToken`"
+                }
+            ],
+            "id": "paginated-update-outputToken",
+            "old": "upstream/evaluators/paginated-trait-tests.smithy",
+            "new": "upstream/evaluators/paginated-trait-tests.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#ListThings",
+                    "trait": "smithy.api#paginated",
+                    "value": {
+                        "inputToken": "token",
+                        "outputToken": "otherToken",
+                        "items": "things",
+                        "pageSize": "maxResults"
+                    }
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Remove.smithy.api#paginated",
+                    "shape": "smithy.example#ListThings",
+                    "severity": "ERROR",
+                    "message": "Removed trait contents from `smithy.api#paginated` at path `/items`. Removed value: `things`"
+                }
+            ],
+            "id": "paginated-remove-items",
+            "old": "upstream/evaluators/paginated-trait-tests.smithy",
+            "new": "upstream/evaluators/paginated-trait-tests.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#ListThings",
+                    "trait": "smithy.api#paginated",
+                    "value": {
+                        "inputToken": "token",
+                        "outputToken": "token",
+                        "pageSize": "maxResults"
+                    }
+                }
+            ]
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Update.smithy.api#paginated",
+                    "shape": "smithy.example#ListThings",
+                    "severity": "NOTE",
+                    "message": "Changed trait contents of `smithy.api#paginated` at path `/items` from `things` to `otherThings`"
+                }
+            ],
+            "id": "paginated-update-items",
+            "old": "upstream/evaluators/paginated-trait-tests.smithy",
+            "new": "upstream/evaluators/paginated-trait-tests.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#ListThings",
+                    "trait": "smithy.api#paginated",
+                    "value": {
+                        "inputToken": "token",
+                        "outputToken": "token",
+                        "items": "otherThings",
+                        "pageSize": "maxResults"
+                    }
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Remove.smithy.api#paginated",
+                    "shape": "smithy.example#ListThings",
+                    "severity": "ERROR",
+                    "message": "Removed trait contents from `smithy.api#paginated` at path `/pageSize`. Removed value: `maxResults`"
+                }
+            ],
+            "id": "paginated-remove-pageSize",
+            "old": "upstream/evaluators/paginated-trait-tests.smithy",
+            "new": "upstream/evaluators/paginated-trait-tests.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#ListThings",
+                    "trait": "smithy.api#paginated",
+                    "value": {
+                        "inputToken": "token",
+                        "outputToken": "token",
+                        "items": "things"
+                    }
+                }
+            ]
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "TraitBreakingChange.Update.smithy.api#paginated",
+                    "shape": "smithy.example#ListThings",
+                    "severity": "ERROR",
+                    "message": "Changed trait contents of `smithy.api#paginated` at path `/pageSize` from `maxResults` to `otherMaxResults`"
+                }
+            ],
+            "id": "paginated-update-pageSize",
+            "old": "upstream/evaluators/paginated-trait-tests.smithy",
+            "new": "upstream/evaluators/paginated-trait-tests.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#ListThings",
+                    "trait": "smithy.api#paginated",
+                    "value": {
+                        "inputToken": "token",
+                        "outputToken": "token",
+                        "items": "things",
+                        "pageSize": "otherMaxResults"
+                    }
+                }
+            ]
+        },
+        {
+            "breaking": false,
+            "events": [],
+            "id": "box-added",
+            "old": "upstream/evaluators/box-added-to-member.smithy",
+            "new": "upstream/evaluators/box-added-to-member.smithy",
+            "mutations": [
+                {
+                    "shape": "smithy.example#Example$baz",
+                    "trait": "smithy.api#box",
+                    "value": {}
+                },
+                {
+                    "shape": "smithy.example#Example$bam",
+                    "trait": "smithy.api#box",
+                    "value": {}
+                }
+            ]
+        }
+    ]
+}

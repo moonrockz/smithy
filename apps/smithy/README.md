@@ -1,6 +1,6 @@
 # smithy CLI
 
-Assemble, validate, select, format, convert and build Smithy models.
+Assemble, validate, select, diff, format, convert and build Smithy models.
 
 ## Run
 
@@ -40,6 +40,7 @@ Use `smithy --help` for the command list, and `smithy convert --help` or
 ```shell
 smithy ast model.smithy extra.json
 smithy validate model.smithy extra.json
+smithy diff --old previous/ --new current/
 smithy build --config smithy-build.json
 smithy clean --config smithy-build.json
 smithy select --selector 'structure > member > string' model.smithy
@@ -55,6 +56,15 @@ smithy format --write model.smithy model.json
 omit built-in prelude and contract definitions. `validate` assembles the same model and prints
 any diagnostics. Reference resolution, mixin expansion, trait application and
 metadata merging follow the model library's rules.
+
+`diff` assembles two local model snapshots independently and reports one
+unsuppressed compatibility event per line. Inputs can be IDL files, JSON AST
+files, directories or JARs with Smithy manifests. ERROR or DANGER differences and
+invalid models exit with status 1. Compatible or unchanged models exit with status
+0. `--output changes.txt` writes the events to a file. Message newlines are escaped
+as `\n`. See the [model diff library](../../pkgs/smithy-diff/README.mbt.md) for the
+comparison API, suppressions and preview-feature behavior. This command compares
+explicit old/new snapshots; Git and project modes are not implemented.
 
 `build` reads the configured local sources and imports, runs each concrete
 projection, and writes model, sources and build-info artifacts under its output

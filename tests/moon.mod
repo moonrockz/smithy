@@ -17,6 +17,7 @@ import {
   "moonbit-community/zipc@0.2.2",
   "moonrockz/smithy@0.4.0",
   "moonrockz/smithy-build@0.4.0",
+  "moonrockz/smithy-diff@0.4.0",
   "moonrockz/smithy-openapi@0.4.0",
   "moonrockz/smithy-syntax@0.4.0",
   "moonrockz/expect@0.6.1",

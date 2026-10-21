@@ -1,0 +1,219 @@
+/// Verify or regenerate model diff expectations using hash-verified Java sources.
+/// Requires a JDK with javac/java; generated code/classes stay under .dev/.
+/// Usage: moonx scripts/reference-diff.mbtx [UPSTREAM_DIRECTORY] [--check]
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let reference_sha : String = "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
+
+///|
+let harness : String =
+  #|import java.nio.file.*;
+  #|import java.util.*;
+  #|import java.util.logging.*;
+  #|import software.amazon.smithy.model.*;
+  #|import software.amazon.smithy.model.node.*;
+  #|import software.amazon.smithy.diff.*;
+  #|import software.amazon.smithy.model.shapes.*;
+  #|import software.amazon.smithy.model.traits.*;
+  #|import software.amazon.smithy.model.transform.*;
+  #|import software.amazon.smithy.diff.testrunner.*;
+  #|import java.util.concurrent.Callable;
+  #|public final class ReferenceDiff {
+  #|  public static void main(String[] args) throws Exception {
+  #|    Logger.getLogger("").setLevel(Level.OFF);
+  #|    Path corpus = Path.of(args[0]);
+  #|    boolean check = args[1].equals("--check");
+  #|    checkGoldens(corpus.resolve("upstream/diffs"), false);
+  #|    checkGoldens(corpus.resolve("upstream/testrunner/testrunner/valid"), false);
+  #|    checkGoldens(corpus.resolve("upstream/testrunner/testrunner/invalid"), true);
+  #|    List<Path> inputs;
+  #|    try (var files = Files.walk(corpus)) {
+  #|      inputs = files.filter(p -> p.toString().endsWith(".a.smithy") || p.toString().endsWith("-a.smithy"))
+  #|          .sorted().toList();
+  #|    }
+  #|    ArrayNode.Builder cases = ArrayNode.builder();
+  #|    for (Path oldPath : inputs) {
+  #|      Path newPath = Path.of(oldPath.toString().replaceAll("([.-])a\\.smithy$", "$1b.smithy"));
+  #|      if (!Files.isRegularFile(newPath)) throw new IllegalStateException("Missing new model: " + oldPath);
+  #|      Model oldModel = Model.assembler().addImport(oldPath).assemble().unwrap();
+  #|      Model newModel = Model.assembler().addImport(newPath).assemble().unwrap();
+  #|      String oldName = corpus.relativize(oldPath).toString().replace('\\', '/');
+  #|      String newName = corpus.relativize(newPath).toString().replace('\\', '/');
+  #|      cases.withValue(compare(oldModel, newModel).withMember("old", oldName).withMember("new", newName));
+  #|      System.out.println("verified: " + oldName);
+  #|    }
+  #|    ArrayNode mutations = Node.parse(Files.readString(corpus.resolve("mutations.json"))).expectArrayNode();
+  #|    for (Node node : mutations) {
+  #|      ObjectNode test = node.expectObjectNode();
+  #|      Model oldModel = Model.assembler().addImport(corpus.resolve(test.expectStringMember("old").getValue())).assemble().unwrap();
+  #|      Model newModel = oldModel;
+  #|      for (Node entry : test.expectArrayMember("mutations")) {
+  #|        ObjectNode mutation = entry.expectObjectNode();
+  #|        ShapeId shapeId = ShapeId.from(mutation.expectStringMember("shape").getValue());
+  #|        ShapeId traitId = ShapeId.from(mutation.expectStringMember("trait").getValue());
+  #|        AbstractShapeBuilder<?, ?> builder = Shape.shapeToBuilder(newModel.expectShape(shapeId));
+  #|        if (mutation.containsMember("value")) {
+  #|          Node value = mutation.expectMember("value");
+  #|          builder.addTrait(TraitFactory.createServiceFactory().createTrait(traitId, shapeId, value)
+  #|              .orElseGet(() -> new DynamicTrait(traitId, value)));
+  #|        } else builder.removeTrait(traitId);
+  #|        newModel = ModelTransformer.create().replaceShapes(newModel, List.of(builder.build()));
+  #|      }
+  #|      cases.withValue(compare(oldModel, newModel).merge(test));
+  #|      System.out.println("verified mutation: " + test.expectStringMember("id").getValue());
+  #|    }
+  #|    ObjectNode actual = ObjectNode.builder()
+  #|      .withMember("referenceSha", "30bdab593f0c2cdf96036782cc3ce15c43a711ef")
+  #|      .withMember("cases", cases.build()).build();
+  #|    Path expected = corpus.resolve("events.json");
+  #|    if (check) Node.assertEquals(actual, Node.parse(Files.readString(expected)));
+  #|    else Files.writeString(expected, Node.prettyPrintJson(actual) + "\n");
+  #|    System.out.println("Reference verified " + inputs.size() + " model pairs and " + mutations.size() + " mutations");
+  #|  }
+  #|  @SuppressWarnings("unchecked")
+  #|  private static void checkGoldens(Path root, boolean expectFailure) throws Exception {
+  #|    int failures = 0;
+  #|    for (Object[] test : SmithyDiffTestSuite.runner().addTestCasesFromDirectory(root).parameterizedTestSource().toList()) {
+  #|      boolean failed = false;
+  #|      try { ((Callable<SmithyDiffTestCase.Result>) test[1]).call(); }
+  #|      catch (RuntimeException | AssertionError error) {
+  #|        if (!expectFailure) throw new IllegalStateException("Upstream diff golden failed: " + test[0], error);
+  #|        failed = true;
+  #|        failures++;
+  #|      }
+  #|      if (failed) System.out.println("verified negative runner fixture: " + test[0]);
+  #|    }
+  #|    if (expectFailure && failures == 0) throw new IllegalStateException("Expected at least one failing test-runner fixture");
+  #|  }
+  #|  private static ObjectNode compare(Model oldModel, Model newModel) {
+  #|    var result = ModelDiff.builder().oldModel(oldModel).newModel(newModel).compare();
+  #|    ArrayNode.Builder events = ArrayNode.builder();
+  #|    result.getDiffEvents().stream().sorted(Comparator.comparing(e -> e.getId() + "|" + e.getShapeId().map(Object::toString).orElse("") + "|" + e.getSeverity() + "|" + e.getMessage()))
+  #|      .forEach(e -> events.withValue(ObjectNode.builder()
+  #|        .withMember("id", e.getId()).withMember("shape", e.getShapeId().map(Object::toString).orElse("-"))
+  #|        .withMember("severity", e.getSeverity().toString()).withMember("message", e.getMessage()).build()));
+  #|    return ObjectNode.builder().withMember("breaking", result.isDiffBreaking()).withMember("events", events.build()).build();
+  #|  }
+  #|}
+
+///|
+fn git_blob_hash(text : String) -> String {
+  @crypto.bytes_to_hex_string(@crypto.sha1(@utf8.encode(
+    "blob " + @utf8.encode(text).length().to_string() + "\u{0000}" + text,
+  )))
+}
+
+///|
+fn java_quote(value : String) -> String {
+  "\"" + value.replace_all(old="\\", new="\\\\").replace_all(old="\"", new="\\\"") + "\""
+}
+
+///|
+async fn checked(command : String, args : Array[String]) -> String {
+  let (status, out, err) = @process.collect_output(command, args)
+  if status != 0 {
+    eprintln(command + " failed\n" + out.text() + err.text())
+    @sys.exit(1)
+  }
+  out.text()
+}
+
+///|
+async fn collect_files(root : String, relative : String) -> Array[String] {
+  let files : Array[String] = []
+  if !@fs.exists(root + "/" + relative) { return files }
+  for name in @fs.readdir(root + "/" + relative, sort=true) {
+    let path = relative + "/" + name
+    if @fs.kind(root + "/" + path) is Directory { files.append(collect_files(root, path)) }
+    else { files.push(path) }
+  }
+  files
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let mut source = ".dev/reference/snapshot"
+  let mut check = false
+  for i = 1; i < args.length(); i = i + 1 {
+    if args[i] == "--check" { check = true } else { source = args[i] }
+  }
+  let tree = @json.parse(checked("curl", ["-fsSL", "--retry", "2",
+    "https://api.github.com/repos/smithy-lang/smithy/git/trees/" + reference_sha + "?recursive=1",
+  ]))
+  guard tree is { "sha": String(sha), "tree": Array(entries), "truncated": False, .. } && sha == reference_sha else {
+    fail("Pinned Java source tree is missing, mismatched or truncated")
+  }
+  let blobs : Map[String, String] = Map([])
+  for entry in entries {
+    if entry is { "type": String("blob"), "path": String(path), "sha": String(blob), .. } { blobs[path] = blob }
+  }
+  let inventory = @json.parse(@fs.read_file("tests/tck/diff/inventory.json").text())
+  guard inventory is { "referenceSha": String(corpus_sha), "files": Array(corpus_files), .. } && corpus_sha == reference_sha else {
+    fail("Invalid pinned diff corpus inventory")
+  }
+  for file in corpus_files {
+    guard file is { "path": String(path), "upstreamPath": String(upstream), "gitBlob": String(blob), .. } && blobs.get(upstream) == Some(blob) else { fail("Invalid diff fixture provenance") }
+    assert_eq(git_blob_hash(@fs.read_file("tests/tck/diff/" + path).text()), blob, msg="Diff fixture blob mismatch: " + path)
+  }
+  let scratch = ".dev/out/reference-diff"
+  let classes = scratch + "/classes"
+  if @fs.exists(classes) { @fs.rmdir(classes, recursive=true) }
+  @fs.mkdir(classes, recursive=true, allow_exist=true)
+  let harness_path = scratch + "/ReferenceDiff.java"
+  @fs.write_file(harness_path, harness)
+  let sources = [harness_path]
+  let resources : Map[String, String] = Map([])
+  let verified : Array[Json] = []
+  for module_ in [
+    "smithy-utils", "smithy-jmespath", "smithy-model", "smithy-diff",
+  ] {
+    let java_prefix = module_ + "/src/main/java"
+    let resource_prefix = module_ + "/src/main/resources"
+    for path in collect_files(source, java_prefix) + collect_files(source, resource_prefix) {
+      let text = @fs.read_file(source + "/" + path).text()
+      guard blobs.get(path) is Some(blob) else { fail("Untracked reference source " + path) }
+      assert_eq(git_blob_hash(text), blob, msg="Java reference blob mismatch: " + path)
+      verified.push(Json::object({ "path": Json::string(path), "gitBlob": Json::string(blob) }))
+      if path.has_prefix(java_prefix + "/") {
+        if path.has_suffix(".java") && !path.has_suffix("/module-info.java") { sources.push(source + "/" + path) }
+      } else {
+        let relative = path[resource_prefix.length() + 1:].to_owned()
+        if (relative.has_prefix("META-INF/services/") || relative == "META-INF/smithy/manifest") && resources.get(relative) is Some(old) {
+          resources[relative] = old.trim_end().to_owned() + "\n" + text
+        } else { resources[relative] = text }
+      }
+    }
+  }
+  for relative, text in resources {
+    let target = classes + "/" + relative
+    let parts = target.split("/").map(p => p.to_owned()).to_array()
+    ignore(parts.pop())
+    @fs.mkdir(parts.join("/"), recursive=true, allow_exist=true)
+    @fs.write_file(target, text)
+  }
+  @fs.write_file(scratch + "/source-inventory.json", Json::object({
+    "referenceSha": Json::string(reference_sha), "files": Json::array(verified),
+  }).stringify(indent=2) + "\n")
+  let options = ["-proc:none", "-encoding", "UTF-8", "-d", classes, "-cp", classes] + sources
+  let argfile = scratch + "/javac.args"
+  @fs.write_file(argfile, options.map(java_quote).join("\n") + "\n")
+  println("Compiling hash-verified pinned Java model diff evaluators")
+  ignore(checked("javac", ["@" + argfile]))
+  println(checked("java", ["-cp", classes, "ReferenceDiff", "tests/tck/diff", if check { "--check" } else { "--generate" }, scratch + "/artifacts"]))
+}
+
+///|
+test "javac argument files quote spaces and Windows path separators" {
+  assert_eq(java_quote("C:\\source files\\Test.java"), "\"C:\\\\source files\\\\Test.java\"")
+}

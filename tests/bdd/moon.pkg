@@ -2,6 +2,7 @@ import {
   "moonrockz/artifact-resources" @resources,
   "moonrockz/artifact-resources/local" @local_resources,
   "moonrockz/smithy-build" @build,
+  "moonrockz/smithy-diff" @diff,
   "moonrockz/smithy-openapi" @openapi,
   "moonbit-community/zipc",
   "moonbitlang/core/encoding/utf8",

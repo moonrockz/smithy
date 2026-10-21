@@ -45,7 +45,7 @@ fn command_line() -> @argparse.Command {
   )
   @argparse.Command(
     "smithy",
-    about="A Smithy toolchain for MoonBit: assemble, validate, select, format and convert models.",
+    about="A Smithy toolchain for MoonBit: assemble, validate, select, diff, format and convert models.",
     version=version_text(),
     arg_required_else_help=true,
     subcommand_required=true,
@@ -56,6 +56,23 @@ fn command_line() -> @argparse.Command {
         options=[output],
       ),
       input_command("validate", "Assemble files and report model diagnostics."),
+      @argparse.Command(
+        "diff",
+        about="Compare two model files or directories and report compatibility changes.",
+        options=[
+          @argparse.OptionArg(
+            "old",
+            about="Old Smithy model file or directory.",
+            required=true,
+          ),
+          @argparse.OptionArg(
+            "new",
+            about="New Smithy model file or directory.",
+            required=true,
+          ),
+          output,
+        ],
+      ),
       @argparse.Command(
         "build",
         about="Run projections from smithy-build.json.",
@@ -143,6 +160,8 @@ struct Options {
   from : String?
   to : String?
   selector : String?
+  old_model : String?
+  new_model : String?
   offline : Bool
   cache_dir : String?
   config : String?
@@ -198,6 +217,8 @@ fn options(args : Array[String]) -> Options raise CliError {
   {
     offline: matches.flags.get("offline") == Some(true),
     cache_dir: value("cache-dir"),
+    old_model: value("old"),
+    new_model: value("new"),
     command,
     files,
     from,
@@ -282,6 +303,13 @@ fn run(args : Array[String]) -> Int32 raise {
   if opts.command == "version" {
     println(version_text())
     return 0
+  }
+  if opts.command == "diff" {
+    return run_diff(
+      opts.old_model.unwrap(),
+      opts.new_model.unwrap(),
+      opts.output,
+    )
   }
   if opts.command == "build" || opts.command == "clean" {
     return run_build(
