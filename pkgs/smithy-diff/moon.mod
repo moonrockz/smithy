@@ -1,6 +1,6 @@
 name = "moonrockz/smithy-diff"
 
-version = "0.4.0"
+version = "0.5.0"
 
 description = "Compare assembled Smithy models for compatibility"
 
@@ -15,6 +15,6 @@ readme = "README.mbt.md"
 warnings = "-implicit_impl_as_method"
 
 import {
-  "moonrockz/smithy@0.4.0",
+  "moonrockz/smithy@0.5.0",
   "moonbitlang/x@0.5.5",
 }

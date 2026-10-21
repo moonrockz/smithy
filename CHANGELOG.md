@@ -6,6 +6,23 @@ is 0.x, a minor release can contain breaking changes.
 
 <!-- git-cliff: end of header -->
 
+## [0.5.0] - 2026-10-21
+
+Validate JSON files against Smithy shapes with `smithy validate-value` or reuse prepared contracts from the new `moonrockz/smithy-validation` package. Structured findings identify exact instance paths, preserve numeric precision and enforce bounded traversal and pattern work across supported targets. This release also adds OpenAPI export and model compatibility diffs with JSONL event output. The shared JSON-RPC/OpenRPC design is documented for the next protocol-validation slices; date-time value validation currently excludes leap-second notation.
+
+### 🚀 Features
+
+- *(openapi)* Convert Smithy services to OpenAPI ([#36](https://github.com/moonrockz/smithy/pull/36)) by @DamianReeves
+- *(diff)* Compare Smithy model compatibility ([#37](https://github.com/moonrockz/smithy/pull/37)) by @DamianReeves
+- *(validation)* Validate JSON values through the library and CLI ([#38](https://github.com/moonrockz/smithy/pull/38)) by @DamianReeves
+- *(diff)* Add JSONL event output ([#39](https://github.com/moonrockz/smithy/pull/39)) by @DamianReeves
+
+### 🐛 Bug fixes
+
+- *(release)* Update every package pin in standalone consumers ([#41](https://github.com/moonrockz/smithy/pull/41)) by @DamianReeves
+
+**Full changelog**: https://github.com/moonrockz/smithy/compare/v0.4.0...v0.5.0
+
 ## [0.4.0] - 2026-10-21
 
 The new `moonrockz/artifact-resources` package loads selected resource trees from directories, ZIP/JAR, tar/gzip and npm archives, with validated paths, logical aliases and structured provenance. Smithy build sources, global imports and projection imports can now acquire public archive URLs, pinned GitHub release assets, exact npm versions and pinned Maven JARs with integrity verification, shared caching and explicit offline builds. Private repositories accept supplied Bearer or Basic credentials bound to exact origins through environment references; redirects strip authorization across origins and authenticated cache entries are isolated. Existing JSON string inputs and JAR manifest discovery remain compatible. Library callers must migrate resource metadata to domain types, wrap path inputs with `BuildInput::from_path`, initialize the added cache/offline/credential configuration fields, handle the new input/provenance/diagnostic variants, and update custom HTTP transports to receive `HttpRequest` as detailed below.
