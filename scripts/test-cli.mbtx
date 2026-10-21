@@ -567,7 +567,8 @@ async fn exercise_rpc_batches(runner : Runner, root : String, skip_stdin : Bool)
     ("[1,2,3]", 1, "InvalidEnvelope", "/2"),
     ("[", 1, "InvalidJson", ""),
     ("[{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,\"bad\"]}]", 1, "TypeMismatch", "/0/params/1"),
-    ("[" + "1,".repeat(100) + "1]", 1, "LimitExceeded", "/99"),
+    ("[" + "1,".repeat(99) + "1]", 1, "InvalidEnvelope", "/99"),
+    ("[" + "1,".repeat(100) + "1]", 1, "LimitExceeded", "/100"),
     ("[".repeat(130) + "0" + "]".repeat(130), 1, "JsonInputLimit", ""),
   ] {
     @fs.write_file(runner.dir + "/batch-requests.json", request)

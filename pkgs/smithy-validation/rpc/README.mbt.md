@@ -232,8 +232,9 @@ bounded payload checks over mapped parameters, result or error data. The supplie
 runs its own bounded checks. Each pass uses the configured generic limits.
 The combined report is capped by the configured finding limit and reports incomplete checks.
 Batch validation first bounds the entire array, including ignored fields and every element,
-then checks individual envelopes and payloads. Its combined finding budget stops further checks
-when exhausted, so entries can be a prefix of the original array. Original batch context must be
+then checks individual envelopes and payloads. Its combined finding budget retains all findings
+up to capacity. A further attempted finding replaces the final summary slot with `LimitExceeded`
+and stops validation, so entries can be a prefix of the original array. Original batch context must be
 completely checked before association; duplicate-key and resource failures cannot masquerade as
 protocol parse errors. Association uses indexed groups rather than scanning every call per reply.
 See the [value profile](../README.mbt.md) for default limits and unsupported constraints,

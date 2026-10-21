@@ -393,3 +393,75 @@ test "batch contextual parameter errors coexist with notification omissions" {
   assert_false(result.is_valid())
   assert_true(result.findings.iter().any(f => f.code == @rpc.InvalidContext))
 }
+
+///|
+test "batch finding budgets retain exact-capacity findings and stop only on overflow" {
+  let model = response_model()
+  let target = @smithy.ShapeId::parse("reply#Api").unwrap()
+  for limit in [1, 3] {
+    let service = @rpc.PreparedService::prepare(
+      model,
+      target,
+      @rpc.V2_0,
+      config=@validation.Config::new(
+        limits=@validation.Limits::new(findings=limit),
+      ),
+    )
+    let text = "[" + Array::make(limit, "1").join(",") + "]"
+    let result = service.validate_request_batch(text)
+    assert_true(result.complete)
+    assert_eq(result.findings.length(), limit)
+    assert_true(result.findings.iter().all(f => f.code == @rpc.InvalidEnvelope))
+    let overflow = service.validate_request_batch(
+      "[" + Array::make(limit + 1, "1").join(",") + "]",
+    )
+    assert_false(overflow.complete)
+    assert_eq(overflow.findings.length(), limit)
+    assert_eq(
+      overflow.findings[limit - 1].code,
+      @rpc.Value(@validation.LimitExceeded),
+    )
+    assert_eq(
+      overflow.findings[limit - 1].path.pointer(),
+      "/" + limit.to_string(),
+    )
+    assert_false(overflow.entries[limit].result.complete)
+    assert_eq(
+      overflow.entries[limit].result.findings[0].code,
+      @rpc.Value(@validation.LimitExceeded),
+    )
+    let replies = "[" +
+      Array::make(limit, "{\"jsonrpc\":\"2.0\",\"result\":19,\"id\":1}").join(
+        ",",
+      ) +
+      "]"
+    let result = service.validate_response_batch(
+      Some(replies),
+      context=Some(@rpc.BatchEnvelopeOnly),
+    )
+    assert_true(result.is_valid())
+    assert_eq(result.findings.length(), limit)
+    assert_true(result.findings.iter().all(f => f.code == @rpc.LimitedScope))
+  }
+  let service = @rpc.PreparedService::prepare(
+    model,
+    target,
+    @rpc.V2_0,
+    config=@validation.Config::new(limits=@validation.Limits::new(findings=1)),
+  )
+  let call = "{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[1,2],\"id\":1}"
+  let result = service.validate_request_batch("[1," + call + "]")
+  assert_true(result.complete)
+  assert_eq(result.entries.length(), 2)
+  let repeated = service.validate_request_batch("[" + call + "," + call + "]")
+  assert_true(repeated.is_valid())
+  assert_eq(repeated.findings[0].code, @rpc.AmbiguousId)
+  let overflow = service.validate_request_batch(
+    "[" + call + "," + call + "," + call + "]",
+  )
+  assert_false(overflow.complete)
+  assert_eq(
+    overflow.entries[2].result.findings[0].code,
+    @rpc.Value(@validation.LimitExceeded),
+  )
+}

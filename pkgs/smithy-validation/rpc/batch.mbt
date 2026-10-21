@@ -72,20 +72,23 @@ fn PreparedService::batch_report(self : PreparedService) -> BatchReport {
 }
 
 ///|
-fn BatchReport::add(self : BatchReport, finding : Finding) -> Unit {
+fn BatchReport::add(self : BatchReport, finding : Finding) -> Finding? {
   if !self.complete {
-    return
+    return None
   }
-  if self.findings.length() >= self.limit - 1 {
-    self.findings.push({
+  if self.findings.length() >= self.limit {
+    let stopped = {
       ..finding,
       code: Value(@validation.LimitExceeded),
       severity: @validation.Error,
       message: "I reached the batch finding limit before completing every check.",
-    })
+    }
+    self.findings[self.limit - 1] = stopped
     self.complete = false
+    Some(stopped)
   } else {
     self.findings.push(finding)
+    Some(finding)
   }
 }
 
@@ -106,6 +109,7 @@ fn BatchReport::emit(
     operation: None,
     offset: None,
   })
+  |> ignore
 }
 
 ///|
@@ -114,14 +118,16 @@ fn BatchReport::collect(
   findings : Array[Finding],
   base : @validation.InstancePath,
 ) -> Array[Finding] {
-  let start = self.findings.length()
+  let collected = []
   for finding in findings {
-    self.add({ ..finding, path: base.append(finding.path), })
+    if self.add({ ..finding, path: base.append(finding.path), }) is Some(added) {
+      collected.push(added)
+    }
     if !self.complete {
       break
     }
   }
-  self.findings[start:].to_owned()
+  collected
 }
 
 ///|
@@ -194,23 +200,32 @@ pub fn PreparedService::validate_request_batch_json(
     let result = self.validate_json(value)
     let base = batch_path(Some(index))
     let findings = report.collect(result.findings, base)
-    let start = report.findings.length()
-    if !invalid_request_envelope(self.version, value, result) &&
+    if report.complete &&
+      !invalid_request_envelope(self.version, value, result) &&
       result.kind == Some(Call) &&
       batch_id(result.id) is Some(id) {
       if seen.contains(id) {
-        report.emit(
-          AmbiguousId,
-          base.field("id") catch {
-            _ => base
-          },
-          "I found a repeated call ID; these requests cannot be correlated uniquely.",
-          severity=@validation.Advisory,
+        findings.append(
+          report.collect(
+            [
+              {
+                code: AmbiguousId,
+                path: root.field("id") catch {
+                  _ => root
+                },
+                shape: self.service,
+                operation: None,
+                offset: None,
+                message: "I found a repeated call ID; these requests cannot be correlated uniquely.",
+                severity: @validation.Advisory,
+              },
+            ],
+            base,
+          ),
         )
       }
       seen.add(id)
     }
-    findings.append(report.findings[start:].to_owned())
     report.complete = report.complete && result.complete
     entries.push({
       index,
@@ -446,7 +461,11 @@ pub fn PreparedService::validate_response_batch_json(
     entries.push({
       index: None,
       request_index: None,
-      result: { ..result, findings, },
+      result: {
+        ..result,
+        findings,
+        complete: result.complete && report.complete,
+      },
     })
     return finish()
   }
