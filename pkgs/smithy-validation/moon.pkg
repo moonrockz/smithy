@@ -1,6 +1,7 @@
 import {
   "moonrockz/smithy",
   "moonbitlang/core/json",
+  "moonbitlang/core/string",
 }
 
 import {

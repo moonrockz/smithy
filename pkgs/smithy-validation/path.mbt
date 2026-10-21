@@ -8,7 +8,7 @@ pub(all) enum InstanceStep {
 
 ///|
 pub struct InstancePath {
-  parts : Array[InstanceStep]
+  priv parts : Array[InstanceStep]
 } derive(Eq, Debug)
 
 ///|
