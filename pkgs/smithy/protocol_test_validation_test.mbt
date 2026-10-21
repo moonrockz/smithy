@@ -93,3 +93,25 @@ test "protocol traits are opt in and remain implicit on model export" {
     is Some(_),
   )
 }
+
+///|
+test "empty JSON bodies and non-JSON media types do not cause false syntax events" {
+  for
+    suffix in [
+      "bodyMediaType: \"application/json\"", "body: \"\", bodyMediaType: \"application/json\"",
+      "body: \"raw\", bodyMediaType: \"application/notjson\"",
+    ] {
+    let loaded = protocol_case_events(
+      "{id: \"TestCase\", protocol: Protocol, method: \"POST\", uri: \"/\", params: {count: 1}, " +
+      suffix +
+      "}",
+    )
+    assert_false(
+      loaded
+      .validation_events()
+      .iter()
+      .any(e => e.severity == "ERROR" || e.severity == "DANGER"),
+      msg=loaded.validation_events().map(e => e.message).join("\n"),
+    )
+  }
+}

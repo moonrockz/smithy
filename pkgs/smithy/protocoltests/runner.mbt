@@ -86,8 +86,11 @@ pub fn default_body_matches(
     .trim()
     .to_owned()
     .to_lower()
+  if expected == "" {
+    return actual.length() == 0
+  }
   try {
-    if media == "application/json" || media.has_suffix("+json") {
+    if media.has_suffix("/json") || media.has_suffix("+json") {
       @smithy.NodeValue::from_json(@json.parse(expected)) ==
       @smithy.NodeValue::from_json(@json.parse(@utf8.decode(actual)))
     } else if media == "" ||

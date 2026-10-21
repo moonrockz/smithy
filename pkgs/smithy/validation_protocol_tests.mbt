@@ -97,9 +97,16 @@ fn Model::protocol_test_events(self : Model) -> Array[ValidationEvent] {
             })
           }
         }
-        if validation_string(case_, "bodyMediaType") is Some(media) &&
-          media.split(";").to_array()[0].has_suffix("json") {
-          let body = validation_string(case_, "body").unwrap_or("")
+        let media = validation_string(case_, "bodyMediaType")
+          .unwrap_or("")
+          .split(";")
+          .to_array()[0]
+          .trim()
+          .to_owned()
+          .to_lower()
+        if validation_string(case_, "body") is Some(body) &&
+          body != "" &&
+          (media.has_suffix("/json") || media.has_suffix("+json")) {
           let valid = try {
             ignore(@json.parse(body))
             true

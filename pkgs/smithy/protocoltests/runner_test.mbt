@@ -178,6 +178,19 @@ test "missing body asserts nothing while empty body asserts empty bytes" {
 ///|
 test "body comparison preserves exact JSON values and supports binary and custom formats" {
   assert_true(
+    @protocoltests.default_body_matches("", b"", Some("application/json")),
+  )
+  assert_false(
+    @protocoltests.default_body_matches("", b"null", Some("application/json")),
+  )
+  assert_true(
+    @protocoltests.default_body_matches(
+      "{\"a\":1}",
+      b"{ \"a\" : 1 }",
+      Some("text/json"),
+    ),
+  )
+  assert_true(
     @protocoltests.default_body_matches(
       "1.00",
       b"1",
