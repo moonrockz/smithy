@@ -95,6 +95,7 @@ fn build_add_input(
   base : String,
   cache~ : @resources.VerifiedCache? = None,
   mode~ : @resources.AcquisitionMode = @resources.Online,
+  credentials~ : @resources.Credentials = @resources.Credentials::new().unwrap(),
   source~ : Bool = false,
   projection~ : String? = None,
 ) -> Unit raise {
@@ -105,6 +106,7 @@ fn build_add_input(
         expected_digest=archive.expected_digest,
         cache~,
         mode~,
+        credentials~,
       )
       .add_repository({
         id: @resources.RepositoryId::parse("input").unwrap(),
@@ -136,6 +138,7 @@ fn build_add_input(
         expected_digest=archive.expected_digest,
         cache~,
         mode~,
+        credentials~,
       )
       .add_repository({
         id: @resources.RepositoryId::parse("input").unwrap(),
@@ -172,6 +175,7 @@ fn build_add_input(
         expected_digest=archive.expected_digest,
         cache~,
         mode~,
+        credentials~,
       )
       .add_repository({
         id: @resources.RepositoryId::parse("input").unwrap(),
@@ -202,6 +206,7 @@ fn build_add_input(
         @http_resources.transport,
         cache~,
         mode~,
+        credentials~,
         format=archive.format,
         expected_digest=archive.expected_digest,
       ).add_repository({
@@ -696,15 +701,25 @@ fn run_build(
     build_remove_tree(output)
     return 0
   }
+  let credentials = config.resolve_credentials(environment)
   let loader = @smithy.Loader::new()
   let runner = @build.BuildRunner::new(config).register_plugin(
     "jsonSchema", json_schema_plugin,
   )
   for input in config.sources {
-    build_add_input(loader, runner, input, base, cache~, mode~, source=true)
+    build_add_input(
+      loader,
+      runner,
+      input,
+      base,
+      cache~,
+      mode~,
+      credentials~,
+      source=true,
+    )
   }
   for input in config.imports {
-    build_add_input(loader, runner, input, base, cache~, mode~)
+    build_add_input(loader, runner, input, base, cache~, mode~, credentials~)
   }
   for projection in config.projections {
     for input in projection.imports {
@@ -715,6 +730,7 @@ fn run_build(
         base,
         cache~,
         mode~,
+        credentials~,
         projection=Some(projection.name),
       )
     }

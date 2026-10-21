@@ -191,8 +191,16 @@ pub fn NpmArchive::open(
   limits~ : Limits = Limits::new(),
   cache~ : VerifiedCache? = None,
   mode~ : AcquisitionMode = Online,
+  credentials~ : Credentials = Credentials::new().unwrap(),
 ) -> EntryTree raise ResourceError {
-  self.open_resolved(transport, acquisition_limits~, limits~, cache~, mode~).1
+  self.open_resolved(
+    transport,
+    acquisition_limits~,
+    limits~,
+    cache~,
+    mode~,
+    credentials~,
+  ).1
 }
 
 ///|
@@ -203,6 +211,7 @@ fn NpmArchive::open_resolved(
   limits~ : Limits,
   cache~ : VerifiedCache?,
   mode~ : AcquisitionMode,
+  credentials~ : Credentials,
 ) -> (NpmResolution, EntryTree) raise ResourceError {
   let origin = Provenance::new(self.registry.location()).npm_requested(
     self.registry,
@@ -227,6 +236,7 @@ fn NpmArchive::open_resolved(
       },
       cache~,
       mode~,
+      credentials~,
     ) catch {
       ResourceError(MissingAsset, at, _) =>
         raise ResourceError(
@@ -282,10 +292,15 @@ fn NpmArchive::open_resolved(
       url: tarball,
       format: Tgz,
       expected_digest: self.expected_digest,
-    }.open(transport, acquisition_limits~, limits~, cache~, mode~, verify=(
-      body,
-      at,
-    ) => integrity.verify(body, at)) catch {
+    }.open(
+      transport,
+      acquisition_limits~,
+      limits~,
+      cache~,
+      mode~,
+      credentials~,
+      verify=(body, at) => integrity.verify(body, at),
+    ) catch {
       ResourceError(code, at, message) =>
         raise ResourceError(code, at.through(provenance), message)
     }
@@ -305,6 +320,7 @@ pub fn register_npm(
   limits~ : Limits = Limits::new(),
   cache~ : VerifiedCache? = None,
   mode~ : AcquisitionMode = Online,
+  credentials~ : Credentials = Credentials::new().unwrap(),
 ) -> Registry raise ResourceError {
   registry.register_provider(ProviderId::parse("npm").unwrap(), (
     repository,
@@ -322,7 +338,14 @@ pub fn register_npm(
       registry: base,
       reference: requested,
       expected_digest,
-    }.open_resolved(transport, acquisition_limits~, limits~, cache~, mode~)
+    }.open_resolved(
+      transport,
+      acquisition_limits~,
+      limits~,
+      cache~,
+      mode~,
+      credentials~,
+    )
     {
       reference,
       identity: ArtifactIdentity::parse(resolution.to_string()).unwrap(),

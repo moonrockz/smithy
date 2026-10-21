@@ -33,6 +33,5 @@ Smithy model package. Nothing is installed or extracted from either example.
 
 GitHub.com is the supported service. Public compatible API endpoints can be
 selected using `api` in the library or `github.api` in build configuration.
-Credentials, enterprise authentication, latest selection and asset patterns are
-outside this slice. See the [full contract](../../pkgs/artifact-resources/README.mbt.md#pinned-github-release-assets)
+Supplied credentials use [origin bindings](../../apps/smithy/README.md#repository-credentials). Enterprise SSO, latest selection and asset patterns are outside this slice. See the [full contract](../../pkgs/artifact-resources/README.mbt.md#pinned-github-release-assets)
 for bounds, host support, provenance and stable diagnostics.

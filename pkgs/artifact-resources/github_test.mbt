@@ -39,9 +39,9 @@ fn github_transport(
     let text = requested.to_string()
     calls.push(text)
     let (resolved, bytes) = if text.contains("/tags/") {
-      (requested, @utf8.encode(release.stringify()))
+      (requested.url, @utf8.encode(release.stringify()))
     } else if text.contains("/assets?") {
-      (requested, @utf8.encode(assets.stringify()))
+      (requested.url, @utf8.encode(assets.stringify()))
     } else {
       (url("https://cdn.example.test/exact.zip"), body)
     }
@@ -255,7 +255,7 @@ test "GitHub paginates exact selection and detects duplicates across pages" {
       if requested.to_string().contains("/assets?") {
         calls.push(requested.to_string())
         {
-          resolved: requested,
+          resolved: requested.url,
           status: 200,
           body: @utf8.encode(
             Json::array(
@@ -305,7 +305,7 @@ test "GitHub status policy distinguishes release missing auth rate limits and in
     ] {
     let code = github_code(() => {
       github_request().open((requested, _) => {
-        resolved: requested,
+        resolved: requested.url,
         status,
         body,
       })
@@ -372,7 +372,7 @@ test "GitHub bounds metadata enumeration and rejects oversized constructed URLs"
   let transport : @resources.HttpTransport = (requested, limits) => {
     if requested.to_string().contains("/assets?") {
       calls.push(requested.to_string())
-      { resolved: requested, status: 200, body: full, }
+      { resolved: requested.url, status: 200, body: full, }
     } else {
       delegate(requested, limits)
     }
@@ -386,7 +386,7 @@ test "GitHub bounds metadata enumeration and rejects oversized constructed URLs"
     github_code(() => {
       request.open(
         (requested, _) => {
-          resolved: requested,
+          resolved: requested.url,
           status: 403,
           body: Bytes::make(65, 65),
         },

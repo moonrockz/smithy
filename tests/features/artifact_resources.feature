@@ -75,14 +75,19 @@ Feature: Reusable local artifact resources
     And the artifact model contains "example.resources#SharedName"
     And the artifact model excludes "example.resources#ProjectionOnly"
 
-  Scenario: Resolve a pinned Maven JAR and preserve manifest discovery offline
+  Scenario Outline: Resolve a pinned Maven JAR and preserve manifest discovery offline
     Given the declared artifact model:
       """smithy
       $version: "2"
       namespace example.resources
       string Message
       """
-    When I resolve the pinned Maven JAR offline
+    When I resolve the "<access>" Maven JAR offline
     Then the artifact model contains "example.resources#Message"
     And the artifact model excludes "example.resources#Unlisted"
     And the resource logical name is "nested/message.smithy"
+
+    Examples:
+      | access        |
+      | public        |
+      | authenticated |

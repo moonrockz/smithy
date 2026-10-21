@@ -1,12 +1,24 @@
 ///|
 /// Native hosts and Node.js use curl on PATH, with its verified HTTPS stack.
 /// Wasm hosts return unsupported-transport without attempting filesystem/network I/O.
-pub fn transport(
-  url : @resources.HttpUrl,
+fn transfer(
+  request : @resources.HttpRequest,
   limits : @resources.AcquisitionLimits,
-) -> @resources.HttpResponse raise @resources.ResourceError {
+  milliseconds : Int32,
+) -> (@resources.HttpResponse, String) raise @resources.ResourceError {
+  let url = request.url
   let origin = @resources.Provenance::new(url.location())
-  let result = run(url.to_string(), limits.max_bytes, limits.timeout_seconds)
+  let header = match request.authorization {
+    None => ""
+    Some(auth) => "header = \"Authorization: " + auth.header_value() + "\"\n"
+  }
+  let config = header +
+    (if request.accept == @resources.OctetStream {
+      "header = \"Accept: application/octet-stream\"\n"
+    } else {
+      ""
+    })
+  let result = run(url.to_string(), limits.max_bytes, milliseconds, config)
   guard result is [u32le(code), ..] else {
     raise @resources.ResourceError(
       @resources.TransportFailure,
@@ -33,20 +45,23 @@ pub fn transport(
       "curl transport failed with code \{code}; native and Node.js hosts require curl on PATH",
     )
   }
-  // curl appends metadata after the binary body. Parse backwards so arbitrary
-  // archive bytes, including newlines and NULs, cannot become response metadata.
-  let mut end = result.length() - 1
-  while end >= 4 && result[end] != b'\n' {
-    end -= 1
+  // Parse three trailing lines backwards, leaving the binary body untouched.
+  let mut redirect_line = result.length() - 1
+  while redirect_line >= 4 && result[redirect_line] != b'\n' {
+    redirect_line -= 1
   }
-  guard end >= 8 else {
+  let mut url_line = redirect_line - 1
+  while url_line >= 4 && result[url_line] != b'\n' {
+    url_line -= 1
+  }
+  guard url_line >= 8 && result[url_line - 4] == b'\n' else {
     raise @resources.ResourceError(
       @resources.TransportFailure,
       origin,
       "Missing HTTP response metadata",
     )
   }
-  let resolved_text = @utf8.decode(result[end + 1:]) catch {
+  let resolved_text = @utf8.decode(result[url_line + 1:redirect_line]) catch {
     _ =>
       raise @resources.ResourceError(
         @resources.TransportFailure,
@@ -54,18 +69,16 @@ pub fn transport(
         "Invalid resolved URL encoding",
       )
   }
-  // A redirect fragment is client-side metadata and is not sent in the GET.
   let retrieval_url = resolved_text.split("#").next().unwrap().to_owned()
-  guard @resources.HttpUrl::parse(retrieval_url) is Some(resolved) &&
-    result[end - 4] == b'\n' else {
+  guard @resources.HttpUrl::parse(retrieval_url) is Some(resolved) else {
     raise @resources.ResourceError(
       @resources.TransportFailure,
       origin,
-      "Invalid resolved URL or HTTP status",
+      "Invalid resolved URL",
     )
   }
   let mut status = 0
-  for byte in result[end - 3:end] {
+  for byte in result[url_line - 3:url_line] {
     if byte < b'0' || byte > b'9' {
       raise @resources.ResourceError(
         @resources.TransportFailure,
@@ -75,7 +88,7 @@ pub fn transport(
     }
     status = status * 10 + byte.to_int() - 48
   }
-  let body = result[4:end - 4].to_owned()
+  let body = result[4:url_line - 4].to_owned()
   if body.length() > limits.max_bytes {
     raise @resources.ResourceError(
       @resources.ResourceLimit,
@@ -83,5 +96,84 @@ pub fn transport(
       "Download exceeds byte limit",
     )
   }
-  { resolved, status, body, }
+  let redirect = @utf8.decode(result[redirect_line + 1:]) catch {
+    _ =>
+      raise @resources.ResourceError(
+        @resources.TransportFailure,
+        origin,
+        "Invalid redirect encoding",
+      )
+  }
+  ({ resolved, status, body, }, redirect)
+}
+
+///|
+/// Follow redirects at the typed boundary. Only the initial origin may receive
+/// authorization; another origin's configured credentials are never introduced.
+pub fn transport(
+  request : @resources.HttpRequest,
+  limits : @resources.AcquisitionLimits,
+) -> @resources.HttpResponse raise @resources.ResourceError {
+  let origin = @resources.Provenance::new(request.url.location())
+  if request.authorization is Some(_) &&
+    !request.url.origin().permits_credentials() {
+    raise @resources.ResourceError(
+      @resources.InvalidResolution,
+      origin,
+      "Credentials require HTTPS, except on loopback",
+    )
+  }
+  let deadline = now_ms() + limits.timeout_seconds.to_double() * 1000.0
+  let mut current = request.url
+  for redirects = 0; ; redirects = redirects + 1 {
+    let remaining = deadline - now_ms()
+    if remaining <= 0.0 {
+      raise @resources.ResourceError(
+        @resources.AcquisitionTimeout,
+        origin,
+        "HTTP acquisition deadline exceeded",
+      )
+    }
+    let (response, redirect) = transfer(
+      {
+        ..request,
+        url: current,
+        authorization: if current.origin() == request.url.origin() {
+          request.authorization
+        } else {
+          None
+        },
+      },
+      limits,
+      Int32::max(1, remaining.to_int()),
+    )
+    if now_ms() > deadline {
+      raise @resources.ResourceError(
+        @resources.AcquisitionTimeout,
+        origin,
+        "HTTP acquisition deadline exceeded",
+      )
+    }
+    if ![301, 302, 303, 307, 308].contains(response.status) || redirect == "" {
+      return response
+    }
+    if redirects == 5 {
+      raise @resources.ResourceError(
+        @resources.TransportFailure,
+        origin,
+        "HTTP acquisition exceeds five redirects",
+      )
+    }
+    let retrieval = redirect.split("#").next().unwrap().to_owned()
+    guard @resources.HttpUrl::parse(retrieval) is Some(next) &&
+      !(current.to_string().has_prefix("https:") &&
+      next.to_string().has_prefix("http:")) else {
+      raise @resources.ResourceError(
+        @resources.TransportFailure,
+        origin,
+        "Unsafe HTTP redirect destination",
+      )
+    }
+    current = next
+  }
 }

@@ -27,7 +27,7 @@ classified JAR. Add root/path/glob selection when a manifest is not appropriate.
 
 This is direct artifact acquisition. No POMs, transitive graph, ranges, mutable
 snapshots, plugins or bundled code run. Each configured input chooses its public
-repository explicitly. Credentials remain a separate milestone. See the
+repository explicitly. Supplied credentials use [origin bindings](../../apps/smithy/README.md#repository-credentials). See the
 [provider contract](../../pkgs/artifact-resources/README.mbt.md#pinned-maven-jars)
 for coordinate validation, integrity, cache and host support.
 

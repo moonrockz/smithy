@@ -29,7 +29,7 @@ extern "js" fn publish(path : Bytes, bytes : Bytes) -> Bool =
   #|  let dir;
   #|  try {
   #|    dir = fs.mkdtempSync(path + '.tmp-');
-  #|    fs.writeFileSync(dir + '/value', bytes, {flag: 'wx'});
+  #|    fs.writeFileSync(dir + '/value', bytes, {flag: 'wx', mode: 0o600});
   #|    fs.renameSync(dir + '/value', path);
   #|    return true;
   #|  } catch (_) { return false; }

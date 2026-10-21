@@ -9,7 +9,9 @@ test "controlled HTTP host fixture" {
   ).unwrap()
   for path in ["/bytes", "/relative", "/absolute", "/fragment"] {
     let response = @http.transport(
-      @resources.HttpUrl::parse(base + path).unwrap(),
+      @resources.HttpRequest::anonymous(
+        @resources.HttpUrl::parse(base + path).unwrap(),
+      ),
       limits,
     )
     assert_eq(response.body, b"fixture\n200\nhttps://fake.invalid/a\x00")
@@ -24,7 +26,9 @@ test "controlled HTTP host fixture" {
       ("/failure", 500),
     ] {
     let response = @http.transport(
-      @resources.HttpUrl::parse(base + path).unwrap(),
+      @resources.HttpRequest::anonymous(
+        @resources.HttpUrl::parse(base + path).unwrap(),
+      ),
       limits,
     )
     assert_eq(response.status, status)
@@ -34,13 +38,19 @@ test "controlled HTTP host fixture" {
       ("/loop", @resources.TransportFailure),
       ("/disconnect", @resources.TransportFailure),
       ("/slow", @resources.AcquisitionTimeout),
+      ("/slow-redirect", @resources.AcquisitionTimeout),
       ("/large", @resources.ResourceLimit),
       ("/stream", @resources.ResourceLimit),
       ("/file-redirect", @resources.TransportFailure),
       ("/credential-redirect", @resources.TransportFailure),
     ] {
     let actual = try
-      @http.transport(@resources.HttpUrl::parse(base + path).unwrap(), limits)
+      @http.transport(
+        @resources.HttpRequest::anonymous(
+          @resources.HttpUrl::parse(base + path).unwrap(),
+        ),
+        limits,
+      )
     catch {
       @resources.ResourceError(code, _, _) => Some(code)
     } noraise {
@@ -51,7 +61,12 @@ test "controlled HTTP host fixture" {
   // HTTPS to a plain HTTP loopback peer must fail TLS, never silently fall back.
   let tls_url = base.replace(old="http://", new="https://") + "/bytes"
   let rejected = try
-    @http.transport(@resources.HttpUrl::parse(tls_url).unwrap(), limits)
+    @http.transport(
+      @resources.HttpRequest::anonymous(
+        @resources.HttpUrl::parse(tls_url).unwrap(),
+      ),
+      limits,
+    )
   catch {
     @resources.ResourceError(_, _, _) => true
   } noraise {
@@ -65,7 +80,9 @@ test "unsupported hosts fail explicitly without I/O" {
   if @env.get_env_var("SMITHY_UNSUPPORTED_HTTP_TEST") == Some("1") {
     let code = try
       @http.transport(
-        @resources.HttpUrl::parse("https://example.invalid/a.zip").unwrap(),
+        @resources.HttpRequest::anonymous(
+          @resources.HttpUrl::parse("https://example.invalid/a.zip").unwrap(),
+        ),
         @resources.AcquisitionLimits::new().unwrap(),
       )
     catch {

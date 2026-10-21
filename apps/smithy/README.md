@@ -199,7 +199,7 @@ At most five redirects are followed; HTTPS cannot downgrade to HTTP.
 Acquisition defaults to 64 MiB and a 30-second total transfer timeout.
 Existing archive expansion and resource limits still apply. Missing assets,
 authentication-required responses, transport errors and digest mismatches fail
-with distinct stable resource codes. Credentials are a separate capability.
+with distinct stable resource codes. Supplied credentials are configured below.
 
 Remote inputs share a verified cache across sources, global imports and projection
 imports. By default it lives at `.smithy/cache` relative to the configuration file.
@@ -261,7 +261,7 @@ release. Asset names match exactly. `github` cannot be combined with `path` or
 `url`. ZIP/JAR, tar and tar/gzip use the same selectors; set `format` to `tgz` for
 `.tar.gz`/`.tgz`. An optional `digest` pins SHA-256. `github.api` defaults to
 `https://api.github.com`; a compatible public API base can be set explicitly.
-Latest-release selection, inferred matches and credentials are unsupported.
+Latest-release selection and inferred matches are unsupported. Supplied tokens use the credential bindings below.
 
 The initial build caches release metadata, asset pages and verified content.
 Run `smithy build --config smithy-build.json --offline` afterward to resolve the
@@ -317,7 +317,7 @@ Missing or invalid integrity data fails explicitly. See the
 Use `--offline` after the first successful online build. Registry metadata,
 repository sidecars and verified content use the same cache; every hit rechecks
 integrity. `--cache-dir` or `cacheDirectory` selects a cache location. Local
-builds continue to work without network access. Credentials, npm dist-tags/ranges,
+builds continue to work without network access. npm dist-tags/ranges,
 Maven snapshots, POM/transitive resolution and package lifecycle hooks are outside
 this public acquisition slice. Root-level `maven.dependencies` remains rejected.
 
@@ -332,3 +332,46 @@ Repeat either command with `--offline`. Native Linux/macOS/Windows and Node.js
 hosts use curl. Wasm and Wasm GC retain portable archive/provider behavior with a
 custom library transport/cache store. Normal tests use controlled HTTP fixtures,
 not live registry availability.
+
+## Repository credentials
+
+Declare exact origin bindings at the root of `smithy-build.json`. Bindings contain
+only environment variable names, never literal secret values:
+
+```json
+{
+  "version": "2.0",
+  "credentials": [
+    { "origin": "https://api.github.com", "bearerTokenEnv": "GITHUB_TOKEN" },
+    { "origin": "https://registry.npmjs.org", "bearerTokenEnv": "NPM_TOKEN" },
+    { "origin": "https://maven.example.com", "usernameEnv": "MAVEN_USER", "passwordEnv": "MAVEN_PASSWORD" }
+  ]
+}
+```
+
+Combine these bindings with the existing `github`, `npm`, `maven` or URL inputs.
+They apply consistently to sources, global imports and projection imports.
+Configure only the origins you use. Each origin can have one Bearer or Basic
+binding. Origins and environment variable names in this section are literal;
+`${NAME}` expansion does not apply inside `credentials`. Values are resolved at
+build invocation, and a configured missing, empty or malformed secret fails with
+a redacted configuration error. `clean` does not resolve secrets.
+
+A binding covers the origin's scheme, host, port and every path. HTTPS is required
+except for loopback fixtures. Credentials are never sent to another redirect
+origin, even when it has a binding of its own. A separately hosted authenticated
+npm tarball needs an explicit origin binding for its direct request. Authenticated
+GitHub assets use its asset API with octet-stream negotiation; use a read token
+with access to the selected repository.
+
+The cache isolates origins and credential identities from anonymous entries and
+other credentials. Online hits and offline runs require the same supplied values
+and verify content again. Cache hits do not check token revocation with the server;
+remove the cache to require fresh authorization. Treat cache files as private
+artifact data and protect the cache directory. Authentication errors identify the
+resource and HTTP 401/403 status without printing the authorization value.
+
+See the [runnable credential example](../../examples/authenticated-repositories/README.md)
+and [library policy](../../pkgs/artifact-resources/README.mbt.md#supplied-repository-credentials).
+Interactive login, enterprise SSO, `.npmrc` and Maven settings discovery are outside
+this milestone.

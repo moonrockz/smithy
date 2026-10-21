@@ -24,6 +24,7 @@ pub(all) struct BuildConfig {
   sources : Array[BuildInput]
   imports : Array[BuildInput]
   cache_directory : @resources.CacheDirectory
+  credentials : Array[CredentialBinding]
   offline : Bool
   output_directory : String
   projections : Array[ProjectionConfig]
@@ -286,8 +287,16 @@ pub fn BuildConfig::parse(
   let document = @json.parse(clean) catch {
     _ => raise InvalidBuildConfig("Invalid smithy-build.json")
   }
+  let credentials = config_credentials(document)
   let document = if source.contains("${") {
-    config_expand(document, environment)
+    let expanded = match document {
+      Object(fields) => {
+        ignore(fields.remove("credentials"))
+        Json::object(fields)
+      }
+      _ => document
+    }
+    config_expand(expanded, environment)
   } else {
     document
   }
@@ -358,6 +367,7 @@ pub fn BuildConfig::parse(
     imports: config_inputs(document, "imports"),
     cache_directory: config_cache_directory(document),
     offline: config_bool(document, "offline"),
+    credentials,
     output_directory,
     projections,
     plugins: config_plugins(document),

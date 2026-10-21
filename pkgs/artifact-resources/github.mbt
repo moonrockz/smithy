@@ -1,5 +1,5 @@
 ///|
-/// A public GitHub repository coordinate, independent of its API host.
+/// A GitHub repository coordinate, independent of its API host.
 pub struct GitHubRepository {
   priv value : String
 } derive(Eq, Debug)
@@ -202,7 +202,7 @@ fn github_json(bytes : Bytes, origin : Provenance) -> Json raise ResourceError {
 }
 
 ///|
-/// Resolve a public release by tag, enumerate assets in bounded pages and match
+/// Resolve a release by tag, enumerate assets in bounded pages and match
 /// one exact name. Metadata and archive bytes share the verified HTTP cache.
 pub fn GitHubArchive::open(
   self : GitHubArchive,
@@ -212,6 +212,7 @@ pub fn GitHubArchive::open(
   limits~ : Limits = Limits::new(),
   cache~ : VerifiedCache? = None,
   mode~ : AcquisitionMode = Online,
+  credentials~ : Credentials = Credentials::new().unwrap(),
 ) -> EntryTree raise ResourceError {
   self.open_resolved(
     transport,
@@ -220,6 +221,7 @@ pub fn GitHubArchive::open(
     limits~,
     cache~,
     mode~,
+    credentials~,
   ).1
 }
 
@@ -232,6 +234,7 @@ fn GitHubArchive::open_resolved(
   limits~ : Limits = Limits::new(),
   cache~ : VerifiedCache? = None,
   mode~ : AcquisitionMode = Online,
+  credentials~ : Credentials = Credentials::new().unwrap(),
 ) -> (GitHubResolution, EntryTree) raise ResourceError {
   let origin = Provenance::new(api.location()).github_requested(
     self.repository,
@@ -289,6 +292,7 @@ fn GitHubArchive::open_resolved(
       limits=metadata_limits,
       cache~,
       mode~,
+      credentials~,
     ) catch {
       ResourceError(code, at, message) =>
         raise ResourceError(code, at.through(origin), message)
@@ -385,6 +389,12 @@ fn GitHubArchive::open_resolved(
       "GitHub asset requires a positive ID, uploaded state and credential-free download URL",
     )
   }
+  let authenticated = credentials.for_url(api) is Some(_)
+  let download = if authenticated {
+    HttpUrl::parse(prefix + "assets/" + asset_id.to_string()).unwrap()
+  } else {
+    download
+  }
   let resolution : GitHubResolution = {
     repository: self.repository,
     requested: self.reference,
@@ -434,7 +444,15 @@ fn GitHubArchive::open_resolved(
     } else {
       api_digest
     },
-  }.open(transport, acquisition_limits~, limits~, cache~, mode~) catch {
+  }.open(
+    transport,
+    acquisition_limits~,
+    limits~,
+    cache~,
+    mode~,
+    credentials~,
+    accept=if authenticated { OctetStream } else { AnyContent },
+  ) catch {
     ResourceError(code, at, message) =>
       raise ResourceError(code, at.through(provenance), message)
   }
@@ -453,6 +471,7 @@ pub fn register_github(
   limits~ : Limits = Limits::new(),
   cache~ : VerifiedCache? = None,
   mode~ : AcquisitionMode = Online,
+  credentials~ : Credentials = Credentials::new().unwrap(),
 ) -> Registry raise ResourceError {
   registry.register_provider(ProviderId::parse("github").unwrap(), (
     repository,
@@ -479,6 +498,7 @@ pub fn register_github(
       limits~,
       cache~,
       mode~,
+      credentials~,
     )
     {
       reference,

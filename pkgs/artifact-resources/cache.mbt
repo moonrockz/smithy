@@ -61,7 +61,28 @@ pub(all) struct AcquiredBytes {
 }
 
 ///|
-fn http_cache_key(url : HttpUrl) -> CacheKey {
+fn http_cache_key(
+  url : HttpUrl,
+  authorization : Authorization?,
+  accept : HttpAccept,
+) -> CacheKey {
+  if authorization is Some(_) || accept != AnyContent {
+    let identity : Json = [
+      url.to_string(),
+      authorization
+      .map(a => ContentDigest::sha256(@utf8.encode(a.header)).to_string())
+      .unwrap_or("anonymous"),
+      if accept == OctetStream {
+        "octet-stream"
+      } else {
+        "any"
+      },
+    ]
+    return CacheKey::reference(
+      ProviderId::parse("authorized-http").unwrap(),
+      ArtifactKey::parse(identity.stringify()).unwrap(),
+    )
+  }
   CacheKey::reference(
     ProviderId::parse("public-http").unwrap(),
     ArtifactKey::parse(url.to_string()).unwrap(),
@@ -117,16 +138,35 @@ pub fn acquire(
   cache~ : VerifiedCache? = None,
   mode~ : AcquisitionMode = Online,
   verify~ : IntegrityVerifier = (_, _) => (),
+  credentials~ : Credentials = Credentials::new().unwrap(),
+  accept~ : HttpAccept = AnyContent,
 ) -> AcquiredBytes raise ResourceError {
   let origin = Provenance::new(requested.location())
+  let authorization = credentials.for_url(requested)
+  let reference_key = http_cache_key(requested, authorization, accept)
+  fn content_key(digest : ContentDigest) -> CacheKey {
+    match authorization {
+      None => CacheKey::content(digest)
+      Some(auth) =>
+        CacheKey::reference(
+          ProviderId::parse("authorized-content").unwrap(),
+          ArtifactKey::parse(
+            Json::array([
+              Json::string(requested.origin().to_string()),
+              Json::string(digest.to_string()),
+              Json::string(
+                ContentDigest::sha256(@utf8.encode(auth.header)).to_string(),
+              ),
+            ]).stringify(),
+          ).unwrap(),
+        )
+    }
+  }
   if cache is Some(cache) &&
-    (cache.store.read)(http_cache_key(requested), 32768) is Some(bytes) {
+    (cache.store.read)(reference_key, 32768) is Some(bytes) {
     let metadata = cache_metadata(bytes, requested)
     let at = Provenance::new(metadata.resolved.location()).acquired(metadata)
-    guard (cache.store.read)(
-        CacheKey::content(metadata.digest),
-        limits.max_bytes,
-      )
+    guard (cache.store.read)(content_key(metadata.digest), limits.max_bytes)
       is Some(body) else {
       raise ResourceError(
         CacheCorrupt,
@@ -165,7 +205,7 @@ pub fn acquire(
       "No verified cached acquisition for requested URL",
     )
   }
-  let response = transport(requested, limits)
+  let response = transport({ url: requested, authorization, accept, }, limits)
   if response.body.length() > limits.max_bytes {
     raise ResourceError(
       ResourceLimit,
@@ -197,17 +237,14 @@ pub fn acquire(
   }
   verify(response.body, at)
   if cache is Some(cache) {
-    (cache.store.publish)(CacheKey::content(metadata.digest), response.body)
+    (cache.store.publish)(content_key(metadata.digest), response.body)
     let json : Json = {
       "version": 1,
       "requested": requested.to_string(),
       "resolved": metadata.resolved.to_string(),
       "digest": metadata.digest.to_string(),
     }
-    (cache.store.publish)(
-      http_cache_key(requested),
-      @utf8.encode(json.stringify()),
-    )
+    (cache.store.publish)(reference_key, @utf8.encode(json.stringify()))
   }
   { metadata, body: response.body, }
 }
