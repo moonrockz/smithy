@@ -1,5 +1,6 @@
 import {
   "moonrockz/smithy",
+  "moonrockz/smithy-syntax" @syntax,
   "moonbitlang/core/json",
   "moonbitlang/core/string",
   "moonbitlang/core/encoding/base64",

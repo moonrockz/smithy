@@ -14,4 +14,5 @@ warnings = "-implicit_impl_as_method"
 
 import {
   "moonrockz/smithy@0.4.0",
+  "moonrockz/smithy-syntax@0.4.0",
 }
