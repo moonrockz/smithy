@@ -30,6 +30,14 @@ Events use the shared `smithy.ValidationEvent` type. `events` includes suppresse
 events and has deterministic order by event ID, shape ID, severity and message.
 `is_breaking()` is true when an event has ERROR or DANGER severity.
 
+The constraint evaluators preserve two quirks of the pinned reference. They
+compare `@length` and `@range` bounds only when the trait exists in both models;
+adding either trait uses the generic NOTE event. Both evaluators substitute zero
+for an absent minimum, including `@range`. Introducing a nonpositive range
+minimum therefore produces no constraint ERROR, while removing a negative
+minimum can produce one. The local constraint-boundary reference cases record
+these behaviors. `is_breaking()` follows the reference's event severities.
+
 ```sh
 smithy diff --old old-model.smithy --new new-model.smithy
 smithy diff --old old-models/ --new new-models/ --output changes.txt

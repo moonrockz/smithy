@@ -2,6 +2,94 @@
     "referenceSha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef",
     "cases": [
         {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Add.smithy.api#length",
+                    "shape": "example.constraints#LengthMax",
+                    "severity": "NOTE",
+                    "message": "Added trait `smithy.api#length` with value \n```\n{\n    \"max\": 10\n}\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Add.smithy.api#length",
+                    "shape": "example.constraints#LengthMin",
+                    "severity": "NOTE",
+                    "message": "Added trait `smithy.api#length` with value \n```\n{\n    \"min\": 1\n}\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Add.smithy.api#range",
+                    "shape": "example.constraints#RangeMax",
+                    "severity": "NOTE",
+                    "message": "Added trait `smithy.api#range` with value \n```\n{\n    \"max\": 10\n}\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Add.smithy.api#range",
+                    "shape": "example.constraints#RangeMin",
+                    "severity": "NOTE",
+                    "message": "Added trait `smithy.api#range` with value \n```\n{\n    \"min\": -10\n}\n```\n"
+                }
+            ],
+            "old": "local/constraints-added.a.smithy",
+            "new": "local/constraints-added.b.smithy"
+        },
+        {
+            "breaking": false,
+            "events": [
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#range",
+                    "shape": "example.constraints#Negative",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#range` from \n```\n{\n    \"max\": 100\n}\n```\n to \n```\n{\n    \"min\": -10,\n    \"max\": 100\n}\n```\n"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#range",
+                    "shape": "example.constraints#Zero",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#range` from \n```\n{\n    \"max\": 100\n}\n```\n to \n```\n{\n    \"min\": 0,\n    \"max\": 100\n}\n```\n"
+                }
+            ],
+            "old": "local/range-min-nonpositive.a.smithy",
+            "new": "local/range-min-nonpositive.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ChangedRangeTrait",
+                    "shape": "example.constraints#Positive",
+                    "severity": "ERROR",
+                    "message": "smithy.api#range trait value `min` was made more restrictive by raising from 0 to 1"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#range",
+                    "shape": "example.constraints#Positive",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#range` from \n```\n{\n    \"max\": 100\n}\n```\n to \n```\n{\n    \"min\": 1,\n    \"max\": 100\n}\n```\n"
+                }
+            ],
+            "old": "local/range-min-positive.a.smithy",
+            "new": "local/range-min-positive.b.smithy"
+        },
+        {
+            "breaking": true,
+            "events": [
+                {
+                    "id": "ChangedRangeTrait",
+                    "shape": "example.constraints#Removed",
+                    "severity": "ERROR",
+                    "message": "smithy.api#range trait value `min` was made more restrictive by raising from -10 to 0"
+                },
+                {
+                    "id": "ModifiedTrait.Update.smithy.api#range",
+                    "shape": "example.constraints#Removed",
+                    "severity": "NOTE",
+                    "message": "Changed trait `smithy.api#range` from \n```\n{\n    \"min\": -10,\n    \"max\": 100\n}\n```\n to \n```\n{\n    \"max\": 100\n}\n```\n"
+                }
+            ],
+            "old": "local/range-min-removed-negative.a.smithy",
+            "new": "local/range-min-removed-negative.b.smithy"
+        },
+        {
             "breaking": true,
             "events": [
                 {

@@ -49,7 +49,7 @@ test "all pinned reference cases match full events and breaking status" {
     } else {
     fail("Invalid reference manifest")
   }
-  assert_true(cases.length() >= 84)
+  assert_true(cases.length() >= 88)
   let failures = []
   for case in cases {
     guard case

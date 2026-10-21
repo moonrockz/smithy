@@ -13,8 +13,8 @@ The 176 upstream resources are all represented:
 | 13 single-model fixtures | Trait, pagination and legacy box mutations |
 
 `events.json` records full events and breaking status from the actual Java
-`ModelDiff` implementation. It covers the 62 upstream pairs, one additional local
-pair that exercises the remaining built-in evaluators, and 21 mutations declared
+`ModelDiff` implementation. It covers the 62 upstream pairs, five local pairs
+covering remaining evaluators and constraint boundaries, and 21 mutations declared
 in `mutations.json`. Mutation instructions reproduce the upstream Java unit
 tests against assembled models, including mutations that intentionally bypass
 assembly validation. Every upstream model is covered by the permanent inventory

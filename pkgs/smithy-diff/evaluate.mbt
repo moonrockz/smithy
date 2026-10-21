@@ -375,12 +375,16 @@ fn constraint_changes(
     ] {
     let a = change.old_shape.trait_value("smithy.api#" + name)
     let b = change.new_shape.trait_value("smithy.api#" + name)
+    // The pinned Java evaluator uses getChangedTrait, which requires both
+    // traits. Newly applied constraints are handled by the generic evaluator.
     if a == None || b == None || a == b {
       continue
     }
     let zero = @smithy.NodeValue::Number(
       @smithy.NodeNumber::parse("0").unwrap(),
     )
+    // AbstractLengthAndRangeValidator defaults missing minima to zero for
+    // both traits, including range. Preserve the reference event contract.
     let old_min = field(a, "min").unwrap_or(zero)
     let new_min = field(b, "min").unwrap_or(zero)
     if old_min is Number(old_number) &&

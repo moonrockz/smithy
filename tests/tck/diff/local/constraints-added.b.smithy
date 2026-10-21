@@ -1,0 +1,10 @@
+$version: "2"
+namespace example.constraints
+@length(max: 10)
+string LengthMax
+@length(min: 1)
+string LengthMin
+@range(min: -10)
+long RangeMin
+@range(max: 10)
+long RangeMax
