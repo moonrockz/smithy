@@ -51,6 +51,39 @@ test "argparse accepts standard option forms and interspersed inputs" {
 }
 
 ///|
+test "value validation options select typed policies and permit stdin once" {
+  let opts = options([
+    "validate-value", "--shape", "example#Input", "--value", "-", "--unknown-members",
+    "ignore", "--member-names", "json", "--diagnostics", "json", "model.smithy",
+  ])
+  assert_eq(opts.command, "validate-value")
+  assert_eq(opts.value_validation.unwrap().target.to_string(), "example#Input")
+  for
+    args in [
+      ["validate-value", "--shape", "bad", "--value", "x.json", "m.smithy"],
+      [
+        "validate-value", "--shape", "example#Input", "--value", "-", "--from", "idl",
+        "-",
+      ],
+      [
+        "validate-value", "--shape", "example#Input", "--value", "x.json", "--diagnostics",
+        "xml", "m.smithy",
+      ],
+      [
+        "validate-value", "--shape", "example#Input", "--value", "x.json", "--unknown-members",
+        "guess", "m.smithy",
+      ],
+    ] {
+    let code = try options(args) catch {
+      CliError(_, code) => code
+    } noraise {
+      _ => 0
+    }
+    assert_eq(code, 2)
+  }
+}
+
+///|
 test "IDL formatting is idempotent and preserves literals and comments" {
   let text =
     #|$version :  "2"

@@ -10,7 +10,7 @@ priv enum ValueFrame {
 /// Core currently retains large integers but rounds ordinary decimal tokens.
 /// Rebuilding containers also preserves last-key-wins behavior for duplicate
 /// keys, including duplicates whose earlier values have different structures.
-fn parse_exact(text : String) -> Json raise @json.ParseError {
+pub fn parse_exact(text : String) -> Json raise @json.ParseError {
   @json.parse(text) |> ignore
   let stack : Array[ValueFrame] = []
   let mut root = Json::null()

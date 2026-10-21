@@ -484,7 +484,7 @@ async fn exercise(
     assert_eq(out, help)
   }
   for command in [
-    "ast", "validate", "select", "diff", "format", "convert", "build", "clean", "version",
+    "ast", "validate", "validate-value", "select", "diff", "format", "convert", "build", "clean", "version",
   ] {
     let (help, _) = runner.command([command, "--help"], 0)
     assert_true(help.contains("Usage: smithy \{command}"))
@@ -500,6 +500,65 @@ async fn exercise(
       assert_true(help.contains("jsonl") && help.contains("flushes"))
       assert_false(help.contains("--stream"))
     }
+  }
+  let value_model = "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }\n"
+  @fs.write_file("\{dir}/value-model.smithy", value_model)
+  let value_args = ["validate-value", "--shape", "example#Input", "--value", "value.json", "value-model.smithy"]
+  for (text, expected_code, finding) in [
+    ("{\"count\":2}", 0, ""),
+    ("{\"count\":0}", 1, "Range"),
+    ("{}", 1, "RequiredMember"),
+    ("{\"count\":null}", 1, "TypeMismatch"),
+    ("{\"count\":\"2\"}", 1, "TypeMismatch"),
+    ("{\"count\":2,\"extra\":1}", 1, "UnknownMember"),
+    ("{\"count\":1,\"count\":2}", 1, "DuplicateJsonKey"),
+    ("{", 1, "InvalidJson"),
+  ] {
+    @fs.write_file("\{dir}/value.json", text)
+    let (out, err) = runner.command(value_args, expected_code)
+    if expected_code == 0 { assert_eq(out + err, "") } else { assert_true((out + err).contains(finding), msg=out + err) }
+    let (out, _) = runner.command(value_args + ["--diagnostics", "json"], expected_code)
+    guard @json.parse(out) is Object(result) else { fail("Expected structured value result") }
+    assert_eq(result.get("valid"), Some(Json::boolean(expected_code == 0)))
+    if finding == "Range" {
+      guard result.get("findings") is Some(Array([Object(first), ..])) else { fail("Expected range finding") }
+      assert_eq(first.get("code"), Some(Json::string("Range")))
+      assert_eq(first.get("pointer"), Some(Json::string("/count")))
+      assert_eq(first.get("shape"), Some(Json::string("example#Input$count")))
+    }
+    assert_eq(@fs.read_file("\{dir}/value.json").text(), text)
+  }
+  @fs.write_file("\{dir}/value.json", "{\"count\":2}")
+  runner.command(["validate-value", "--shape", "example#Missing", "--value", "value.json", "value-model.smithy"], 2) |> ignore
+  runner.command(["validate-value", "--shape", "not-an-id", "--value", "value.json", "value-model.smithy"], 2) |> ignore
+  runner.command(["validate-value", "--shape", "example#Input", "value-model.smithy"], 2) |> ignore
+  runner.command(value_args + ["--diagnostics", "xml"], 2) |> ignore
+  runner.command(["validate-value", "--shape", "example#Input", "--value", "missing.json", "value-model.smithy"], 1) |> ignore
+  if !skip_stdin && (target != "wasm-gc" || @env.get_env_var("OS") != Some("Windows_NT")) {
+    runner.command(["validate-value", "--shape", "example#Input", "--value", "-", "value-model.smithy"], 0, input="{\"count\":2}") |> ignore
+    runner.command(["validate-value", "--shape", "example#Input", "--value", "value.json", "--from", "idl", "-"], 0, input=value_model) |> ignore
+  }
+  runner.command(["validate-value", "--shape", "example#Input", "--value", "-", "--from", "idl", "-"], 2) |> ignore
+  @fs.write_file("\{dir}/precise.smithy", "$version: \"2\"\nnamespace example\n@range(min: 0.10000000000000000001)\nbigDecimal Precise\n")
+  @fs.write_file("\{dir}/precise.json", "0.10000000000000000000")
+  runner.command(["validate-value", "--shape", "example#Precise", "--value", "precise.json", "precise.smithy"], 1) |> ignore
+  assert_eq(@fs.read_file("\{dir}/value-model.smithy").text(), value_model)
+  let (invalid_model, _) = runner.command(["validate-value", "--shape", "example#Broken", "--value", "value.json", "--diagnostics", "json", "broken.smithy"], 1)
+  guard @json.parse(invalid_model) is Object(model_result) && model_result.get("findings") is Some(Array([Object(model_finding), ..])) else { fail("Expected model diagnostics") }
+  assert_eq(model_finding.get("source"), Some(Json::string("broken.smithy")))
+  let (missing_model, missing_model_err) = runner.command(["validate-value", "--shape", "example#Input", "--value", "value.json", "--diagnostics", "json", "missing.smithy"], 1)
+  guard @json.parse(missing_model) is Object(missing_result) && missing_result.get("findings") is Some(Array([Object(missing_finding), ..])) else { fail("Expected structured model read diagnostics") }
+  assert_eq(missing_finding.get("source"), Some(Json::string("missing.smithy")))
+  assert_eq(missing_finding.get("code"), Some(Json::string("InputRead")))
+  assert_eq(missing_model_err, "")
+  for (configuration, severity) in [("selector: \"structure\"", "DANGER"), ("selector: \"[\"", "ERROR")] {
+    @fs.write_file("\{dir}/value-invalid-event.smithy", "$version: \"2\"\nmetadata validators = [{name: \"EmitEachSelector\", configuration: {" + configuration + "}}]\nnamespace example\nstructure Input {}\n")
+    @fs.write_file("\{dir}/value-empty.json", "{}")
+    let (event_out, event_err) = runner.command(["validate-value", "--shape", "example#Input", "--value", "value-empty.json", "--diagnostics", "json", "value-invalid-event.smithy"], 1)
+    guard @json.parse(event_out) is Object(event_result) && event_result.get("findings") is Some(Array([Object(event_finding), ..])) else { fail("Expected model validation event") }
+    assert_eq(event_finding.get("severity"), Some(Json::string(severity)))
+    assert_eq(event_result.get("valid"), Some(Json::boolean(false)))
+    assert_eq(event_err, "")
   }
   let (out, _) = runner.command(["convert", "missing.smithy", "--help"], 0)
   assert_true(out.contains("Usage: smithy convert"))

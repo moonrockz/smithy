@@ -1,0 +1,19 @@
+/// Validate JSON with the published library, independently of the Smithy workspace.
+import {
+  "moonrockz/smithy@0.4.0",
+  "moonrockz/smithy-validation@0.4.0" @validation,
+}
+
+///|
+fn main raise {
+  let loaded = @smithy.Loader::new().add_idl(
+    "example.smithy", "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }",
+  ).assemble()
+  let prepared = @validation.PreparedValidator::prepare(loaded.model.unwrap(), @smithy.ShapeId::parse("example#Input").unwrap())
+  let good = prepared.validate_json(@validation.parse_json_value("{\"count\":2}"))
+  let bad = prepared.validate_json(@validation.parse_json_value("{\"count\":0}"))
+  assert_true(good.is_valid())
+  assert_false(bad.is_valid())
+  assert_eq(bad.findings[0].code, @validation.Range)
+  println("valid=\{good.is_valid()} invalid=\{bad.findings[0].code.to_string()} at \{bad.findings[0].path.pointer()}")
+}

@@ -19,6 +19,10 @@ and the [model diff API](pkgs/smithy-diff/README.mbt.md).
 The build plugins convert assembled models to JSON Schema and services to OpenAPI
 3.0.2 or 3.1.0. See [OpenAPI usage](pkgs/smithy-openapi/README.mbt.md).
 
+`moonrockz/smithy-validation` checks application JSON directly against selected Smithy data shapes,
+with exact numbers and structured findings. The CLI exposes it through `smithy validate-value`.
+See [value validation](pkgs/smithy-validation/README.mbt.md).
+
 ## Packages
 
 | Path | Module | Purpose |
@@ -26,6 +30,7 @@ The build plugins convert assembled models to JSON Schema and services to OpenAP
 | `pkgs/artifact-resources` | `moonrockz/artifact-resources` | Portable entry trees, resource loading, public HTTP/GitHub/npm/Maven acquisition, verified cache, supplied credentials and provider registry |
 | `pkgs/jmespath` | `moonrockz/jmespath` | JMESPath parser, inspectable AST and JSON evaluator |
 | `pkgs/smithy` | `moonrockz/smithy` | Semantic model and multi-file IDL/JSON loader |
+| `pkgs/smithy-validation` | `moonrockz/smithy-validation` | Validate application JSON values directly against Smithy data shapes |
 | `pkgs/smithy-diff` | `moonrockz/smithy-diff` | Compare models and report compatibility changes |
 | `pkgs/smithy-build` | `moonrockz/smithy-build` | Build configuration, projections and plugins |
 | `pkgs/smithy-jsonschema` | `moonrockz/smithy-jsonschema` | Convert assembled value shapes to JSON Schema |
@@ -168,6 +173,7 @@ smithy/
 ├── lefthook.yml               # git hooks
 ├── apps/smithy/               # CLI (moonrockz/smithy-cli)
 ├── pkgs/smithy/               # library (moonrockz/smithy)
+├── pkgs/smithy-validation/    # Direct application value validation and typed findings
 ├── pkgs/smithy-build/         # build projections and plugins
 ├── pkgs/smithy-diff/          # Model compatibility differences
 ├── pkgs/smithy-jsonschema/    # JSON Schema converter

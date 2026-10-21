@@ -1,0 +1,14 @@
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-syntax" @syntax,
+  "moonbitlang/core/json",
+  "moonbitlang/core/string",
+  "moonbitlang/core/encoding/base64",
+}
+
+import {
+  "moonrockz/smithy-validation" @validation,
+  "moonbitlang/core/quickcheck",
+  "moonrockz/smithy",
+  "moonbitlang/core/json",
+} for "test"
