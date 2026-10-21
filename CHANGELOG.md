@@ -6,6 +6,32 @@ is 0.x, a minor release can contain breaking changes.
 
 <!-- git-cliff: end of header -->
 
+## [0.4.0] - 2026-10-21
+
+<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+
+### ⚠️ Breaking changes
+
+- *(resources)* Resource metadata uses validated domain types; `BuildConfig.sources`, `BuildConfig.imports` and `ProjectionConfig.imports` contain `BuildInput` values. Use `BuildInput::from_path` for legacy library inputs. JSON string configuration remains compatible. API migration and selection rules are documented. ([#28](https://github.com/moonrockz/smithy/pull/28))
+- *(resources)* BuildInput adds Remote(PublicArchive, Selection), and with_location can raise BuildError for invalid remote replacement URLs. Exhaustive ResourceCode and ProvenanceStep matches need acquisition cases. ([#30](https://github.com/moonrockz/smithy/pull/30))
+- *(resources)* Direct BuildConfig constructors must initialize cache_directory: CacheDirectory and offline. Parsed configuration supplies defaults. Exhaustive Location matches must handle FilesystemDirectory. ([#31](https://github.com/moonrockz/smithy/pull/31))
+- *(resources)* Exhaustive matches must handle BuildInput::GitHub, GitHubRequestStep/GitHubStep provenance, and MissingRelease, AmbiguousAsset and RateLimited resource codes. ([#32](https://github.com/moonrockz/smithy/pull/32))
+- *(resources)* Load npm and Maven artifacts ([#33](https://github.com/moonrockz/smithy/pull/33))
+- *(resources)* HttpTransport receives HttpRequest instead of HttpUrl. Use request.url inside callbacks and HttpRequest::anonymous(url) for public host calls. BuildConfig adds credential environment bindings. ([#34](https://github.com/moonrockz/smithy/pull/34))
+
+### 🚀 Features
+
+- Add reusable local artifact resources ([#27](https://github.com/moonrockz/smithy/pull/27)) by @DamianReeves
+- *(resources)* [**breaking**] Select local resource trees ([#28](https://github.com/moonrockz/smithy/pull/28)) by @DamianReeves
+- *(resources)* Load local tar and npm archives ([#29](https://github.com/moonrockz/smithy/pull/29)) by @DamianReeves
+- *(resources)* [**breaking**] Load verified public archives ([#30](https://github.com/moonrockz/smithy/pull/30)) by @DamianReeves
+- *(resources)* [**breaking**] Cache artifacts for offline builds ([#31](https://github.com/moonrockz/smithy/pull/31)) by @DamianReeves
+- *(resources)* [**breaking**] Load pinned GitHub release assets ([#32](https://github.com/moonrockz/smithy/pull/32)) by @DamianReeves
+- *(resources)* [**breaking**] Load npm and Maven artifacts ([#33](https://github.com/moonrockz/smithy/pull/33)) by @DamianReeves
+- *(resources)* [**breaking**] Add repository credentials ([#34](https://github.com/moonrockz/smithy/pull/34)) by @DamianReeves
+
+**Full changelog**: https://github.com/moonrockz/smithy/compare/v0.3.0...v0.4.0
+
 ## [0.3.0] - 2026-10-19
 
 Smithy now converts assembled models to JSON Schema through the new `moonrockz/smithy-jsonschema` package and the `jsonSchema` build plugin. The new `moonrockz/smithy-build` package and `smithy build` and `smithy clean` commands support projections, all 28 built-in transforms, local JAR imports and environment substitutions. `smithy select` evaluates selectors, and validation now runs configured and default validators with reference event IDs, severities, shape IDs and suppressions. Build outputs require a dedicated directory separate from sources and imports, with an ownership marker protecting existing files. Code that constructs `Shape`, `ModelDiagnostic` or `LoadResult` records directly must supply the added `provenance`, `event_id` and `validation_findings` fields respectively; loader callers need no record changes.
