@@ -1,0 +1,46 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "smithy.example#Service": {
+            "type": "service",
+            "version": "2006-03-01",
+            "operations": [
+                {
+                    "target": "smithy.example#CreateDocument"
+                }
+            ],
+            "traits": {
+                "aws.protocols#restJson1": {}
+            }
+        },
+        "smithy.example#CreateDocument": {
+            "type": "operation",
+            "input": {
+                "target": "smithy.example#CreateDocumentInput"
+            },
+            "traits": {
+                "smithy.api#http": {
+                    "uri": "/document",
+                    "method": "POST"
+                }
+            }
+        },
+        "smithy.example#CreateDocumentInput": {
+            "type": "structure",
+            "members": {
+                "abc": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#jsonName": "Abc"
+                    }
+                },
+                "def": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#jsonName": "Def"
+                    }
+                }
+            }
+        }
+    }
+}

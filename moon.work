@@ -5,6 +5,7 @@ members = [
   "./pkgs/smithy",
   "./pkgs/smithy-build",
   "./pkgs/smithy-jsonschema",
+  "./pkgs/smithy-openapi",
   "./pkgs/smithy-syntax",
   "./apps/smithy",
   "./docs/cookbook",

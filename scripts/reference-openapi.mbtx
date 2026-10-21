@@ -1,0 +1,182 @@
+/// Verify or regenerate OpenAPI expectations using hash-verified Java sources.
+/// Requires a JDK with javac/java; generated code/classes stay under .dev/.
+/// Usage: moonx scripts/reference-openapi.mbtx [UPSTREAM_DIRECTORY] [--check]
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let reference_sha : String = "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
+
+///|
+let harness : String =
+  #|import java.nio.file.*;
+  #|import java.util.*;
+  #|import java.util.logging.*;
+  #|import software.amazon.smithy.model.*;
+  #|import software.amazon.smithy.model.node.*;
+  #|import software.amazon.smithy.openapi.*;
+  #|import software.amazon.smithy.openapi.fromsmithy.*;
+  #|import software.amazon.smithy.build.*;
+  #|
+  #|public final class ReferenceOpenApi {
+  #|  public static void main(String[] args) throws Exception {
+  #|    Logger.getLogger("").setLevel(Level.OFF);
+  #|    Path corpus = Path.of(args[0]);
+  #|    boolean check = args[1].equals("--check");
+  #|    ObjectNode manifest = Node.parse(Files.readString(corpus.resolve("cases.json"))).expectObjectNode();
+  #|    if (!manifest.expectStringMember("referenceSha").getValue().equals("30bdab593f0c2cdf96036782cc3ce15c43a711ef"))
+  #|      throw new IllegalStateException("Unexpected reference SHA");
+  #|    int successes = 0, failures = 0;
+  #|    for (Node entry : manifest.expectArrayMember("cases").getElements()) {
+  #|      ObjectNode test = entry.expectObjectNode();
+  #|      String id = test.expectStringMember("id").getValue();
+  #|      Model model = Model.assembler().discoverModels()
+  #|          .addImport(corpus.resolve(test.expectStringMember("model").getValue()))
+  #|          .assemble().unwrap();
+  #|      ObjectNode actual;
+  #|      try {
+  #|        OpenApiConfig config = OpenApiConfig.fromNode(test.expectObjectMember("settings"));
+  #|        Path artifacts = Path.of(args[2]).resolve(id);
+  #|        FileManifest output = FileManifest.create(artifacts);
+  #|        new Smithy2OpenApi().execute(PluginContext.builder().model(model).originalModel(model)
+  #|            .settings(test.expectObjectMember("settings")).fileManifest(output).build());
+  #|        actual = Node.parse(Files.readString(artifacts.resolve(config.getService().getName() + ".openapi.json")))
+  #|            .expectObjectNode();
+  #|      } catch (RuntimeException error) {
+  #|        if (test.containsMember("error")) { failures++; System.out.println("expected failure: " + id); continue; }
+  #|        throw new IllegalStateException("Unexpected reference conversion failure: " + id, error);
+  #|      }
+  #|      if (test.containsMember("error")) throw new IllegalStateException("Expected reference failure: " + id);
+  #|      if (test.containsMember("upstreamExpected")) {
+  #|        Node apiResult = OpenApiConverter.create()
+  #|            .config(OpenApiConfig.fromNode(test.expectObjectMember("settings"))).convert(model).toNode();
+  #|        Node.assertEquals(apiResult, Node.parse(Files.readString(corpus.resolve(
+  #|            test.expectStringMember("upstreamExpected").getValue()))));
+  #|      }
+  #|      Path expected = corpus.resolve(test.expectStringMember("expected").getValue());
+  #|      if (check || test.expectStringMember("expected").getValue().startsWith("upstream/")) {
+  #|        try { Node.assertEquals(actual, Node.parse(Files.readString(expected))); }
+  #|        catch (RuntimeException | AssertionError error) { throw new IllegalStateException("Reference golden mismatch: " + id, error); }
+  #|      } else {
+  #|        Files.createDirectories(expected.getParent());
+  #|        Files.writeString(expected, Node.prettyPrintJson(actual) + "\n");
+  #|      }
+  #|      successes++;
+  #|      System.out.println("verified: " + id);
+  #|    }
+  #|    System.out.println("Reference verified " + successes + " documents and " + failures + " failure cases");
+  #|  }
+  #|}
+
+///|
+fn git_blob_hash(text : String) -> String {
+  @crypto.bytes_to_hex_string(@crypto.sha1(@utf8.encode(
+    "blob " + @utf8.encode(text).length().to_string() + "\u{0000}" + text,
+  )))
+}
+
+///|
+fn java_quote(value : String) -> String {
+  "\"" + value.replace_all(old="\\", new="\\\\").replace_all(old="\"", new="\\\"") + "\""
+}
+
+///|
+async fn checked(command : String, args : Array[String]) -> String {
+  let (status, out, err) = @process.collect_output(command, args)
+  if status != 0 {
+    eprintln(command + " failed\n" + out.text() + err.text())
+    @sys.exit(1)
+  }
+  out.text()
+}
+
+///|
+async fn collect_files(root : String, relative : String) -> Array[String] {
+  let files : Array[String] = []
+  if !@fs.exists(root + "/" + relative) { return files }
+  for name in @fs.readdir(root + "/" + relative, sort=true) {
+    let path = relative + "/" + name
+    if @fs.kind(root + "/" + path) is Directory { files.append(collect_files(root, path)) }
+    else { files.push(path) }
+  }
+  files
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let mut source = ".dev/reference/snapshot"
+  let mut check = false
+  for i = 1; i < args.length(); i = i + 1 {
+    if args[i] == "--check" { check = true } else { source = args[i] }
+  }
+  let tree = @json.parse(checked("curl", ["-fsSL", "--retry", "2",
+    "https://api.github.com/repos/smithy-lang/smithy/git/trees/" + reference_sha + "?recursive=1",
+  ]))
+  guard tree is { "sha": String(sha), "tree": Array(entries), "truncated": False, .. } && sha == reference_sha else {
+    fail("Pinned Java source tree is missing, mismatched or truncated")
+  }
+  let blobs : Map[String, String] = Map([])
+  for entry in entries {
+    if entry is { "type": String("blob"), "path": String(path), "sha": String(blob), .. } { blobs[path] = blob }
+  }
+  let scratch = ".dev/out/reference-openapi"
+  let classes = scratch + "/classes"
+  if @fs.exists(classes) { @fs.rmdir(classes, recursive=true) }
+  @fs.mkdir(classes, recursive=true, allow_exist=true)
+  let harness_path = scratch + "/ReferenceOpenApi.java"
+  @fs.write_file(harness_path, harness)
+  let sources = [harness_path]
+  let resources : Map[String, String] = Map([])
+  let verified : Array[Json] = []
+  for module_ in [
+    "smithy-utils", "smithy-jmespath", "smithy-model", "smithy-build", "smithy-diff",
+    "smithy-protocol-traits", "smithy-aws-traits", "smithy-jsonschema", "smithy-openapi-traits", "smithy-openapi",
+  ] {
+    let java_prefix = module_ + "/src/main/java"
+    let resource_prefix = module_ + "/src/main/resources"
+    for path in collect_files(source, java_prefix) + collect_files(source, resource_prefix) {
+      let text = @fs.read_file(source + "/" + path).text()
+      guard blobs.get(path) is Some(blob) else { fail("Untracked reference source " + path) }
+      assert_eq(git_blob_hash(text), blob, msg="Java reference blob mismatch: " + path)
+      verified.push(Json::object({ "path": Json::string(path), "gitBlob": Json::string(blob) }))
+      if path.has_prefix(java_prefix + "/") {
+        if path.has_suffix(".java") && !path.has_suffix("/module-info.java") { sources.push(source + "/" + path) }
+      } else {
+        let relative = path[resource_prefix.length() + 1:].to_owned()
+        if (relative.has_prefix("META-INF/services/") || relative == "META-INF/smithy/manifest") && resources.get(relative) is Some(old) {
+          resources[relative] = old.trim_end().to_owned() + "\n" + text
+        } else { resources[relative] = text }
+      }
+    }
+  }
+  for relative, text in resources {
+    let target = classes + "/" + relative
+    let parts = target.split("/").map(p => p.to_owned()).to_array()
+    ignore(parts.pop())
+    @fs.mkdir(parts.join("/"), recursive=true, allow_exist=true)
+    @fs.write_file(target, text)
+  }
+  @fs.write_file(scratch + "/source-inventory.json", Json::object({
+    "referenceSha": Json::string(reference_sha), "files": Json::array(verified),
+  }).stringify(indent=2) + "\n")
+  let options = ["-proc:none", "-encoding", "UTF-8", "-d", classes, "-cp", classes] + sources
+  let argfile = scratch + "/javac.args"
+  @fs.write_file(argfile, options.map(java_quote).join("\n") + "\n")
+  println("Compiling hash-verified pinned Java OpenAPI converter")
+  ignore(checked("javac", ["@" + argfile]))
+  println(checked("java", ["-cp", classes, "ReferenceOpenApi", "tests/tck/openapi", if check { "--check" } else { "--generate" }, scratch + "/artifacts"]))
+}
+
+///|
+test "javac argument files quote spaces and Windows path separators" {
+  assert_eq(java_quote("C:\\source files\\Test.java"), "\"C:\\\\source files\\\\Test.java\"")
+}

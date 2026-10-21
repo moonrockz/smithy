@@ -119,6 +119,14 @@ run = "moonx scripts/vendor-tck.mbtx"
 description = "Regenerate Java reference build and validation expectations"
 run = "moonx scripts/reference-build.mbtx"
 
+[tasks."tck:vendor:openapi"]
+description = "Vendor hash-verified OpenAPI reference fixtures (args: upstream source directory)"
+run = "moonx scripts/vendor-openapi.mbtx"
+
+[tasks."tck:reference:openapi"]
+description = "Verify OpenAPI expectations against pinned Java sources (args: source directory, --check)"
+run = "moonx scripts/reference-openapi.mbtx"
+
 [tasks."test:native-zig"]
 description = "Run the native tests with zig as the C compiler (the host wrapper of zig-cross)"
 run = "moonx scripts/zig-cross.mbtx exec host -- moonx scripts/test.mbtx native"

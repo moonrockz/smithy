@@ -1,0 +1,217 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "DocumentExamples",
+        "version": "2024-01-01"
+    },
+    "paths": {
+        "/array": {
+            "get": {
+                "operationId": "GetArrayDocument",
+                "responses": {
+                    "200": {
+                        "description": "GetArrayDocument 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetArrayDocumentResponseContent"
+                                },
+                                "examples": {
+                                    "GetArrayDocument_example1": {
+                                        "summary": "Array-valued document",
+                                        "description": "Document member whose example value is a JSON array",
+                                        "value": {
+                                            "data": [
+                                                {
+                                                    "name": "first",
+                                                    "size": 1
+                                                },
+                                                {
+                                                    "name": "second",
+                                                    "size": 2
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/boolean": {
+            "get": {
+                "operationId": "GetBooleanDocument",
+                "responses": {
+                    "200": {
+                        "description": "GetBooleanDocument 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetBooleanDocumentResponseContent"
+                                },
+                                "examples": {
+                                    "GetBooleanDocument_example1": {
+                                        "summary": "Boolean-valued document",
+                                        "description": "Document member whose example value is a JSON boolean",
+                                        "value": {
+                                            "data": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/null": {
+            "get": {
+                "operationId": "GetNullDocument",
+                "responses": {
+                    "200": {
+                        "description": "GetNullDocument 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetNullDocumentResponseContent"
+                                },
+                                "examples": {
+                                    "GetNullDocument_example1": {
+                                        "summary": "Null-valued document",
+                                        "description": "Document member whose example value is JSON null",
+                                        "value": {
+                                            "data": null
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/number": {
+            "get": {
+                "operationId": "GetNumberDocument",
+                "responses": {
+                    "200": {
+                        "description": "GetNumberDocument 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetNumberDocumentResponseContent"
+                                },
+                                "examples": {
+                                    "GetNumberDocument_example1": {
+                                        "summary": "Number-valued document",
+                                        "description": "Document member whose example value is a JSON number",
+                                        "value": {
+                                            "data": 42
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/object": {
+            "get": {
+                "operationId": "GetObjectDocument",
+                "responses": {
+                    "200": {
+                        "description": "GetObjectDocument 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetObjectDocumentResponseContent"
+                                },
+                                "examples": {
+                                    "GetObjectDocument_example1": {
+                                        "summary": "Object-valued document",
+                                        "description": "Document member whose example value is a JSON object",
+                                        "value": {
+                                            "data": {
+                                                "name": "only",
+                                                "size": 1
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/scalar": {
+            "get": {
+                "operationId": "GetScalarDocument",
+                "responses": {
+                    "200": {
+                        "description": "GetScalarDocument 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetScalarDocumentResponseContent"
+                                },
+                                "examples": {
+                                    "GetScalarDocument_example1": {
+                                        "summary": "Scalar-valued document",
+                                        "description": "Document member whose example value is a JSON string",
+                                        "value": {
+                                            "data": "just-a-string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "GetArrayDocumentResponseContent": {
+                "type": "object",
+                "properties": {
+                    "data": {}
+                }
+            },
+            "GetBooleanDocumentResponseContent": {
+                "type": "object",
+                "properties": {
+                    "data": {}
+                }
+            },
+            "GetNullDocumentResponseContent": {
+                "type": "object",
+                "properties": {
+                    "data": {}
+                }
+            },
+            "GetNumberDocumentResponseContent": {
+                "type": "object",
+                "properties": {
+                    "data": {}
+                }
+            },
+            "GetObjectDocumentResponseContent": {
+                "type": "object",
+                "properties": {
+                    "data": {}
+                }
+            },
+            "GetScalarDocumentResponseContent": {
+                "type": "object",
+                "properties": {
+                    "data": {}
+                }
+            }
+        }
+    }
+}

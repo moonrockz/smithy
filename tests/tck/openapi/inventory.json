@@ -1,0 +1,505 @@
+{
+  "referenceSha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef",
+  "files": [
+    {
+      "path": "LICENSE",
+      "upstreamPath": "LICENSE",
+      "gitBlob": "67db8588217f266eb561f75fae738656325deac9"
+    },
+    {
+      "path": "upstream/adds-empty-response.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/adds-empty-response.json",
+      "gitBlob": "c97abc45c2ec76888ebdb6a7fc31a7b6f45b102a"
+    },
+    {
+      "path": "upstream/consolidates-security-service.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/consolidates-security-service.json",
+      "gitBlob": "6cf3bdc1a84ace3f6adc6cbc8d889131f422cdbe"
+    },
+    {
+      "path": "upstream/documentation-test-members.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/documentation-test-members.openapi.json",
+      "gitBlob": "08f239aae4a0b1f9a9daa92720b5c7aa7f2e41d1"
+    },
+    {
+      "path": "upstream/documentation-test-members.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/documentation-test-members.smithy",
+      "gitBlob": "789f43c38643101552e3143385c5ef507942b4ea"
+    },
+    {
+      "path": "upstream/documentation-test.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/documentation-test.openapi.json",
+      "gitBlob": "c897b5541a4267f4447a1c12437f0934ee215610"
+    },
+    {
+      "path": "upstream/documentation-test.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/documentation-test.smithy",
+      "gitBlob": "cbcfb29e955b88a132dc800b9a2da9605012c115"
+    },
+    {
+      "path": "upstream/error-deconflicting-test.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/error-deconflicting-test.openapi.json",
+      "gitBlob": "6b93cefdd104dd6cecafab3df80ae2bfdd21da65"
+    },
+    {
+      "path": "upstream/error-deconflicting-test.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/error-deconflicting-test.smithy",
+      "gitBlob": "e5bbd7e982b7e8cecef7aa12fa3fbd8b54415a48"
+    },
+    {
+      "path": "upstream/externaldocs-test.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/externaldocs-test.openapi.json",
+      "gitBlob": "9d365fce98f5a496fef3c06b9dfa87557a298096"
+    },
+    {
+      "path": "upstream/externaldocs-test.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/externaldocs-test.smithy",
+      "gitBlob": "c6717b90ba4b0dd0804745f180a81be188f66410"
+    },
+    {
+      "path": "upstream/mappers/endpoint-service.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/endpoint-service.smithy",
+      "gitBlob": "08ad7715d11b3e47f803dccd2adbd996801217b6"
+    },
+    {
+      "path": "upstream/mappers/greedy-labels.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/greedy-labels.smithy",
+      "gitBlob": "a8848c52e11b0a579aea0ec3650c4e3e006d0b9d"
+    },
+    {
+      "path": "upstream/mappers/prefix-headers.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/prefix-headers.smithy",
+      "gitBlob": "9b278c3b927eb9b82b10490a186bc181104e93bd"
+    },
+    {
+      "path": "upstream/mappers/small-service.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/small-service.smithy",
+      "gitBlob": "0ac00b436e37835f4e60293f1092ab3cc9534b93"
+    },
+    {
+      "path": "upstream/mappers/specificationextensions/inlined-type-target.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/specificationextensions/inlined-type-target.openapi.json",
+      "gitBlob": "22075a3e4cd06dd227fdc0c66817660e9ee3d0fd"
+    },
+    {
+      "path": "upstream/mappers/specificationextensions/inlined-type-target.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/specificationextensions/inlined-type-target.smithy",
+      "gitBlob": "092b9fcf66906540487fca4aeab39d80c0d51631"
+    },
+    {
+      "path": "upstream/mappers/specificationextensions/operation-target.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/specificationextensions/operation-target.openapi.json",
+      "gitBlob": "da9d355dfb01d1c368ed304e957306a5814bd243"
+    },
+    {
+      "path": "upstream/mappers/specificationextensions/operation-target.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/specificationextensions/operation-target.smithy",
+      "gitBlob": "63c616baf3b562c29e68c64d6c073f42fd01ec62"
+    },
+    {
+      "path": "upstream/mappers/specificationextensions/service-target.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/specificationextensions/service-target.openapi.json",
+      "gitBlob": "7a61227197149d927d5b3dc91c07c68a5187e8b8"
+    },
+    {
+      "path": "upstream/mappers/specificationextensions/service-target.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/specificationextensions/service-target.smithy",
+      "gitBlob": "9064c6971de7b590b22665046e5461d83be8281e"
+    },
+    {
+      "path": "upstream/mappers/specificationextensions/specification-extension-traits.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/specificationextensions/specification-extension-traits.smithy",
+      "gitBlob": "2eff3fde8f7c9990d2debef5f6bcaf6a33501c60"
+    },
+    {
+      "path": "upstream/mappers/specificationextensions/structure-target.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/specificationextensions/structure-target.openapi.json",
+      "gitBlob": "10c9fc72829c408697a38f232ef7e45dcb1102e1"
+    },
+    {
+      "path": "upstream/mappers/specificationextensions/structure-target.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/specificationextensions/structure-target.smithy",
+      "gitBlob": "9058f48249d9b7f9ab1b06f138ac2d5fd7183a2a"
+    },
+    {
+      "path": "upstream/mappers/substitutions.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mappers/substitutions.smithy",
+      "gitBlob": "4d2e1ddc65dfce1257c71125651d55597b092422"
+    },
+    {
+      "path": "upstream/missing-http-bindings.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/missing-http-bindings.json",
+      "gitBlob": "1ade19461494bd67ee87818ea46e3673f2aeaf59"
+    },
+    {
+      "path": "upstream/missing-protocols-trait.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/missing-protocols-trait.json",
+      "gitBlob": "c417fd5a9d6fe8de35405974b81d340f0b0c7e19"
+    },
+    {
+      "path": "upstream/mixed-security-service.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mixed-security-service.json",
+      "gitBlob": "aa2a9dc5b261e125d3df6e3bf68e7c6dfcd8ab5a"
+    },
+    {
+      "path": "upstream/mixed-security-service.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/mixed-security-service.openapi.json",
+      "gitBlob": "1a4bd00c703f5ab707b3ede0a7f10309a56d43c7"
+    },
+    {
+      "path": "upstream/model-with-mixins.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/model-with-mixins.openapi.json",
+      "gitBlob": "2b4df23ad58bea03cf9c73073dfe1e465f87941d"
+    },
+    {
+      "path": "upstream/model-with-mixins.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/model-with-mixins.smithy",
+      "gitBlob": "c9c09f68ba820788d7e75dc501fa1d644a1b0d14"
+    },
+    {
+      "path": "upstream/nonconflicting-unit.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/nonconflicting-unit.openapi.json",
+      "gitBlob": "14ea8c0d60ab9fa04c05e89b74b3cdcccb19bfdd"
+    },
+    {
+      "path": "upstream/nonconflicting-unit.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/nonconflicting-unit.smithy",
+      "gitBlob": "aa4e58eacc1805400802f1b25400e895a31d293d"
+    },
+    {
+      "path": "upstream/nullability-and-format.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/nullability-and-format.smithy",
+      "gitBlob": "32bc3581a86742f4074db12794df7d67f01f1dce"
+    },
+    {
+      "path": "upstream/openapi-3-0-2.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/openapi-3-0-2.openapi.json",
+      "gitBlob": "9425372b34aae91d37785f4120c86d5898cc61c4"
+    },
+    {
+      "path": "upstream/openapi-3-1-0.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/openapi-3-1-0.openapi.json",
+      "gitBlob": "4b23521854c43b384ee11424208c07d895dc88e6"
+    },
+    {
+      "path": "upstream/protocols/adds-header-mediatype-format.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/adds-header-mediatype-format.json",
+      "gitBlob": "9d85888e8d2ea0adbf5c128ec1f4744897441267"
+    },
+    {
+      "path": "upstream/protocols/adds-header-mediatype-format.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/adds-header-mediatype-format.openapi.json",
+      "gitBlob": "efad9955e21ad7313a114822127c28a26ac37be5"
+    },
+    {
+      "path": "upstream/protocols/adds-header-timestamp-format.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/adds-header-timestamp-format.json",
+      "gitBlob": "6e90f7ab33271e5fd25b6e42f7f8018d99e3c8df"
+    },
+    {
+      "path": "upstream/protocols/adds-header-timestamp-format.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/adds-header-timestamp-format.openapi.json",
+      "gitBlob": "84a651d3ed45241698eef807d8d8ecd08c1ba7f3"
+    },
+    {
+      "path": "upstream/protocols/adds-json-document-bodies.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/adds-json-document-bodies.json",
+      "gitBlob": "1c0712f7ffec9fc1b3757e774639e952d8068c31"
+    },
+    {
+      "path": "upstream/protocols/adds-json-document-bodies.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/adds-json-document-bodies.openapi.json",
+      "gitBlob": "37d9a67962f2c4339556107f0eb43ce41670e14b"
+    },
+    {
+      "path": "upstream/protocols/adds-path-timestamp-format.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/adds-path-timestamp-format.json",
+      "gitBlob": "ebefa234f6286f899b9f4544434e90e223906c99"
+    },
+    {
+      "path": "upstream/protocols/adds-path-timestamp-format.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/adds-path-timestamp-format.openapi.json",
+      "gitBlob": "4da8bc434971d78893d48b02e939f7142ce332d9"
+    },
+    {
+      "path": "upstream/protocols/adds-query-timestamp-format.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/adds-query-timestamp-format.json",
+      "gitBlob": "f17fbdfe1f0ae31ed4e5e5aa18fe2b449130cb68"
+    },
+    {
+      "path": "upstream/protocols/adds-query-timestamp-format.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/adds-query-timestamp-format.openapi.json",
+      "gitBlob": "7c59cc62322acdd8e6dfd0f0d34e9af0c34304bc"
+    },
+    {
+      "path": "upstream/protocols/aws-rest-json-uses-jsonname.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/aws-rest-json-uses-jsonname.json",
+      "gitBlob": "c5c322954fbbdc7786c67427751aa17279f34188"
+    },
+    {
+      "path": "upstream/protocols/aws-rest-json-uses-jsonname.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/aws-rest-json-uses-jsonname.openapi.json",
+      "gitBlob": "792434fc647a973a88f6e2228acf9c6029d546ba"
+    },
+    {
+      "path": "upstream/protocols/document-examples-test.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/document-examples-test.smithy",
+      "gitBlob": "7437f66bfc5fcf19e3ec2b5f92cbc25f8948b2ab"
+    },
+    {
+      "path": "upstream/protocols/error-code-collision-test-use-oneof.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/error-code-collision-test-use-oneof.openapi.json",
+      "gitBlob": "a6abceb9c24d458120030ac06ef48230e34052d4"
+    },
+    {
+      "path": "upstream/protocols/error-code-collision-test.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/error-code-collision-test.smithy",
+      "gitBlob": "b20bec28612034c4ac81ace09983715ce454fe45"
+    },
+    {
+      "path": "upstream/protocols/examples-test.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/examples-test.openapi.json",
+      "gitBlob": "9d4d7413fac038e708493311de195f4069355a69"
+    },
+    {
+      "path": "upstream/protocols/examples-test.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/examples-test.smithy",
+      "gitBlob": "5bd61b88a56d00b5f0c653bc73adfb6f667e067c"
+    },
+    {
+      "path": "upstream/protocols/greedy-labels-name-parameter-without-suffix.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/greedy-labels-name-parameter-without-suffix.json",
+      "gitBlob": "9de3568d293d33acf773ec0b42be997ef936ae8f"
+    },
+    {
+      "path": "upstream/protocols/greedy-labels-name-parameter-without-suffix.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/greedy-labels-name-parameter-without-suffix.openapi.json",
+      "gitBlob": "c32d8bd5934529c26bd16a3deb0607a37d9e8314"
+    },
+    {
+      "path": "upstream/protocols/greedy-labels.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/greedy-labels.json",
+      "gitBlob": "f6d839c01fe5ae30ea6edcd4723dcd5e310f931b"
+    },
+    {
+      "path": "upstream/protocols/greedy-labels.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/greedy-labels.openapi.json",
+      "gitBlob": "d7a2b9e5f7af7e943194cbbeb4888beddea12c06"
+    },
+    {
+      "path": "upstream/protocols/non-alphanumeric-content-names.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/non-alphanumeric-content-names.json",
+      "gitBlob": "7dd9de9a29f5dc71fd2acaa9dc1a0144f6c9a896"
+    },
+    {
+      "path": "upstream/protocols/non-alphanumeric-content-names.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/non-alphanumeric-content-names.openapi.json",
+      "gitBlob": "8d5e52ea3871a9e6b49c99155a833db5c44d83cd"
+    },
+    {
+      "path": "upstream/protocols/rest-json-protocol-headers.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/rest-json-protocol-headers.smithy",
+      "gitBlob": "1e9dab33409a6f800afa2f00f961d4e108a320a4"
+    },
+    {
+      "path": "upstream/protocols/rpc-v2-json.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/rpc-v2-json.openapi.json",
+      "gitBlob": "2deb24a70532258a5c96d1d507ab221ac89d899d"
+    },
+    {
+      "path": "upstream/protocols/rpc-v2-json.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/rpc-v2-json.smithy",
+      "gitBlob": "79ee3a336d270ab5a41f0242398e76a888da3068"
+    },
+    {
+      "path": "upstream/protocols/supports-payloads.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/supports-payloads.json",
+      "gitBlob": "0f7957f6a4d4878244c51a1884f05efad5c55e5e"
+    },
+    {
+      "path": "upstream/protocols/supports-payloads.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/supports-payloads.openapi.json",
+      "gitBlob": "e4f2f8cb7ed5be85c977826adf1d7b6553b09d86"
+    },
+    {
+      "path": "upstream/protocols/synthesizes-contents.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/synthesizes-contents.json",
+      "gitBlob": "c5743b8f0afd07970065e2c722601deb9756993a"
+    },
+    {
+      "path": "upstream/protocols/synthesizes-contents.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/protocols/synthesizes-contents.openapi.json",
+      "gitBlob": "8255ad64f1e735f703954cf6b86fd30cfc56fa9e"
+    },
+    {
+      "path": "upstream/security/awsv4-security.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/security/awsv4-security.json",
+      "gitBlob": "bd987669fbe2eb53932cc132066bb00732b8ea02"
+    },
+    {
+      "path": "upstream/security/awsv4-security.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/security/awsv4-security.openapi.json",
+      "gitBlob": "a0e49a74e7bb466ac396f7c14a0a7124568ff0ce"
+    },
+    {
+      "path": "upstream/security/http-api-key-bearer-security.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/security/http-api-key-bearer-security.json",
+      "gitBlob": "8d7eb9cf5742cea95c2bdb9bc6f341a7bfa838fa"
+    },
+    {
+      "path": "upstream/security/http-api-key-bearer-security.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/security/http-api-key-bearer-security.openapi.json",
+      "gitBlob": "f0fb282ae432abdf66e3fdd504abf63446f7e5f0"
+    },
+    {
+      "path": "upstream/security/http-api-key-security.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/security/http-api-key-security.json",
+      "gitBlob": "4777f0176b59b86a879cb75afaaf756c8af62fe1"
+    },
+    {
+      "path": "upstream/security/http-api-key-security.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/security/http-api-key-security.openapi.json",
+      "gitBlob": "b09d7b305035681bda2325884576d463c07a7a5c"
+    },
+    {
+      "path": "upstream/security/http-basic-security.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/security/http-basic-security.json",
+      "gitBlob": "b3a5131ad222d3ab39ba6e27bcd72edf48f87119"
+    },
+    {
+      "path": "upstream/security/http-basic-security.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/security/http-basic-security.openapi.json",
+      "gitBlob": "2646faa54c3564324c222078b85d32bc0a31052e"
+    },
+    {
+      "path": "upstream/security/http-digest-security.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/security/http-digest-security.json",
+      "gitBlob": "1fdb124bb346eb0cf8cd5f298ad7e5a172d83122"
+    },
+    {
+      "path": "upstream/security/http-digest-security.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/security/http-digest-security.openapi.json",
+      "gitBlob": "c5edebfa6a9a185e202da10413655f01041ec6d0"
+    },
+    {
+      "path": "upstream/service-with-common-errors.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/service-with-common-errors.json",
+      "gitBlob": "423fc40c34e8679a70641bc4d1de09071fb428e3"
+    },
+    {
+      "path": "upstream/service-with-common-errors.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/service-with-common-errors.openapi.json",
+      "gitBlob": "bcad7ced1242becdaf551bd573a77b92914965ad"
+    },
+    {
+      "path": "upstream/service-with-multiple-protocols.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/service-with-multiple-protocols.smithy",
+      "gitBlob": "b8e376ce4a7e7cffe8024ff5c1b53b2bf1232613"
+    },
+    {
+      "path": "upstream/service-with-renames.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/service-with-renames.json",
+      "gitBlob": "e9474e660e0a8c89d9d65a2178091fc38df34fed"
+    },
+    {
+      "path": "upstream/service-with-renames.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/service-with-renames.openapi.json",
+      "gitBlob": "d090f5ebf7778761ea8a6fc912861ccc8a8c7bfc"
+    },
+    {
+      "path": "upstream/service-with-required-path.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/service-with-required-path.json",
+      "gitBlob": "c48388843e56774105ffb8b5ccf67d34a01d4226"
+    },
+    {
+      "path": "upstream/service-with-required-path.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/service-with-required-path.openapi.json",
+      "gitBlob": "cb2a5826599d95f2d60646755fb5f60694e20dec"
+    },
+    {
+      "path": "upstream/streaming-service.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/streaming-service.openapi.json",
+      "gitBlob": "2cf70d4d221fe2c10f2d9d439ba47210e6c6b02c"
+    },
+    {
+      "path": "upstream/streaming-service.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/streaming-service.smithy",
+      "gitBlob": "56a22009238e2270e8d370c7383821151ed0e862"
+    },
+    {
+      "path": "upstream/tagged-service-all-tags.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/tagged-service-all-tags.openapi.json",
+      "gitBlob": "0a0c1d3c7f1bad042964d6556ee0c14eef7e6543"
+    },
+    {
+      "path": "upstream/tagged-service-empty-supported-tags.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/tagged-service-empty-supported-tags.openapi.json",
+      "gitBlob": "7d356fd06e0c27feb7df10b8cb1fa20da5b9b2b2"
+    },
+    {
+      "path": "upstream/tagged-service-order-supported-tags.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/tagged-service-order-supported-tags.openapi.json",
+      "gitBlob": "6066804a752ef04b32b1bfa057285bd0d9892502"
+    },
+    {
+      "path": "upstream/tagged-service-order.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/tagged-service-order.json",
+      "gitBlob": "335905a36940f5a13a5ff3e2161dab9845cae099"
+    },
+    {
+      "path": "upstream/tagged-service-order.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/tagged-service-order.openapi.json",
+      "gitBlob": "467fea920b7489963b32f691646c88dc24b5449e"
+    },
+    {
+      "path": "upstream/tagged-service-supported-tags.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/tagged-service-supported-tags.openapi.json",
+      "gitBlob": "9b6bd0d12af2ad6b8078c16fbe3af68b2563bf21"
+    },
+    {
+      "path": "upstream/tagged-service.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/tagged-service.json",
+      "gitBlob": "2867a77c2edb3d27d0982ad9457b8c215bc83e5d"
+    },
+    {
+      "path": "upstream/test-service-integer.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/test-service-integer.openapi.json",
+      "gitBlob": "96e296d05dda4e4bd00d6dfd142ffe441e0fa45c"
+    },
+    {
+      "path": "upstream/test-service.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/test-service.json",
+      "gitBlob": "023b89eb73921a6eb9b937c49c483a90f7118435"
+    },
+    {
+      "path": "upstream/test-service.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/test-service.openapi.json",
+      "gitBlob": "5bbce68bd25f0849b0f6c3eb5a1080cd2f1fbc0f"
+    },
+    {
+      "path": "upstream/unable-to-resolve-protocol.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/unable-to-resolve-protocol.json",
+      "gitBlob": "c81090888f22ad7f656153db858b3f5051b53dd0"
+    },
+    {
+      "path": "upstream/union-test.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/union-test.openapi.json",
+      "gitBlob": "59f8cf25c0a056e894ab5e0bf1ac9db698724fb7"
+    },
+    {
+      "path": "upstream/union-test.smithy",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/union-test.smithy",
+      "gitBlob": "006c8ca95873b5d0ff195d07e5ea43753def66c7"
+    },
+    {
+      "path": "upstream/unsupported-http-method.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/unsupported-http-method.json",
+      "gitBlob": "60a2c139efc6920dfb7efedcf8267f78533d63cf"
+    },
+    {
+      "path": "upstream/unsupported-http-method.openapi.json",
+      "upstreamPath": "smithy-openapi/src/test/resources/software/amazon/smithy/openapi/fromsmithy/unsupported-http-method.openapi.json",
+      "gitBlob": "467a4dddf2eb1006e0bc508d6745fced09afaef6"
+    }
+  ]
+}

@@ -13,6 +13,7 @@ pub(all) struct Config {
   disable_default_values : Bool
   disable_int_enums : Bool
   use_integer_type : Bool
+  alphanumeric_only_refs : Bool
 }
 
 ///|
@@ -29,6 +30,7 @@ pub fn Config::new(
   disable_default_values~ : Bool = false,
   disable_int_enums~ : Bool = false,
   use_integer_type~ : Bool = false,
+  alphanumeric_only_refs~ : Bool = false,
 ) -> Config {
   {
     map_strategy,
@@ -43,5 +45,6 @@ pub fn Config::new(
     disable_default_values,
     disable_int_enums,
     use_integer_type,
+    alphanumeric_only_refs,
   }
 }

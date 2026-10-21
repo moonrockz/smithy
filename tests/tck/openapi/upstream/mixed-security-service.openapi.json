@@ -1,0 +1,84 @@
+{
+  "openapi": "3.0.2",
+  "info": {
+    "title": "Service",
+    "version": "2006-03-01"
+  },
+  "paths": {
+    "/1": {
+      "get": {
+        "operationId": "Operation1",
+        "responses": {
+          "200": {
+            "description": "Operation1 200 response"
+          }
+        }
+      }
+    },
+    "/2": {
+      "get": {
+        "operationId": "Operation2",
+        "responses": {
+          "200": {
+            "description": "Operation2 200 response"
+          }
+        },
+        "security": [
+          {
+            "smithy.api.httpBasicAuth": [ ]
+          }
+        ]
+      }
+    },
+    "/3": {
+      "get": {
+        "operationId": "Operation3",
+        "responses": {
+          "200": {
+            "description": "Operation3 200 response"
+          }
+        },
+        "security": [
+          {
+            "smithy.api.httpBasicAuth": []
+          },
+          {
+            "aws.auth.sigv4": [ ]
+          }
+        ]
+      }
+    },
+    "/4": {
+      "get": {
+        "operationId": "UnauthenticatedOperation",
+        "responses": {
+          "200": {
+            "description": "UnauthenticatedOperation 200 response"
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "smithy.api.httpBasicAuth": {
+        "type": "http",
+        "description": "HTTP Basic authentication",
+        "scheme": "Basic"
+      },
+      "aws.auth.sigv4": {
+        "type": "apiKey",
+        "description": "AWS Signature Version 4 authentication",
+        "name": "Authorization",
+        "in": "header",
+        "x-amazon-apigateway-authtype": "awsSigv4"
+      }
+    }
+  },
+  "security": [
+    {
+      "aws.auth.sigv4": [ ]
+    }
+  ]
+}

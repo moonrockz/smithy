@@ -1,0 +1,9 @@
+{
+    "openapi": "3.0.2",
+    "info": {
+        "title": "Custom",
+        "version": "2018-01-01",
+        "description": "SUB_HELLO"
+    },
+    "x-note": "Explicit extension"
+}

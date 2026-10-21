@@ -1,0 +1,19 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "PrefixHeaders",
+        "version": "2018-01-01"
+    },
+    "paths": {
+        "/": {
+            "get": {
+                "operationId": "PrefixHeadersOperation",
+                "responses": {
+                    "200": {
+                        "description": "PrefixHeadersOperation 200 response"
+                    }
+                }
+            }
+        }
+    }
+}

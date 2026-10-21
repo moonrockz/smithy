@@ -59,7 +59,11 @@ metadata merging follow the model library's rules.
 `build` reads the configured local sources and imports, runs each concrete
 projection, and writes model, sources and build-info artifacts under its output
 directory. A `jsonSchema` plugin setting writes `schema.json` for each
-projection. `clean` removes that configured output directory.
+projection. The `openapi` plugin writes `<ServiceName>.openapi.json` in OpenAPI
+3.0.2 or 3.1.0; its `service` setting is required. See the
+[OpenAPI library and plugin guide](../../pkgs/smithy-openapi/README.mbt.md) for
+protocol selection, configuration and conversion boundaries. `clean` removes
+that configured output directory.
 
 Build sources and imports also accept local JAR files with a
 `META-INF/smithy/manifest`. Configuration strings and keys expand `${NAME}`

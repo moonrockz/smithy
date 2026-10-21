@@ -1,0 +1,7 @@
+{
+    "openapi": "3.0.2",
+    "info": {
+        "title": "Service",
+        "version": "2006-03-01"
+    }
+}

@@ -1,0 +1,43 @@
+{
+  "openapi": "3.0.2",
+  "info": {
+    "title": "Service",
+    "version": "2006-03-01"
+  },
+  "paths": {
+    "/document": {
+      "post": {
+        "operationId": "CreateDocument",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDocumentRequestContent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CreateDocument 200 response"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateDocumentRequestContent": {
+        "type": "object",
+        "properties": {
+          "Abc": {
+            "type": "string"
+          },
+          "Def": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}

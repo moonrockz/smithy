@@ -8,6 +8,7 @@ import {
   "moonrockz/smithy",
   "moonrockz/smithy-build" @build,
   "moonrockz/smithy-jsonschema" @jsonschema,
+  "moonrockz/smithy-openapi" @openapi,
   "moonrockz/smithy-syntax" @syntax,
   "moonbitlang/core/argparse",
   "moonbitlang/core/env",

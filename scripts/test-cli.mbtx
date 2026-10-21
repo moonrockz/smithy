@@ -195,6 +195,44 @@ async fn exercise(
   assert_false(@fs.exists("\{dir}/build-output/filtered/model/model.json"))
   runner.command(["clean"], 0) |> ignore
   assert_false(@fs.exists("\{dir}/build-output"))
+  @fs.write_file("\{dir}/openapi.smithy", @fs.read_file("\{root}/tests/tck/openapi/local/core-features.smithy"))
+  @fs.write_file("\{dir}/openapi-build.json", (
+    #|{"version":"1.0","sources":["openapi.smithy"],"outputDirectory":"openapi-output",
+    #| "plugins":{"openapi::v30":{"service":"example.core#Example","onErrorStatusConflict":"oneOf"}},
+    #| "projections":{"public":{"plugins":{"openapi::v31":{"service":"example.core#Example","version":"3.1.0","onErrorStatusConflict":"oneOf"}}}}}
+  ))
+  runner.command(["build", "--config", "openapi-build.json"], 0) |> ignore
+  for (projection, plugin, golden) in [("source", "v30", "core-features"), ("public", "v31", "core-features-31")] {
+    assert_eq(@json.parse(@fs.read_file("\{dir}/openapi-output/\{projection}/\{plugin}/Example.openapi.json").text()),
+      @json.parse(@fs.read_file("\{root}/tests/tck/openapi/generated/\{golden}.openapi.json").text()))
+  }
+  @fs.write_file("\{dir}/openapi-missing.json", "{\"version\":\"1.0\",\"sources\":[\"openapi.smithy\"],\"outputDirectory\":\"openapi-missing-output\",\"plugins\":{\"openapi\":{\"service\":\"example.core#Missing\"}}}")
+  let (missing_out, missing_err) = runner.command(["build", "--config", "openapi-missing.json"], 1)
+  assert_true((missing_out + missing_err).contains("example.core#Missing"))
+  runner.command(["clean", "--config", "openapi-build.json"], 0) |> ignore
+  assert_false(@fs.exists("\{dir}/openapi-output"))
+  @fs.write_file("\{dir}/prefix.smithy", (
+    #|$version: "2"
+    #|namespace example.prefix
+    #|use aws.protocols#restJson1
+    #|@restJson1
+    #|service Api { version: "1", operations: [Get] }
+    #|@http(method: "GET", uri: "/")
+    #|operation Get { input: Input }
+    #|@input
+    #|structure Input { @httpPrefixHeaders("x-") headers: Headers }
+    #|map Headers { key: String, value: String }
+  ))
+  for policy in ["FAIL", "WARN"] {
+    @fs.write_file("\{dir}/prefix-build.json", "{\"version\":\"1.0\",\"sources\":[\"prefix.smithy\"],\"outputDirectory\":\"prefix-output\",\"plugins\":{\"openapi\":{\"service\":\"example.prefix#Api\",\"onHttpPrefixHeaders\":\"\{policy}\"}}}")
+    let (out, err) = runner.command(["build", "--config", "prefix-build.json"], if policy == "FAIL" { 1 } else { 0 })
+    assert_true((out + err).contains("httpPrefixHeaders"))
+    if policy == "WARN" {
+      let converted = @json.parse(@fs.read_file("\{dir}/prefix-output/source/openapi/Api.openapi.json").text())
+      assert_true(converted is { "paths": { "/": { "get": { "responses": _, .. }, .. }, .. }, .. })
+      assert_false(converted.stringify().contains("x-"))
+    }
+  }
   @fs.write_file("\{dir}/env-build.json", "{\"version\":\"2.0\",\"sources\":[\"${SMITHY_ROOT_DIR}/input.smithy\"],\"outputDirectory\":\"${SMITHY_TEST_OUTPUT}\"}")
   runner.command(["build", "--config", "env-build.json"], 0, extra_env={ "SMITHY_TEST_OUTPUT": "env-output", "SMITHY_ROOT_DIR": "invalid-override" }) |> ignore
   assert_true(@fs.exists("\{dir}/env-output/source/model/model.json"))
