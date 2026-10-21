@@ -62,7 +62,7 @@ fn Assembly::target(
 }
 
 ///|
-fn NodeNumber::is_integer(self : NodeNumber) -> Bool {
+pub fn NodeNumber::is_integer(self : NodeNumber) -> Bool {
   self.coefficient == BigInt::from_int(0) ||
   self.exponent >= BigInt::from_int(0)
 }

@@ -15,6 +15,12 @@ pub impl Eq for NodeNumber with fn equal(self, other) {
 }
 
 ///|
+/// The original exact JSON numeric token, including scale and signed zero.
+pub fn NodeNumber::to_string(self : NodeNumber) -> String {
+  self.text
+}
+
+///|
 /// Compare exact numeric values without converting through Double.
 pub fn NodeNumber::numeric_compare(
   self : NodeNumber,

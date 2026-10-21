@@ -3,6 +3,7 @@ members = [
   "./pkgs/artifact-resources",
   "./pkgs/jmespath",
   "./pkgs/smithy",
+  "./pkgs/smithy-validation",
   "./pkgs/smithy-build",
   "./pkgs/smithy-diff",
   "./pkgs/smithy-jsonschema",
