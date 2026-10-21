@@ -186,3 +186,54 @@ test "value schemas explicitly reject union strategies that discard member contr
     assert_true(@jsonschema.convert(model, config=settings) is Object(_))
   }
 }
+
+///|
+test "value schemas reject pattern maps before losing sparse values and key constraints" {
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "sparse.smithy",
+    (
+      #|$version: "2"
+      #|namespace sparse
+      #|@pattern("^[a-z]+$") string Key
+      #|@sparse map Values { key: Key, value: Integer }
+    ),
+  )
+  .assemble().model.unwrap()
+  let settings = @jsonschema.Config::new(map_strategy="patternProperties")
+  let mut rejected = false
+  ignore(@jsonschema.convert_values(model, config=settings)) catch {
+    @jsonschema.InvalidConfiguration(message) => {
+      rejected = true
+      assert_true(message.contains("propertyNames"))
+    }
+    _ => fail("Expected unsupported value map strategy")
+  }
+  assert_true(rejected)
+  assert_true(@jsonschema.convert(model, config=settings) is Object(_))
+}
+
+///|
+test "value schemas reject nonnumeric float alternatives before widening ranged values" {
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "float.smithy",
+    (
+      #|$version: "2"
+      #|namespace floats
+      #|@range(min: 0) float Value
+    ),
+  )
+  .assemble().model.unwrap()
+  let settings = @jsonschema.Config::new(support_non_numeric_floats=true)
+  let mut rejected = false
+  ignore(@jsonschema.SchemaIndex::for_values(model, config=settings)) catch {
+    @jsonschema.InvalidConfiguration(message) => {
+      rejected = true
+      assert_true(message.contains("support_non_numeric_floats=false"))
+    }
+    _ => fail("Expected unsupported value float representation")
+  }
+  assert_true(rejected)
+  assert_true(@jsonschema.convert(model, config=settings) is Object(_))
+}
