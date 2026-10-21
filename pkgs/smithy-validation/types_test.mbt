@@ -124,3 +124,24 @@ test "neutral native timestamps restrict seconds to zero through fifty-nine" {
     assert_true(rejected)
   }
 }
+
+///|
+test "instance path map keys distinguish occurrence key token and value identity" {
+  let root = @validation.InstancePath::root()
+  let paths = [
+    root.field("a"),
+    root.field("a", occurrence=1),
+    root.map_key("a"),
+    root.index(0),
+    root.field_position(0),
+    root.field_name_position(0),
+  ]
+  let values : Map[@validation.InstancePath, Int32] = Map([])
+  for i in 0..<paths.length() {
+    values[paths[i]] = i
+  }
+  assert_eq(values.length(), 6)
+  assert_eq(values.get(root.field("a", occurrence=1)), Some(1))
+  assert_eq(values.get(root.field_name_position(0)), Some(5))
+  assert_eq(values.get(root.field("b")), None)
+}

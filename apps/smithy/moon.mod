@@ -18,6 +18,8 @@ import {
   "moonrockz/artifact-resources@0.5.0",
   "moonrockz/smithy@0.5.0",
   "moonrockz/smithy-validation@0.5.0",
+  "moonrockz/smithy-ion-validation@0.5.0",
+  "moonrockz/ion@0.6.0",
   "moonrockz/smithy-build@0.5.0",
   "moonrockz/smithy-diff@0.5.0",
   "moonrockz/smithy-jsonschema@0.5.0",

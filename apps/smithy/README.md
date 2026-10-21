@@ -386,6 +386,29 @@ Exact numeric tokens survive parsing, including decimals and integers above Doub
 The [library policies](../../pkgs/smithy-validation/README.mbt.md) document nulls, sparse collections,
 scalar formats, regex restrictions and unsupported runtime contract conditions.
 
+Use `--input-format ion-text` or `--input-format ion-binary` to validate a native Ion value. For the
+same model, `{count: 2}` succeeds and `{count: 0}` fails with `Range`, native kind `int`, and member
+`example#Input$count`:
+
+```shell
+smithy validate value --shape example#Input --value request.ion --input-format ion-text model.smithy
+smithy validate value --shape example#Input --value request.10n --input-format ion-binary --diagnostics json model.smithy
+```
+
+Ion input uses the released `moonrockz/ion` text and binary codecs. By default the datagram must contain
+exactly one user value. Pass `--ion-index 1` to select its second user value explicitly; symbol-table
+declarations are handled by the codecs. Both encodings and stdin support this selection. Decode errors
+include the source filename, with offsets when supplied by the codec. Inputs are limited to 16 MiB and
+128 nested codec operations before the validator's own depth/work/finding limits apply.
+
+Ion numbers keep exact values; blobs remain bytes and timestamps retain precision and offset.
+Annotations, symbols, clobs and S-expressions have no implicit Smithy mapping. Duplicates preserve their
+zero-based field occurrence in structured `path` steps; a JSON Pointer alone cannot distinguish them.
+Findings include `nativeKind`, or null for an absent required member. Read the
+[Ion profile and standalone example](../../pkgs/smithy-ion-validation/README.mbt.md) for all native-kind
+rules. The Ion adapter is a separate optional library module; ordinary JSON and JSON-RPC library
+consumers do not depend on Ion. `validate rpc` continues to accept JSON messages only.
+
 ## Validate JSON-RPC messages
 
 `smithy validate rpc` checks a JSON-RPC 1.0 or 2.0 request, notification or contextual response against a selected

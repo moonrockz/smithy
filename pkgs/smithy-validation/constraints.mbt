@@ -140,6 +140,8 @@ fn prepare_constraints(
     None => config.timestamp_format
     Some(String("epoch-seconds")) => EpochSeconds
     Some(String("date-time")) => DateTime
+    Some(String("http-date")) if config.profile == NativeProfile =>
+      config.timestamp_format
     Some(String(_)) =>
       raise UnsupportedConstraint(
         id, "I cannot validate this timestamp format in the JSON value profile.",

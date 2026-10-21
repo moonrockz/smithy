@@ -1,0 +1,17 @@
+# Direct Ion adapter
+
+`smithy-ion-validation` depends inward on `smithy`, `smithy-validation` and the released `moonrockz/ion@0.6.0` model package. The codecs are test dependencies. No WIT package is imported, and no Ion dependency enters the shared validator or its JSON and RPC packages.
+
+The adapter prepares the shared engine with `config.with_profile(NativeProfile)`. It retains every other configuration field, including work, depth and finding limits. Core owns shape preparation, native placement rules, exact constraints, duplicate and member checks, uniqueness and iterative graph traversal. The adapter owns only the representation mapping and enrichment of findings with Ion kinds.
+
+`IonView` retains the original Ion node, its occurrence path and a shared index of native kinds. The shared engine calls `expansion_size()` before inspection and checks it against the remaining work budget and pending frames. The adapter computes this bound from the immediate container and annotation lengths in constant time, without creating child views or copying annotations. A wide value that exceeds the budget therefore stops before its occurrence index grows.
+
+`inspect()` reads one node. A container creates views for its immediate children without reading their descendants. An annotated node returns the annotations plus a view of the same value that suppresses a second annotation check. The shared engine rejects the annotations and inspects that underlying view at the same path. No call converts an Ion tree to JSON or recursively reconstructs it.
+
+Integers use their exact BigInt token. Decimals form an exact JSON-number token from coefficient and exponent, for example `123e-5`, with `-0` retained for signed zero. The exponent is never expanded to zeros, even at Int32 extremes. Timestamp components, fraction and offset pass through the validated neutral `NativeTimestamp` constructor. An invalid programmatic timestamp becomes `InvalidTimestamp`, which the engine reports as UnsupportedValue; the adapter never panics or invents a fallback timestamp.
+
+Known field names use `NativeObject` and retain every duplicate field. Their paths contain `Field(name, occurrence)`. Unresolved names stay `None`; their field-name diagnostic uses `FieldNamePosition(index)` and their descendant value path uses `FieldPosition(index)`. No synthetic name is introduced. Map-key and field-name-position findings have native kind Symbol. A required-member finding has no offending value, so its native kind is absent.
+
+The occurrence index records `IonType` while child views are created. Enrichment looks up each finding once; it does not walk the original value again or repeatedly scan a wide struct. The index uses structured `InstancePath` keys directly, preserving duplicate occurrences and the distinction between field-name and field-value positions without rendering paths internally. Only paths and scalar kind labels enter this index; it does not hold another recursively projected Ion tree.
+
+Tests use released public constructors and text/binary codecs. They cover all Ion kinds and typed nulls, exact numbers and extreme exponents, nested constraints, configured policies and limits, unsupported open content, unresolved fields and symbols, annotation paths, field duplicates, native uniqueness, timestamp precision and invalid components, JSON diagnostics, codec equivalence and immutability.

@@ -242,6 +242,10 @@ run = "moonx scripts/test-resource-consumer.mbtx"
 description = "Compile and run an isolated packaged validation consumer on all targets"
 run = "moonx scripts/test-validation-consumer.mbtx"
 
+[tasks."test:ion-consumer"]
+description = "Compile and run an isolated packaged Ion validation consumer on all targets"
+run = "moonx scripts/test-validation-consumer.mbtx --ion"
+
 [tasks."fixtures:npm"]
 description = "Regenerate the local npm archive fixture without package hooks or network"
 run = "moonx scripts/vendor-tar-fixtures.mbtx"

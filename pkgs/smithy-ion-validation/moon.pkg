@@ -1,0 +1,16 @@
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-validation" @validation,
+  "moonrockz/ion/ion",
+  "moonbitlang/core/json",
+}
+
+import {
+  "moonrockz/smithy-ion-validation" @adapter,
+  "moonrockz/smithy",
+  "moonrockz/smithy-validation" @validation,
+  "moonrockz/ion/ion",
+  "moonrockz/ion/text",
+  "moonrockz/ion/binary",
+  "moonbitlang/core/json",
+} for "test"

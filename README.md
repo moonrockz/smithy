@@ -28,6 +28,10 @@ Its [RPC package](pkgs/smithy-validation/rpc/README.mbt.md) checks JSON-RPC 1.0 
 notifications and contextual responses against modeled service methods through `smithy validate rpc`.
 Explicit JSON-RPC 2.0 batch checks preserve element paths and associate unordered replies by exact IDs.
 
+`moonrockz/smithy-ion-validation` validates immutable Ion values directly with a documented
+native type profile. See [Ion validation](pkgs/smithy-ion-validation/README.mbt.md) and the
+[standalone consumer](examples/ion-validation-consumer/main.mbtx).
+
 The [protocol test suite API](pkgs/smithy/protocoltests/README.mbt.md) loads standard
 HTTP request/response test cases and compares messages produced by supplied
 protocol implementations. Validate case definitions with
@@ -41,6 +45,7 @@ protocol implementations. Validate case definitions with
 | `pkgs/jmespath` | `moonrockz/jmespath` | JMESPath parser, inspectable AST and JSON evaluator |
 | `pkgs/smithy` | `moonrockz/smithy` | Semantic model and multi-file IDL/JSON loader |
 | `pkgs/smithy-validation` | `moonrockz/smithy-validation` | Validate application JSON values directly against Smithy data shapes |
+| `pkgs/smithy-ion-validation` | `moonrockz/smithy-ion-validation` | Validate native Ion values directly against Smithy data shapes |
 | `pkgs/smithy-diff` | `moonrockz/smithy-diff` | Compare models and report compatibility changes |
 | `pkgs/smithy-build` | `moonrockz/smithy-build` | Build configuration, projections and plugins |
 | `pkgs/smithy-jsonschema` | `moonrockz/smithy-jsonschema` | Convert assembled value shapes to JSON Schema |
@@ -148,6 +153,8 @@ mise run validate              # package structure against moon.work
 mise run test                  # all targets; the tests module runs on js and native only
 mise run test -- js native     # some targets
 mise run test:cli              # built CLI behavior on native, wasm, js and wasm-gc
+mise run test:validation-consumer # isolated JSON/RPC consumers without Ion or WIT
+mise run test:ion-consumer     # isolated native Ion consumer without WIT, all targets
 mise run test:http             # controlled public archive transport and CLI fixtures
 mise run test:bdd              # moonspec acceptance features (tests/bdd, js target)
 mise run tck:vendor:json -- REF # refresh the vendored JSON AST reference corpus
@@ -185,6 +192,7 @@ smithy/
 ├── apps/smithy/               # CLI (moonrockz/smithy-cli)
 ├── pkgs/smithy/               # library (moonrockz/smithy)
 ├── pkgs/smithy-validation/    # Direct application value validation and typed findings
+├── pkgs/smithy-ion-validation/ # Optional native Ion validation adapter
 ├── pkgs/smithy-build/         # build projections and plugins
 ├── pkgs/smithy-diff/          # Model compatibility differences
 ├── pkgs/smithy-jsonschema/    # JSON Schema converter

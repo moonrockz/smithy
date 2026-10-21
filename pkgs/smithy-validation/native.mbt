@@ -18,6 +18,19 @@ pub struct NativeTimestamp {
 } derive(Debug)
 
 ///|
+pub impl Eq for NativeTimestamp with fn equal(self, other) {
+  self.year == other.year &&
+  self.month == other.month &&
+  self.day == other.day &&
+  self.hour == other.hour &&
+  self.minute == other.minute &&
+  self.second == other.second &&
+  self.offset == other.offset &&
+  self.fraction.map(n => n.to_string()) ==
+  other.fraction.map(n => n.to_string())
+}
+
+///|
 fn calendar_day(year : Int32, month : Int32, day : Int32) -> Bool {
   if year < 1 || year > 9999 || month < 1 || month > 12 || day < 1 {
     return false
@@ -119,4 +132,48 @@ pub fn NativeTimestamp::fraction(self : NativeTimestamp) -> @smithy.NodeNumber? 
 ///|
 pub fn NativeTimestamp::offset(self : NativeTimestamp) -> NativeOffset {
   self.offset
+}
+
+///|
+/// Expand a finite IEEE 754 value exactly, with at most 1074 fractional digits.
+/// Decimal display strings round away the information needed at range boundaries.
+fn exact_float(value : Double) -> @smithy.NodeNumber? {
+  let bits = value.reinterpret_as_int64()
+  let exponent_bits = ((bits >> 52) & 2047L).to_int()
+  if exponent_bits == 2047 {
+    return None
+  }
+  let fraction = bits & 4503599627370495L
+  let coefficient = BigInt::from_int64(
+    if exponent_bits == 0 {
+      fraction
+    } else {
+      fraction + 4503599627370496L
+    },
+  )
+  let exponent = if exponent_bits == 0 { -1074 } else { exponent_bits - 1075 }
+  let expanded = if exponent >= 0 {
+    coefficient << exponent
+  } else {
+    coefficient * BigInt::from_int(5).pow(BigInt::from_int(-exponent))
+  }
+  let text = (if bits < 0L { "-" } else { "" }) +
+    expanded.to_string() +
+    "e" +
+    (if exponent < 0 { exponent } else { 0 }).to_string()
+  @smithy.NodeNumber::parse(text)
+}
+
+///|
+fn[V] exact_numeric(node : ValueNode[V]) -> @smithy.NodeNumber? {
+  match node {
+    Number(n) | Native(Decimal(n)) => Some(n)
+    Native(Float(n)) => exact_float(n)
+    _ => None
+  }
+}
+
+///|
+fn NativeTimestamp::full(self : NativeTimestamp) -> Bool {
+  self.second is Some(_) && self.offset is KnownOffsetMinutes(_)
 }

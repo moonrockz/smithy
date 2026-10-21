@@ -3,13 +3,15 @@
 pub(all) enum InstanceStep {
   Field(String, Int32)
   Index(Int32)
+  FieldPosition(Int32)
+  FieldNamePosition(Int32)
   MapKey(String, Int32)
-} derive(Eq, Debug)
+} derive(Eq, Debug, Hash)
 
 ///|
 pub struct InstancePath {
   priv parts : Array[InstanceStep]
-} derive(Eq, Debug)
+} derive(Eq, Debug, Hash)
 
 ///|
 pub fn InstancePath::root() -> InstancePath {
@@ -78,7 +80,8 @@ pub fn InstancePath::pointer(self : InstancePath) -> String {
   for part in self.parts {
     out.write_string("/")
     match part {
-      Index(i) => out.write_string(i.to_string())
+      Index(i) | FieldPosition(i) | FieldNamePosition(i) =>
+        out.write_string(i.to_string())
       Field(name, _) | MapKey(name, _) =>
         out.write_string(
           name.replace_all(old="~", new="~0").replace_all(old="/", new="~1"),
@@ -93,6 +96,16 @@ pub impl @json.ToJson for InstancePath with fn to_json(self) {
   Json::array(
     self.parts.map(step => {
       match step {
+        FieldNamePosition(i) =>
+          Json::object({
+            "kind": Json::string("fieldNamePosition"),
+            "index": Json::number(i.to_double()),
+          })
+        FieldPosition(i) =>
+          Json::object({
+            "kind": Json::string("fieldPosition"),
+            "index": Json::number(i.to_double()),
+          })
         Index(i) =>
           Json::object({
             "kind": Json::string("index"),
@@ -113,4 +126,30 @@ pub impl @json.ToJson for InstancePath with fn to_json(self) {
       }
     }),
   )
+}
+
+///|
+pub fn InstancePath::field_position(
+  self : InstancePath,
+  index : Int32,
+) -> InstancePath raise ConfigurationError {
+  guard index >= 0 else {
+    raise ConfigurationError(
+      "I expected a nonnegative physical field position.",
+    )
+  }
+  self.child(FieldPosition(index))
+}
+
+///|
+pub fn InstancePath::field_name_position(
+  self : InstancePath,
+  index : Int32,
+) -> InstancePath raise ConfigurationError {
+  guard index >= 0 else {
+    raise ConfigurationError(
+      "I expected a nonnegative physical field-name position.",
+    )
+  }
+  self.child(FieldNamePosition(index))
 }

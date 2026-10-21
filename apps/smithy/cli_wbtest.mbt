@@ -121,6 +121,71 @@ test "value validation options select typed policies and permit stdin once" {
 }
 
 ///|
+test "Ion value inputs require explicit format and datagram selection" {
+  let args = [
+    "validate", "value", "--shape", "example#Input", "--value", "values.ion", "--input-format",
+    "ion-text", "--ion-index", "1", "model.smithy",
+  ]
+  assert_eq(options(args).files, ["model.smithy"])
+  let selected = options(args).value_validation.unwrap()
+  assert_true(selected.input_format == IonTextInput)
+  assert_eq(selected.ion_index, Some(1))
+  for
+    suffix in [
+      ["--input-format", "xml"],
+      ["--ion-index", "0"],
+      ["--input-format", "ion-text", "--ion-index", "-1"],
+      ["--input-format", "ion-binary", "--ion-index", "x"],
+    ] {
+    let code = try
+      options(args[:6].to_owned() + ["values.ion", "model.smithy"] + suffix)
+    catch {
+      CliError(_, code) => code
+    } noraise {
+      _ => 0
+    }
+    assert_eq(code, 2)
+  }
+}
+
+///|
+test "Ion input decoders enforce selection and source limits" {
+  let values = "{count: 0} {count: 2}"
+  let selected = parse_ion_input(@utf8.encode(values), IonTextInput, Some(1))
+  assert_true(selected.equals(@ion_text.read_ion("{count: 2}")))
+  let binary = @ion_binary.write_binary(@ion_text.read_ion_datagram(values))
+  assert_true(parse_ion_input(binary, IonBinaryInput, Some(1)).equals(selected))
+  for
+    (bytes, format, index, expected) in [
+      (b"", IonTextInput, None, "IonSelection"),
+      (@utf8.encode(values), IonTextInput, None, "IonSelection"),
+      (@utf8.encode(values), IonTextInput, Some(2), "IonSelection"),
+      (b"{", IonTextInput, None, "InvalidIon"),
+      (b"\xff", IonTextInput, None, "InvalidIon"),
+      (b"\xe0\x01\x00\xea\xde", IonBinaryInput, None, "InvalidIon"),
+      (
+        @utf8.encode("[".repeat(140) + "0" + "]".repeat(140)),
+        IonTextInput,
+        None,
+        "IonInputLimit",
+      ),
+      (
+        Bytes::make(16 * 1024 * 1024 + 1, b' '),
+        IonBinaryInput,
+        None,
+        "IonInputLimit",
+      ),
+    ] {
+    let code = try parse_ion_input(bytes, format, index) catch {
+      IonInputError(code, _, _) => code
+    } noraise {
+      _ => "accepted"
+    }
+    assert_eq(code, expected)
+  }
+}
+
+///|
 test "IDL formatting is idempotent and preserves literals and comments" {
   let text =
     #|$version :  "2"
