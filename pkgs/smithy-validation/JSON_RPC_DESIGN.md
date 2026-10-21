@@ -2,8 +2,10 @@
 
 This is the shared design for Smithy value validation, JSON-RPC modeling/message checks, optional Ion
 validation and OpenRPC export. Direct JSON value validation is implemented in this module and the
-`validate-value` CLI. The JSON-RPC traits, `validate-rpc` workflow, Ion adapter and OpenRPC exporter
-described below are follow-on capabilities, not existing commands or published trait definitions.
+`validate-value` CLI. The `rpc` package implements opt-in JSON-RPC trait definitions, prepared
+methods, request/notification validation and `smithy validate rpc`. Response/error validation,
+batches, exchanges, the Ion adapter and OpenRPC exporter remain follow-on capabilities.
+See the [request validator](rpc/README.mbt.md) for executable examples and implemented boundaries.
 
 The goal is to define an API in Smithy and check actual messages against it. A description export is
 a separate deliverable. Model assembly validates definitions; instance validation checks application
@@ -60,7 +62,7 @@ ProtocolVersion has exactly V1_0 and V2_0, corresponding to the published JSON-R
 specifications. Do not infer a version or imply support for 1.1 drafts. Keep these versions distinct
 from Smithy RPC v2 JSON, OpenRPC document versions and JSON Schema dialects.
 
-A future opt-in `smithy.rpc` trait model supplies:
+The opt-in `smithy.rpc` trait model supplies:
 
 | Trait | Contract |
 |---|---|
@@ -74,9 +76,10 @@ null. Without a selection, output is the whole output structure. A conflicting r
 invalid. Error data similarly selects the whole error structure by default, a named member, or an
 explicit absent-data mode. A data member selector cannot coexist with absent-data mode.
 
-Preparation rejects duplicate wire names/application codes, undeclared member selectors, incomplete
-or repeated positional ordering, reserved application codes and mappings incompatible with a
-declared protocol version. Application methods cannot use reserved `rpc.` names. Supported system
+Request preparation rejects duplicate wire names, undeclared result member selectors, incomplete
+or repeated positional ordering and mappings incompatible with a declared protocol version.
+Response preparation will also reject duplicate/reserved application codes and invalid error-data
+selectors. Application methods cannot use reserved `rpc.` names. Supported system
 extensions require explicit preparation rather than automatic acceptance of a reserved name.
 
 Named parameters use the chosen Smithy/jsonName policy. Positional order is a complete explicit
@@ -85,7 +88,7 @@ must be present. Interior omissions require explicit values satisfying the selec
 For 2.0, omitted params means no arguments. For 1.0, params is always a positional array, including
 an empty one. A named-only method cannot claim a usable 1.0 mapping.
 
-The planned trait syntax is:
+The trait syntax is:
 
 ```smithy
 $version: "2"
@@ -108,7 +111,7 @@ structure SubtractInput {
 structure SubtractOutput { @required value: Integer }
 ```
 
-With that future contract, `[42,23]` is valid positional input in either version. In 2.0,
+With that contract, `[42,23]` is valid positional input in either version. In 2.0,
 `{"minuend":42,"subtrahend":23}` is also valid. `[42,"23"]` fails at `/params/1` on
 `example#SubtractInput$subtrahend`. Result `19` validates against `SubtractOutput$value`; result
 `"19"` fails that member. `@rpcError(code: 1001, dataMember: "detail")` selects a modeled error's
@@ -117,9 +120,10 @@ independently of whether a request is a notification.
 
 ## Message and exchange APIs
 
-PreparedService snapshots wire method names to operation IDs, input validators, result selections,
-error mappings and the chosen version/profile. It returns findings; it does not invoke handlers or
-transmit protocol errors. Parameters/results/error data delegate to the generic value engine.
+PreparedService snapshots wire method names to operation IDs, input validators, result selections
+and the chosen version/profile. Error mapping preparation belongs to the later response slice.
+It returns findings; it does not invoke handlers or transmit protocol errors. Parameters delegate
+to the generic value engine; later result/error-data validation will reuse that engine too.
 
 RequestId distinguishes Absent from Present(NodeValue). Numbers remain exact; legacy structured IDs
 retain structural identity. A 1.0 present-null ID is a notification. A 2.0 absent ID is a notification;
@@ -137,13 +141,20 @@ Unknown envelope extension fields are ignored by the base profile unless an expl
 policy checks them. The payload's unknown-member policy is separate. Duplicate JSON keys are
 rejected as an explicit deterministic-input compatibility policy.
 
-Planned CLI examples are `smithy validate-rpc --version 2.0 --service example#Calculator --message
-call.json model.smithy`, contextual `--request call.json --response reply.json`, and a transcript
-mode with explicit directions. These commands are not part of direct value validation.
+The request/notification milestone also fixes the shared JSON parser's error offsets, as reported
+in [PR #38](https://github.com/moonrockz/smithy/pull/38#discussion_r4337569571).
+Balanced malformed input such as `{"a":truX}` must report the parser's failure location instead of
+the completed preflight scan's EOF position. Regression coverage must verify the library offset
+and its propagation through structured CLI diagnostics for value and RPC validation.
+
+The request validator is an `rpc` subcommand of `smithy validate`.
+The CLI is `smithy validate rpc --version 2.0 --service example#Calculator --message call.json
+model.smithy`. Contextual `--request call.json --response reply.json` and a transcript mode with
+explicit directions remain planned; these options are not implemented by this request slice.
 
 ## Rule and original-example coverage
 
-The table specifies follow-on work, not implemented protocol conformance. R = requests/notifications,
+The table separates implemented request coverage from follow-on work. R = requests/notifications,
 S = responses/errors, B = batches, E = exchanges, T = transport-only, C = explicit compatibility policy.
 
 | Source | Class | Required check or classified boundary |

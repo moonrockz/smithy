@@ -22,6 +22,8 @@ The build plugins convert assembled models to JSON Schema and services to OpenAP
 `moonrockz/smithy-validation` checks application JSON directly against selected Smithy data shapes,
 with exact numbers and structured findings. The CLI exposes it through `smithy validate-value`.
 See [value validation](pkgs/smithy-validation/README.mbt.md).
+Its [RPC package](pkgs/smithy-validation/rpc/README.mbt.md) checks JSON-RPC 1.0 and 2.0 requests
+and notifications against modeled service methods through `smithy validate rpc`.
 
 ## Packages
 

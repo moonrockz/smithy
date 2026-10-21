@@ -412,6 +412,64 @@ async fn exercise_diff_jsonl(runner : Runner, root : String) -> Unit {
 }
 
 ///|
+async fn exercise_rpc(runner : Runner, root : String, skip_stdin : Bool) -> Unit {
+  let model = @fs.read_file(root + "/examples/json-rpc/calculator.smithy").text()
+  @fs.write_file(runner.dir + "/rpc.smithy", model)
+  let base = ["validate", "rpc", "--version", "2.0", "--service", "example#Calculator", "--message", "rpc.json", "rpc.smithy"]
+  for (message, status, code, pointer) in [
+    ("{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,23],\"id\":9007199254740993}", 0, "", ""),
+    ("{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,\"23\"]}", 1, "TypeMismatch", "/params/1"),
+    ("{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":{\"minuend\":42}}", 1, "RequiredMember", "/params/subtrahend"),
+    ("{\"jsonrpc\":\"2.0\",\"method\":\"ping\"}", 0, "", ""),
+    ("{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":null}", 0, "DiscouragedId", "/id"),
+    ("{\"jsonrpc\":\"2.0\",\"method\":\"missing\"}", 1, "UnknownMethod", "/method"),
+    ("[]", 1, "UnsupportedMessage", ""),
+    ("{\"a\":truX}", 1, "InvalidJson", ""),
+  ] {
+    @fs.write_file(runner.dir + "/rpc.json", message)
+    let (out, _) = runner.command(base + ["--diagnostics", "json"], status)
+    guard @json.parse(out) is Object(result) else { fail("Expected RPC diagnostics") }
+    assert_eq(result.get("valid"), Some(Json::boolean(status == 0)))
+    if code != "" {
+      guard result.get("findings") is Some(Array([Object(finding), ..])) else { fail("Expected an RPC finding") }
+      assert_eq(finding.get("code"), Some(Json::string(code)))
+      assert_eq(finding.get("pointer"), Some(Json::string(pointer)))
+      if code == "TypeMismatch" {
+        assert_eq(finding.get("shape"), Some(Json::string("example#SubtractInput$subtrahend")))
+        assert_eq(finding.get("operation"), Some(Json::string("example#Subtract")))
+      }
+      if code == "InvalidJson" { assert_eq(finding.get("offset"), Some(Json::number(8.0))) }
+    }
+    runner.command(base, status) |> ignore
+  }
+  @fs.write_file(runner.dir + "/rpc.json", "{\"method\":\"subtract\",\"params\":[42,23],\"id\":null}")
+  let legacy = base.copy(); legacy[3] = "1.0"
+  runner.command(legacy, 0) |> ignore
+  let invalid_version = base.copy(); invalid_version[3] = "1.1"
+  runner.command(invalid_version, 2) |> ignore
+  let bad_service = base.copy(); bad_service[5] = "example#Subtract"
+  runner.command(bad_service, 2) |> ignore
+  let missing_message = base.copy(); missing_message[7] = "missing-rpc.json"
+  runner.command(missing_message + ["--diagnostics", "json"], 1) |> ignore
+  for args in [["validate", "rpc", "--help"], ["help", "validate", "rpc"]] {
+    let (help, _) = runner.command(args, 0)
+    assert_true(help.contains("Usage: smithy validate rpc") && help.contains("--message"))
+  }
+  if !skip_stdin && (runner.target != "wasm-gc" || @env.get_env_var("OS") != Some("Windows_NT")) {
+    let stdin_message = legacy.copy(); stdin_message[7] = "-"
+    runner.command(stdin_message, 0, input="{\"method\":\"ping\",\"params\":[],\"id\":null}") |> ignore
+    let stdin_model = legacy.copy(); stdin_model[8] = "-"
+    runner.command(stdin_model + ["--from", "idl"], 0, input=model) |> ignore
+  }
+  let double_stdin = legacy.copy(); double_stdin[7] = "-"; double_stdin[8] = "-"
+  runner.command(double_stdin + ["--from", "idl"], 2) |> ignore
+  @fs.write_file(runner.dir + "/bad-value.json", "{\"a\":truX}")
+  let (out, _) = runner.command(["validate-value", "--shape", "example#Example", "--value", "bad-value.json", "--diagnostics", "json", "input.smithy"], 1)
+  guard @json.parse(out) is { "findings": [ { "offset": Number(offset, ..), .. }, .. ], .. } else { fail("Expected value parse offset") }
+  assert_eq(offset, 8.0)
+}
+
+///|
 async fn exercise(
   root : String,
   target : String,
@@ -447,6 +505,7 @@ async fn exercise(
   let runner : Runner = { target, executable, prefix, dir, }
   let input = "$version: \"2\"\nmetadata values = [9007199254740993]\nnamespace example\n// comment\nstructure  Example {\nname : String\n}\n"
   @fs.write_file("\{dir}/input.smithy", input)
+  exercise_rpc(runner, root, skip_stdin)
   @fs.write_file(
     "\{dir}/broken.smithy",
     "$version: \"2\"\nnamespace example\nstructure Broken { x: Missing }",

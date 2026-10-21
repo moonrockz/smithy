@@ -48,10 +48,10 @@ fn value_problem(
 }
 
 ///|
-fn run_value_validation(
+fn validation_model_ok(
   opts : ValueOptions,
   assembled : @smithy.LoadResult,
-) -> Int32 {
+) -> Bool {
   let errors = assembled
     .validation_events()
     .filter(event => event.severity == "ERROR" || event.severity == "DANGER")
@@ -85,10 +85,10 @@ fn run_value_validation(
         eprintln(validation_event_text(event))
       }
     }
-    return 1
+    return false
   }
-  guard assembled.model is Some(model) else {
-    return value_problem(
+  guard assembled.model is Some(_) else {
+    value_problem(
       opts,
       "InvalidModel",
       assembled.diagnostics
@@ -97,7 +97,21 @@ fn run_value_validation(
       1,
       source=assembled.diagnostics.get(0).map(d => d.source.file),
     )
+    |> ignore
+    return false
   }
+  true
+}
+
+///|
+fn run_value_validation(
+  opts : ValueOptions,
+  assembled : @smithy.LoadResult,
+) -> Int32 {
+  if !validation_model_ok(opts, assembled) {
+    return 1
+  }
+  let model = assembled.model.unwrap()
   let prepared = @validation.PreparedValidator::prepare(
     model,
     opts.target,

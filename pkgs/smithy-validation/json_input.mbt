@@ -101,6 +101,31 @@ pub fn parse_json_value(text : String) -> Json raise ValueInputError {
     i += 1
   }
   @syntax.parse_json_value(text) catch {
-    _ => raise InvalidJson(i, "I expected one well-formed JSON value.")
+    error => {
+      let offset = match error {
+        @json.InvalidChar(position, _)
+        | @json.InvalidNumber(position, _)
+        | @json.InvalidIdentEscape(position) => {
+          let mut line = 1
+          let mut start = 0
+          for at = 0; at < text.length(); at = at + 1 {
+            if line == position.line {
+              break
+            }
+            if text.code_unit_at(at).to_int() == 10 {
+              line += 1
+              start = at + 1
+            }
+          }
+          start + position.column
+        }
+        @json.InvalidEof => text.length()
+        @json.DepthLimitExceeded => 0 // Preflight already enforces a tighter limit.
+      }
+      raise InvalidJson(
+        offset,
+        "I expected one well-formed JSON value: " + error.to_string(),
+      )
+    }
   }
 }

@@ -1,4 +1,24 @@
 ///|
+test "RPC options belong to the nested command scope" {
+  let opts = options([
+    "validate", "rpc", "--version", "2.0", "--service", "example#Api", "--message",
+    "message.json", "model.smithy",
+  ])
+  assert_eq(opts.rpc_version, Some(@rpc.V2_0))
+  let code = try
+    options([
+      "validate", "--from", "json", "rpc", "--version", "2.0", "--service", "example#Api",
+      "--message", "message.json", "model.smithy",
+    ])
+  catch {
+    CliError(_, code) => code
+  } noraise {
+    _ => 0
+  }
+  assert_eq(code, 2)
+}
+
+///|
 test "invalid command options fail with usage status" {
   for
     args in [
