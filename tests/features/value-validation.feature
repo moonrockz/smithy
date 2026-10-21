@@ -1,6 +1,13 @@
 Feature: Direct application value validation
   Validate JSON against Smithy data shapes through the reusable value engine.
 
+  Scenario: Leap seconds use the UTC insertion date through numeric offsets
+    Given a prepared date-time member validator
+    When I validate the JSON value "{\"at\":\"2017-01-01T05:29:60.5+05:30\"}"
+    Then the value is valid
+    When I validate the JSON value "{\"at\":\"2017-01-01T05:29:60.5-05:30\"}"
+    Then the value finding is "InvalidTimestamp" at "/at" on "example#Input$at"
+
   Scenario: A value satisfies the modeled contract
     Given a prepared count value validator
     When I validate the JSON value "{\"count\":2}"

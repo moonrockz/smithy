@@ -24,6 +24,16 @@ fn value_model(source : String) -> @smithy.Model raise {
 
 ///|
 impl @moonspec.World for ValueValidationWorld with fn configure(self, setup) {
+  setup.given0("a prepared date-time member validator", fn() raise {
+    self.prepared = Some(
+      @validation.PreparedValidator::prepare(
+        value_model(
+          "@timestampFormat(\"date-time\")\ntimestamp Time\nstructure Input { @required at: Time }",
+        ),
+        @smithy.ShapeId::parse("example#Input").unwrap(),
+      ),
+    )
+  })
   setup.given0("a prepared count value validator", fn() raise {
     let model = value_model(
       "@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }",

@@ -93,3 +93,34 @@ test "native timestamp boundary rejects impossible dates and partial times" {
     assert_true(rejected)
   }
 }
+
+///|
+test "neutral native timestamps restrict seconds to zero through fifty-nine" {
+  for offset in [@validation.UnknownOffset, @validation.KnownOffsetMinutes(0)] {
+    let timestamp = @validation.NativeTimestamp::new(
+      2016,
+      month=Some(12),
+      day=Some(31),
+      hour=Some(23),
+      minute=Some(59),
+      second=Some(59),
+      offset~,
+    )
+    assert_eq(timestamp.second(), Some(59))
+    let mut rejected = false
+    ignore(
+      @validation.NativeTimestamp::new(
+        2016,
+        month=Some(12),
+        day=Some(31),
+        hour=Some(23),
+        minute=Some(59),
+        second=Some(60),
+        offset~,
+      ),
+    ) catch {
+      @validation.ConfigurationError(_) => rejected = true
+    }
+    assert_true(rejected)
+  }
+}
