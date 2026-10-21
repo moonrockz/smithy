@@ -66,7 +66,7 @@ continues to check model definitions. Stdin may appear once across model and val
 | Numbers | Exact mathematical integers and byte/short/integer/long bounds. BigInteger/BigDecimal remain exact. Float/double magnitude is checked without rounding input. |
 | Nonnumeric floats | Opt-in `nonnumeric_floats=true` permits exactly `NaN`, `Infinity`, `-Infinity` strings, subject to range rules. |
 | Blob | Canonical padded RFC 4648 base64, including zero padding bits. |
-| Timestamp | Exact epoch-seconds number; `timestamp_format=DateTime` or effective `timestampFormat("date-time")` selects a calendar-checked string with an offset. HTTP-date is unsupported. |
+| Timestamp | Exact epoch-seconds number; `timestamp_format=DateTime` or effective `timestampFormat("date-time")` selects a calendar-checked string with an offset. HTTP-date and leap-second notation are unsupported. |
 | Runtime contracts | Reachable `smithy.contracts#conditions` raises `UnsupportedConstraint`. Assembly still validates the expression definition. |
 
 The portable pattern profile supports literals, classes/ranges, groups, alternation, repetitions,
@@ -74,6 +74,12 @@ whole-input anchors and common digit/word/whitespace escapes. Dot excludes line 
 Lookaround, backreferences, flags, Unicode properties, complement escapes inside classes and
 unsupported core regex constructs fail preparation. Matching searches unless anchored. This is
 not the full ECMA-262 language.
+
+Preparation limits patterns to 4,096 source UTF-16 units, 32 nested groups and 1,024 expanded
+expression units, counting repetition expansion and alternatives. Matching charges eight times
+the expanded estimate times the input UTF-16 length plus one against the call's work budget.
+Patterns exceeding the preparation caps raise `UnsupportedConstraint`; exhausted matching work
+returns `LimitExceeded` before executing the pattern.
 
 ## Findings, adapters and limits
 

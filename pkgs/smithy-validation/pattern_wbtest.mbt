@@ -12,7 +12,7 @@ test "portable patterns translate escapes without changing literals or classes" 
       ("^(?:a|b){1,3}$", "aba", "abab"),
     ] {
     let compiled = compile_pattern(pattern, id)
-    assert_true(compiled.execute(good) is Some(_), msg=pattern)
-    assert_true(compiled.execute(bad) is None, msg=pattern)
+    assert_true(compiled.execute(good), msg=pattern)
+    assert_false(compiled.execute(bad), msg=pattern)
   }
 }

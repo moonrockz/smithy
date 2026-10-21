@@ -149,10 +149,15 @@ fn[V : ValueView] check_constraints(
     }
   }
   if c.pattern is Some(pattern) && node is String(text) {
-    if !budget.charge(path, shape.id) {
+    let units = if text.length() >= budget.limits.work / pattern.weight {
+      budget.limits.work + 1
+    } else {
+      (text.length() + 1) * pattern.weight
+    }
+    if !budget.charge(path, shape.id, units~) {
       return
     }
-    if pattern.execute(text) is None {
+    if !pattern.execute(text) {
       emit(Pattern, "I expected the string to match the modeled pattern.")
     }
   }

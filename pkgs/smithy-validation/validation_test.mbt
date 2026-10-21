@@ -16,6 +16,36 @@ fn codes(result : @validation.ValidationResult) -> Array[String] {
 }
 
 ///|
+test "string enums retain constraints and member overrides" {
+  let m = model(
+    "@length(min: 2)\n@pattern(\"^a\")\nenum Value {\n A = \"ab\"\n B = \"b\"\n}\nstructure Input {\n @length(min: 1)\n @pattern(\"^b\")\n value: Value\n}",
+  )
+  let direct = @validation.PreparedValidator::prepare(m, target("Value"))
+  assert_true(direct.validate_json(Json::string("ab")).is_valid())
+  assert_eq(codes(direct.validate_json(Json::string("b"))), [
+    "Length", "Pattern",
+  ])
+  let member_ = @validation.PreparedValidator::prepare(m, target("Input"))
+  assert_true(
+    member_.validate_json(@json.parse("{\"value\":\"b\"}")).is_valid(),
+  )
+  assert_eq(codes(member_.validate_json(@json.parse("{\"value\":\"ab\"}"))), [
+    "Pattern",
+  ])
+}
+
+///|
+test "pattern matching consumes work proportional to pattern and input" {
+  let v = validator(
+    "@pattern(\"^a+$\")\nstring Value",
+    config=@validation.Config::new(limits=@validation.Limits::new(work=20)),
+  )
+  let result = v.validate_json(Json::string("a".repeat(100)))
+  assert_false(result.complete)
+  assert_eq(codes(result), ["LimitExceeded"])
+}
+
+///|
 test "scalar values enforce exact types numeric bounds and constraints" {
   for
     (source, good, bad, code) in [

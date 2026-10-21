@@ -4,7 +4,7 @@ priv struct Constraints {
   max : @smithy.NodeNumber?
   min_length : @smithy.NodeNumber?
   max_length : @smithy.NodeNumber?
-  pattern : @string.Regex?
+  pattern : BoundedPattern?
   unique : Bool
   timestamp : TimestampFormat
 } derive(Debug)
@@ -58,6 +58,9 @@ fn constraint_bounds(
   }
   let min = read("min")
   let max = read("max")
+  if min is None && max is None {
+    raise InvalidModel(id, "I expected at least one constraint bound.")
+  }
   if min is Some(min) && max is Some(max) && min.numeric_compare(max) > 0 {
     raise InvalidModel(
       id, "I expected the minimum constraint bound to be no greater than the maximum.",
@@ -114,6 +117,7 @@ fn prepare_constraints(
   }
   if length is Some(_) &&
     !(target.body is Simple(String | Blob) ||
+    target.body is Enum(_) ||
     target.body is List(_) ||
     target.body is Map(..)) {
     raise InvalidModel(
@@ -127,8 +131,8 @@ fn prepare_constraints(
   let (min_length, max_length) = constraint_bounds(length, id, length=true)
   let compiled = match pattern {
     None => None
-    Some(String(text)) if target.body is Simple(String) =>
-      Some(compile_pattern(text, id))
+    Some(String(text)) if target.body is Simple(String) ||
+      target.body is Enum(_) => Some(compile_pattern(text, id))
     _ =>
       raise InvalidModel(id, "I expected a string pattern on a string shape.")
   }

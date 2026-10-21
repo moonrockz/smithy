@@ -52,6 +52,41 @@ fn run_value_validation(
   opts : ValueOptions,
   assembled : @smithy.LoadResult,
 ) -> Int32 {
+  let errors = assembled
+    .validation_events()
+    .filter(event => event.severity == "ERROR" || event.severity == "DANGER")
+  if !errors.is_empty() {
+    if opts.diagnostics == JsonFindings {
+      let findings = errors.map(event => {
+        let finding : Map[String, Json] = {
+          "code": Json::string(event.id),
+          "severity": Json::string(event.severity),
+          "message": Json::string(event.message),
+          "shape": event.shape
+          .map(id => Json::string(id.to_string()))
+          .unwrap_or(Json::null()),
+          "source": event.source
+          .map(source => Json::string(source.file))
+          .unwrap_or(Json::null()),
+          "path": Json::array([]),
+          "pointer": Json::string(""),
+        }
+        Json::object(finding)
+      })
+      println(
+        Json::object({
+          "valid": Json::boolean(false),
+          "complete": Json::boolean(false),
+          "findings": Json::array(findings),
+        }).stringify(),
+      )
+    } else {
+      for event in errors {
+        eprintln(validation_event_text(event))
+      }
+    }
+    return 1
+  }
   guard assembled.model is Some(model) else {
     return value_problem(
       opts,

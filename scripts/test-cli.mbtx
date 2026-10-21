@@ -180,6 +180,20 @@ async fn exercise(
   let (invalid_model, _) = runner.command(["validate-value", "--shape", "example#Broken", "--value", "value.json", "--diagnostics", "json", "broken.smithy"], 1)
   guard @json.parse(invalid_model) is Object(model_result) && model_result.get("findings") is Some(Array([Object(model_finding), ..])) else { fail("Expected model diagnostics") }
   assert_eq(model_finding.get("source"), Some(Json::string("broken.smithy")))
+  let (missing_model, missing_model_err) = runner.command(["validate-value", "--shape", "example#Input", "--value", "value.json", "--diagnostics", "json", "missing.smithy"], 1)
+  guard @json.parse(missing_model) is Object(missing_result) && missing_result.get("findings") is Some(Array([Object(missing_finding), ..])) else { fail("Expected structured model read diagnostics") }
+  assert_eq(missing_finding.get("source"), Some(Json::string("missing.smithy")))
+  assert_eq(missing_finding.get("code"), Some(Json::string("InputRead")))
+  assert_eq(missing_model_err, "")
+  for (configuration, severity) in [("selector: \"structure\"", "DANGER"), ("selector: \"[\"", "ERROR")] {
+    @fs.write_file("\{dir}/value-invalid-event.smithy", "$version: \"2\"\nmetadata validators = [{name: \"EmitEachSelector\", configuration: {" + configuration + "}}]\nnamespace example\nstructure Input {}\n")
+    @fs.write_file("\{dir}/value-empty.json", "{}")
+    let (event_out, event_err) = runner.command(["validate-value", "--shape", "example#Input", "--value", "value-empty.json", "--diagnostics", "json", "value-invalid-event.smithy"], 1)
+    guard @json.parse(event_out) is Object(event_result) && event_result.get("findings") is Some(Array([Object(event_finding), ..])) else { fail("Expected model validation event") }
+    assert_eq(event_finding.get("severity"), Some(Json::string(severity)))
+    assert_eq(event_result.get("valid"), Some(Json::boolean(false)))
+    assert_eq(event_err, "")
+  }
   let (out, _) = runner.command(["convert", "missing.smithy", "--help"], 0)
   assert_true(out.contains("Usage: smithy convert"))
   runner.command(["help", "unknown"], 2) |> ignore

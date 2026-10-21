@@ -394,7 +394,24 @@ fn run(args : Array[String]) -> Int32 raise {
   let mut failed = false
   for name in opts.files {
     let format = input_format(name, opts.from)
-    let text = if name == "-" {
+    let text = if opts.value_validation is Some(value_opts) {
+      try {
+        if name == "-" {
+          read_stdin()
+        } else {
+          @fs.read_file_to_string(name)
+        }
+      } catch {
+        _ =>
+          return value_problem(
+            value_opts,
+            "InputRead",
+            "I could not read the model input.",
+            1,
+            source=Some(name),
+          )
+      }
+    } else if name == "-" {
       read_stdin()
     } else {
       @fs.read_file_to_string(name)

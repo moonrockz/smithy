@@ -75,6 +75,33 @@ test "prepare rejects unsupported constraints instead of accepting them" {
 }
 
 ///|
+test "prepare bounds pattern expansion and group nesting" {
+  for
+    pattern in ["^((a{256}){256}){256}$", "(".repeat(64) + "a" + ")".repeat(64)] {
+    let m = model("@pattern(\"" + pattern + "\")\nstring Value")
+    let mut rejected = false
+    ignore(@validation.PreparedValidator::prepare(m, target("Value"))) catch {
+      @validation.UnsupportedConstraint(_, _) => rejected = true
+      _ => fail("Expected UnsupportedConstraint")
+    }
+    assert_true(rejected)
+  }
+}
+
+///|
+test "prepare rejects empty numeric and length constraints" {
+  for source in ["@range\ninteger Value", "@length\nstring Value"] {
+    let m = model(source)
+    let mut rejected = false
+    ignore(@validation.PreparedValidator::prepare(m, target("Value"))) catch {
+      @validation.InvalidModel(_, _) => rejected = true
+      _ => fail("Expected InvalidModel")
+    }
+    assert_true(rejected)
+  }
+}
+
+///|
 test "prepare checks JSON naming collisions even on programmatic models" {
   let m = model("structure Input { a: String, b: String }")
   let trait_id = @smithy.ShapeId::parse("smithy.api#jsonName").unwrap()
