@@ -5,11 +5,20 @@ priv enum ValueDiagnostics {
 } derive(Eq)
 
 ///|
+priv enum ValueInputFormat {
+  JsonInput
+  IonTextInput
+  IonBinaryInput
+} derive(Eq)
+
+///|
 priv struct ValueOptions {
   target : @smithy.ShapeId
   file : String
   diagnostics : ValueDiagnostics
   config : @validation.Config
+  input_format : ValueInputFormat
+  ion_index : Int32?
 }
 
 ///|
@@ -112,6 +121,9 @@ fn run_value_validation(
     return 1
   }
   let model = assembled.model.unwrap()
+  if opts.input_format != JsonInput {
+    return run_ion_validation(opts, model)
+  }
   let prepared = @validation.PreparedValidator::prepare(
     model,
     opts.target,

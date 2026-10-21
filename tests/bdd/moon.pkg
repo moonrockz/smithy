@@ -18,5 +18,8 @@ import {
   "moonrockz/smithy",
   "moonrockz/smithy/protocoltests",
   "moonrockz/smithy-validation" @validation,
+  "moonrockz/smithy-ion-validation" @ion_validation,
+  "moonrockz/ion/text" @ion_text,
+  "moonrockz/ion/binary" @ion_binary,
   "moonrockz/smithy-validation/rpc",
 } for "wbtest"

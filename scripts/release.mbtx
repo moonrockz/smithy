@@ -230,6 +230,7 @@ let publish_list : Array[(String, String)] = [
   ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
   ("pkgs/smithy", "moonrockz/smithy"),
   ("pkgs/smithy-validation", "moonrockz/smithy-validation"),
+  ("pkgs/smithy-ion-validation", "moonrockz/smithy-ion-validation"),
   ("pkgs/smithy-build", "moonrockz/smithy-build"),
   ("pkgs/smithy-diff", "moonrockz/smithy-diff"),
   ("pkgs/smithy-jsonschema", "moonrockz/smithy-jsonschema"),

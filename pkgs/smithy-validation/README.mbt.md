@@ -107,11 +107,29 @@ an RPC parameter finding remain `/params/0` instead of becoming `/params/count`.
 Positive configurable maxima are depth 1,024, 10,000,000 work units and 10,000 findings. The last
 finding slot is reserved for `LimitExceeded`. Exhaustion sets `complete=false`; `is_valid()` requires
 completion and no Error findings. Iterative walking/equality also checks document values, ignored
-fields and cyclic inputs. Adapters themselves are trusted code.
+fields and cyclic inputs. Adapters themselves are trusted code. An adapter that allocates child
+wrappers in `inspect` overrides `ValueView::expansion_size` with a non-allocating immediate width.
+The engine checks that width before inspecting values in validation and uniqueness comparisons;
+the default zero preserves existing adapters that already inspect without expansion.
 
 Native scalar, annotation and sexp values are explicitly unsupported by the JSON profile. The
-neutral view retains exact decimals, floats, timestamps, symbols and bytes for later opt-in profiles.
-Ion and WIT remain separate integrations outside this library's dependency graph.
+neutral view retains exact decimals, floats, timestamps, symbols and bytes. Select
+`Config::new(profile=NativeProfile)` for native adapters, or preserve an existing configuration
+with `config.with_profile(NativeProfile)`. Decimal values match BigDecimal/Float/Double, finite
+binary floats match Float/Double, blobs match Blob and full native timestamps with known offsets
+match Timestamp. NativeProfile does not accept JSON serialization forms for blobs or timestamps.
+Document accepts finite numeric kinds, nulls, strings, booleans and list/object descendants.
+Symbols, clobs, sexps and annotations remain unsupported, including in ignored content.
+
+Native uniqueness compares numbers mathematically across numeric kinds and bytes by content.
+Timestamps compare retained components, offsets and exact fractional tokens, preserving fractional
+precision. NativeObject preserves duplicate resolved fields and unresolved names. FieldPosition
+identifies an unresolved field's value; FieldNamePosition identifies its field-name token. Both
+remain distinct from array indices in structured findings. Annotations are rejected while their
+underlying values are inspected at the same path within the shared execution limits.
+
+The optional `moonrockz/smithy-ion-validation` module supplies the direct Ion adapter. Ion and WIT
+remain outside this library's dependency graph.
 
 Run `mise run test:validation-consumer` to audit resolved packaged dependencies and run an isolated
 example on all four targets. See [design](DESIGN.md) and the

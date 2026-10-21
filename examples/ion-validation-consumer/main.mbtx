@@ -1,0 +1,33 @@
+///|
+/// Validate Ion with the published optional adapter, independently of the workspace.
+import {
+  "moonrockz/smithy@0.5.0",
+  "moonrockz/smithy-ion-validation@0.5.0" @validation,
+  "moonrockz/ion@0.6.0/ion",
+}
+
+///|
+fn main raise {
+  let loaded = @smithy.Loader::new()
+    .add_idl(
+      "example.smithy", "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }",
+    )
+    .assemble()
+  let prepared = @validation.PreparedValidator::prepare(
+    loaded.model.unwrap(),
+    @smithy.ShapeId::parse("example#Input").unwrap(),
+  )
+  let good = prepared.validate(
+    @ion.Ion::from_fields([@ion.Field("count", @ion.Ion::int(2))]),
+  )
+  let bad = prepared.validate(
+    @ion.Ion::from_fields([@ion.Field("count", @ion.Ion::int(0))]),
+  )
+  assert_true(good.is_valid())
+  assert_false(bad.is_valid())
+  assert_eq(bad.findings[0].code.to_string(), "Range")
+  assert_eq(bad.findings[0].native_kind, Some(@ion.IonType::Int))
+  println(
+    "ion valid=\{good.is_valid()} invalid=\{bad.findings[0].code.to_string()} at \{bad.findings[0].path.pointer()}",
+  )
+}

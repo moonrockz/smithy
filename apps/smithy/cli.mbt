@@ -57,7 +57,7 @@ fn command_line() -> @argparse.Command {
       ),
       @argparse.Command(
         "validate",
-        about="Validate model definitions, JSON values or JSON-RPC messages.",
+        about="Validate model definitions, JSON or Ion values, or JSON-RPC messages.",
         flags=[
           @argparse.FlagArg(
             "protocol-tests",
@@ -73,7 +73,7 @@ fn command_line() -> @argparse.Command {
         subcommands=[
           input_command(
             "value",
-            "Validate a JSON value against a selected Smithy data shape.",
+            "Validate a JSON or Ion value against a selected Smithy data shape.",
             options=[
               @argparse.OptionArg(
                 "shape",
@@ -82,8 +82,16 @@ fn command_line() -> @argparse.Command {
               ),
               @argparse.OptionArg(
                 "value",
-                about="JSON value file, or '-' for stdin.",
+                about="Value file, or '-' for stdin.",
                 required=true,
+              ),
+              @argparse.OptionArg(
+                "input-format",
+                about="Value encoding: json, ion-text or ion-binary; default json.",
+              ),
+              @argparse.OptionArg(
+                "ion-index",
+                about="Select a zero-based Ion datagram value; otherwise require exactly one value.",
               ),
               @argparse.OptionArg(
                 "diagnostics",
@@ -464,10 +472,39 @@ fn options(args : Array[String]) -> Options raise CliError {
         "stdin '-' may only be read once across model and value inputs", 2,
       )
     }
+    let input_format = match value("input-format").unwrap_or("json") {
+      "json" => JsonInput
+      "ion-text" => IonTextInput
+      "ion-binary" => IonBinaryInput
+      _ =>
+        raise CliError(
+          "expected json, ion-text or ion-binary after --input-format", 2,
+        )
+    }
+    let ion_index = match value("ion-index") {
+      None => None
+      Some(text) => {
+        guard input_format != JsonInput else {
+          raise CliError("--ion-index requires an Ion --input-format", 2)
+        }
+        guard !text.is_empty() && text.iter().all(c => c >= '0' && c <= '9') else {
+          raise CliError("expected a nonnegative integer after --ion-index", 2)
+        }
+        let index = @string.parse_int(text) catch {
+          _ =>
+            raise CliError(
+              "expected a nonnegative integer after --ion-index", 2,
+            )
+        }
+        Some(index)
+      }
+    }
     Some(ValueOptions::{
       target,
       file,
       diagnostics,
+      input_format,
+      ion_index,
       config: @validation.Config::new(unknown_members~, member_names~),
     })
   } else {

@@ -2,6 +2,14 @@
 /// Read one value without copying or converting its descendants.
 pub(open) trait ValueView {
   fn inspect(Self) -> ValueNode[Self]
+  /// Non-allocating count of immediate wrappers or annotations inspect may expand.
+  /// Adapters that allocate per child override this before exposing wide values.
+  fn expansion_size(Self) -> Int32 = _
+}
+
+///|
+impl ValueView with fn expansion_size(_self) {
+  0
 }
 
 ///|
@@ -27,6 +35,7 @@ pub(all) enum NativeScalar {
   Float(Double)
   Decimal(@smithy.NodeNumber)
   Timestamp(NativeTimestamp)
+  InvalidTimestamp
   Symbol(String?)
   Blob(Bytes)
   Clob(Bytes)
@@ -57,6 +66,7 @@ pub(all) enum ValueNode[V] {
   String(String)
   Array(Array[V])
   Object(Array[(String, V)])
+  NativeObject(Array[(String?, V)])
   LocatedObject(Array[LocatedField[V]])
   Native(NativeScalar)
   Sexp(Array[V])

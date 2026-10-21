@@ -48,7 +48,14 @@ pub(all) enum TimestampFormat {
 } derive(Eq, Debug)
 
 ///|
+pub(all) enum ValueProfile {
+  JsonProfile
+  NativeProfile
+} derive(Eq, Debug)
+
+///|
 pub struct Config {
+  profile : ValueProfile
   limits : Limits
   unknown_members : UnknownMembers
   member_names : MemberNames
@@ -58,6 +65,7 @@ pub struct Config {
 
 ///|
 pub fn Config::new(
+  profile~ : ValueProfile = JsonProfile,
   limits~ : Limits = { depth: 128, work: 100000, findings: 100, },
   unknown_members~ : UnknownMembers = Reject,
   member_names~ : MemberNames = Smithy,
@@ -65,6 +73,7 @@ pub fn Config::new(
   nonnumeric_floats~ : Bool = false,
 ) -> Config {
   {
+    profile,
     limits,
     unknown_members,
     member_names,
@@ -166,4 +175,14 @@ pub impl @json.ToJson for ValidationResult with fn to_json(self) {
     "complete": Json::boolean(self.complete),
     "findings": Json::array(self.findings.map(f => @json.to_json(f))),
   })
+}
+
+///|
+pub fn Config::with_profile(self : Config, profile : ValueProfile) -> Config {
+  { ..self, profile, }
+}
+
+///|
+pub fn Config::profile(self : Config) -> ValueProfile {
+  self.profile
 }

@@ -8,6 +8,9 @@ import {
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonrockz/ion@0.6.0/text" @ion_text,
+  "moonrockz/ion@0.6.0/binary" @ion_binary,
   "moonbit-community/zipc@0.2.2",
   "moonbit-community/flate@0.2.0/gzip",
   "moonbitlang/x@0.5.5/sys",
@@ -27,10 +30,15 @@ async fn Runner::command(
   args : Array[String],
   expected : Int32,
   input? : String,
+  input_bytes? : Bytes,
   extra_env~ : Map[String, String] = Map([]),
 ) -> (String, String) {
   let all = self.prefix.copy()
   all.append(args)
+  let input = match input {
+    Some(text) => Some(@utf8.encode(text))
+    None => input_bytes
+  }
   let (code, out, err) = match input {
     None => @process.collect_output(self.executable, all, cwd=self.dir, extra_env~)
     Some(text) =>
@@ -660,6 +668,163 @@ async fn exercise_rpc(runner : Runner, root : String, skip_stdin : Bool) -> Unit
 }
 
 ///|
+async fn exercise_ion(runner : Runner, skip_stdin : Bool) -> Unit {
+  @fs.write_file(
+    runner.dir + "/ion.smithy",
+    "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }\n",
+  )
+  let args = [
+    "validate", "value", "--shape", "example#Input", "--value", "value.ion", "--input-format",
+    "ion-text", "--diagnostics", "json", "ion.smithy",
+  ]
+  for
+    (text, code, finding) in [
+      ("{count: 2}", 0, ""),
+      ("{count: 0}", 1, "Range"),
+      ("{}", 1, "RequiredMember"),
+      ("{count: null.int}", 1, "TypeMismatch"),
+      ("{count: ready}", 1, "UnsupportedValue"),
+      ("{count: 1, count: 2}", 1, "DuplicateMember"),
+      ("tag::{count: 2}", 1, "UnsupportedValue"),
+      ("{count: (1 2)}", 1, "UnsupportedValue"),
+    ] {
+    @fs.write_file(runner.dir + "/value.ion", text)
+    let (text_out, _) = runner.command(args, code)
+    let json = @json.parse(text_out)
+    guard json is Object(result) else { fail("Expected Ion findings") }
+    assert_eq(result.get("valid"), Some(Json::boolean(code == 0)))
+    if finding != "" {
+      guard result.get("findings") is Some(Array(findings)) else {
+        fail("Expected findings")
+      }
+      assert_true(
+        findings.any(f => f is { "code": String(c), .. } && c == finding),
+      )
+      if finding == "Range" {
+        guard findings
+          is [
+            {
+              "nativeKind": String("int"),
+              "shape": String("example#Input$count"),
+              "pointer": String("/count"),
+              ..
+            },
+          ] else {
+          fail(text_out)
+        }
+      }
+      if finding == "DuplicateMember" {
+        assert_true(
+          findings.any(f => {
+            f
+            is {
+              "path": [
+                {
+                  "kind": String("field"),
+                  "name": String("count"),
+                  "occurrence": Number(1.0, ..),
+                  ..
+                },
+              ],
+              ..
+            }
+          }),
+        )
+      }
+    }
+    let binary = @ion_binary.write_binary_value(@ion_text.read_ion(text))
+    @fs.write_file(runner.dir + "/value.10n", binary)
+    let binary_args = [
+      "validate", "value", "--shape", "example#Input", "--value", "value.10n", "--input-format",
+      "ion-binary", "--diagnostics", "json", "ion.smithy",
+    ]
+    let (binary_out, _) = runner.command(binary_args, code)
+    assert_eq(@json.parse(binary_out), json)
+    assert_eq(@fs.read_file(runner.dir + "/value.ion").text(), text)
+    if !skip_stdin && finding == "Range" {
+      let (out, _) = runner.command(
+        [
+          "validate", "value", "--shape", "example#Input", "--value", "-", "--input-format",
+          "ion-binary", "--diagnostics", "json", "ion.smithy",
+        ],
+        1,
+        input_bytes=binary,
+      )
+      assert_eq(@json.parse(out), json)
+    }
+  }
+  for
+    (text, problem) in [
+      ("", "IonSelection"),
+      ("{count: 0} {count: 2}", "IonSelection"),
+      ("{", "InvalidIon"),
+    ] {
+    @fs.write_file(runner.dir + "/value.ion", text)
+    let (out, _) = runner.command(args, 1)
+    assert_true(out.contains(problem) && out.contains("value.ion"), msg=out)
+  }
+  @fs.write_file(runner.dir + "/value.ion", "{count: 0} {count: 2}")
+  let (selected, _) = runner.command(args + ["--ion-index", "1"], 0)
+  assert_true(selected.contains("\"valid\":true"))
+  runner.command(args + ["--ion-index", "2"], 1) |> ignore
+  runner.command(args + ["--ion-index", "-1"], 2) |> ignore
+  if !skip_stdin {
+    runner.command(
+      [
+        "validate", "value", "--shape", "example#Input", "--value", "-", "--input-format",
+        "ion-text", "ion.smithy",
+      ],
+      0,
+      input="{count: 2}",
+    )
+    |> ignore
+  }
+  @fs.write_file(runner.dir + "/value.10n", b"\xe0\x01\x00\xea\xde")
+  let (out, _) = runner.command(
+    [
+      "validate", "value", "--shape", "example#Input", "--value", "value.10n", "--input-format",
+      "ion-binary", "--diagnostics", "json", "ion.smithy",
+    ],
+    1,
+  )
+  assert_true(out.contains("InvalidIon") && out.contains("value.10n"))
+  let oversized = Bytes::make(16 * 1024 * 1024 + 1, b' ')
+  @fs.write_file(runner.dir + "/oversized.ion", oversized)
+  let (out, _) = runner.command(
+    [
+      "validate", "value", "--shape", "example#Input", "--value", "oversized.ion",
+      "--input-format", "ion-text", "--diagnostics", "json", "ion.smithy",
+    ],
+    1,
+  )
+  assert_true(out.contains("IonInputLimit"), msg=out)
+  if !skip_stdin {
+    // Keep the pipe open after the limit byte. A reader that waits for EOF
+    // cannot complete this command before the timeout.
+    @async.with_timeout(15000, () => {
+      @async.with_task_group(group => {
+        let (stdin, writer) = @process.write_to_process()
+        defer writer.close()
+        group.spawn_bg(() => writer.write(oversized))
+        let args = runner.prefix +
+          [
+            "validate", "value", "--shape", "example#Input", "--value", "-", "--input-format",
+            "ion-text", "--diagnostics", "json", "ion.smithy",
+          ]
+        let (code, out, err) = @process.collect_output(
+          runner.executable,
+          args,
+          cwd=runner.dir,
+          stdin~,
+        )
+        assert_eq(code, 1, msg=err.text())
+        assert_true(out.text().contains("IonInputLimit"), msg=out.text())
+      })
+    })
+  }
+}
+
+///|
 async fn exercise(
   root : String,
   target : String,
@@ -698,6 +863,7 @@ async fn exercise(
   exercise_rpc(runner, root, skip_stdin)
   exercise_rpc_responses(runner, root, skip_stdin)
   exercise_rpc_batches(runner, root, skip_stdin)
+  exercise_ion(runner, skip_stdin)
   @fs.write_file(
     "\{dir}/broken.smithy",
     "$version: \"2\"\nnamespace example\nstructure Broken { x: Missing }",

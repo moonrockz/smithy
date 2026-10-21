@@ -4,6 +4,7 @@ members = [
   "./pkgs/jmespath",
   "./pkgs/smithy",
   "./pkgs/smithy-validation",
+  "./pkgs/smithy-ion-validation",
   "./pkgs/smithy-build",
   "./pkgs/smithy-diff",
   "./pkgs/smithy-jsonschema",

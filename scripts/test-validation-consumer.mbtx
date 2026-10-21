@@ -1,5 +1,8 @@
 ///|
 /// Qualify an isolated consumer against normal local package archives.
+/// Default JSON/RPC and --openrpc modes exclude Ion. --ion permits the adapter
+/// and released Ion module, and every mode excludes WIT-related integrations.
+/// Optional arguments after the mode select targets; the default is all four.
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -19,14 +22,32 @@ async fn write(path : String, bytes : &@io.Data) -> Unit {
 }
 
 ///|
-fn allowed(name : String, openrpc : Bool) -> Bool {
-  ![
-    "moonrockz/ion", "moonrockz/wit", "moonrockz/wac", "moonrockz/wasm-devkit", "moonrockz/smithy-openapi",
-  ].contains(name) &&
-  (
-    openrpc ||
-    !["moonrockz/smithy-jsonschema", "moonrockz/smithy-openrpc"].contains(name)
-  )
+enum ConsumerProfile {
+  JsonConsumer
+  OpenRpcConsumer
+  IonConsumer
+} derive(Eq)
+
+///|
+let integration_modules : Array[String] = [
+  "moonrockz/ion", "moonrockz/smithy-ion-validation", "moonrockz/wit", "moonrockz/wac",
+  "moonrockz/wasm-devkit", "moonrockz/smithy-jsonschema", "moonrockz/smithy-openapi",
+  "moonrockz/smithy-openrpc",
+]
+
+///|
+fn allowed(name : String, profile : ConsumerProfile) -> Bool {
+  match name {
+    "moonrockz/ion" | "moonrockz/smithy-ion-validation" =>
+      profile == IonConsumer
+    "moonrockz/smithy-jsonschema" | "moonrockz/smithy-openrpc" =>
+      profile == OpenRpcConsumer
+    "moonrockz/wit"
+    | "moonrockz/wac"
+    | "moonrockz/wasm-devkit"
+    | "moonrockz/smithy-openapi" => false
+    _ => true
+  }
 }
 
 ///|
@@ -55,10 +76,10 @@ async fn seed(
   name : String,
   version : String,
   seen : Set[String],
-  openrpc : Bool,
+  profile : ConsumerProfile,
 ) -> Unit {
   assert_true(
-    allowed(name, openrpc),
+    allowed(name, profile),
     msg="Unexpected integration dependency " + name,
   )
   let coordinate = name + "@" + version
@@ -68,6 +89,7 @@ async fn seed(
   seen.add(coordinate)
   let local_module = match name {
     "moonrockz/smithy-validation" => Some("pkgs/smithy-validation")
+    "moonrockz/smithy-ion-validation" => Some("pkgs/smithy-ion-validation")
     "moonrockz/smithy" => Some("pkgs/smithy")
     "moonrockz/smithy-syntax" => Some("pkgs/smithy-syntax")
     "moonrockz/jmespath" => Some("pkgs/jmespath")
@@ -162,36 +184,45 @@ async fn seed(
   if entry is Object(fields) && fields.get("deps") is Some(Object(deps)) {
     for dependency, pin in deps {
       guard pin is String(pin) else { fail("Expected a pinned dependency") }
-      seed(root, registry_home, fixture, dependency, pin, seen, openrpc)
+      seed(root, registry_home, fixture, dependency, pin, seen, profile)
     }
   }
 }
 
 ///|
-async fn audit_manifests(dir : String, openrpc : Bool) -> Int32 {
+fn manifest_name(source : String) -> String raise {
+  if source.trim_start().has_prefix("{") {
+    return string_field(@json.parse(source), "name")
+  }
+  for line in source.split("\n") {
+    if line.trim_start().has_prefix("name = \"") {
+      return line.split("\"").to_array()[1].to_owned()
+    }
+  }
+  fail("Missing module name")
+}
+
+///|
+async fn audit_manifests(
+  dir : String,
+  profile : ConsumerProfile,
+  resolved : Set[String],
+) -> Int32 {
   let mut count = 0
   for entry in @fs.readdir(dir) {
     let path = dir + "/" + entry
     if @fs.kind(path) is Directory {
-      count += audit_manifests(path, openrpc)
+      count += audit_manifests(path, profile, resolved)
     } else if entry == "moon.mod" || entry == "moon.mod.json" {
       let source = @fs.read_file(path).text()
-      let forbidden_names = if openrpc {
-        [
-          "moonrockz/ion", "moonrockz/wit", "moonrockz/wac", "moonrockz/wasm-devkit",
-          "moonrockz/smithy-openapi",
-        ]
-      } else {
-        [
-          "moonrockz/ion", "moonrockz/wit", "moonrockz/wac", "moonrockz/wasm-devkit",
-          "moonrockz/smithy-jsonschema", "moonrockz/smithy-openapi", "moonrockz/smithy-openrpc",
-        ]
-      }
-      for forbidden in forbidden_names {
-        assert_false(
-          source.contains(forbidden),
-          msg="Unexpected dependency in " + path,
-        )
+      resolved.add(manifest_name(source))
+      for name in integration_modules {
+        if !allowed(name, profile) {
+          assert_false(
+            source.contains(name),
+            msg="Unexpected dependency " + name + " in " + path,
+          )
+        }
       }
       count += 1
     }
@@ -203,10 +234,12 @@ async fn audit_manifests(dir : String, openrpc : Bool) -> Int32 {
 async fn exercise(
   root : String,
   targets : Array[String],
-  openrpc~ : Bool = false,
+  profile~ : ConsumerProfile = JsonConsumer,
 ) -> Unit {
   let dir = root +
-    (if openrpc {
+    (if profile == IonConsumer {
+      "/.dev/out/ion-validation-consumer"
+    } else if profile == OpenRpcConsumer {
       "/.dev/out/openrpc-consumer"
     } else {
       "/.dev/out/validation-consumer"
@@ -225,17 +258,21 @@ async fn exercise(
     root,
     registry_home,
     fixture,
-    if openrpc {
+    if profile == IonConsumer {
+      "moonrockz/smithy-ion-validation"
+    } else if profile == OpenRpcConsumer {
       "moonrockz/smithy-openrpc"
     } else {
       "moonrockz/smithy-validation"
     },
     version,
     seen,
-    openrpc,
+    profile,
   )
   for
-    example_name in (if openrpc {
+    example_name in (if profile == IonConsumer {
+      ["ion-validation-consumer"]
+    } else if profile == OpenRpcConsumer {
       ["openrpc"]
     } else {
       ["validation-consumer", "rpc-consumer"]
@@ -245,14 +282,18 @@ async fn exercise(
     write(
       consumer + "/moon.mod",
       "name = \"validation-consumer\"\nversion = \"0.0.0\"\nimport {\n  \"moonrockz/smithy@\{version}\",\n  \"moonrockz/smithy-validation@\{version}\",\n" +
-      (if openrpc {
+      (if profile == IonConsumer {
+        "  \"moonrockz/smithy-ion-validation@\{version}\",\n  \"moonrockz/ion@0.6.0\",\n"
+      } else if profile == OpenRpcConsumer {
         "  \"moonrockz/smithy-openrpc@\{version}\",\n"
       } else {
         ""
       }) +
       "}\n",
     )
-    let validation_import = if openrpc {
+    let validation_import = if profile == IonConsumer {
+      "\"moonrockz/smithy-ion-validation\" @validation,\n  \"moonrockz/ion/ion\","
+    } else if profile == OpenRpcConsumer {
       "\"moonrockz/smithy-validation/rpc\",\n  \"moonrockz/smithy-openrpc\" @openrpc,"
     } else if example_name == "rpc-consumer" {
       "\"moonrockz/smithy-validation/rpc\","
@@ -285,7 +326,7 @@ async fn exercise(
         extra_env~,
       )
       assert_eq(code, 0, msg=err.text())
-      if openrpc {
+      if profile == OpenRpcConsumer {
         let document = @json.parse(out.text())
         assert_true(
           document
@@ -296,7 +337,9 @@ async fn exercise(
       } else {
         assert_eq(
           out.text().trim().to_owned(),
-          if example_name == "rpc-consumer" {
+          if profile == IonConsumer {
+            "ion valid=true invalid=Range at /count"
+          } else if example_name == "rpc-consumer" {
             "rpc valid=true invalid=Range at /params/0"
           } else {
             "valid=true invalid=Range at /count"
@@ -305,15 +348,23 @@ async fn exercise(
       }
       println("Isolated " + example_name + " passed: " + target)
     }
-    let audited = audit_manifests(consumer + "/.mooncakes", openrpc)
+    let resolved : Set[String] = Set([])
+    let audited = audit_manifests(consumer + "/.mooncakes", profile, resolved)
     assert_true(
       audited >= 4,
       msg="Expected the full resolved model/validation module graph",
     )
+    if profile == IonConsumer {
+      assert_true(
+        resolved.contains("moonrockz/smithy-ion-validation") &&
+        resolved.contains("moonrockz/ion"),
+        msg="Expected the published adapter and Ion in the resolved graph",
+      )
+    }
     println(
       "Audited " +
       audited.to_string() +
-      " resolved manifests without optional integrations",
+      " resolved manifests within the consumer's dependency profile",
     )
   }
 }
@@ -321,8 +372,14 @@ async fn exercise(
 ///|
 async fn main {
   let targets = @env.args()[1:].to_owned()
-  let openrpc = targets.length() > 0 && targets[0] == "--openrpc"
-  if openrpc {
+  let profile = if targets.length() > 0 && targets[0] == "--ion" {
+    IonConsumer
+  } else if targets.length() > 0 && targets[0] == "--openrpc" {
+    OpenRpcConsumer
+  } else {
+    JsonConsumer
+  }
+  if profile != JsonConsumer {
     targets.remove(0) |> ignore
   }
   exercise(
@@ -332,11 +389,41 @@ async fn main {
     } else {
       targets
     },
-    openrpc~,
+    profile~,
   )
 }
 
 ///|
 async test "isolated validation consumer resolves no optional integrations" {
   exercise(@fs.realpath(".."), ["native", "wasm", "js", "wasm-gc"])
+}
+
+///|
+test "ordinary validation excludes the optional Ion adapter" {
+  assert_false(allowed("moonrockz/smithy-ion-validation", JsonConsumer))
+  assert_false(allowed("moonrockz/ion", JsonConsumer))
+  assert_false(allowed("moonrockz/smithy-ion-validation", OpenRpcConsumer))
+  assert_false(allowed("moonrockz/ion", OpenRpcConsumer))
+}
+
+///|
+test "Ion consumer allows its adapter but excludes WIT and unrelated integrations" {
+  assert_true(allowed("moonrockz/smithy-ion-validation", IonConsumer))
+  assert_true(allowed("moonrockz/ion", IonConsumer))
+  for
+    name in [
+      "moonrockz/wit", "moonrockz/wac", "moonrockz/wasm-devkit", "moonrockz/smithy-openapi",
+      "moonrockz/smithy-jsonschema", "moonrockz/smithy-openrpc",
+    ] {
+    assert_false(allowed(name, IonConsumer))
+  }
+}
+
+///|
+async test "isolated Ion consumer resolves Ion and excludes WIT" {
+  exercise(
+    @fs.realpath(".."),
+    ["native", "wasm", "js", "wasm-gc"],
+    profile=IonConsumer,
+  )
 }
