@@ -31,6 +31,12 @@ as written. The CST supports future formatting and editor tooling.
 | root | The curated public model types and parsing, traversal and rendering functions |
 | `internal/lawkit` | Shared property-test generators, outside the public API |
 
+`parse_json_value` also exposes the codec's exact numeric token parser for arbitrary JSON values.
+It retains decimal spelling, large exponents and signed zero, without requiring a Smithy JSON AST
+document. Like the core JSON parser, it keeps the last duplicate object name. It does not enforce
+application input limits; the direct value validator checks nesting, size and duplicate names before
+calling it.
+
 The facade exports `parse`, `parse_idl`, `parse_tokens`, `tokenize`, `codes`,
 `diagnostic_description`, the JSON AST codec functions, traversal functions
 and diagnostic rendering functions, including `render_all_to`.

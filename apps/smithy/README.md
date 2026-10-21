@@ -40,6 +40,7 @@ Use `smithy --help` for the command list, and `smithy convert --help` or
 ```shell
 smithy ast model.smithy extra.json
 smithy validate model.smithy extra.json
+smithy validate-value --shape example#Input --value request.json model.smithy
 smithy diff --old previous/ --new current/
 smithy build --config smithy-build.json
 smithy clean --config smithy-build.json
@@ -249,6 +250,47 @@ Run the pinned [public archive example](../../examples/public-archive/README.md)
 mise exec -- moon run apps/smithy --target js -- build --config examples/public-archive/smithy-build.json
 ```
 
+
+## Validate application values
+
+`validate` checks Smithy model definitions. `validate-value` checks application JSON against a selected
+assembled data shape, using the same engine as the `moonrockz/smithy-validation` library.
+
+```smithy
+$version: "2"
+namespace example
+@range(min: 1, max: 100)
+integer Count
+structure Input {
+    @required
+    count: Count
+}
+```
+
+Save that model as `model.smithy` and a value such as `{"count":2}` as `request.json`:
+
+```shell
+smithy validate-value --shape example#Input --value request.json model.smithy
+smithy validate-value --shape example#Input --value request.json --diagnostics json model.smithy
+```
+
+The first command succeeds quietly. With `{"count":0}`, it reports a `Range` finding at `/count` on
+`example#Input$count` and exits 1. Missing required members, wrong types and unknown members also fail.
+JSON output contains `valid`, `complete`, and findings with codes, typed path steps, a JSON Pointer,
+shape/member IDs and messages. Invalid JSON and duplicate decoded names produce structured input
+findings too. Input files remain unchanged; defaults and coercions are not applied.
+
+Use `--value -` to read the value from stdin. Alternatively use `--from idl -` or `--from json -` for
+a model from stdin, with a value file. Stdin may be used only once across both inputs. Multiple model
+files assemble together. `--unknown-members ignore` permits unknown structure fields, and
+`--member-names json` selects effective `jsonName` names. Unknown union alternatives still fail.
+
+Exit 0 means complete and valid. Invalid model/value input, I/O failures or validation limits exit 1.
+Invalid usage, missing/nondata targets and unsupported configurations exit 2. Input is limited to
+16 MiB of UTF-8 and 128 nested JSON containers; validation also has explicit depth/work/finding limits.
+Exact numeric tokens survive parsing, including decimals and integers above Double's safe range.
+The [library policies](../../pkgs/smithy-validation/README.mbt.md) document nulls, sparse collections,
+scalar formats, regex restrictions and unsupported runtime contract conditions.
 
 ## Public GitHub release assets
 

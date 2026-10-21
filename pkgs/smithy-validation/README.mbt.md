@@ -1,0 +1,103 @@
+# Direct value validation
+
+Validate application values against assembled Smithy data shapes through a reusable library and the `smithy validate-value` command. This module depends on the Smithy model and core libraries; optional format integrations belong in separate modules.
+
+## Library
+
+```mbt check
+///|
+test {
+  let loaded = @smithy.Loader::new()
+    .add_idl(
+      "model.smithy", "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }",
+    )
+    .assemble()
+  let prepared = @validation.PreparedValidator::prepare(
+    loaded.model.unwrap(),
+    @smithy.ShapeId::parse("example#Input").unwrap(),
+  )
+  assert_true(
+    prepared
+    .validate_json(@validation.parse_json_value("{\"count\":2}"))
+    .is_valid(),
+  )
+  let result = prepared.validate_json(
+    @validation.parse_json_value("{\"count\":0}"),
+  )
+  assert_false(result.is_valid())
+  assert_eq(result.findings[0].code, @validation.Range)
+  assert_eq(result.findings[0].path.pointer(), "/count")
+  assert_eq(result.findings[0].shape.to_string(), "example#Input$count")
+}
+```
+
+Prepare once and validate repeatedly. Preparation snapshots the selected shape's reachable contract,
+including member trait overrides. Later edits to the source model do not change it. Targets may be
+data shapes or members. Services, operations, resources, mixins and missing targets fail preparation.
+NodeValue inputs use `prepared.validate(value)` directly. Other types implement `ValueView`.
+
+Use `parse_json_value` for text input. It rejects duplicate decoded keys, limits nesting to 128
+containers and input to 16 MiB of UTF-8, and preserves every numeric token. A caller-supplied `Json`
+can preserve only numbers the caller retained: ordinary core JSON parsing may already have rounded
+decimals. A valid numeric `repr` is authoritative; without one, only the supplied finite Double
+value is available.
+
+## CLI
+
+```sh
+smithy validate-value --shape example#Input --value request.json model.smithy
+smithy validate-value --shape example#Input --value - --diagnostics json model.smithy
+```
+
+Text success is quiet; text findings go to stderr. JSON diagnostics go to stdout with `valid`,
+`complete` and `findings`. Invalid models/values, malformed input, I/O errors and incomplete checks
+exit 1. Invalid usage, targets and unsupported configurations exit 2. Existing `smithy validate`
+continues to check model definitions. Stdin may appear once across model and value inputs.
+
+## Policies
+
+| Concern | Default and explicit choices |
+|---|---|
+| Unknown structure fields | Reject; `unknown_members=Ignore` or CLI `--unknown-members ignore` permits them. Unknown union alternatives always fail. |
+| Member names | Smithy names; `member_names=JsonName` or CLI `--member-names json` uses `jsonName`. Preparation rejects collisions. |
+| Null | Distinct from absence. Optional members may be absent but must match their target when present. Document and sparse list/map values permit null. |
+| Defaults/coercion | No mutation, default insertion or string-to-number coercion. Defaults do not excuse an absent required member. |
+| Constraints | Exact range, Unicode scalar string length, decoded blob byte length, collection length, pattern, uniqueness and enum checks. Each explicit member trait replaces that same target trait as a whole. |
+| Numbers | Exact mathematical integers and byte/short/integer/long bounds. BigInteger/BigDecimal remain exact. Float/double magnitude is checked without rounding input. |
+| Nonnumeric floats | Opt-in `nonnumeric_floats=true` permits exactly `NaN`, `Infinity`, `-Infinity` strings, subject to range rules. |
+| Blob | Canonical padded RFC 4648 base64, including zero padding bits. |
+| Timestamp | Exact epoch-seconds number; `timestamp_format=DateTime` or effective `timestampFormat("date-time")` selects a calendar-checked string with an offset. HTTP-date and leap-second notation are unsupported. |
+| Runtime contracts | Reachable `smithy.contracts#conditions` raises `UnsupportedConstraint`. Assembly still validates the expression definition. |
+
+The portable pattern profile supports literals, classes/ranges, groups, alternation, repetitions,
+whole-input anchors and common digit/word/whitespace escapes. Dot excludes line terminators.
+Lookaround, backreferences, flags, Unicode properties, complement escapes inside classes and
+unsupported core regex constructs fail preparation. Matching searches unless anchored. This is
+not the full ECMA-262 language.
+
+Preparation limits patterns to 4,096 source UTF-16 units, 32 nested groups and 1,024 expanded
+expression units, counting repetition expansion and alternatives. Matching charges eight times
+the expanded estimate times the input UTF-16 length plus one against the call's work budget.
+Patterns exceeding the preparation caps raise `UnsupportedConstraint`; exhausted matching work
+returns `LimitExceeded` before executing the pattern.
+
+## Findings, adapters and limits
+
+Findings carry a stable code, Error/Advisory severity, typed instance path, semantic shape/member ID
+and message. `pointer()` renders JSON Pointer; retain `steps()` to distinguish repeated fields and
+map keys. LocatedObject adapters preserve original source positions. An optional `base_path` lets
+an RPC parameter finding remain `/params/0` instead of becoming `/params/count`.
+
+`Limits::new` defaults to depth 128, 100,000 value/constraint/equality work units and 100 findings.
+Positive configurable maxima are depth 1,024, 10,000,000 work units and 10,000 findings. The last
+finding slot is reserved for `LimitExceeded`. Exhaustion sets `complete=false`; `is_valid()` requires
+completion and no Error findings. Iterative walking/equality also checks document values, ignored
+fields and cyclic inputs. Adapters themselves are trusted code.
+
+Native scalar, annotation and sexp values are explicitly unsupported by the JSON profile. The
+neutral view retains exact decimals, floats, timestamps, symbols and bytes for later opt-in profiles.
+Ion and WIT remain separate integrations outside this library's dependency graph.
+
+Run `mise run test:validation-consumer` to audit resolved packaged dependencies and run an isolated
+example on all four targets. See [design](DESIGN.md) and the
+[shared RPC contract](JSON_RPC_DESIGN.md).

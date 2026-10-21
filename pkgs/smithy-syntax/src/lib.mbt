@@ -26,6 +26,14 @@ pub fn parse_json_ast(text : String) -> JsonAst raise {
 }
 
 ///|
+/// Parse an arbitrary JSON value while retaining every exact numeric token.
+/// Duplicate names keep the last value, as in the core JSON parser. Callers
+/// needing strict duplicate or input limits must enforce them before parsing.
+pub fn parse_json_value(text : String) -> Json raise @json.ParseError {
+  @json_ast.parse_exact(text)
+}
+
+///|
 /// Decode a Smithy JSON AST value, with JSON Pointer paths on errors.
 pub fn decode_json_ast(value : Json) -> JsonAst raise @json.JsonDecodeError {
   @json_ast.decode(value)
