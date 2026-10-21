@@ -134,6 +134,7 @@ pub fn NpmPackageRef::from_key(key : ArtifactKey) -> NpmPackageRef? {
 pub(all) struct NpmResolution {
   registry : RepositoryUrl
   reference : NpmPackageRef
+  metadata : Acquisition
   tarball : HttpUrl
   integrity : NpmIntegrity
 } derive(Eq, Debug)
@@ -144,6 +145,12 @@ pub fn NpmResolution::to_string(self : NpmResolution) -> String {
   self.reference.to_string() +
   " registry=" +
   self.registry.to_string() +
+  " metadata=" +
+  self.metadata.requested.to_string() +
+  " -> " +
+  self.metadata.resolved.to_string() +
+  " " +
+  self.metadata.digest.to_string() +
   " " +
   self.integrity.to_string()
 }
@@ -266,6 +273,7 @@ fn NpmArchive::open_resolved(
     let resolution : NpmResolution = {
       registry: self.registry,
       reference: self.reference,
+      metadata: data.metadata,
       tarball,
       integrity,
     }

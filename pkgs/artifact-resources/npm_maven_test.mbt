@@ -57,6 +57,7 @@ fn npm_transport(
   body : Bytes,
   reference~ : @resources.NpmPackageRef = npm_reference(),
   metadata~ : Json? = None,
+  metadata_resolved~ : @resources.HttpUrl? = None,
   calls~ : Array[String] = [],
 ) -> @resources.HttpTransport {
   (requested, _) => {
@@ -64,7 +65,7 @@ fn npm_transport(
     let is_metadata = requested.to_string().has_prefix("https://registry.test/")
     {
       resolved: if is_metadata {
-        requested
+        metadata_resolved.unwrap_or(requested)
       } else {
         url("https://cdn.test/pinned.tgz")
       },
@@ -616,4 +617,50 @@ test "Maven statuses and all reference boundary constructors fail safely" {
     ),
     Some(maven_coordinates(classifier=Some("test"))),
   )
+}
+
+///|
+test "npm retains the redirected metadata acquisition online and offline" {
+  let body = @gzip.gzip_compress(
+    tar_record("package/a.txt", b"hello") + tar_end(),
+  )
+  let request = npm_request()
+  let metadata = npm_metadata(request.reference, body)
+  let resolved = url("https://registry-cdn.test/exact-version.json")
+  let calls = []
+  let cache = memory_cache(Map([]))
+  let tree = request.open(
+    npm_transport(
+      body,
+      metadata=Some(metadata),
+      metadata_resolved=Some(resolved),
+      calls~,
+    ),
+    cache=Some(cache),
+  )
+  assert_true(tree.provenance().to_string().contains(resolved.to_string()))
+  guard tree.provenance().steps()[0] is @resources.NpmStep(resolution) else {
+    abort("Expected npm resolution")
+  }
+  assert_eq(resolution.metadata, @resources.Acquisition::{
+    requested: url(
+      "https://registry.test/npm/%40acme%2Fmodels/1.2.3-rc.1%2Bbuild.1",
+    ),
+    resolved,
+    digest: @resources.ContentDigest::sha256(@utf8.encode(metadata.stringify())),
+  })
+  let resource = @resources.load_resources(tree, [
+      {
+        name: @resources.ResourceName::parse("a.txt").unwrap(),
+        path: entry("package/a.txt"),
+      },
+    ])[0]
+  assert_eq(resource.provenance.steps(), tree.provenance().steps())
+  let offline = request.open(
+    (_, _) => abort("offline metadata redirect called transport"),
+    cache=Some(cache),
+    mode=@resources.Offline,
+  )
+  assert_eq(offline.provenance(), tree.provenance())
+  assert_eq(calls.length(), 2)
 }

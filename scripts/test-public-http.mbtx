@@ -450,9 +450,9 @@ async fn repository_builds(
       assert_false(@fs.exists(dir + "/PACKAGE_HOOK_RAN"))
     }
   }
-  // Two package metadata requests share one redirected tarball; three Maven
+  // Two redirected metadata requests share one redirected tarball; three Maven
   // JARs need two sidecars, while the third uses its caller-provided digest.
-  assert_eq(requests.length() - initial, if supported { 9 } else { 0 })
+  assert_eq(requests.length() - initial, if supported { 11 } else { 0 })
   if supported {
     for kind in ["npm-scoped", "maven"] {
       let fields = repository_selection(base, kind, "sources", jars)
@@ -478,6 +478,16 @@ async fn repository_builds(
         expected=1,
       )
       assert_true(output.contains("integrity-failure"), msg=output)
+      if kind.has_prefix("npm") {
+        assert_true(
+          output.contains(base + "/npm/%40fixture%2Fmodels/1.2.3"),
+          msg=output,
+        )
+        assert_true(
+          output.contains(base + "/npm/metadata/scoped.json"),
+          msg=output,
+        )
+      }
       assert_true(
         output.contains(
           if kind.has_prefix("npm") {
@@ -621,7 +631,20 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
         }
         if path == "/npm/models/1.2.3" ||
           path == "/npm/%40fixture%2Fmodels/1.2.3" {
-          let name = if path.contains("%40") {
+          let destination = if path.contains("%40") {
+            "/npm/metadata/scoped.json"
+          } else {
+            "/npm/metadata/unscoped.json"
+          }
+          conn.send_response(302, "npm metadata redirect", extra_headers={
+            "Location": destination,
+          })
+          conn.end_response()
+          return
+        }
+        if path == "/npm/metadata/scoped.json" ||
+          path == "/npm/metadata/unscoped.json" {
+          let name = if path == "/npm/metadata/scoped.json" {
             "@fixture/models"
           } else {
             "models"

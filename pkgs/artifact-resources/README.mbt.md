@@ -486,8 +486,10 @@ and again on every cache hit.
 cache~, mode~)` registers provider ID `npm`. Repository locations are registry
 base URLs. Obtain artifact keys from `NpmPackageRef::key()`. Both metadata and
 verified content use the common cache; `Offline` forbids transport calls.
-`NpmStep(NpmResolution)` retains registry, exact package/version, tarball URL and
-integrity requirements. Acquisition history retains redirects and compressed
+`NpmStep(NpmResolution)` retains registry, exact package/version, metadata
+`Acquisition`, tarball URL and integrity requirements. The metadata acquisition
+records the exact-version endpoint, its resolved URL after redirects and the
+response SHA-256 that selected the tarball and integrity value. Acquisition history retains redirects and compressed
 content SHA-256; resource origins retain the physical entry path. Resolution
 failures retain `NpmRequestStep`.
 
