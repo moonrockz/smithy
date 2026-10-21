@@ -4,7 +4,8 @@ This is the shared design for Smithy value validation, JSON-RPC modeling/message
 validation and OpenRPC export. Direct JSON value validation is implemented in this module and the
 `validate value` CLI. The `rpc` package implements opt-in JSON-RPC trait definitions, prepared
 methods, request/notification and contextual response/error validation through `smithy validate rpc`.
-Batches, exchanges, the Ion adapter and OpenRPC exporter remain follow-on capabilities.
+Batches, exchanges and the Ion adapter remain follow-on capabilities. The separate
+`moonrockz/smithy-openrpc` module implements description export through a library and build plugin.
 See the [message validator](rpc/README.mbt.md) for executable examples and implemented boundaries.
 
 The goal is to define an API in Smithy and check actual messages against it. A description export is
@@ -200,10 +201,15 @@ official metaschema release 1.14.9 artifact permits 1.3.2; its SHA-256 is
 `e5f534fb0dd9dd3598d26414e278a8c96e923ee7b54bef7009c499f4c71d0f82`.
 Vendor the released `open-rpc-meta-schema.json`, not the repository's generation template.
 
-The proposed library is `convert(model, service: ShapeId, config: OpenRpcConfig) -> OpenRpcResult`.
+The library is `moonrockz/smithy-openrpc`: `Config::new(ServiceId, ...)` selects a typed service,
+and `convert_result(model, config)` returns the document and structured conversion warnings.
 A build plugin named `openrpc` writes deterministic `openrpc.json`. Settings select the service,
 info metadata, naming and extension policy. Use the existing JSON Schema converter/reference index
 with `#/components/schemas`, preserving effective member constraints and valid references.
+`PreparedService::contracts()` supplies detached, sorted method/error mappings to the exporter.
+JSON Schema's opt-in `SchemaIndex::for_values` and `convert_values` APIs preserve runtime member replacement semantics,
+intrinsic numeric bounds, closed structures, union cardinality and sparse collections. Recursive
+constrained members receive collision-checked shared definitions rather than recursive expansion.
 
 Export service metadata, method names/docs, ordered Content Descriptors and requiredness, results,
 application errors, examples and reusable schemas. Map parameter mode to by-name/by-position/either.
@@ -216,6 +222,9 @@ OpenRPC standard output covers 2.0 only. Preserve 1.0 validation independently; 
 1.x OpenRPC. Consumers may serve a generated document via rpc.discover; a discovery server is not
 required. Acceptance validates deterministic documents against the pinned official metaschema and
 shares representative method/schema fixtures with message validation.
+The [exporter guide](../smithy-openrpc/README.mbt.md) documents exact settings, error-data/example
+extensions and schema limitations. `mise run test:openrpc` qualifies actual CLI/library artifacts
+against the vendored official metaschema and compares representative schemas with runtime results.
 
 ## Ion profile and released API audit
 

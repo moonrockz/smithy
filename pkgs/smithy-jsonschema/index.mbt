@@ -6,6 +6,7 @@ pub struct SchemaIndex {
   shapes : Map[String, Json]
   names : Map[String, String]
   config : Config
+  priv value_contracts : Bool
   document : Json
   definitions : Map[String, @smithy.ShapeId]
 }
@@ -16,7 +17,33 @@ pub fn SchemaIndex::new(
   service~ : String = "",
   config~ : Config = Config::new(),
 ) -> SchemaIndex raise {
-  let document = convert(model, service~, config~)
+  SchemaIndex::with_profile(model, service~, config~, value_contracts=false)
+}
+
+///|
+/// Prepare value-compatible schemas without changing reference conversion.
+pub fn SchemaIndex::for_values(
+  model : @smithy.Model,
+  service~ : String = "",
+  config~ : Config = Config::new(),
+) -> SchemaIndex raise {
+  SchemaIndex::with_profile(model, service~, config~, value_contracts=true)
+}
+
+///|
+fn SchemaIndex::with_profile(
+  model : @smithy.Model,
+  service~ : String = "",
+  config~ : Config = Config::new(),
+  value_contracts~ : Bool = false,
+) -> SchemaIndex raise {
+  let document = convert_with_profile(
+    model,
+    service~,
+    config~,
+    value_contracts~,
+  )
+  let config : ConversionConfig = { settings: config, value_contracts, }
   let ast = @syntax.encode_json_ast(model.to_json_ast())
   guard ast is { "shapes": Object(shapes), .. } else {
     raise InvalidConfiguration("Model has no shape table")
@@ -29,6 +56,9 @@ pub fn SchemaIndex::new(
     }
   }
   deconflict_names(shapes, connected, names, service, config)
+  if config.value_contracts {
+    value_member_names(shapes, connected, names, service)
+  }
   let definitions : Map[String, @smithy.ShapeId] = Map([])
   for id, _ in connected {
     if @smithy.ShapeId::parse(id) is Some(shape_id) &&
@@ -38,7 +68,21 @@ pub fn SchemaIndex::new(
       definitions[name] = shape_id
     }
   }
-  { shapes, names, config, document, definitions, }
+  if config.value_contracts {
+    for id, name in names {
+      if id.contains("$") && @smithy.ShapeId::parse(id) is Some(shape_id) {
+        definitions[name] = shape_id
+      }
+    }
+  }
+  {
+    shapes,
+    names,
+    config: config.settings,
+    value_contracts: config.value_contracts,
+    document,
+    definitions,
+  }
 }
 
 ///|
@@ -67,16 +111,26 @@ pub fn SchemaIndex::shape(
   id : @smithy.ShapeId,
   config~ : Config? = None,
 ) -> Json raise JsonSchemaError {
+  let effective : ConversionConfig = {
+    settings: config.unwrap_or(self.config),
+    value_contracts: self.value_contracts,
+  }
+  validate_value_config(effective)
+  if id.to_string() == "smithy.api#Unit" {
+    return if effective.value_contracts {
+      Json::object({
+        "type": Json::string("object"),
+        "properties": Json::object(Map([])),
+        "additionalProperties": Json::boolean(false),
+      })
+    } else {
+      Json::object({ "type": Json::string("object") })
+    }
+  }
   guard self.shapes.get(id.to_string()) is Some(shape) else {
     raise InvalidConfiguration("Unknown schema shape `" + id.to_string() + "`")
   }
-  shape_schema(
-    shape,
-    self.shapes,
-    [id.to_string()],
-    config.unwrap_or(self.config),
-    self.names,
-  )
+  shape_schema(shape, self.shapes, [id.to_string()], effective, self.names)
 }
 
 ///|
@@ -86,6 +140,11 @@ pub fn SchemaIndex::schema_for_member(
   id : @smithy.ShapeId,
   config~ : Config? = None,
 ) -> Json raise JsonSchemaError {
+  let effective : ConversionConfig = {
+    settings: config.unwrap_or(self.config),
+    value_contracts: self.value_contracts,
+  }
+  validate_value_config(effective)
   guard id.member_name() is Some(name) &&
     self.shapes.get(id.root().to_string()) is Some(Object(parent)) else {
     raise InvalidConfiguration("Unknown schema member `" + id.to_string() + "`")
@@ -97,13 +156,7 @@ pub fn SchemaIndex::schema_for_member(
   guard entries.get(name) is Some(entry) && member_target(entry) is Some(_) else {
     raise InvalidConfiguration("Unknown schema member `" + id.to_string() + "`")
   }
-  member_schema(
-    entry,
-    self.shapes,
-    [],
-    config.unwrap_or(self.config),
-    self.names,
-  )
+  member_schema(entry, self.shapes, [], effective, self.names)
 }
 
 ///|
@@ -145,7 +198,7 @@ pub fn SchemaIndex::structure(
     Json::object(filtered),
     self.shapes,
     [id.to_string()],
-    self.config,
+    { settings: self.config, value_contracts: self.value_contracts, },
     self.names,
   )
 }

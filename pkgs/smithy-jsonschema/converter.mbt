@@ -13,8 +13,12 @@ fn member_target(entry : Json) -> String? {
 }
 
 ///|
-fn property_name(name : String, entry : Json, config : Config) -> String {
-  if config.use_json_name &&
+fn property_name(
+  name : String,
+  entry : Json,
+  config : ConversionConfig,
+) -> String {
+  if config.settings.use_json_name &&
     entry is Object(fields) &&
     fields.get("traits") is Some(Object(traits)) &&
     traits.get("smithy.api#jsonName") is Some(String(value)) {
@@ -54,7 +58,7 @@ fn apply_traits(
   schema : Map[String, Json],
   traits : Map[String, Json],
   kind : String,
-  config : Config,
+  config : ConversionConfig,
 ) -> Unit {
   for
     (trait_id, keyword) in [
@@ -93,7 +97,7 @@ fn apply_traits(
   if traits.get("smithy.api#uniqueItems") is Some(_) {
     schema["uniqueItems"] = Json::boolean(true)
   }
-  if !config.disable_default_values &&
+  if !config.settings.disable_default_values &&
     traits.get("smithy.api#default") is Some(value) {
     schema["default"] = value
   }
@@ -109,14 +113,14 @@ fn apply_traits(
 }
 
 ///|
-fn type_schema(kind : String, config : Config) -> Json {
+fn type_schema(kind : String, config : ConversionConfig) -> Json {
   let fields : Map[String, Json] = Map([])
   match kind {
     "string" | "blob" | "timestamp" => fields["type"] = Json::string("string")
     "boolean" => fields["type"] = Json::string("boolean")
     "byte" | "short" | "integer" | "long" =>
       fields["type"] = Json::string(
-        if config.use_integer_type {
+        if config.settings.use_integer_type {
           "integer"
         } else {
           "number"
@@ -129,6 +133,12 @@ fn type_schema(kind : String, config : Config) -> Json {
     "enum" => fields["type"] = Json::string("string")
     "intEnum" => fields["type"] = Json::string("number")
     _ => ()
+  }
+  if config.value_contracts {
+    value_numeric_bounds(fields, kind)
+    if kind == "blob" {
+      value_blob_contract(fields, Map([]))
+    }
   }
   Json::object(fields)
 }
@@ -145,45 +155,49 @@ fn target_schema(
   target : String,
   shapes : Map[String, Json],
   active : Array[String],
-  config : Config,
+  config : ConversionConfig,
   names : Map[String, String],
 ) -> Json {
   if target == "smithy.api#Unit" {
     return Json::object({
-      "$ref": Json::string(config.definition_pointer + "/Unit"),
+      "$ref": Json::string(config.settings.definition_pointer + "/Unit"),
     })
   }
   if target.has_prefix("smithy.api#") {
     let parts = target.split("#").to_array()
     let kind = if parts.length() == 2 { parts[1].to_owned() } else { "" }
-    let keyword = match kind {
-      "String" => "string"
-      "Blob" => "blob"
-      "Boolean" => "boolean"
-      "Byte" => "byte"
-      "Short" => "short"
-      "Integer" => "integer"
-      "Long" => "long"
-      "Float" => "float"
-      "Double" => "double"
-      "BigInteger" => "bigInteger"
-      "BigDecimal" => "bigDecimal"
-      "Timestamp" => "timestamp"
-      _ => "document"
+    let keyword = if config.value_contracts {
+      value_prelude_kind(target)
+    } else {
+      match kind {
+        "String" => "string"
+        "Blob" => "blob"
+        "Boolean" => "boolean"
+        "Byte" => "byte"
+        "Short" => "short"
+        "Integer" => "integer"
+        "Long" => "long"
+        "Float" => "float"
+        "Double" => "double"
+        "BigInteger" => "bigInteger"
+        "BigDecimal" => "bigDecimal"
+        "Timestamp" => "timestamp"
+        _ => "document"
+      }
     }
     if keyword == "timestamp" {
-      if config.default_timestamp_format == "date-time" {
+      if config.settings.default_timestamp_format == "date-time" {
         return Json::object({
           "type": Json::string("string"),
           "format": Json::string("date-time"),
         })
       }
-      if config.default_timestamp_format.has_prefix("epoch-") {
+      if config.settings.default_timestamp_format.has_prefix("epoch-") {
         return Json::object({ "type": Json::string("number") })
       }
     }
     if (keyword == "float" || keyword == "double") &&
-      config.support_non_numeric_floats {
+      config.settings.support_non_numeric_floats {
       return Json::object({
         "oneOf": Json::array([
           Json::object({ "type": Json::string("number") }),
@@ -201,7 +215,8 @@ fn target_schema(
     return type_schema(keyword, config)
   }
   if shapes.get(target) is Some(shape) {
-    if !active.contains(target) &&
+    if !config.value_contracts &&
+      !active.contains(target) &&
       shape is Object(body) &&
       body.get("type") is Some(String(kind)) &&
       (
@@ -219,7 +234,7 @@ fn target_schema(
         kind == "bigDecimal" ||
         kind == "timestamp" ||
         kind == "document" ||
-        (kind == "intEnum" && config.disable_int_enums)
+        (kind == "intEnum" && config.settings.disable_int_enums)
       ) {
       return shape_schema(shape, shapes, active + [target], config, names)
     }
@@ -228,7 +243,7 @@ fn target_schema(
       .get(target)
       .unwrap_or(if parts.length() == 2 { parts[1].to_owned() } else { target })
     return Json::object({
-      "$ref": Json::string(config.definition_pointer + "/" + name),
+      "$ref": Json::string(config.settings.definition_pointer + "/" + name),
     })
   }
   Json::object(Map([]))
@@ -239,11 +254,41 @@ fn member_schema(
   entry : Json,
   shapes : Map[String, Json],
   active : Array[String],
-  config : Config,
+  config : ConversionConfig,
   names : Map[String, String],
+  member_id~ : String = "",
 ) -> Json {
   guard member_target(entry) is Some(target) else {
     return Json::object(Map([]))
+  }
+  if config.value_contracts && names.get(member_id) is Some(name) {
+    return Json::object({
+      "$ref": Json::string(config.settings.definition_pointer + "/" + name),
+    })
+  }
+  if config.value_contracts &&
+    entry is Object(member_fields) &&
+    member_fields.get("traits") is Some(Object(overrides)) &&
+    value_overrides(overrides) &&
+    shapes.get(target) is Some(Object(target_fields)) {
+    let effective = target_fields.copy()
+    let traits = match target_fields.get("traits") {
+      Some(Object(traits)) => traits.copy()
+      _ => Map([])
+    }
+    for key, value in overrides {
+      traits[key] = value
+    }
+    effective["traits"] = Json::object(traits)
+    // Inline the selected top-level contract. Nested structures still use
+    // the index's shared references and recursive targets remain bounded.
+    return shape_schema(
+      Json::object(effective),
+      shapes,
+      active + [target],
+      config,
+      names,
+    )
   }
   let base = target_schema(target, shapes, active, config, names)
   guard base is Object(schema) else { return base }
@@ -275,12 +320,12 @@ fn member_schema(
       }
     }
     if schema_description(traits) is Some(description) &&
-      (schema.get("$ref") is None || config.add_reference_descriptions) {
+      (schema.get("$ref") is None || config.settings.add_reference_descriptions) {
       schema["description"] = description
     } else if schema.get("$ref") is Some(_) {
       schema.remove("description") |> ignore
     }
-    if !config.disable_default_values &&
+    if !config.settings.disable_default_values &&
       schema.get("$ref") is Some(_) &&
       traits.get("smithy.api#default") is Some(value) {
       schema.remove("default") |> ignore
@@ -292,6 +337,17 @@ fn member_schema(
       })
     }
   }
+  if config.value_contracts && target.has_prefix("smithy.api#") {
+    let kind = value_prelude_kind(target)
+    value_numeric_bounds(schema, kind)
+    if kind == "blob" {
+      let traits = match entry {
+        { "traits": Object(traits), .. } => traits
+        _ => Map([])
+      }
+      value_blob_contract(schema, traits)
+    }
+  }
   Json::object(schema)
 }
 
@@ -300,7 +356,7 @@ fn shape_schema(
   shape : Json,
   shapes : Map[String, Json],
   active : Array[String],
-  config : Config,
+  config : ConversionConfig,
   names : Map[String, String],
 ) -> Json {
   guard shape is Object(fields) && fields.get("type") is Some(String(kind)) else {
@@ -310,7 +366,8 @@ fn shape_schema(
     Object(fields) => fields
     _ => Map([])
   }
-  if (kind == "float" || kind == "double") && config.support_non_numeric_floats {
+  if (kind == "float" || kind == "double") &&
+    config.settings.support_non_numeric_floats {
     schema.remove("type") |> ignore
     schema["oneOf"] = Json::array([
       Json::object({ "type": Json::string("number") }),
@@ -324,7 +381,10 @@ fn shape_schema(
       }),
     ])
   }
-  if (kind == "enum" || (kind == "intEnum" && !config.disable_int_enums)) &&
+  if (
+      kind == "enum" ||
+      (kind == "intEnum" && !config.settings.disable_int_enums)
+    ) &&
     fields.get("members") is Some(Object(members)) {
     let values : Array[Json] = []
     let options : Array[Json] = []
@@ -339,7 +399,7 @@ fn shape_schema(
         _ => Json::string(name)
       }
       values.push(value)
-      if kind == "enum" && config.enum_strategy == "oneOf" {
+      if kind == "enum" && config.settings.enum_strategy == "oneOf" {
         let option : Map[String, Json] = { "const": value }
         if entry is Object(entry_fields) &&
           entry_fields.get("traits") is Some(Object(traits)) {
@@ -353,7 +413,7 @@ fn shape_schema(
         options.push(Json::object(option))
       }
     }
-    if kind == "enum" && config.enum_strategy == "oneOf" {
+    if kind == "enum" && config.settings.enum_strategy == "oneOf" {
       schema["oneOf"] = Json::array(options)
     } else {
       schema["enum"] = Json::array(values)
@@ -363,7 +423,7 @@ fn shape_schema(
     apply_traits(schema, traits, kind, config)
   }
   if kind == "timestamp" {
-    let mut format = config.default_timestamp_format
+    let mut format = config.settings.default_timestamp_format
     if fields.get("traits") is Some(Object(traits)) &&
       traits.get("smithy.api#timestampFormat") is Some(String(value)) {
       format = value
@@ -379,8 +439,15 @@ fn shape_schema(
     fields.get("value") is Some(value_entry) &&
     member_target(key_entry) is Some(_) &&
     member_target(value_entry) is Some(_) {
-    let value_schema = member_schema(value_entry, shapes, active, config, names)
-    if config.map_strategy == "patternProperties" {
+    let value_schema = member_schema(
+      value_entry,
+      shapes,
+      active,
+      config,
+      names,
+      member_id=value_member_id(active, "value"),
+    )
+    if config.settings.map_strategy == "patternProperties" {
       let mut pattern = ".+"
       if member_target(key_entry) is Some(target) &&
         shapes.get(target)
@@ -397,7 +464,12 @@ fn shape_schema(
       schema["patternProperties"] = Json::object(patterns)
     } else {
       schema["propertyNames"] = member_schema(
-        key_entry, shapes, active, config, names,
+        key_entry,
+        shapes,
+        active,
+        config,
+        names,
+        member_id=value_member_id(active, "key"),
       )
       schema["additionalProperties"] = value_schema
     }
@@ -405,11 +477,18 @@ fn shape_schema(
   if kind == "list" &&
     fields.get("member") is Some(entry) &&
     member_target(entry) is Some(_) {
-    schema["items"] = member_schema(entry, shapes, active, config, names)
+    schema["items"] = member_schema(
+      entry,
+      shapes,
+      active,
+      config,
+      names,
+      member_id=value_member_id(active, "member"),
+    )
   }
   if (
       kind == "structure" ||
-      (kind == "union" && config.union_strategy == "structure")
+      (kind == "union" && config.settings.union_strategy == "structure")
     ) &&
     fields.get("members") is Some(Object(members)) {
     let properties : Map[String, Json] = Map([])
@@ -418,7 +497,12 @@ fn shape_schema(
       if member_target(entry) is Some(_) {
         let property = property_name(name, entry, config)
         properties[property] = member_schema(
-          entry, shapes, active, config, names,
+          entry,
+          shapes,
+          active,
+          config,
+          names,
+          member_id=value_member_id(active, name),
         )
         if entry is Object(entry_fields) &&
           entry_fields.get("traits") is Some(Object(traits)) &&
@@ -438,18 +522,26 @@ fn shape_schema(
       schema["type"] = Json::string("object")
     }
   }
-  if kind == "union" && config.union_strategy == "object" {
+  if kind == "union" && config.settings.union_strategy == "object" {
     schema["type"] = Json::string("object")
   }
   if kind == "union" &&
-    config.union_strategy == "oneOf" &&
+    config.settings.union_strategy == "oneOf" &&
     fields.get("members") is Some(Object(members)) {
     let options : Array[Json] = []
     for name, entry in members {
       if member_target(entry) is Some(_) {
+        let semantic_name = name
         let name = property_name(name, entry, config)
         let properties : Map[String, Json] = Map([])
-        properties[name] = member_schema(entry, shapes, active, config, names)
+        properties[name] = member_schema(
+          entry,
+          shapes,
+          active,
+          config,
+          names,
+          member_id=value_member_id(active, semantic_name),
+        )
         options.push(
           Json::object({
             "type": Json::string("object"),
@@ -461,6 +553,17 @@ fn shape_schema(
       }
     }
     schema["oneOf"] = Json::array(options)
+  }
+  if config.value_contracts {
+    value_numeric_bounds(schema, kind)
+    value_collection_contract(schema, shape, kind)
+    if kind == "blob" {
+      let traits = match shape {
+        { "traits": Object(traits), .. } => traits
+        _ => Map([])
+      }
+      value_blob_contract(schema, traits)
+    }
   }
   Json::object(schema)
 }
@@ -509,7 +612,7 @@ fn connected_shapes(
 fn schema_names(
   shapes : Map[String, Json],
   service : String,
-  config : Config,
+  config : ConversionConfig,
 ) -> Map[String, String] {
   let names : Map[String, String] = Map([])
   let renames = match shapes.get(service) {
@@ -527,7 +630,7 @@ fn schema_names(
         Some(String(name)) => name
         _ => parts[1].to_owned()
       }
-      names[id] = if config.alphanumeric_only_refs {
+      names[id] = if config.settings.alphanumeric_only_refs {
         let out = StringBuilder()
         for ch in name {
           if (ch >= 'a' && ch <= 'z') ||
@@ -546,13 +649,16 @@ fn schema_names(
 }
 
 ///|
-fn is_definition_shape(shape : Json, config : Config) -> Bool {
+fn is_definition_shape(shape : Json, config : ConversionConfig) -> Bool {
   guard shape is Object(body) && body.get("type") is Some(String(kind)) else {
     return false
   }
   if body.get("traits") is Some(Object(traits)) &&
     traits.get("smithy.api#mixin") is Some(_) {
     return false
+  }
+  if config.value_contracts {
+    return !["service", "resource", "operation"].contains(kind)
   }
   !(kind == "service" ||
   kind == "resource" ||
@@ -563,7 +669,7 @@ fn is_definition_shape(shape : Json, config : Config) -> Bool {
     "blob", "boolean", "byte", "short", "integer", "long", "float", "double", "bigInteger",
     "bigDecimal", "timestamp", "document",
   ].contains(kind) ||
-  (kind == "intEnum" && config.disable_int_enums))
+  (kind == "intEnum" && config.settings.disable_int_enums))
 }
 
 ///|
@@ -585,7 +691,7 @@ fn deconflict_names(
   connected : Map[String, Bool],
   names : Map[String, String],
   service : String,
-  config : Config,
+  config : ConversionConfig,
 ) -> Unit raise JsonSchemaError {
   let claimed : Map[String, String] = Map([])
   let ids = shapes.keys().to_array()
@@ -647,22 +753,47 @@ pub fn convert(
   service~ : String = "",
   config~ : Config = Config::new(),
 ) -> Json raise {
-  if !["propertyNames", "patternProperties"].contains(config.map_strategy) ||
-    !["oneOf", "object", "structure"].contains(config.union_strategy) ||
-    !["enum", "oneOf"].contains(config.enum_strategy) {
+  convert_with_profile(model, service~, config~, value_contracts=false)
+}
+
+///|
+/// Convert with runtime value-contract semantics while retaining the existing
+/// reference-compatible convert signature and Config record.
+pub fn convert_values(
+  model : @smithy.Model,
+  service~ : String = "",
+  config~ : Config = Config::new(),
+) -> Json raise {
+  convert_with_profile(model, service~, config~, value_contracts=true)
+}
+
+///|
+fn convert_with_profile(
+  model : @smithy.Model,
+  service~ : String = "",
+  config~ : Config = Config::new(),
+  value_contracts~ : Bool = false,
+) -> Json raise {
+  let config : ConversionConfig = { settings: config, value_contracts, }
+  validate_value_config(config)
+  if !["propertyNames", "patternProperties"].contains(
+      config.settings.map_strategy,
+    ) ||
+    !["oneOf", "object", "structure"].contains(config.settings.union_strategy) ||
+    !["enum", "oneOf"].contains(config.settings.enum_strategy) {
     raise InvalidConfiguration("Unknown JSON Schema strategy")
   }
   if !["date-time", "http-date", "epoch-seconds"].contains(
-      config.default_timestamp_format,
+      config.settings.default_timestamp_format,
     ) {
     raise InvalidConfiguration(
-      "Unknown timestamp format: " + config.default_timestamp_format,
+      "Unknown timestamp format: " + config.settings.default_timestamp_format,
     )
   }
-  if !config.definition_pointer.has_prefix("#/") {
+  if !config.settings.definition_pointer.has_prefix("#/") {
     raise InvalidConfiguration("definitionPointer must start with #/")
   }
-  if !(config.schema_document_extensions is Object(_)) {
+  if !(config.settings.schema_document_extensions is Object(_)) {
     raise InvalidConfiguration("schemaDocumentExtensions must be an object")
   }
   if service != "" &&
@@ -678,6 +809,9 @@ pub fn convert(
   let connected = connected_shapes(service, shapes)
   let names = schema_names(shapes, service, config)
   deconflict_names(shapes, connected, names, service, config)
+  if config.value_contracts {
+    value_member_names(shapes, connected, names, service)
+  }
   for id, shape in shapes {
     if service != "" && connected.get(id) is None {
       continue
@@ -699,36 +833,59 @@ pub fn convert(
         }
       }
     }
-    if kind == "list" ||
-      (kind == "string" && !has_enum_trait(shape)) ||
-      kind == "blob" ||
-      kind == "boolean" ||
-      kind == "byte" ||
-      kind == "short" ||
-      kind == "integer" ||
-      kind == "long" ||
-      kind == "float" ||
-      kind == "double" ||
-      kind == "bigInteger" ||
-      kind == "bigDecimal" ||
-      kind == "timestamp" ||
-      kind == "document" ||
-      (kind == "intEnum" && config.disable_int_enums) {
+    if !config.value_contracts &&
+      (
+        kind == "list" ||
+        (kind == "string" && !has_enum_trait(shape)) ||
+        kind == "blob" ||
+        kind == "boolean" ||
+        kind == "byte" ||
+        kind == "short" ||
+        kind == "integer" ||
+        kind == "long" ||
+        kind == "float" ||
+        kind == "double" ||
+        kind == "bigInteger" ||
+        kind == "bigDecimal" ||
+        kind == "timestamp" ||
+        kind == "document" ||
+        (kind == "intEnum" && config.settings.disable_int_enums)
+      ) {
       continue
     }
     guard names.get(id) is Some(name) else { continue }
     definitions[name] = shape_schema(shape, shapes, [id], config, names)
   }
+  if config.value_contracts {
+    for (member_id, entry) in value_member_entries(shapes) {
+      if names.get(member_id) is Some(name) {
+        definitions[name] = member_schema(entry, shapes, [], config, names)
+      }
+    }
+  }
   if unit_targeted {
-    definitions["Unit"] = Json::object({ "type": Json::string("object") })
+    if config.value_contracts && definitions.contains("Unit") {
+      raise ConflictingShapeName(
+        "A contextual data shape conflicts with smithy.api#Unit using schema name Unit; rename that shape in the service.",
+      )
+    }
+    definitions["Unit"] = if config.value_contracts {
+      Json::object({
+        "type": Json::string("object"),
+        "properties": Json::object(Map([])),
+        "additionalProperties": Json::boolean(false),
+      })
+    } else {
+      Json::object({ "type": Json::string("object") })
+    }
   }
   let document : Map[String, Json] = Map([])
-  if config.schema_document_extensions is Object(extensions) {
+  if config.settings.schema_document_extensions is Object(extensions) {
     for key, value in extensions {
       document[key] = value
     }
   }
-  let pointer = config.definition_pointer.split("/").to_array()
+  let pointer = config.settings.definition_pointer.split("/").to_array()
   let mut nested = Json::object(definitions)
   for index = pointer.length() - 1; index >= 1; index = index - 1 {
     let parent : Map[String, Json] = Map([])

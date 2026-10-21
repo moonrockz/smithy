@@ -155,6 +155,19 @@ projection. The `openapi` plugin writes `<ServiceName>.openapi.json` in OpenAPI
 protocol selection, configuration and conversion boundaries. `clean` removes
 that configured output directory.
 
+The `openrpc` plugin writes `openrpc.json` for a JSON-RPC 2.0 service. Its
+required `service` setting selects the Smithy service ID; the CLI supplies the
+opt-in `smithy.rpc` traits. OpenRPC document version 1.3.2, JSON Schema draft-07,
+the service's API version and JSON-RPC wire version 2.0 are separate values.
+Run the [example](../../examples/openrpc/smithy-build.json) from a source checkout:
+
+```sh
+moon run apps/smithy -- build --config examples/openrpc/smithy-build.json
+```
+
+See the [library and plugin guide](../../pkgs/smithy-openrpc/README.mbt.md)
+for typed configuration, errors, examples and extension policies.
+
 Build sources and imports also accept local JAR files with a
 `META-INF/smithy/manifest`. Configuration strings and keys expand `${NAME}`
 from environment variables; `\${NAME}` escapes a placeholder.

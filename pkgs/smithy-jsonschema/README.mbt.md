@@ -29,6 +29,20 @@ once, then use `document()`, `shape(id)`, `schema_for_member(id)` and
 Filtering a structure happens before required properties are computed.
 `definition(name)` resolves component names within the selected service closure.
 
+Protocol exporters can opt into `SchemaIndex::for_values` or `convert_values`.
+This mode
+replaces target constraints with explicit member overrides, retains intrinsic
+integer/float bounds, closes structures, limits unions to exactly one known
+member, and allows null collection values only where sparse or Document permits
+them. Shared data and constrained member variants use definitions so recursive
+collections remain finite. It does not change the reference-compatible defaults.
+Wire-specific limitations such as decoded blob lengths and timestamp policies
+still require the exporting protocol's diagnostics and extensions.
+Value conversion requires `union_strategy="oneOf"`,
+`map_strategy="propertyNames"` and `support_non_numeric_floats=false`.
+Other settings for these options raise `InvalidConfiguration` because they
+discard runtime member, map-key, sparse-value or numeric-bound contracts.
+
 ## Build plugin
 
 The Smithy CLI registers the `jsonSchema` plugin. Put this in

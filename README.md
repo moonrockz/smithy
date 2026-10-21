@@ -18,6 +18,8 @@ converts and builds IDL and JSON models. It also compares model snapshots with
 and the [model diff API](pkgs/smithy-diff/README.mbt.md).
 The build plugins convert assembled models to JSON Schema and services to OpenAPI
 3.0.2 or 3.1.0. See [OpenAPI usage](pkgs/smithy-openapi/README.mbt.md).
+The `openrpc` plugin exports JSON-RPC 2.0 services as OpenRPC 1.3.2 with
+draft-07 value schemas. See [OpenRPC usage](pkgs/smithy-openrpc/README.mbt.md).
 
 `moonrockz/smithy-validation` checks application JSON directly against selected Smithy data shapes,
 with exact numbers and structured findings. The CLI exposes it through `smithy validate value`.
@@ -42,6 +44,7 @@ protocol implementations. Validate case definitions with
 | `pkgs/smithy-build` | `moonrockz/smithy-build` | Build configuration, projections and plugins |
 | `pkgs/smithy-jsonschema` | `moonrockz/smithy-jsonschema` | Convert assembled value shapes to JSON Schema |
 | `pkgs/smithy-openapi` | `moonrockz/smithy-openapi` | Convert services to OpenAPI with REST JSON and RPC v2 JSON protocols |
+| `pkgs/smithy-openrpc` | `moonrockz/smithy-openrpc` | Export JSON-RPC 2.0 services as OpenRPC 1.3.2 |
 | `pkgs/smithy-syntax` | `moonrockz/smithy-syntax` | Smithy IDL scanner, AST, CST, parser and diagnostics |
 | `docs/cookbook` | `moonrockz/smithy_cookbook` | Tested cookbook articles for the syntax module |
 | `tests` | `moonrockz/smithy_tests` | Compatibility kit (vendored reference corpus) and moonspec acceptance features; not published |
@@ -185,6 +188,7 @@ smithy/
 ├── pkgs/smithy-diff/          # Model compatibility differences
 ├── pkgs/smithy-jsonschema/    # JSON Schema converter
 ├── pkgs/smithy-openapi/       # OpenAPI service converter and protocols
+├── pkgs/smithy-openrpc/       # OpenRPC service converter
 ├── pkgs/artifact-resources/   # reusable local artifact/resource library
 ├── pkgs/jmespath/             # JMESPath parser and evaluator (moonrockz/jmespath)
 ├── pkgs/smithy-syntax/        # IDL syntax (moonrockz/smithy-syntax)

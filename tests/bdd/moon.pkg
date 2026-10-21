@@ -4,6 +4,7 @@ import {
   "moonrockz/smithy-build" @build,
   "moonrockz/smithy-diff" @diff,
   "moonrockz/smithy-openapi" @openapi,
+  "moonrockz/smithy-openrpc" @openrpc,
   "moonbit-community/zipc",
   "moonbitlang/core/encoding/utf8",
   "moonrockz/smithy-syntax" @syntax,

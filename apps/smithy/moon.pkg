@@ -12,6 +12,7 @@ import {
   "moonrockz/smithy-diff" @diff,
   "moonrockz/smithy-jsonschema" @jsonschema,
   "moonrockz/smithy-openapi" @openapi,
+  "moonrockz/smithy-openrpc" @openrpc,
   "moonrockz/smithy-syntax" @syntax,
   "moonbitlang/core/argparse",
   "moonbitlang/core/env",

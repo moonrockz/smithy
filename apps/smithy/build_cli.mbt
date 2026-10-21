@@ -627,6 +627,26 @@ fn json_schema_plugin(
 }
 
 ///|
+fn openrpc_plugin(
+  model : @smithy.Model,
+  settings : Json,
+) -> Map[String, String] raise @build.BuildError {
+  let result = @openrpc.convert_result(
+    model,
+    @openrpc.Config::from_json(settings),
+  ) catch {
+    error =>
+      raise @build.InvalidBuildConfig(
+        "OpenRPC conversion failed: " + error.message(),
+      )
+  }
+  for warning in result.warnings {
+    eprintln("WARNING: " + warning.shape.to_string() + ": " + warning.message)
+  }
+  { "openrpc.json": result.document.stringify(indent=2) + "\n" }
+}
+
+///|
 fn openapi_plugin(
   model : @smithy.Model,
   settings : Json,
@@ -733,6 +753,12 @@ fn run_build(
   for projection in config.projections {
     plugin_names.append(projection.plugins.keys().to_array())
   }
+  if plugin_names.any(name => name.split("::").next() == Some("openrpc")) {
+    guard @rpc.loader().assemble().model is Some(protocols) else {
+      raise CliError("Could not load bundled JSON-RPC trait definitions", 2)
+    }
+    let _ = loader.add_defaults(protocols)
+  }
   if plugin_names.any(name => name.split("::").next() == Some("openapi")) {
     let provider = @smithy.Loader::new()
     for input in @openapi.protocol_definitions() {
@@ -746,6 +772,7 @@ fn run_build(
   let runner = @build.BuildRunner::new(config)
     .register_plugin("jsonSchema", json_schema_plugin)
     .register_plugin("openapi", openapi_plugin)
+    .register_plugin("openrpc", openrpc_plugin)
   for input in config.sources {
     build_add_input(
       loader,
