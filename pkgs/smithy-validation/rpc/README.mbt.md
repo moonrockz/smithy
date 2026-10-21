@@ -107,14 +107,15 @@ when the result itself is null. Failure has nonnull error and null result. Legac
 opaque by default, with a `LimitedScope` advisory. Explicit `legacy_errors=CodeMessageData`
 opts into the code/message/data application mapping; 1.0 itself does not require that schema.
 
-Original-request context uses original text so parse failures can match -32700 with null ID.
+Original-request context uses original text. In 2.0, parse failures can match -32700 with null ID.
 Invalid envelopes match -32600, unknown methods match -32601, and invalid modeled parameters
 match -32602. Detectable valid request IDs are echoed exactly; unknown/invalid IDs become null.
 Exact numeric identity compares mathematical values without rounding, including nested legacy
 IDs. Valid notifications cannot have a supplied response. Duplicate keys and incomplete
 resource checks fail context validation rather than becoming protocol parse errors. Invalid
-1.0 original requests have no standardized protocol-error mapping and fail context validation.
-Original-request arrays are unsupported batch contexts. This API checks a single supplied association, not transcript completeness.
+1.0 original request envelopes have no standardized protocol-error mapping and fail context validation.
+Well-formed 1.0 calls with unknown methods or invalid modeled parameters require a nonnull legacy
+error, without inventing a required 2.0 error code. Original-request arrays are unsupported batch contexts. This API checks a single supplied association, not transcript completeness.
 
 ## CLI
 

@@ -65,6 +65,7 @@ pub fn PreparedService::validate_response_json(
   let mut original : RequestResult? = None
   let mut expected_code : ErrorCode? = None
   let mut expected_id : RequestId? = None
+  let mut expected_legacy_error = false
   let root = @validation.InstancePath::root()
   fn emit(
     code : FindingCode,
@@ -139,15 +140,9 @@ pub fn PreparedService::validate_response_json(
           root,
           "I expected a single original request, not a batch context.",
         )
-      } else if self.version == V1_0 && !request.is_valid() {
-        complete = request.complete
-        emit(
-          InvalidContext,
-          root,
-          "I expected a valid original version 1.0 request; that protocol defines no standard invalid-request error mapping.",
-        )
       } else if !request.complete {
-        if request.findings.iter().any(f => f.code == InvalidJson) {
+        if self.version == V2_0 &&
+          request.findings.iter().any(f => f.code == InvalidJson) {
           expected_code = Some(error_code("-32700"))
           expected_id = Some(Present(@smithy.Null))
         } else {
@@ -162,7 +157,8 @@ pub fn PreparedService::validate_response_json(
         let invalid_params_envelope = match parsed {
           Some(Object(fields)) =>
             match fields.get("params") {
-              Some(Array(_)) | Some(Object(_)) | None => false
+              Some(Array(_)) => false
+              Some(Object(_)) | None => self.version == V1_0
               _ => true
             }
           _ => false
@@ -177,7 +173,15 @@ pub fn PreparedService::validate_response_json(
             f.code == UnsupportedMessage
           })
         if envelope_invalid {
-          expected_code = Some(error_code("-32600"))
+          if self.version == V1_0 {
+            emit(
+              InvalidContext,
+              root,
+              "I expected a well-formed original version 1.0 request envelope; that protocol defines no standard invalid-request error mapping.",
+            )
+          } else {
+            expected_code = Some(error_code("-32600"))
+          }
           // A detectable, valid ID is echoed; otherwise the unknown ID is null.
           expected_id = Some(
             if request.findings.iter().any(f => f.code == InvalidId) ||
@@ -195,7 +199,9 @@ pub fn PreparedService::validate_response_json(
           )
         } else {
           expected_id = Some(request.id)
-          if request.findings.iter().any(f => f.code == UnknownMethod) {
+          if self.version == V1_0 && !request.is_valid() {
+            expected_legacy_error = true
+          } else if request.findings.iter().any(f => f.code == UnknownMethod) {
             expected_code = Some(error_code("-32601"))
           } else if !request.is_valid() {
             expected_code = Some(error_code("-32602"))
@@ -381,6 +387,13 @@ pub fn PreparedService::validate_response_json(
           }
         } else {
           kind = Some(ApplicationError)
+          if method_ is None && scope == RequestContext {
+            emit(
+              LimitedScope,
+              field("error"),
+              "I could not check application error data without a modeled method for the original request.",
+            )
+          }
           if method_ is Some(method_) {
             match method_.errors.iter().find_first(e => e.code == code) {
               None =>
@@ -449,6 +462,13 @@ pub fn PreparedService::validate_response_json(
       InvalidId,
       field("id"),
       "I expected a null unknown ID for a parse-error response.",
+    )
+  }
+  if expected_legacy_error && (kind is None || kind == Some(Success)) {
+    emit(
+      InvalidContext,
+      field("error"),
+      "I expected a nonnull legacy error for the supplied unknown method or invalid modeled parameters.",
     )
   }
   if expected_code is Some(expected) && response_code != Some(expected) {

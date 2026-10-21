@@ -495,6 +495,14 @@ async fn exercise_rpc_responses(runner : Runner, root : String, skip_stdin : Boo
   @fs.write_file(runner.dir + "/reply.json", "{\"result\":19,\"error\":null,\"id\":{\"exact\":[9007199254740992]}}")
   let (out, _) = runner.command(legacy + ["--request", "request.json"], 1)
   assert_true(out.contains("IdMismatch"))
+  for (method_, params) in [("subtract", "[42,\"bad\"]"), ("missing", "[]")] {
+    @fs.write_file(runner.dir + "/request.json", "{\"method\":\"" + method_ + "\",\"params\":" + params + ",\"id\":1}")
+    @fs.write_file(runner.dir + "/reply.json", "{\"result\":null,\"error\":\"legacy failure\",\"id\":1}")
+    runner.command(legacy + ["--request", "request.json"], 0) |> ignore
+    @fs.write_file(runner.dir + "/reply.json", "{\"result\":19,\"error\":null,\"id\":1}")
+    let (out, _) = runner.command(legacy + ["--request", "request.json"], 1)
+    assert_true(out.contains("InvalidContext"))
+  }
   let missing_file = base.copy(); missing_file[7] = "missing-reply.json"
   runner.command(missing_file + ["--envelope-only"], 1) |> ignore
   runner.command(base + ["--request", "missing-request.json"], 1) |> ignore

@@ -678,3 +678,66 @@ test "error code boundary accepts exact mathematical integers without machine bo
     None,
   )
 }
+
+///|
+test "legacy original calls can fail without a standardized protocol error code" {
+  let service = response_service(version=@rpc.V1_0)
+  for (method_, params) in [("subtract", "[42,\"bad\"]"), ("missing", "[]")] {
+    let context = Some(
+      @rpc.OriginalRequest(
+        "{\"method\":\"" +
+        method_ +
+        "\",\"params\":" +
+        params +
+        ",\"id\":{\"exact\":9007199254740993}}",
+      ),
+    )
+    let checked = service.validate_response(
+      "{\"result\":null,\"error\":\"legacy failure\",\"id\":{\"exact\":9007199254740993}}",
+      context~,
+    )
+    assert_true(checked.is_valid(), msg=@json.to_json(checked).stringify())
+    assert_eq(checked.kind, Some(@rpc.LegacyError))
+    assert_false(
+      service
+      .validate_response(
+        "{\"result\":19,\"error\":null,\"id\":{\"exact\":9007199254740993}}",
+        context~,
+      )
+      .is_valid(),
+    )
+    assert_false(
+      service
+      .validate_response(
+        "{\"result\":null,\"error\":\"legacy failure\",\"id\":{\"exact\":9007199254740992}}",
+        context~,
+      )
+      .is_valid(),
+    )
+  }
+  let checked = service.validate_response(
+    "{\"result\":null,\"error\":{\"code\":1001,\"message\":\"failure\",\"data\":\"detail\"},\"id\":1}",
+    context=Some(
+      @rpc.OriginalRequest(
+        "{\"method\":\"subtract\",\"params\":[42,\"bad\"],\"id\":1}",
+      ),
+    ),
+    legacy_errors=@rpc.CodeMessageData,
+  )
+  assert_true(checked.is_valid())
+  for
+    request in [
+      "{\"method\":1,\"params\":[],\"id\":1}", "{\"method\":\"subtract\",\"params\":null,\"id\":1}",
+      "{\"method\":\"subtract\",\"params\":{},\"id\":1}", "{\"method\":\"subtract\",\"id\":1}",
+      "{\"a\":truX}",
+    ] {
+    assert_false(
+      service
+      .validate_response(
+        "{\"result\":null,\"error\":\"failure\",\"id\":1}",
+        context=Some(@rpc.OriginalRequest(request)),
+      )
+      .is_valid(),
+    )
+  }
+}
