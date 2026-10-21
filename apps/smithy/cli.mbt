@@ -58,6 +58,12 @@ fn command_line() -> @argparse.Command {
       @argparse.Command(
         "validate",
         about="Validate model definitions, JSON values or JSON-RPC messages.",
+        flags=[
+          @argparse.FlagArg(
+            "protocol-tests",
+            about="Load the bundled smithy.test protocol-test traits.",
+          ),
+        ],
         options=[
           @argparse.OptionArg("from", about="Model format: idl or json."),
         ],
@@ -266,6 +272,7 @@ struct Options {
   diff_format : DiffFormat
   value_validation : ValueOptions?
   rpc_version : @rpc.ProtocolVersion?
+  protocol_tests : Bool
   rpc_options : RpcOptions?
   offline : Bool
   cache_dir : String?
@@ -295,7 +302,8 @@ fn options(args : Array[String]) -> Options raise CliError {
   if validation_command is Some((name, _)) &&
     (
       !matches.values.get("file").unwrap_or([]).is_empty() ||
-      matches.values.contains("from")
+      matches.values.contains("from") ||
+      matches.flags.get("protocol-tests") == Some(true)
     ) {
     raise CliError("place model inputs and options after validate " + name, 2)
   }
@@ -471,6 +479,7 @@ fn options(args : Array[String]) -> Options raise CliError {
     diff_format,
     value_validation,
     rpc_version,
+    protocol_tests: matches.flags.get("protocol-tests") == Some(true),
     rpc_options,
     command,
     files,
@@ -579,7 +588,7 @@ fn run(args : Array[String]) -> Int32 raise {
   let loader = if opts.rpc_version is Some(_) {
     @rpc.loader()
   } else {
-    @smithy.Loader::new()
+    @smithy.Loader::new(protocol_tests=opts.protocol_tests)
   }
   let inputs : Map[String, String] = Map([])
   let formatted : Array[(String, String)] = []

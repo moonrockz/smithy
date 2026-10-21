@@ -7,6 +7,7 @@ fn Model::node_validation_events(
   event_id : String,
   severity : String,
   allow_constraint_errors~ : Bool = false,
+  protocol_params~ : Bool = false,
 ) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
   let stack = [(target, value, "")]
@@ -201,7 +202,8 @@ fn Model::node_validation_events(
       (Simple(Document), _) => true
       (Simple(Boolean), Boolean(_)) => true
       (Simple(String | Blob), String(_)) => true
-      (Simple(Timestamp), String(_) | Number(_)) => true
+      (Simple(Timestamp), Number(_)) => true
+      (Simple(Timestamp), String(_)) => !protocol_params
       (Simple(Float | Double), Number(_)) => true
       (Simple(Float | Double), String("NaN" | "Infinity" | "-Infinity")) => true
       (Simple(BigDecimal), Number(_)) => true
@@ -213,12 +215,22 @@ fn Model::node_validation_events(
         n.in_range("-9223372036854775808", "9223372036854775807")
       (List(member_), Array(values)) => {
         for i, value in values {
+          if protocol_params &&
+            value is Null &&
+            shape.trait_value("smithy.api#sparse") is Some(_) {
+            continue
+          }
           stack.push((member_, value, path + "/" + i.to_string()))
         }
         true
       }
       (Map(key~, value=member_), Object(values)) => {
         for name, value in values {
+          if protocol_params &&
+            value is Null &&
+            shape.trait_value("smithy.api#sparse") is Some(_) {
+            continue
+          }
           stack.push(
             (key, String(name), path + "/" + pointer(name) + " (map-key)"),
           )
@@ -241,6 +253,8 @@ fn Model::node_validation_events(
           }
           declared.add(name)
           match values.get(name) {
+            Some(Null) if protocol_params &&
+              member_shape.trait_value("smithy.api#required") is None => ()
             Some(value) =>
               stack.push((member_, value, path + "/" + pointer(name)))
             None =>

@@ -1,0 +1,245 @@
+{
+  "referenceSha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef",
+  "files": [
+    {
+      "path": "LICENSE",
+      "upstreamPath": "LICENSE",
+      "gitBlob": "67db8588217f266eb561f75fae738656325deac9"
+    },
+    {
+      "path": "smithy.test.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/main/resources/META-INF/smithy/smithy.test.smithy",
+      "gitBlob": "c73367a0d865f45b724902ae2d7ed351513ba3b0"
+    },
+    {
+      "path": "upstream/errorfiles/all-malformed-request-features.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/all-malformed-request-features.errors",
+      "gitBlob": "009fa5acd16e0a2f53b7a32cfddfa88c7c44c5d0"
+    },
+    {
+      "path": "upstream/errorfiles/all-malformed-request-features.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/all-malformed-request-features.smithy",
+      "gitBlob": "24a193e0d50cf52dba9706c1e3f78f2a5603c47b"
+    },
+    {
+      "path": "upstream/errorfiles/all-request-features.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/all-request-features.errors",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "upstream/errorfiles/all-request-features.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/all-request-features.smithy",
+      "gitBlob": "f87146441b04294cbd0480e97664149eed0ba55b"
+    },
+    {
+      "path": "upstream/errorfiles/all-response-features.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/all-response-features.errors",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "upstream/errorfiles/all-response-features.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/all-response-features.smithy",
+      "gitBlob": "44493e6a3826dd108b0069cb6fb35510e6a380b8"
+    },
+    {
+      "path": "upstream/errorfiles/detects-duplicate-ids.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/detects-duplicate-ids.errors",
+      "gitBlob": "a15cdbf56dfeb585aaed7f3032b689c0cdee5509"
+    },
+    {
+      "path": "upstream/errorfiles/detects-duplicate-ids.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/detects-duplicate-ids.smithy",
+      "gitBlob": "37b07493d2757bd64d07876c7dbdcb4c6f166bf5"
+    },
+    {
+      "path": "upstream/errorfiles/detects-invalid-malformed-request-parameters.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/detects-invalid-malformed-request-parameters.errors",
+      "gitBlob": "c4149e251231bed873e5c37ef191a3230793eee0"
+    },
+    {
+      "path": "upstream/errorfiles/detects-invalid-malformed-request-parameters.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/detects-invalid-malformed-request-parameters.smithy",
+      "gitBlob": "3c931df08734552377bf507a26ca13be3154de2f"
+    },
+    {
+      "path": "upstream/errorfiles/detects-invalid-malformed-request-response.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/detects-invalid-malformed-request-response.errors",
+      "gitBlob": "e2d7a4db2fd0aae0f5ab434993846358740e5066"
+    },
+    {
+      "path": "upstream/errorfiles/detects-invalid-malformed-request-response.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/detects-invalid-malformed-request-response.smithy",
+      "gitBlob": "ef3c281a98d95ce0e33d42ad29a85069d68bbfaa"
+    },
+    {
+      "path": "upstream/errorfiles/detects-invalid-params.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/detects-invalid-params.errors",
+      "gitBlob": "3184e6cdd6994346e447cb675950537ff52f0022"
+    },
+    {
+      "path": "upstream/errorfiles/detects-invalid-params.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/detects-invalid-params.smithy",
+      "gitBlob": "19b25713b3140fea81a8ca4cc376e44c1efe42e4"
+    },
+    {
+      "path": "upstream/errorfiles/events-duplicate-ids.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/events-duplicate-ids.errors",
+      "gitBlob": "ea62bac9c1a50d71ed7dcf3fc2a2edc1d72778cb"
+    },
+    {
+      "path": "upstream/errorfiles/events-duplicate-ids.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/events-duplicate-ids.smithy",
+      "gitBlob": "0f0142baf419cf0a7dbd22baacde4dc9868d7c0f"
+    },
+    {
+      "path": "upstream/errorfiles/events-must-define-an-event.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/events-must-define-an-event.errors",
+      "gitBlob": "ea87654e64e61fb052f075841147e60276e1839d"
+    },
+    {
+      "path": "upstream/errorfiles/events-must-define-an-event.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/events-must-define-an-event.smithy",
+      "gitBlob": "e6fb0905eec3c43287873ec9060b3a2e07ba6caf"
+    },
+    {
+      "path": "upstream/errorfiles/events-validates-media-type.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/events-validates-media-type.errors",
+      "gitBlob": "5fc6f25b8956341aac72d1b27df104dfca4ab157"
+    },
+    {
+      "path": "upstream/errorfiles/events-validates-media-type.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/events-validates-media-type.smithy",
+      "gitBlob": "73e6a61eb258297f9252877b2e511cd3c9394f4f"
+    },
+    {
+      "path": "upstream/errorfiles/events-validates-params.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/events-validates-params.errors",
+      "gitBlob": "86e3e35628dad5cbb0702fbb7df21745fa05ac82"
+    },
+    {
+      "path": "upstream/errorfiles/events-validates-params.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/events-validates-params.smithy",
+      "gitBlob": "5cf5724b716f0118187a7ee92809adb1e34401d2"
+    },
+    {
+      "path": "upstream/errorfiles/events-validates-stream-presence.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/events-validates-stream-presence.errors",
+      "gitBlob": "753beb07f548f1c97efc2fcb5b3b1bb8797e2d07"
+    },
+    {
+      "path": "upstream/errorfiles/events-validates-stream-presence.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/events-validates-stream-presence.smithy",
+      "gitBlob": "c5c267ad902668daacf01e44f3b023d39a16ba9f"
+    },
+    {
+      "path": "upstream/errorfiles/invalid-json.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/invalid-json.errors",
+      "gitBlob": "5d41ad24bbb49444d37aaa468a33664c548d08fa"
+    },
+    {
+      "path": "upstream/errorfiles/invalid-json.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/invalid-json.smithy",
+      "gitBlob": "ea968bde3dba25fb250562b25a621c76ecfd46a3"
+    },
+    {
+      "path": "upstream/errorfiles/invalid-xml-with-dtd.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/invalid-xml-with-dtd.errors",
+      "gitBlob": "3de1436bc591896f0b1d7c8c09e217fc1d641bf9"
+    },
+    {
+      "path": "upstream/errorfiles/invalid-xml-with-dtd.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/invalid-xml-with-dtd.smithy",
+      "gitBlob": "bd2f40251b626c05931258729b9c5dc9c44fff20"
+    },
+    {
+      "path": "upstream/errorfiles/invalid-xml.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/invalid-xml.errors",
+      "gitBlob": "3de1436bc591896f0b1d7c8c09e217fc1d641bf9"
+    },
+    {
+      "path": "upstream/errorfiles/invalid-xml.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/invalid-xml.smithy",
+      "gitBlob": "934c5b35c3f15f1f76b0632c279abf35e30f9c84"
+    },
+    {
+      "path": "upstream/errorfiles/missing-vendor-params-shape.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/missing-vendor-params-shape.errors",
+      "gitBlob": "c5a167909182aa9f2f39c5060b39e7677526992b"
+    },
+    {
+      "path": "upstream/errorfiles/missing-vendor-params-shape.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/missing-vendor-params-shape.smithy",
+      "gitBlob": "8046026c7cf36ce9548b3bade8fba82c7ffcad9d"
+    },
+    {
+      "path": "upstream/errorfiles/test-case-on-error.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/test-case-on-error.errors",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "upstream/errorfiles/test-case-on-error.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/test-case-on-error.smithy",
+      "gitBlob": "bcc8e6e021d29a921d63dcaf14261d769e30a194"
+    },
+    {
+      "path": "upstream/errorfiles/timestamp-validation.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/timestamp-validation.errors",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "upstream/errorfiles/timestamp-validation.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/timestamp-validation.smithy",
+      "gitBlob": "77ba378eda52b5d80a65c63f2aaf38e738cb80d8"
+    },
+    {
+      "path": "upstream/errorfiles/valid-json.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/valid-json.errors",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "upstream/errorfiles/valid-json.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/valid-json.smithy",
+      "gitBlob": "c3dcb4699cf3cb028367c270bee6851a3247b06d"
+    },
+    {
+      "path": "upstream/errorfiles/valid-xml.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/valid-xml.errors",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "upstream/errorfiles/valid-xml.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/valid-xml.smithy",
+      "gitBlob": "16de560ea082282786a9e00763dd12fbb15da3bd"
+    },
+    {
+      "path": "upstream/errorfiles/vendor-params-validation.errors",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/vendor-params-validation.errors",
+      "gitBlob": "0224b13edde3819bf5bc67095348aca952c71139"
+    },
+    {
+      "path": "upstream/errorfiles/vendor-params-validation.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/errorfiles/vendor-params-validation.smithy",
+      "gitBlob": "9486fe6766d2d766dfa01e7e891cad833ae218ac"
+    },
+    {
+      "path": "upstream/say-goodbye.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/say-goodbye.smithy",
+      "gitBlob": "e286dabc9e1b46342d2ec632d9956117492c4fea"
+    },
+    {
+      "path": "upstream/say-hello.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/say-hello.smithy",
+      "gitBlob": "09f967a797be831c923f3cefc3ec35c4baa6b29f"
+    },
+    {
+      "path": "upstream/test-with-appliesto.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/test-with-appliesto.smithy",
+      "gitBlob": "56f56dca66cae294b73514dde9afb0710add778c"
+    },
+    {
+      "path": "upstream/test-with-tags.smithy",
+      "upstreamPath": "smithy-protocol-test-traits/src/test/resources/software/amazon/smithy/protocoltests/traits/test-with-tags.smithy",
+      "gitBlob": "adcff988c4b72d4edd7e1fe4ebc99060a0dd421f"
+    }
+  ]
+}

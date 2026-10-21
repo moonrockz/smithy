@@ -1,0 +1,10 @@
+import {
+  "moonrockz/smithy",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/encoding/base64",
+}
+
+import {
+  "moonrockz/smithy/protocoltests",
+} for "test"

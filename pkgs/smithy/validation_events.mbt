@@ -843,6 +843,7 @@ fn Model::collect_validation_events(
   events.append(self.metadata_trait_events())
   events.append(self.semantic_trait_events())
   events.append(self.examples_events())
+  events.append(self.protocol_test_events())
   events.append(self.recursion_and_format_events())
   for definition in validation_array(self.metadata.get("validators")) {
     events.append(self.configured_validation_events(definition))
