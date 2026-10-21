@@ -8,13 +8,18 @@ is 0.x, a minor release can contain breaking changes.
 
 ## [0.5.0] - 2026-10-21
 
-Validate JSON files against Smithy shapes with `smithy validate-value` or reuse prepared contracts from the new `moonrockz/smithy-validation` package. Structured findings identify exact instance paths, preserve numeric precision and enforce bounded traversal and pattern work across supported targets. This release also adds OpenAPI export and model compatibility diffs. The shared JSON-RPC/OpenRPC design is documented for the next protocol-validation slices; date-time value validation currently excludes leap-second notation.
+Validate JSON files against Smithy shapes with `smithy validate-value` or reuse prepared contracts from the new `moonrockz/smithy-validation` package. Structured findings identify exact instance paths, preserve numeric precision and enforce bounded traversal and pattern work across supported targets. This release also adds OpenAPI export and model compatibility diffs with JSONL event output. The shared JSON-RPC/OpenRPC design is documented for the next protocol-validation slices; date-time value validation currently excludes leap-second notation.
 
 ### 🚀 Features
 
 - *(openapi)* Convert Smithy services to OpenAPI ([#36](https://github.com/moonrockz/smithy/pull/36)) by @DamianReeves
 - *(diff)* Compare Smithy model compatibility ([#37](https://github.com/moonrockz/smithy/pull/37)) by @DamianReeves
 - *(validation)* Validate JSON values through the library and CLI ([#38](https://github.com/moonrockz/smithy/pull/38)) by @DamianReeves
+- *(diff)* Add JSONL event output ([#39](https://github.com/moonrockz/smithy/pull/39)) by @DamianReeves
+
+### 🐛 Bug fixes
+
+- *(release)* Update every package pin in standalone consumers ([#41](https://github.com/moonrockz/smithy/pull/41)) by @DamianReeves
 
 **Full changelog**: https://github.com/moonrockz/smithy/compare/v0.4.0...v0.5.0
 
