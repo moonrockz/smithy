@@ -23,6 +23,12 @@ are flattened before conversion. Simple shapes and lists are inlined where
 the reference converter inlines them; shared aggregate shapes use `$ref`.
 Conflicting exported names and invalid configuration raise `JsonSchemaError`.
 
+Protocol converters can prepare `SchemaIndex::new(model, service~, config~)`
+once, then use `document()`, `shape(id)`, `schema_for_member(id)` and
+`structure(id, selected_members)` with the same contextual references.
+Filtering a structure happens before required properties are computed.
+`definition(name)` resolves component names within the selected service closure.
+
 ## Build plugin
 
 The Smithy CLI registers the `jsonSchema` plugin. Put this in

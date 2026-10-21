@@ -10,11 +10,22 @@ pub(all) enum ModelInput {
 /// Repeated assembly creates fresh state and does not mutate its inputs.
 pub struct Loader {
   inputs : Array[ModelInput]
+  defaults : Array[@syntax.JsonAst]
 }
 
 ///|
 pub fn Loader::new() -> Loader {
-  { inputs: [], }
+  { inputs: [], defaults: [], }
+}
+
+///|
+/// Supply validated provider definitions only where no input defines the root
+/// shape. Explicit inputs take precedence regardless of call order. Defaults
+/// contribute neither metadata nor apply statements; the first provider wins
+/// when several providers define the same shape.
+pub fn Loader::add_defaults(self : Loader, model : Model) -> Loader raise {
+  self.defaults.push(model.to_json_ast())
+  self
 }
 
 ///|
@@ -474,6 +485,19 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
       assembly.known.add(id)
       assembly.kinds[id] = shape.kind.keyword()
     }
+  }
+  for document in self.defaults {
+    let shapes = document.shapes
+      .unwrap_or(Map([]))
+      .filter((id, _) => !assembly.known.contains(id))
+    for id, shape in shapes {
+      assembly.known.add(id)
+      assembly.kinds[id] = shape.kind.keyword()
+    }
+    input_order.push((false, jsons.length()))
+    jsons.push(
+      ("<defaults>", { ..document, shapes: Some(shapes), metadata: None, }),
+    )
   }
   for (is_idl, index) in input_order {
     if is_idl {

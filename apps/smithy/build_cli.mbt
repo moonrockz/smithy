@@ -626,6 +626,31 @@ fn json_schema_plugin(
 }
 
 ///|
+fn openapi_plugin(
+  model : @smithy.Model,
+  settings : Json,
+) -> Map[String, String] raise @build.BuildError {
+  let (config, result) = try {
+    let config = @openapi.Config::from_json(settings)
+    (config, @openapi.convert_result(model, config))
+  } catch {
+    error =>
+      raise @build.InvalidBuildConfig(
+        "OpenAPI conversion failed: " + error.message(),
+      )
+  }
+  for warning in result.warnings {
+    eprintln("WARNING: " + warning.shape.to_string() + ": " + warning.message)
+  }
+  let files : Map[String, String] = Map([])
+  files[config.service().shape_id().name() + ".openapi.json"] = result.document.stringify(
+      indent=4,
+    ) +
+    "\n"
+  files
+}
+
+///|
 fn run_build(
   config_path : String,
   clean : Bool,
@@ -703,9 +728,23 @@ fn run_build(
   }
   let credentials = config.resolve_credentials(environment)
   let loader = @smithy.Loader::new()
-  let runner = @build.BuildRunner::new(config).register_plugin(
-    "jsonSchema", json_schema_plugin,
-  )
+  let plugin_names = config.plugins.keys().to_array()
+  for projection in config.projections {
+    plugin_names.append(projection.plugins.keys().to_array())
+  }
+  if plugin_names.any(name => name.split("::").next() == Some("openapi")) {
+    let provider = @smithy.Loader::new()
+    for input in @openapi.protocol_definitions() {
+      let _ = provider.add(input)
+    }
+    guard provider.assemble().model is Some(protocols) else {
+      raise CliError("Could not load bundled OpenAPI protocol definitions", 2)
+    }
+    let _ = loader.add_defaults(protocols)
+  }
+  let runner = @build.BuildRunner::new(config)
+    .register_plugin("jsonSchema", json_schema_plugin)
+    .register_plugin("openapi", openapi_plugin)
   for input in config.sources {
     build_add_input(
       loader,

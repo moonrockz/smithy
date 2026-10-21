@@ -1,0 +1,47 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "MyService",
+        "version": "2017-02-11"
+    },
+    "paths": {
+        "/": {
+            "get": {
+                "operationId": "GetSomething",
+                "responses": {
+                    "200": {
+                        "description": "GetSomething 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetSomethingResponseContent"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "FooWidget": {
+                "type": "object"
+            },
+            "GetSomethingResponseContent": {
+                "type": "object",
+                "properties": {
+                    "widget1": {
+                        "$ref": "#/components/schemas/Widget"
+                    },
+                    "fooWidget": {
+                        "$ref": "#/components/schemas/FooWidget"
+                    }
+                }
+            },
+            "Widget": {
+                "type": "object"
+            }
+        }
+    }
+}

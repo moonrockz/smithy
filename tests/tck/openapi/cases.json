@@ -1,0 +1,1022 @@
+{
+  "referenceSha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef",
+  "cases": [
+    {
+      "id": "service",
+      "model": "upstream/test-service.json",
+      "settings": {
+        "service": "example.rest#RestService"
+      },
+      "expected": "upstream/test-service.openapi.json"
+    },
+    {
+      "id": "integer-types",
+      "model": "upstream/test-service.json",
+      "settings": {
+        "service": "example.rest#RestService",
+        "useIntegerType": true
+      },
+      "expected": "upstream/test-service-integer.openapi.json"
+    },
+    {
+      "id": "documentation",
+      "model": "upstream/documentation-test.smithy",
+      "settings": {
+        "service": "smithy.example#MyDocs"
+      },
+      "expected": "upstream/documentation-test.openapi.json"
+    },
+    {
+      "id": "external-docs",
+      "model": "upstream/externaldocs-test.smithy",
+      "settings": {
+        "service": "smithy.example#MyDocs"
+      },
+      "expected": "upstream/externaldocs-test.openapi.json"
+    },
+    {
+      "id": "renames",
+      "model": "upstream/service-with-renames.json",
+      "settings": {
+        "service": "smithy.example#MyService"
+      },
+      "expected": "upstream/service-with-renames.openapi.json"
+    },
+    {
+      "id": "common-errors",
+      "model": "upstream/service-with-common-errors.json",
+      "settings": {
+        "service": "smithy.example#MyService"
+      },
+      "expected": "upstream/service-with-common-errors.openapi.json"
+    },
+    {
+      "id": "required-path",
+      "model": "upstream/service-with-required-path.json",
+      "settings": {
+        "service": "example.rest#RestService"
+      },
+      "expected": "upstream/service-with-required-path.openapi.json"
+    },
+    {
+      "id": "streaming",
+      "model": "upstream/streaming-service.smithy",
+      "settings": {
+        "service": "smithy.example#Streaming"
+      },
+      "expected": "upstream/streaming-service.openapi.json"
+    },
+    {
+      "id": "mixins",
+      "model": "upstream/model-with-mixins.smithy",
+      "settings": {
+        "service": "smithy.example#HasMixin"
+      },
+      "expected": "upstream/model-with-mixins.openapi.json"
+    },
+    {
+      "id": "unit",
+      "model": "upstream/nonconflicting-unit.smithy",
+      "settings": {
+        "service": "example.rest#RestService"
+      },
+      "expected": "upstream/nonconflicting-unit.openapi.json"
+    },
+    {
+      "id": "unsupported-http-method",
+      "model": "upstream/unsupported-http-method.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "generated/unsupported-http-method.json",
+      "upstreamExpected": "upstream/unsupported-http-method.openapi.json",
+      "upstreamMode": "model"
+    },
+    {
+      "id": "member-documentation",
+      "model": "upstream/documentation-test-members.smithy",
+      "settings": {
+        "service": "smithy.example#MyDocs",
+        "version": "3.1.0",
+        "addReferenceDescriptions": true
+      },
+      "expected": "upstream/documentation-test-members.openapi.json"
+    },
+    {
+      "id": "openapi-3.0.2",
+      "model": "upstream/nullability-and-format.smithy",
+      "settings": {
+        "service": "example#Example",
+        "version": "3.0.2"
+      },
+      "expected": "upstream/openapi-3-0-2.openapi.json"
+    },
+    {
+      "id": "openapi-3.1.0",
+      "model": "upstream/nullability-and-format.smithy",
+      "settings": {
+        "service": "example#Example",
+        "version": "3.1.0"
+      },
+      "expected": "upstream/openapi-3-1-0.openapi.json"
+    },
+    {
+      "id": "all-tags",
+      "model": "upstream/tagged-service.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "tags": true
+      },
+      "expected": "generated/all-tags.json",
+      "upstreamExpected": "upstream/tagged-service-all-tags.openapi.json",
+      "upstreamMode": "model"
+    },
+    {
+      "id": "supported-tags",
+      "model": "upstream/tagged-service.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "tags": true,
+        "supportedTags": [
+          "baz",
+          "foo"
+        ]
+      },
+      "expected": "generated/supported-tags.json",
+      "upstreamExpected": "upstream/tagged-service-supported-tags.openapi.json",
+      "upstreamMode": "model"
+    },
+    {
+      "id": "empty-tags",
+      "model": "upstream/tagged-service.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "tags": true,
+        "supportedTags": []
+      },
+      "expected": "generated/empty-tags.json",
+      "upstreamExpected": "upstream/tagged-service-empty-supported-tags.openapi.json",
+      "upstreamMode": "model"
+    },
+    {
+      "id": "tag-order",
+      "model": "upstream/tagged-service-order.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "tags": true
+      },
+      "expected": "generated/tag-order.json",
+      "upstreamExpected": "upstream/tagged-service-order.openapi.json",
+      "upstreamMode": "model"
+    },
+    {
+      "id": "filtered-tag-order",
+      "model": "upstream/tagged-service-order.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "tags": true,
+        "supportedTags": [
+          "one",
+          "two",
+          "three",
+          "four"
+        ]
+      },
+      "expected": "generated/filtered-tag-order.json",
+      "upstreamExpected": "upstream/tagged-service-order-supported-tags.openapi.json",
+      "upstreamMode": "model"
+    },
+    {
+      "id": "adds-json-document-bodies",
+      "model": "upstream/protocols/adds-json-document-bodies.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/protocols/adds-json-document-bodies.openapi.json"
+    },
+    {
+      "id": "adds-path-timestamp-format",
+      "model": "upstream/protocols/adds-path-timestamp-format.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/protocols/adds-path-timestamp-format.openapi.json"
+    },
+    {
+      "id": "adds-query-timestamp-format",
+      "model": "upstream/protocols/adds-query-timestamp-format.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/protocols/adds-query-timestamp-format.openapi.json"
+    },
+    {
+      "id": "adds-header-timestamp-format",
+      "model": "upstream/protocols/adds-header-timestamp-format.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/protocols/adds-header-timestamp-format.openapi.json"
+    },
+    {
+      "id": "adds-header-mediatype-format",
+      "model": "upstream/protocols/adds-header-mediatype-format.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/protocols/adds-header-mediatype-format.openapi.json"
+    },
+    {
+      "id": "supports-payloads",
+      "model": "upstream/protocols/supports-payloads.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/protocols/supports-payloads.openapi.json"
+    },
+    {
+      "id": "aws-rest-json-uses-jsonname",
+      "model": "upstream/protocols/aws-rest-json-uses-jsonname.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/protocols/aws-rest-json-uses-jsonname.openapi.json"
+    },
+    {
+      "id": "synthesizes-contents",
+      "model": "upstream/protocols/synthesizes-contents.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/protocols/synthesizes-contents.openapi.json"
+    },
+    {
+      "id": "greedy-labels",
+      "model": "upstream/protocols/greedy-labels.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/protocols/greedy-labels.openapi.json"
+    },
+    {
+      "id": "greedy-label-name",
+      "model": "upstream/protocols/greedy-labels-name-parameter-without-suffix.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "removeGreedyParameterSuffix": true
+      },
+      "expected": "generated/greedy-label-name.json",
+      "upstreamExpected": "upstream/protocols/greedy-labels-name-parameter-without-suffix.openapi.json",
+      "upstreamMode": "model"
+    },
+    {
+      "id": "alphanumeric-components",
+      "model": "upstream/protocols/non-alphanumeric-content-names.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "alphanumericOnlyRefs": true
+      },
+      "expected": "generated/alphanumeric-components.json",
+      "upstreamExpected": "upstream/protocols/non-alphanumeric-content-names.openapi.json",
+      "upstreamMode": "model"
+    },
+    {
+      "id": "examples",
+      "model": "upstream/protocols/examples-test.smithy",
+      "settings": {
+        "service": "smithy.examplestrait#Banking"
+      },
+      "expected": "upstream/protocols/examples-test.openapi.json"
+    },
+    {
+      "id": "error-conflicts",
+      "model": "upstream/protocols/error-code-collision-test.smithy",
+      "settings": {
+        "service": "example#Example",
+        "onErrorStatusConflict": "oneOf"
+      },
+      "expected": "upstream/protocols/error-code-collision-test-use-oneof.openapi.json"
+    },
+    {
+      "id": "error-examples",
+      "model": "upstream/error-deconflicting-test.smithy",
+      "settings": {
+        "service": "test.service.error#TestService",
+        "onErrorStatusConflict": "oneOf"
+      },
+      "expected": "upstream/error-deconflicting-test.openapi.json"
+    },
+    {
+      "id": "rpc-v2-json",
+      "model": "upstream/protocols/rpc-v2-json.smithy",
+      "settings": {
+        "service": "example.smithy#MyService"
+      },
+      "expected": "upstream/protocols/rpc-v2-json.openapi.json"
+    },
+    {
+      "id": "http-api-key-security",
+      "model": "upstream/security/http-api-key-security.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/security/http-api-key-security.openapi.json"
+    },
+    {
+      "id": "http-api-key-bearer-security",
+      "model": "upstream/security/http-api-key-bearer-security.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/security/http-api-key-bearer-security.openapi.json"
+    },
+    {
+      "id": "http-basic-security",
+      "model": "upstream/security/http-basic-security.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/security/http-basic-security.openapi.json"
+    },
+    {
+      "id": "http-digest-security",
+      "model": "upstream/security/http-digest-security.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "upstream/security/http-digest-security.openapi.json"
+    },
+    {
+      "id": "empty-response",
+      "model": "upstream/adds-empty-response.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "generated/empty-response.json"
+    },
+    {
+      "id": "omitted-http-bindings",
+      "model": "upstream/missing-http-bindings.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "expected": "generated/omitted-http-bindings.json"
+    },
+    {
+      "id": "prefix-headers-warn",
+      "model": "upstream/mappers/prefix-headers.smithy",
+      "settings": {
+        "service": "smithy.example#PrefixHeaders",
+        "onHttpPrefixHeaders": "WARN"
+      },
+      "expected": "generated/prefix-headers-warn.json",
+      "warnings": 2
+    },
+    {
+      "id": "unsupported-trait-warn",
+      "model": "upstream/mappers/endpoint-service.smithy",
+      "settings": {
+        "service": "smithy.example#EndpointService",
+        "ignoreUnsupportedTraits": true
+      },
+      "expected": "generated/unsupported-trait-warn.json",
+      "warnings": 1
+    },
+    {
+      "id": "custom-content-type",
+      "model": "upstream/protocols/adds-json-document-bodies.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "jsonContentType": "application/custom+json"
+      },
+      "expected": "generated/custom-content-type.json"
+    },
+    {
+      "id": "document-examples",
+      "model": "upstream/protocols/document-examples-test.smithy",
+      "settings": {
+        "service": "smithy.example.documentexamples#DocumentExamples"
+      },
+      "expected": "generated/document-examples.json"
+    },
+    {
+      "id": "substitutions",
+      "model": "upstream/mappers/substitutions.smithy",
+      "settings": {
+        "service": "smithy.example#Service",
+        "substitutions": {
+          "SUB_HELLO": "Replacement"
+        }
+      },
+      "expected": "generated/substitutions.json"
+    },
+    {
+      "id": "json-add",
+      "model": "upstream/mappers/substitutions.smithy",
+      "settings": {
+        "service": "smithy.example#Service",
+        "jsonAdd": {
+          "/info/title": "Custom",
+          "/x-note": "Explicit extension"
+        }
+      },
+      "expected": "generated/json-add.json"
+    },
+    {
+      "id": "keep-unused-components",
+      "model": "upstream/test-service.json",
+      "settings": {
+        "service": "example.rest#RestService",
+        "keepUnusedComponents": true
+      },
+      "expected": "generated/keep-unused-components.json"
+    },
+    {
+      "id": "missing-service",
+      "model": "upstream/test-service.json",
+      "settings": {},
+      "error": "configuration"
+    },
+    {
+      "id": "unknown-service",
+      "model": "upstream/test-service.json",
+      "settings": {
+        "service": "example#Missing"
+      },
+      "error": "missing-service"
+    },
+    {
+      "id": "wrong-service-kind",
+      "model": "upstream/test-service.json",
+      "settings": {
+        "service": "smithy.api#String"
+      },
+      "error": "invalid-service"
+    },
+    {
+      "id": "missing-protocol",
+      "model": "upstream/missing-protocols-trait.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "error": "protocol-resolution"
+    },
+    {
+      "id": "unknown-protocol-provider",
+      "model": "upstream/unable-to-resolve-protocol.json",
+      "settings": {
+        "service": "smithy.example#Service"
+      },
+      "error": "unsupported-protocol"
+    },
+    {
+      "id": "protocol-not-applied",
+      "model": "upstream/test-service.json",
+      "settings": {
+        "service": "example.rest#RestService",
+        "protocol": "smithy.protocols#rpcv2Json"
+      },
+      "error": "protocol-resolution"
+    },
+    {
+      "id": "prefix-headers-fail",
+      "model": "upstream/mappers/prefix-headers.smithy",
+      "settings": {
+        "service": "smithy.example#PrefixHeaders"
+      },
+      "error": "prefix-headers"
+    },
+    {
+      "id": "forbid-greedy-labels",
+      "model": "upstream/mappers/greedy-labels.smithy",
+      "settings": {
+        "service": "smithy.example#Greedy",
+        "forbidGreedyLabels": true
+      },
+      "error": "greedy-label"
+    },
+    {
+      "id": "unsupported-trait-fail",
+      "model": "upstream/mappers/endpoint-service.smithy",
+      "settings": {
+        "service": "smithy.example#EndpointService"
+      },
+      "error": "unsupported-trait"
+    },
+    {
+      "id": "member-docs-require-3-1",
+      "model": "upstream/documentation-test-members.smithy",
+      "settings": {
+        "service": "smithy.example#MyDocs",
+        "addReferenceDescriptions": true
+      },
+      "error": "configuration"
+    },
+    {
+      "id": "service-31",
+      "model": "upstream/test-service.json",
+      "settings": {
+        "service": "example.rest#RestService",
+        "version": "3.1.0"
+      },
+      "expected": "generated/service-31.openapi.json"
+    },
+    {
+      "id": "integer-types-31",
+      "model": "upstream/test-service.json",
+      "settings": {
+        "service": "example.rest#RestService",
+        "useIntegerType": true,
+        "version": "3.1.0"
+      },
+      "expected": "generated/integer-types-31.openapi.json"
+    },
+    {
+      "id": "documentation-31",
+      "model": "upstream/documentation-test.smithy",
+      "settings": {
+        "service": "smithy.example#MyDocs",
+        "version": "3.1.0"
+      },
+      "expected": "generated/documentation-31.openapi.json"
+    },
+    {
+      "id": "external-docs-31",
+      "model": "upstream/externaldocs-test.smithy",
+      "settings": {
+        "service": "smithy.example#MyDocs",
+        "version": "3.1.0"
+      },
+      "expected": "generated/external-docs-31.openapi.json"
+    },
+    {
+      "id": "renames-31",
+      "model": "upstream/service-with-renames.json",
+      "settings": {
+        "service": "smithy.example#MyService",
+        "version": "3.1.0"
+      },
+      "expected": "generated/renames-31.openapi.json"
+    },
+    {
+      "id": "common-errors-31",
+      "model": "upstream/service-with-common-errors.json",
+      "settings": {
+        "service": "smithy.example#MyService",
+        "version": "3.1.0"
+      },
+      "expected": "generated/common-errors-31.openapi.json"
+    },
+    {
+      "id": "required-path-31",
+      "model": "upstream/service-with-required-path.json",
+      "settings": {
+        "service": "example.rest#RestService",
+        "version": "3.1.0"
+      },
+      "expected": "generated/required-path-31.openapi.json"
+    },
+    {
+      "id": "streaming-31",
+      "model": "upstream/streaming-service.smithy",
+      "settings": {
+        "service": "smithy.example#Streaming",
+        "version": "3.1.0"
+      },
+      "expected": "generated/streaming-31.openapi.json"
+    },
+    {
+      "id": "mixins-31",
+      "model": "upstream/model-with-mixins.smithy",
+      "settings": {
+        "service": "smithy.example#HasMixin",
+        "version": "3.1.0"
+      },
+      "expected": "generated/mixins-31.openapi.json"
+    },
+    {
+      "id": "unit-31",
+      "model": "upstream/nonconflicting-unit.smithy",
+      "settings": {
+        "service": "example.rest#RestService",
+        "version": "3.1.0"
+      },
+      "expected": "generated/unit-31.openapi.json"
+    },
+    {
+      "id": "unsupported-http-method-31",
+      "model": "upstream/unsupported-http-method.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/unsupported-http-method-31.openapi.json"
+    },
+    {
+      "id": "openapi-3.0.2-31",
+      "model": "upstream/nullability-and-format.smithy",
+      "settings": {
+        "service": "example#Example",
+        "version": "3.1.0"
+      },
+      "expected": "generated/openapi-3.0.2-31.openapi.json"
+    },
+    {
+      "id": "all-tags-31",
+      "model": "upstream/tagged-service.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "tags": true,
+        "version": "3.1.0"
+      },
+      "expected": "generated/all-tags-31.openapi.json"
+    },
+    {
+      "id": "supported-tags-31",
+      "model": "upstream/tagged-service.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "tags": true,
+        "supportedTags": [
+          "baz",
+          "foo"
+        ],
+        "version": "3.1.0"
+      },
+      "expected": "generated/supported-tags-31.openapi.json"
+    },
+    {
+      "id": "empty-tags-31",
+      "model": "upstream/tagged-service.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "tags": true,
+        "supportedTags": [],
+        "version": "3.1.0"
+      },
+      "expected": "generated/empty-tags-31.openapi.json"
+    },
+    {
+      "id": "tag-order-31",
+      "model": "upstream/tagged-service-order.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "tags": true,
+        "version": "3.1.0"
+      },
+      "expected": "generated/tag-order-31.openapi.json"
+    },
+    {
+      "id": "filtered-tag-order-31",
+      "model": "upstream/tagged-service-order.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "tags": true,
+        "supportedTags": [
+          "one",
+          "two",
+          "three",
+          "four"
+        ],
+        "version": "3.1.0"
+      },
+      "expected": "generated/filtered-tag-order-31.openapi.json"
+    },
+    {
+      "id": "adds-json-document-bodies-31",
+      "model": "upstream/protocols/adds-json-document-bodies.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/adds-json-document-bodies-31.openapi.json"
+    },
+    {
+      "id": "adds-path-timestamp-format-31",
+      "model": "upstream/protocols/adds-path-timestamp-format.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/adds-path-timestamp-format-31.openapi.json"
+    },
+    {
+      "id": "adds-query-timestamp-format-31",
+      "model": "upstream/protocols/adds-query-timestamp-format.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/adds-query-timestamp-format-31.openapi.json"
+    },
+    {
+      "id": "adds-header-timestamp-format-31",
+      "model": "upstream/protocols/adds-header-timestamp-format.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/adds-header-timestamp-format-31.openapi.json"
+    },
+    {
+      "id": "adds-header-mediatype-format-31",
+      "model": "upstream/protocols/adds-header-mediatype-format.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/adds-header-mediatype-format-31.openapi.json"
+    },
+    {
+      "id": "supports-payloads-31",
+      "model": "upstream/protocols/supports-payloads.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/supports-payloads-31.openapi.json"
+    },
+    {
+      "id": "aws-rest-json-uses-jsonname-31",
+      "model": "upstream/protocols/aws-rest-json-uses-jsonname.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/aws-rest-json-uses-jsonname-31.openapi.json"
+    },
+    {
+      "id": "synthesizes-contents-31",
+      "model": "upstream/protocols/synthesizes-contents.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/synthesizes-contents-31.openapi.json"
+    },
+    {
+      "id": "greedy-labels-31",
+      "model": "upstream/protocols/greedy-labels.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/greedy-labels-31.openapi.json"
+    },
+    {
+      "id": "greedy-label-name-31",
+      "model": "upstream/protocols/greedy-labels-name-parameter-without-suffix.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "removeGreedyParameterSuffix": true,
+        "version": "3.1.0"
+      },
+      "expected": "generated/greedy-label-name-31.openapi.json"
+    },
+    {
+      "id": "alphanumeric-components-31",
+      "model": "upstream/protocols/non-alphanumeric-content-names.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "alphanumericOnlyRefs": true,
+        "version": "3.1.0"
+      },
+      "expected": "generated/alphanumeric-components-31.openapi.json"
+    },
+    {
+      "id": "examples-31",
+      "model": "upstream/protocols/examples-test.smithy",
+      "settings": {
+        "service": "smithy.examplestrait#Banking",
+        "version": "3.1.0"
+      },
+      "expected": "generated/examples-31.openapi.json"
+    },
+    {
+      "id": "error-conflicts-31",
+      "model": "upstream/protocols/error-code-collision-test.smithy",
+      "settings": {
+        "service": "example#Example",
+        "onErrorStatusConflict": "oneOf",
+        "version": "3.1.0"
+      },
+      "expected": "generated/error-conflicts-31.openapi.json"
+    },
+    {
+      "id": "error-examples-31",
+      "model": "upstream/error-deconflicting-test.smithy",
+      "settings": {
+        "service": "test.service.error#TestService",
+        "onErrorStatusConflict": "oneOf",
+        "version": "3.1.0"
+      },
+      "expected": "generated/error-examples-31.openapi.json"
+    },
+    {
+      "id": "rpc-v2-json-31",
+      "model": "upstream/protocols/rpc-v2-json.smithy",
+      "settings": {
+        "service": "example.smithy#MyService",
+        "version": "3.1.0"
+      },
+      "expected": "generated/rpc-v2-json-31.openapi.json"
+    },
+    {
+      "id": "http-api-key-security-31",
+      "model": "upstream/security/http-api-key-security.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/http-api-key-security-31.openapi.json"
+    },
+    {
+      "id": "http-api-key-bearer-security-31",
+      "model": "upstream/security/http-api-key-bearer-security.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/http-api-key-bearer-security-31.openapi.json"
+    },
+    {
+      "id": "http-basic-security-31",
+      "model": "upstream/security/http-basic-security.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/http-basic-security-31.openapi.json"
+    },
+    {
+      "id": "http-digest-security-31",
+      "model": "upstream/security/http-digest-security.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/http-digest-security-31.openapi.json"
+    },
+    {
+      "id": "empty-response-31",
+      "model": "upstream/adds-empty-response.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/empty-response-31.openapi.json"
+    },
+    {
+      "id": "omitted-http-bindings-31",
+      "model": "upstream/missing-http-bindings.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "version": "3.1.0"
+      },
+      "expected": "generated/omitted-http-bindings-31.openapi.json"
+    },
+    {
+      "id": "prefix-headers-warn-31",
+      "model": "upstream/mappers/prefix-headers.smithy",
+      "settings": {
+        "service": "smithy.example#PrefixHeaders",
+        "onHttpPrefixHeaders": "WARN",
+        "version": "3.1.0"
+      },
+      "expected": "generated/prefix-headers-warn-31.openapi.json",
+      "warnings": 2
+    },
+    {
+      "id": "unsupported-trait-warn-31",
+      "model": "upstream/mappers/endpoint-service.smithy",
+      "settings": {
+        "service": "smithy.example#EndpointService",
+        "ignoreUnsupportedTraits": true,
+        "version": "3.1.0"
+      },
+      "expected": "generated/unsupported-trait-warn-31.openapi.json",
+      "warnings": 1
+    },
+    {
+      "id": "custom-content-type-31",
+      "model": "upstream/protocols/adds-json-document-bodies.json",
+      "settings": {
+        "service": "smithy.example#Service",
+        "jsonContentType": "application/custom+json",
+        "version": "3.1.0"
+      },
+      "expected": "generated/custom-content-type-31.openapi.json"
+    },
+    {
+      "id": "document-examples-31",
+      "model": "upstream/protocols/document-examples-test.smithy",
+      "settings": {
+        "service": "smithy.example.documentexamples#DocumentExamples",
+        "version": "3.1.0"
+      },
+      "expected": "generated/document-examples-31.openapi.json"
+    },
+    {
+      "id": "substitutions-31",
+      "model": "upstream/mappers/substitutions.smithy",
+      "settings": {
+        "service": "smithy.example#Service",
+        "substitutions": {
+          "SUB_HELLO": "Replacement"
+        },
+        "version": "3.1.0"
+      },
+      "expected": "generated/substitutions-31.openapi.json"
+    },
+    {
+      "id": "json-add-31",
+      "model": "upstream/mappers/substitutions.smithy",
+      "settings": {
+        "service": "smithy.example#Service",
+        "jsonAdd": {
+          "/info/title": "Custom",
+          "/x-note": "Explicit extension"
+        },
+        "version": "3.1.0"
+      },
+      "expected": "generated/json-add-31.openapi.json"
+    },
+    {
+      "id": "keep-unused-components-31",
+      "model": "upstream/test-service.json",
+      "settings": {
+        "service": "example.rest#RestService",
+        "keepUnusedComponents": true,
+        "version": "3.1.0"
+      },
+      "expected": "generated/keep-unused-components-31.openapi.json"
+    },
+    {
+      "id": "core-features",
+      "model": "local/core-features.smithy",
+      "settings": {
+        "service": "example.core#Example",
+        "onErrorStatusConflict": "oneOf"
+      },
+      "expected": "generated/core-features.openapi.json"
+    },
+    {
+      "id": "core-features-31",
+      "model": "local/core-features.smithy",
+      "settings": {
+        "service": "example.core#Example",
+        "onErrorStatusConflict": "oneOf",
+        "version": "3.1.0"
+      },
+      "expected": "generated/core-features-31.openapi.json"
+    },
+    {
+      "id": "core-default-errors",
+      "model": "local/core-features.smithy",
+      "settings": {
+        "service": "example.core#Example",
+        "version": "3.0.2"
+      },
+      "expected": "generated/core-default-errors.openapi.json"
+    },
+    {
+      "id": "core-default-errors-31",
+      "model": "local/core-features.smithy",
+      "settings": {
+        "service": "example.core#Example",
+        "version": "3.1.0"
+      },
+      "expected": "generated/core-default-errors-31.openapi.json"
+    }
+  ],
+  "excludedUpstreamOutputs": [
+    {
+      "path": "upstream/mappers/specificationextensions/inlined-type-target.openapi.json",
+      "reason": "Custom trait export is outside the story."
+    },
+    {
+      "path": "upstream/mappers/specificationextensions/operation-target.openapi.json",
+      "reason": "Custom trait export is outside the story."
+    },
+    {
+      "path": "upstream/mappers/specificationextensions/service-target.openapi.json",
+      "reason": "Custom trait export is outside the story."
+    },
+    {
+      "path": "upstream/mappers/specificationextensions/structure-target.openapi.json",
+      "reason": "Custom trait export is outside the story."
+    },
+    {
+      "path": "upstream/mixed-security-service.openapi.json",
+      "reason": "Uses AWS authentication/service traits outside the protocol package allowed by the story."
+    },
+    {
+      "path": "upstream/security/awsv4-security.openapi.json",
+      "reason": "Uses AWS authentication/service traits outside the protocol package allowed by the story."
+    },
+    {
+      "path": "upstream/union-test.openapi.json",
+      "reason": "Uses AWS authentication/service traits outside the protocol package allowed by the story."
+    }
+  ]
+}

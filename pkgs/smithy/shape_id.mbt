@@ -64,6 +64,21 @@ pub fn ShapeId::root(self : ShapeId) -> ShapeId {
 }
 
 ///|
+pub fn ShapeId::namespace(self : ShapeId) -> String {
+  self.namespace
+}
+
+///|
+pub fn ShapeId::name(self : ShapeId) -> String {
+  self.name
+}
+
+///|
+pub fn ShapeId::member_name(self : ShapeId) -> String? {
+  self.member
+}
+
+///|
 pub fn ShapeId::to_string(self : ShapeId) -> String {
   Show::to_string(self)
 }

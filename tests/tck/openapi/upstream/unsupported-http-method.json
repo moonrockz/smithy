@@ -1,0 +1,125 @@
+{
+    "smithy": "2.0",
+    "shapes": {
+        "smithy.example#Service": {
+            "type": "service",
+            "version": "2006-03-01",
+            "operations": [
+                {
+                    "target": "smithy.example#Patch"
+                },
+                {
+                    "target": "smithy.example#Post"
+                },
+                {
+                    "target": "smithy.example#Put"
+                },
+                {
+                    "target": "smithy.example#Head"
+                },
+                {
+                    "target": "smithy.example#Trace"
+                },
+                {
+                    "target": "smithy.example#Options"
+                },
+                {
+                    "target": "smithy.example#Get"
+                },
+                {
+                    "target": "smithy.example#Delete"
+                },
+                {
+                    "target": "smithy.example#LoremIpsum"
+                }
+            ],
+            "traits": {
+                "smithy.api#tags": [
+                    "foo"
+                ],
+                "aws.protocols#restJson1": {}
+            }
+        },
+        "smithy.example#Patch": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "uri": "/",
+                    "method": "PATCH"
+                }
+            }
+        },
+        "smithy.example#Post": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "uri": "/",
+                    "method": "POST"
+                }
+            }
+        },
+        "smithy.example#Put": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "uri": "/",
+                    "method": "PUT"
+                }
+            }
+        },
+        "smithy.example#Head": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "uri": "/",
+                    "method": "HEAD"
+                }
+            }
+        },
+        "smithy.example#Trace": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "uri": "/",
+                    "method": "TRACE"
+                }
+            }
+        },
+        "smithy.example#Options": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "uri": "/",
+                    "method": "OPTIONS"
+                }
+            }
+        },
+        "smithy.example#Get": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "uri": "/",
+                    "method": "GET"
+                }
+            }
+        },
+        "smithy.example#Delete": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "uri": "/",
+                    "method": "DELETE"
+                }
+            }
+        },
+        "smithy.example#LoremIpsum": {
+            "type": "operation",
+            "traits": {
+                "smithy.api#http": {
+                    "uri": "/",
+                    "method": "LOREM_IPSUM"
+                }
+            }
+        }
+    }
+}

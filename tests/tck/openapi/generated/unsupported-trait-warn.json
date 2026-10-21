@@ -1,0 +1,19 @@
+{
+    "openapi": "3.0.2",
+    "info": {
+        "title": "EndpointService",
+        "version": "2018-01-01"
+    },
+    "paths": {
+        "/": {
+            "get": {
+                "operationId": "EndpointOperation",
+                "responses": {
+                    "200": {
+                        "description": "EndpointOperation 200 response"
+                    }
+                }
+            }
+        }
+    }
+}

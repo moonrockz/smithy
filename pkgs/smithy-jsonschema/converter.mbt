@@ -413,7 +413,7 @@ fn shape_schema(
     ) &&
     fields.get("members") is Some(Object(members)) {
     let properties : Map[String, Json] = Map([])
-    let required : Array[Json] = []
+    let required : Array[String] = []
     for name, entry in members {
       if member_target(entry) is Some(_) {
         let property = property_name(name, entry, config)
@@ -423,7 +423,7 @@ fn shape_schema(
         if entry is Object(entry_fields) &&
           entry_fields.get("traits") is Some(Object(traits)) &&
           traits.get("smithy.api#required") is Some(_) {
-          required.push(Json::string(property))
+          required.push(property)
         }
       }
     }
@@ -431,7 +431,8 @@ fn shape_schema(
       schema["properties"] = Json::object(properties)
     }
     if !required.is_empty() {
-      schema["required"] = Json::array(required)
+      required.sort_by((a, b) => a.lexical_compare(b))
+      schema["required"] = Json::array(required.map(Json::string))
     }
     if kind == "union" {
       schema["type"] = Json::string("object")

@@ -1,0 +1,34 @@
+{
+    "openapi": "3.0.2",
+    "info": {
+        "title": "Service",
+        "version": "2006-03-01"
+    },
+    "paths": {
+        "/": {
+            "get": {
+                "operationId": "Operation1",
+                "responses": {
+                    "200": {
+                        "description": "Operation1 200 response"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "smithy.api.httpApiKeyAuth": {
+                "type": "apiKey",
+                "description": "API key authentication via the 'x-api-key' header",
+                "name": "x-api-key",
+                "in": "header"
+            }
+        }
+    },
+    "security": [
+        {
+            "smithy.api.httpApiKeyAuth": [ ]
+        }
+    ]
+}

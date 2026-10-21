@@ -1,0 +1,154 @@
+{
+    "openapi": "3.0.2",
+    "info": {
+        "title": "Example",
+        "version": "2026-10-21"
+    },
+    "paths": {
+        "/widgets/{id}": {
+            "get": {
+                "operationId": "Read",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Read 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReadResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "FirstError 400 response",
+                        "headers": {
+                            "retry-after": {
+                                "schema": {
+                                    "type": "number"
+                                },
+                                "required": true
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FirstErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "smithy.api.httpBearerAuth": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "FirstErrorResponseContent": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "message"
+                ]
+            },
+            "ReadResponseContent": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "$ref": "#/components/schemas/Value"
+                    }
+                },
+                "required": [
+                    "value"
+                ]
+            },
+            "Record": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            },
+            "Value": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "title": "text",
+                        "properties": {
+                            "text": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "text"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "title": "record",
+                        "properties": {
+                            "record": {
+                                "$ref": "#/components/schemas/Record"
+                            }
+                        },
+                        "required": [
+                            "record"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "title": "document",
+                        "properties": {
+                            "document": {}
+                        },
+                        "required": [
+                            "document"
+                        ]
+                    }
+                ]
+            }
+        },
+        "securitySchemes": {
+            "smithy.api.httpBasicAuth": {
+                "type": "http",
+                "description": "HTTP Basic authentication",
+                "scheme": "Basic"
+            },
+            "smithy.api.httpBearerAuth": {
+                "type": "http",
+                "description": "HTTP Bearer authentication",
+                "scheme": "Bearer"
+            }
+        }
+    },
+    "security": [
+        {
+            "smithy.api.httpBasicAuth": []
+        },
+        {
+            "smithy.api.httpBearerAuth": []
+        }
+    ]
+}

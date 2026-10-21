@@ -1,0 +1,12 @@
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-jsonschema" @jsonschema,
+  "moonbitlang/core/string",
+}
+
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-openapi" @openapi,
+  "moonbitlang/core/json",
+  "moonbitlang/x/fs",
+} for "test"
