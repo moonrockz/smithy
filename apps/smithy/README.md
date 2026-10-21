@@ -44,6 +44,7 @@ model inputs after `value`, or after `rpc` for JSON-RPC validation.
 ```shell
 smithy ast model.smithy extra.json
 smithy validate model.smithy extra.json
+smithy validate --protocol-tests examples/protocol-tests/greeting.smithy
 smithy validate value --shape example#Input --value request.json model.smithy
 smithy validate rpc --version 2.0 --service example#Calculator --message call.json api.smithy
 smithy diff --old previous/ --new current/

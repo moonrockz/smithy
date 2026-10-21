@@ -3,5 +3,9 @@ contain the Smithy prelude and contract traits from
 https://github.com/smithy-lang/smithy, distributed under Apache-2.0.
 PRELUDE_SHA records the upstream revision.
 
+protocol_test_traits.smithy and protocol_test_traits_data.mbt contain the
+Smithy protocol test traits under the same license. PROTOCOL_TEST_SHA records
+their upstream revision.
+
 Smithy
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.

@@ -39,6 +39,11 @@ build fresh state without changing caller-owned AST documents.
 
 ## Semantic records
 
+The optional [HTTP protocol test suite API](protocoltests/README.mbt.md) loads
+standard request and response cases and compares messages from supplied protocol
+adapters. Enable its bundled traits with `Loader::new(protocol_tests=true)`.
+Ordinary loaders do not add `smithy.test` shapes to the model.
+
 - `ShapeId` is an absolute ID with validated namespace, shape name and
   optional member name. `ShapeId::parse` returns `None` for invalid input.
 - `Model` contains metadata and a map of shape IDs to `Shape` records,

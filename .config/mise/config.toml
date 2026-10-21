@@ -222,6 +222,10 @@ run = "moonx scripts/publish.mbtx"
 description = "Exercise CLI file I/O, pipes, diagnostics, formatting and conversion (args: targets)"
 run = "moonx scripts/test-cli.mbtx"
 
+[tasks."tck:vendor:protocols"]
+description = "Vendor pinned Smithy protocol-test traits and fixtures from a source snapshot"
+run = "moonx scripts/vendor-protocol-tests.mbtx"
+
 [tasks."test:changelog"]
 description = "Check that generated changelogs preserve wrapped migration text"
 run = "moonx scripts/test-changelog.mbtx"

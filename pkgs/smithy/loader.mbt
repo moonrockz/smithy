@@ -11,11 +11,12 @@ pub(all) enum ModelInput {
 pub struct Loader {
   inputs : Array[ModelInput]
   defaults : Array[@syntax.JsonAst]
+  protocol_tests : Bool
 }
 
 ///|
-pub fn Loader::new() -> Loader {
-  { inputs: [], defaults: [], }
+pub fn Loader::new(protocol_tests~ : Bool = false) -> Loader {
+  { inputs: [], defaults: [], protocol_tests, }
 }
 
 ///|
@@ -110,7 +111,7 @@ fn location(
 
 ///|
 fn is_builtin_source(name : String) -> Bool {
-  name == "<prelude>" || name == "<contracts>"
+  name == "<prelude>" || name == "<contracts>" || name == "<protocol-tests>"
 }
 
 ///|
@@ -407,6 +408,11 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
     ModelInput::Idl(name="<prelude>", text=prelude_text()),
     ModelInput::Idl(name="<contracts>", text=contracts_text()),
   ]
+  if self.protocol_tests {
+    inputs.push(
+      ModelInput::Idl(name="<protocol-tests>", text=protocol_test_traits_text()),
+    )
+  }
   for input in self.inputs {
     let name = match input {
       Idl(name~, ..) | Json(name~, ..) | Ast(name~, ..) => name

@@ -672,6 +672,18 @@ async fn exercise(
   }
   runner.command(["validate-value"], 2) |> ignore
   let value_model = "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }\n"
+  let protocol_model = @fs.read_file(root + "/examples/protocol-tests/greeting.smithy").text()
+  @fs.write_file(runner.dir + "/protocol.smithy", protocol_model)
+  runner.command(["validate", "--protocol-tests", "protocol.smithy"], 0) |> ignore
+  for (source, finding) in [
+    (protocol_model.replace_all(old="params: {name: \"Ada\"}", new="params: {name: 1}"), "HttpRequestTestsInput"),
+    (protocol_model.replace_all(old="id: \"GreetingRequest\"", new="id: \"GreetingRequest\"\n    appliesTo: \"both\""), "TraitValue"),
+    (protocol_model + "\n@smithy.test#httpRequestTests([{id: \"GreetingRequest\", protocol: fixtureProtocol, method: \"GET\", uri: \"/\"}])\noperation Other {}\n", "UniqueProtocolTestCaseId"),
+  ] {
+    @fs.write_file(runner.dir + "/protocol-invalid.smithy",source)
+    let (out, err) = runner.command(["validate", "--protocol-tests", "protocol-invalid.smithy"], 1)
+    assert_true((out + err).contains(finding),msg=out+err)
+  }
   @fs.write_file("\{dir}/value-model.smithy", value_model)
   let value_args = ["validate", "value", "--shape", "example#Input", "--value", "value.json", "value-model.smithy"]
   runner.command(["validate", "--from", "json", "value"] + value_args[2:].to_owned(), 2) |> ignore
