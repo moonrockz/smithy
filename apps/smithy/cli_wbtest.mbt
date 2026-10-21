@@ -23,6 +23,8 @@ test "invalid command options fail with usage status" {
   for
     args in [
       ["wat"],
+      ["validate-value"],
+      ["validate-rpc"],
       ["diff"],
       ["diff", "--old", "a.smithy"],
       ["diff", "--new", "b.smithy"],
@@ -73,24 +75,39 @@ test "argparse accepts standard option forms and interspersed inputs" {
 ///|
 test "value validation options select typed policies and permit stdin once" {
   let opts = options([
-    "validate-value", "--shape", "example#Input", "--value", "-", "--unknown-members",
+    "validate", "value", "--shape", "example#Input", "--value", "-", "--unknown-members",
     "ignore", "--member-names", "json", "--diagnostics", "json", "model.smithy",
   ])
-  assert_eq(opts.command, "validate-value")
+  assert_eq(opts.command, "validate")
+  assert_eq(opts.rpc_version, None)
   assert_eq(opts.value_validation.unwrap().target.to_string(), "example#Input")
+  let stdin_model = options([
+    "validate", "value", "--shape", "example#Input", "--value", "x.json", "--from",
+    "json", "-",
+  ])
+  assert_eq(stdin_model.from, Some("json"))
+  assert_eq(stdin_model.files, ["-"])
   for
     args in [
-      ["validate-value", "--shape", "bad", "--value", "x.json", "m.smithy"],
       [
-        "validate-value", "--shape", "example#Input", "--value", "-", "--from", "idl",
-        "-",
+        "validate", "--from", "json", "value", "--shape", "example#Input", "--value",
+        "x.json", "m.smithy",
       ],
       [
-        "validate-value", "--shape", "example#Input", "--value", "x.json", "--diagnostics",
+        "validate", "before.smithy", "value", "--shape", "example#Input", "--value",
+        "x.json", "m.smithy",
+      ],
+      ["validate", "value", "--shape", "bad", "--value", "x.json", "m.smithy"],
+      [
+        "validate", "value", "--shape", "example#Input", "--value", "-", "--from",
+        "idl", "-",
+      ],
+      [
+        "validate", "value", "--shape", "example#Input", "--value", "x.json", "--diagnostics",
         "xml", "m.smithy",
       ],
       [
-        "validate-value", "--shape", "example#Input", "--value", "x.json", "--unknown-members",
+        "validate", "value", "--shape", "example#Input", "--value", "x.json", "--unknown-members",
         "guess", "m.smithy",
       ],
     ] {
@@ -170,5 +187,46 @@ test "format rejects invalid syntax and preserves exact JSON numbers" {
   assert_eq(
     format_text("// only a comment", "comments.smithy", "idl"),
     "// only a comment\n",
+  )
+}
+
+///|
+test "response CLI contexts and input scopes reject contradictory usage" {
+  let base = ["validate", "rpc", "--version", "2.0", "--service", "example#Api"]
+  for
+    tail in [
+      ["--response", "r.json", "m.smithy", "--message", "q.json"],
+      ["m.smithy"],
+      ["--message", "q.json", "--method", "op", "m.smithy"],
+      ["--response", "r.json", "--method", "op", "--envelope-only", "m.smithy"],
+      ["--response", "r.json", "--operation", "bad", "m.smithy"],
+      ["--response", "r.json", "--operation", "example#Op$x", "m.smithy"],
+      ["--response", "r.json", "--method", "rpc.internal", "m.smithy"],
+      [
+        "--response", "r.json", "--request", "q.json", "--method", "op", "m.smithy",
+      ],
+      ["--response", "r.json", "--legacy-errors", "opaque", "m.smithy"],
+      ["--response", "-", "--request", "-", "m.smithy"],
+      ["--response", "r.json", "--request", "-", "--from", "idl", "-"],
+      ["--response", "-", "--method", "op", "--from", "idl", "-"],
+    ] {
+    let code = try options(base + tail) catch {
+      CliError(_, code) => code
+    } noraise {
+      _ => 0
+    }
+    assert_eq(code, 2, msg=tail.join(" "))
+  }
+  let opts = options(
+    base + ["--response", "r.json", "--operation", "example#Op", "m.smithy"],
+  )
+  assert_eq(
+    opts.rpc_options.unwrap().context,
+    Some(@rpc.Operation(@smithy.ShapeId::parse("example#Op").unwrap())),
+  )
+  assert_true(opts.rpc_options.unwrap().response)
+  assert_eq(
+    options(base + ["--response", "r.json", "m.smithy"]).rpc_options.unwrap().context,
+    None,
   )
 }

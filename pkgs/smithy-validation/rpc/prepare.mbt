@@ -5,6 +5,17 @@ priv struct PreparedMethod {
   mode : ParameterMode
   order : Array[String]
   result : ResultSelection
+  result_validator : @validation.PreparedValidator?
+  errors : Array[PreparedError]
+}
+
+///|
+priv struct PreparedError {
+  shape : @smithy.ShapeId
+  code : ErrorCode
+  data_validator : @validation.PreparedValidator?
+  data_target : @smithy.ShapeId
+  data_required : Bool
 }
 
 ///|
@@ -74,6 +85,10 @@ pub fn PreparedService::prepare(
       service, "I expected the selected protocol version to be declared by the service.",
     )
   }
+  let service_errors = match root.body {
+    Service(errors~, ..) => errors
+    _ => []
+  }
   let methods : Map[MethodName, PreparedMethod] = Map([])
   let pending = [service]
   let visited : Set[@smithy.ShapeId] = Set([])
@@ -114,7 +129,7 @@ pub fn PreparedService::prepare(
         pending.append(collectionOperations)
         pending.append(resources)
       }
-      Operation(input~, output~, ..) => {
+      Operation(input~, output~, errors~) => {
         let contract = fields(shape.trait_value("smithy.rpc#method"))
         guard text(contract.get("name")) is Some(raw_name) &&
           MethodName::parse(raw_name) is Some(name) else {
@@ -190,6 +205,9 @@ pub fn PreparedService::prepare(
             id, "I expected positional order only for a positional-capable method.",
           )
         }
+        if contract.get("resultMember") is Some(value) && !(value is String(_)) {
+          invalid(id, "I expected a string result member selector.")
+        }
         let result = match
           (contract.get("nullResult"), text(contract.get("resultMember"))) {
           (Some(Boolean(true)), None) => NullResult
@@ -212,6 +230,86 @@ pub fn PreparedService::prepare(
               id, "I expected a boolean nullResult selector.",
             )
         }
+        let result_validator = match result {
+          OutputStructure(target) | OutputMember(target) =>
+            Some(@validation.PreparedValidator::prepare(model, target, config~))
+          NullResult => None
+        }
+        let prepared_errors : Array[PreparedError] = []
+        let seen_errors : Set[@smithy.ShapeId] = Set([])
+        for error_id in service_errors + errors {
+          if seen_errors.contains(error_id) {
+            continue
+          }
+          if seen_errors.length() >= config.limits.work {
+            invalid(id, "I reached the error mapping preparation work limit.")
+          }
+          seen_errors.add(error_id)
+          guard model.shapes.get(error_id) is Some(error_shape) &&
+            error_shape.body is Structure(error_members) &&
+            error_shape.trait_value("smithy.api#error") is Some(_) else {
+            raise InvalidContract(
+              error_id, "I expected a modeled error structure.",
+            )
+          }
+          let mapping = fields(error_shape.trait_value("smithy.rpc#rpcError"))
+          guard mapping.get("code") is Some(Number(number)) &&
+            ErrorCode::from_number(number) is Some(code) else {
+            raise InvalidContract(
+              error_id, "I expected an integer rpcError application code.",
+            )
+          }
+          if code.is_reserved() ||
+            prepared_errors.iter().any(e => e.code == code) {
+            invalid(
+              error_id, "I expected a unique nonreserved application error code within the operation.",
+            )
+          }
+          let data_target = match
+            (mapping.get("absentData"), mapping.get("dataMember")) {
+            (Some(Boolean(true)), None) => None
+            (Some(Boolean(true)), Some(_)) =>
+              raise InvalidContract(
+                error_id, "I expected one error data selector.",
+              )
+            (None | Some(Boolean(false)), Some(String(name))) => {
+              guard error_id.with_member(name) is Some(member_id) &&
+                error_members.contains(member_id) else {
+                raise InvalidContract(
+                  error_id, "I expected a declared error data member.",
+                )
+              }
+              Some(member_id)
+            }
+            (None | Some(Boolean(false)), None) => Some(error_id)
+            _ =>
+              raise InvalidContract(
+                error_id, "I expected valid error data selectors.",
+              )
+          }
+          let data_required = match data_target {
+            Some(target) if target.member_name() is Some(_) =>
+              model.shapes
+              .get(target)
+              .map(s => s.trait_value("smithy.api#required") is Some(_))
+              .unwrap_or(false)
+            Some(_) => true
+            None => false
+          }
+          prepared_errors.push({
+            shape: error_id,
+            code,
+            data_target: data_target.unwrap_or(error_id),
+            data_required,
+            data_validator: match data_target {
+              Some(target) =>
+                Some(
+                  @validation.PreparedValidator::prepare(model, target, config~),
+                )
+              None => None
+            },
+          })
+        }
         methods[name] = {
           operation: id,
           validator: @validation.PreparedValidator::prepare(
@@ -222,6 +320,8 @@ pub fn PreparedService::prepare(
           mode,
           order,
           result,
+          result_validator,
+          errors: prepared_errors,
         }
       }
       _ =>

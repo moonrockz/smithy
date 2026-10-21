@@ -2,10 +2,10 @@
 
 This is the shared design for Smithy value validation, JSON-RPC modeling/message checks, optional Ion
 validation and OpenRPC export. Direct JSON value validation is implemented in this module and the
-`validate-value` CLI. The `rpc` package implements opt-in JSON-RPC trait definitions, prepared
-methods, request/notification validation and `smithy validate rpc`. Response/error validation,
-batches, exchanges, the Ion adapter and OpenRPC exporter remain follow-on capabilities.
-See the [request validator](rpc/README.mbt.md) for executable examples and implemented boundaries.
+`validate value` CLI. The `rpc` package implements opt-in JSON-RPC trait definitions, prepared
+methods, request/notification and contextual response/error validation through `smithy validate rpc`.
+Batches, exchanges, the Ion adapter and OpenRPC exporter remain follow-on capabilities.
+See the [message validator](rpc/README.mbt.md) for executable examples and implemented boundaries.
 
 The goal is to define an API in Smithy and check actual messages against it. A description export is
 a separate deliverable. Model assembly validates definitions; instance validation checks application
@@ -78,7 +78,7 @@ explicit absent-data mode. A data member selector cannot coexist with absent-dat
 
 Request preparation rejects duplicate wire names, undeclared result member selectors, incomplete
 or repeated positional ordering and mappings incompatible with a declared protocol version.
-Response preparation will also reject duplicate/reserved application codes and invalid error-data
+Preparation also rejects duplicate/reserved application codes and invalid error-data
 selectors. Application methods cannot use reserved `rpc.` names. Supported system
 extensions require explicit preparation rather than automatic acceptance of a reserved name.
 
@@ -121,9 +121,9 @@ independently of whether a request is a notification.
 ## Message and exchange APIs
 
 PreparedService snapshots wire method names to operation IDs, input validators, result selections
-and the chosen version/profile. Error mapping preparation belongs to the later response slice.
-It returns findings; it does not invoke handlers or transmit protocol errors. Parameters delegate
-to the generic value engine; later result/error-data validation will reuse that engine too.
+and the chosen version/profile, together with result validators and per-operation application error
+mappings including service errors. It returns findings; it does not invoke handlers or transmit
+protocol errors. Parameters, results and error data delegate to the generic value engine.
 
 RequestId distinguishes Absent from Present(NodeValue). Numbers remain exact; legacy structured IDs
 retain structural identity. A 1.0 present-null ID is a notification. A 2.0 absent ID is a notification;
@@ -149,12 +149,15 @@ and its propagation through structured CLI diagnostics for value and RPC validat
 
 The request validator is an `rpc` subcommand of `smithy validate`.
 The CLI is `smithy validate rpc --version 2.0 --service example#Calculator --message call.json
-model.smithy`. Contextual `--request call.json --response reply.json` and a transcript mode with
-explicit directions remain planned; these options are not implemented by this request slice.
+model.smithy`. Responses use `--response reply.json` with one of `--method subtract`,
+`--operation example#Subtract`, `--request call.json` or `--envelope-only`. Missing response
+context fails. JSON diagnostics are one complete stdout report. The scope is explicit; method-only
+checks cannot prove correlation. Legacy opaque errors remain distinct from the opt-in
+`--legacy-errors code-message-data` mapping. Transcript mode with explicit directions remains planned.
 
 ## Rule and original-example coverage
 
-The table separates implemented request coverage from follow-on work. R = requests/notifications,
+The table separates request and single-response coverage from follow-on batch/exchange work. R = requests/notifications,
 S = responses/errors, B = batches, E = exchanges, T = transport-only, C = explicit compatibility policy.
 
 | Source | Class | Required check or classified boundary |

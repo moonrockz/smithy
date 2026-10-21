@@ -1,6 +1,6 @@
-# JSON-RPC request validation
+# JSON-RPC message validation
 
-Validate one JSON-RPC 1.0 or 2.0 request or notification against a Smithy service.
+Validate one JSON-RPC 1.0 or 2.0 request, notification or contextual response against a Smithy service.
 The library reports findings and never executes handlers or sends responses.
 
 ## Library
@@ -44,9 +44,77 @@ The `rpc.` namespace is reserved and this profile provides no system extensions.
 
 `resultMember` selects an output member contract; `nullResult: true` selects a null result.
 The default is the output structure. Preparation checks selectors and exposes them with
-`result_selection`, but this entry point does not validate responses. The bundled `rpcError`
-trait reserves error-mapping syntax for the later contextual response validator; application
-error codes and data mappings are not prepared or checked by this request slice.
+`result_selection`. Result validators snapshot the effective selected member contract.
+Every modeled operation error and service error needs `rpcError` with an integer application
+code outside -32768 through -32000. Codes must be unique within each operation, including
+service errors. `dataMember` selects an effective error member contract, `absentData: true`
+requires absent data, and the default selects the whole error structure. Conflicting or
+undeclared selectors fail preparation.
+
+## Responses
+
+`validate_response(text, context=Some(...))` and `validate_response_json(json, context=Some(...))`
+check one response. Supply a `ResponseContext`:
+
+| Context | Checks |
+|---|---|
+| `Method(MethodName)` | Envelope and the selected wire method's result/application error data |
+| `Operation(ShapeId)` | Envelope and the selected reachable operation's result/application error data |
+| `OriginalRequest(String)` | Envelope, available method contracts, exact ID and single-request compatibility |
+| `EnvelopeOnly` | Envelope only, with a `LimitedScope` advisory |
+
+Omitting context returns `MissingContext`. A response's extension fields never select a method.
+Method/operation context cannot prove ID correlation. `ResponseResult.scope` reports `Envelope`,
+`MethodPayload` or `RequestContext`. JSON diagnostics render these as `envelope`, `methodPayload`
+and `requestContext`. `complete` describes completion within that declared scope.
+
+```mbt check
+///|
+test {
+  let loaded = @rpc.loader()
+    .add_idl(
+      "api.smithy", "$version: \"2\"\nnamespace example\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#method\n@jsonRpc(versions: [\"2.0\"])\nservice Api { version: \"1\", operations: [Ping] }\n@method(name: \"ping\", params: \"either\", positional: [], nullResult: true)\noperation Ping {}\n",
+    )
+    .assemble()
+  let service = @rpc.PreparedService::prepare(
+    loaded.model.unwrap(),
+    @smithy.ShapeId::parse("example#Api").unwrap(),
+    @rpc.V2_0,
+  )
+  let response = service.validate_response(
+    "{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":9007199254740993}",
+    context=Some(
+      @rpc.OriginalRequest(
+        "{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":9007199254740993}",
+      ),
+    ),
+  )
+  assert_true(response.is_valid())
+  assert_eq(response.scope, @rpc.RequestContext)
+}
+```
+
+Version 2.0 requires the literal version, an ID of string/number/null, and exactly one of
+result or error. An error is an object with an exact integer code, string message and optional
+data. Defined protocol codes and -32099 through -32000 server errors bypass application data
+contracts. Unassigned reserved codes fail. Other codes must be modeled for the selected
+operation. Whole-structure data is required; selected member data may be absent when the member
+is optional. Explicit null always undergoes the member's value validation. No message-length
+limit is invented beyond the shared resource limits.
+
+Version 1.0 requires result, error and an arbitrary JSON ID. Success has null error, including
+when the result itself is null. Failure has nonnull error and null result. Legacy errors are
+opaque by default, with a `LimitedScope` advisory. Explicit `legacy_errors=CodeMessageData`
+opts into the code/message/data application mapping; 1.0 itself does not require that schema.
+
+Original-request context uses original text so parse failures can match -32700 with null ID.
+Invalid envelopes match -32600, unknown methods match -32601, and invalid modeled parameters
+match -32602. Detectable valid request IDs are echoed exactly; unknown/invalid IDs become null.
+Exact numeric identity compares mathematical values without rounding, including nested legacy
+IDs. Valid notifications cannot have a supplied response. Duplicate keys and incomplete
+resource checks fail context validation rather than becoming protocol parse errors. Invalid
+1.0 original requests have no standardized protocol-error mapping and fail context validation.
+Original-request arrays are unsupported batch contexts. This API checks a single supplied association, not transcript completeness.
 
 ## CLI
 
@@ -57,6 +125,11 @@ smithy validate rpc --version 2.0 --service example#Calculator \
   --message examples/json-rpc/call.json examples/json-rpc/calculator.smithy
 smithy validate rpc --version 2.0 --service example#Calculator \
   --message examples/json-rpc/invalid.json --diagnostics json examples/json-rpc/calculator.smithy
+smithy validate rpc --version 2.0 --service example#Replies \
+  --response examples/json-rpc/reply.json --method subtract examples/json-rpc/responses.smithy
+smithy validate rpc --version 2.0 --service example#Replies \
+  --response examples/json-rpc/error.json --request examples/json-rpc/call.json \
+  --diagnostics json examples/json-rpc/responses.smithy
 ```
 
 The first succeeds quietly. The second exits 1 with `TypeMismatch` at `/params/1`, associated
@@ -65,7 +138,12 @@ use stdin `-` once; stdin models require `--from idl` or `--from json`. Model ar
 options follow `validate rpc`. Use `smithy validate rpc --help` for nested command help.
 `smithy validate model.smithy` continues to validate model definitions.
 
-JSON diagnostics go to stdout. Text findings go to stderr, including advisory severity.
+JSON diagnostics emit one complete report to stdout, never JSONL.
+Use exactly one of `--message` and `--response`. Response context options are mutually exclusive.
+`--operation` accepts a Smithy operation ID; `--envelope-only` reports its limited scope.
+`--legacy-errors code-message-data` explicitly selects that 1.0 error mapping.
+Message, response, original request and model inputs may use stdin `-` only once in total.
+ Text findings go to stderr, including advisory severity.
 Invalid messages, malformed JSON, I/O errors, invalid models and incomplete checks exit 1.
 Invalid usage, service contracts and unsupported constraint configurations exit 2.
 
@@ -97,15 +175,16 @@ error findings; advisories do not invalidate a message.
 
 ## Limits and scope
 
-The shared text parser caps input at 16 MiB UTF-8 and depth 128. Each request first runs a
+The shared text parser caps input at 16 MiB UTF-8 and depth 128. Each message first runs a
 bounded document check over the entire envelope, including IDs and ignored extensions, then
-a bounded input check over mapped parameters. Each pass uses the configured generic limits.
+bounded payload checks over mapped parameters, result or error data. The supplied original request
+runs its own bounded checks. Each pass uses the configured generic limits.
 The combined report is capped by the configured finding limit and reports incomplete checks.
 See the [value profile](../README.mbt.md) for default limits and unsupported constraints,
 including runtime contract conditions and regex features.
 
-Response objects and top-level arrays produce `UnsupportedMessage`. Contextual responses,
-error payloads, batches, exchange correlation and transport behavior belong to later slices.
+`validate_request` rejects response objects. Both entry points reject top-level arrays with
+`UnsupportedMessage`. Batches, transcript correlation and transport behavior belong to later slices.
 The package introduces no Ion, WIT, WAC, wasm-devkit or JSON Schema conversion dependencies.
 `mise run test:validation-consumer` builds separate packaged JSON and RPC consumers, audits
 their resolved dependency manifests and runs both examples on all four targets.

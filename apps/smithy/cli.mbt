@@ -57,7 +57,7 @@ fn command_line() -> @argparse.Command {
       ),
       @argparse.Command(
         "validate",
-        about="Validate model definitions or JSON-RPC messages with the rpc subcommand.",
+        about="Validate model definitions, JSON values or JSON-RPC messages.",
         options=[
           @argparse.OptionArg("from", about="Model format: idl or json."),
         ],
@@ -66,8 +66,36 @@ fn command_line() -> @argparse.Command {
         ],
         subcommands=[
           input_command(
+            "value",
+            "Validate a JSON value against a selected Smithy data shape.",
+            options=[
+              @argparse.OptionArg(
+                "shape",
+                about="Absolute Smithy data shape or member ID.",
+                required=true,
+              ),
+              @argparse.OptionArg(
+                "value",
+                about="JSON value file, or '-' for stdin.",
+                required=true,
+              ),
+              @argparse.OptionArg(
+                "diagnostics",
+                about="Findings format: text or json; default text.",
+              ),
+              @argparse.OptionArg(
+                "unknown-members",
+                about="Unknown structure member policy: reject or ignore; default reject.",
+              ),
+              @argparse.OptionArg(
+                "member-names",
+                about="Member naming: smithy or json; default smithy.",
+              ),
+            ],
+          ),
+          input_command(
             "rpc",
-            "Validate one JSON-RPC 1.0 or 2.0 request or notification.",
+            "Validate one JSON-RPC 1.0 or 2.0 request, notification or response.",
             options=[
               @argparse.OptionArg(
                 "version",
@@ -81,8 +109,27 @@ fn command_line() -> @argparse.Command {
               ),
               @argparse.OptionArg(
                 "message",
-                required=true,
-                about="JSON message file, or '-' for stdin.",
+                about="Request/notification JSON file, or '-' for stdin.",
+              ),
+              @argparse.OptionArg(
+                "response",
+                about="Response JSON file, or '-' for stdin; replaces --message.",
+              ),
+              @argparse.OptionArg(
+                "request",
+                about="Original request JSON file, or '-' for stdin; response context.",
+              ),
+              @argparse.OptionArg(
+                "method",
+                about="Explicit wire method for response payload validation.",
+              ),
+              @argparse.OptionArg(
+                "operation",
+                about="Explicit Smithy operation ID for response payload validation.",
+              ),
+              @argparse.OptionArg(
+                "legacy-errors",
+                about="1.0 response error mapping: opaque or code-message-data; default opaque.",
               ),
               @argparse.OptionArg(
                 "diagnostics",
@@ -97,34 +144,12 @@ fn command_line() -> @argparse.Command {
                 about="Payload member names: smithy or json; default smithy.",
               ),
             ],
-          ),
-        ],
-      ),
-      input_command(
-        "validate-value",
-        "Validate a JSON value against a selected Smithy data shape.",
-        options=[
-          @argparse.OptionArg(
-            "shape",
-            about="Absolute Smithy data shape or member ID.",
-            required=true,
-          ),
-          @argparse.OptionArg(
-            "value",
-            about="JSON value file, or '-' for stdin.",
-            required=true,
-          ),
-          @argparse.OptionArg(
-            "diagnostics",
-            about="Findings format: text or json; default text.",
-          ),
-          @argparse.OptionArg(
-            "unknown-members",
-            about="Unknown structure member policy: reject or ignore; default reject.",
-          ),
-          @argparse.OptionArg(
-            "member-names",
-            about="Member naming: smithy or json; default smithy.",
+            flags=[
+              @argparse.FlagArg(
+                "envelope-only",
+                about="Check response envelope only; no modeled payload or ID correlation.",
+              ),
+            ],
           ),
         ],
       ),
@@ -241,6 +266,7 @@ struct Options {
   diff_format : DiffFormat
   value_validation : ValueOptions?
   rpc_version : @rpc.ProtocolVersion?
+  rpc_options : RpcOptions?
   offline : Bool
   cache_dir : String?
   config : String?
@@ -258,16 +284,25 @@ fn options(args : Array[String]) -> Options raise CliError {
   guard parsed.subcommand is Some((command, matches)) else {
     raise CliError("expected a command; use --help", 2)
   }
-  let rpc_mode = command == "validate" && matches.subcommand is Some(("rpc", _))
-  // Model inputs and RPC inputs belong to distinct argparse scopes.
-  if rpc_mode &&
+  let validation_command = if command == "validate" {
+    matches.subcommand
+  } else {
+    None
+  }
+  let rpc_mode = validation_command is Some(("rpc", _))
+  let value_mode = validation_command is Some(("value", _))
+  // Model inputs belong to the selected validation command's argparse scope.
+  if validation_command is Some((name, _)) &&
     (
       !matches.values.get("file").unwrap_or([]).is_empty() ||
       matches.values.contains("from")
     ) {
-    raise CliError("place model inputs and options after validate rpc", 2)
+    raise CliError("place model inputs and options after validate " + name, 2)
   }
-  let matches = if rpc_mode { matches.subcommand.unwrap().1 } else { matches }
+  let matches = match validation_command {
+    Some((_, nested)) => nested
+    None => matches
+  }
   fn value(name : String) -> String? {
     match matches.values.get(name) {
       Some([value, ..]) => Some(value)
@@ -296,7 +331,72 @@ fn options(args : Array[String]) -> Options raise CliError {
   } else {
     None
   }
-  let value_validation = if command == "validate-value" || rpc_mode {
+  let rpc_options = if rpc_mode {
+    let response = value("response")
+    let request = value("request")
+    let method_ = value("method")
+    let operation = value("operation")
+    let envelope = matches.flags.get("envelope-only") == Some(true)
+    if (value("message") is Some(_)) == (response is Some(_)) {
+      raise CliError("use exactly one of --message and --response", 2)
+    }
+    let contexts = (if request is Some(_) { 1 } else { 0 }) +
+      (if method_ is Some(_) { 1 } else { 0 }) +
+      (if operation is Some(_) { 1 } else { 0 }) +
+      (if envelope { 1 } else { 0 })
+    if contexts > 1 {
+      raise CliError(
+        "use only one response context: --request, --method, --operation or --envelope-only",
+        2,
+      )
+    }
+    if response is None && (contexts > 0 || value("legacy-errors") is Some(_)) {
+      raise CliError(
+        "response context and --legacy-errors require --response", 2,
+      )
+    }
+    let legacy_errors = match value("legacy-errors").unwrap_or("opaque") {
+      "opaque" => @rpc.Opaque
+      "code-message-data" => @rpc.CodeMessageData
+      _ =>
+        raise CliError(
+          "expected opaque or code-message-data after --legacy-errors", 2,
+        )
+    }
+    if value("legacy-errors") is Some(_) && rpc_version != Some(@rpc.V1_0) {
+      raise CliError("--legacy-errors requires version 1.0", 2)
+    }
+    let context = if method_ is Some(name) {
+      guard @rpc.MethodName::parse(name) is Some(name) else {
+        raise CliError("expected an application method name after --method", 2)
+      }
+      Some(@rpc.Method(name))
+    } else if operation is Some(id) {
+      guard @smithy.ShapeId::parse(id) is Some(id) && id.member_name() is None else {
+        raise CliError("expected an absolute operation ID after --operation", 2)
+      }
+      Some(@rpc.Operation(id))
+    } else if envelope {
+      Some(@rpc.EnvelopeOnly)
+    } else {
+      None
+    }
+    if request == Some("-") && (response == Some("-") || files.contains("-")) {
+      raise CliError(
+        "stdin '-' may only be read once across model, response and request inputs",
+        2,
+      )
+    }
+    Some(RpcOptions::{
+      response: response is Some(_),
+      request,
+      context,
+      legacy_errors,
+    })
+  } else {
+    None
+  }
+  let value_validation = if value_mode || rpc_mode {
     let selector = if rpc_mode { "service" } else { "shape" }
     let raw_shape = value(selector).unwrap()
     guard @smithy.ShapeId::parse(raw_shape) is Some(target) else {
@@ -305,7 +405,14 @@ fn options(args : Array[String]) -> Options raise CliError {
         2,
       )
     }
-    let file = value(if rpc_mode { "message" } else { "value" }).unwrap()
+    let file = if rpc_mode {
+      match value("response") {
+        Some(file) => file
+        None => value("message").unwrap()
+      }
+    } else {
+      value("value").unwrap()
+    }
     let diagnostics = match value("diagnostics").unwrap_or("text") {
       "text" => TextFindings
       "json" => JsonFindings
@@ -364,6 +471,7 @@ fn options(args : Array[String]) -> Options raise CliError {
     diff_format,
     value_validation,
     rpc_version,
+    rpc_options,
     command,
     files,
     from,
@@ -538,7 +646,12 @@ fn run(args : Array[String]) -> Int32 raise {
   let result = loader.assemble()
   if opts.value_validation is Some(value_opts) {
     if opts.rpc_version is Some(version) {
-      return run_rpc_validation(value_opts, version, result)
+      return run_rpc_validation(
+        value_opts,
+        version,
+        opts.rpc_options.unwrap(),
+        result,
+      )
     }
     return run_value_validation(value_opts, result)
   }
