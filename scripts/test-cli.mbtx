@@ -588,6 +588,29 @@ async fn exercise(
     assert_eq(@fs.read_file("\{dir}/value.json").text(), text)
   }
   @fs.write_file("\{dir}/value.json", "{\"count\":2}")
+  @fs.write_file("\{dir}/timestamp.smithy", "$version: \"2\"\nnamespace example\n@timestampFormat(\"date-time\")\ntimestamp Time\nstructure Input { @required at: Time }\n")
+  let timestamp_args = ["validate-value", "--shape", "example#Input", "--value", "timestamp.json", "timestamp.smithy"]
+  for (text, expected_code) in [
+    ("2016-12-31T23:59:60Z", 0),
+    ("2017-01-01T05:29:60.5+05:30", 0),
+    ("2016-12-31T23:59:60+01:00", 1),
+    ("2017-12-31T23:59:60Z", 1),
+  ] {
+    @fs.write_file("\{dir}/timestamp.json", "{\"at\":\"" + text + "\"}")
+    let (out, err) = runner.command(timestamp_args, expected_code)
+    if expected_code == 0 { assert_eq(out + err, "") } else { assert_true((out + err).contains("InvalidTimestamp")) }
+    let (out, err) = runner.command(timestamp_args + ["--diagnostics", "json"], expected_code)
+    assert_eq(err, "")
+    guard @json.parse(out) is Object(result) else { fail("Expected timestamp diagnostics") }
+    assert_eq(result.get("valid"), Some(Json::boolean(expected_code == 0)))
+    assert_eq(result.get("complete"), Some(Json::boolean(true)))
+    if expected_code == 0 { assert_eq(result.get("findings"), Some(Json::array([]))) } else {
+      guard result.get("findings") is Some(Array([Object(finding)])) else { fail("Expected one timestamp finding") }
+      assert_eq(finding.get("code"), Some(Json::string("InvalidTimestamp")))
+      assert_eq(finding.get("pointer"), Some(Json::string("/at")))
+      assert_eq(finding.get("shape"), Some(Json::string("example#Input$at")))
+    }
+  }
   runner.command(["validate-value", "--shape", "example#Missing", "--value", "value.json", "value-model.smithy"], 2) |> ignore
   runner.command(["validate-value", "--shape", "not-an-id", "--value", "value.json", "value-model.smithy"], 2) |> ignore
   runner.command(["validate-value", "--shape", "example#Input", "value-model.smithy"], 2) |> ignore

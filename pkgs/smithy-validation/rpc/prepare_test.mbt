@@ -1,4 +1,31 @@
 ///|
+test "RPC parameters reuse the current validator's recorded leap-second policy" {
+  let model = contract_model(
+    "name: \"op\", params: \"either\", positional: [\"a\",\"b\"]",
+    input="structure Input { @required @timestampFormat(\"date-time\") a: Timestamp, b: Integer }",
+  )
+  let service = @rpc.PreparedService::prepare(
+    model,
+    @smithy.ShapeId::parse("test#Api").unwrap(),
+    @rpc.V2_0,
+  )
+  assert_true(
+    service
+    .validate_request(
+      "{\"jsonrpc\":\"2.0\",\"method\":\"op\",\"params\":[\"2016-12-31T23:59:60Z\"]}",
+    )
+    .is_valid(),
+  )
+  let result = service.validate_request(
+    "{\"jsonrpc\":\"2.0\",\"method\":\"op\",\"params\":[\"2016-12-30T23:59:60Z\"]}",
+  )
+  assert_false(result.is_valid())
+  assert_eq(result.findings[0].code, @rpc.Value(@validation.InvalidTimestamp))
+  assert_eq(result.findings[0].path.pointer(), "/params/0")
+  assert_eq(result.findings[0].shape.to_string(), "test#Input$a")
+}
+
+///|
 test "serialized JSON AST APIs reload without duplicate optional trait definitions" {
   let original = contract_model(
     "name: \"op\", params: \"either\", positional: [\"a\",\"b\"]",

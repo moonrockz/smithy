@@ -69,8 +69,20 @@ continues to check model definitions. Stdin may appear once across model and val
 | Numbers | Exact mathematical integers and byte/short/integer/long bounds. BigInteger/BigDecimal remain exact. Float/double magnitude is checked without rounding input. |
 | Nonnumeric floats | Opt-in `nonnumeric_floats=true` permits exactly `NaN`, `Infinity`, `-Infinity` strings, subject to range rules. |
 | Blob | Canonical padded RFC 4648 base64, including zero padding bits. |
-| Timestamp | Exact epoch-seconds number; `timestamp_format=DateTime` or effective `timestampFormat("date-time")` selects a calendar-checked string with an offset. HTTP-date and leap-second notation are unsupported. |
+| Timestamp | Exact epoch-seconds number; `timestamp_format=DateTime` or effective `timestampFormat("date-time")` selects a calendar-checked string with an offset, including recorded positive leap seconds. HTTP-date is unsupported. |
 | Runtime contracts | Reachable `smithy.contracts#conditions` raises `UnsupportedConstraint`. Assembly still validates the expression definition. |
+
+Date-time strings accept `:60` only when their calendar date and offset identify a recorded UTC
+insertion minute. For example, `2016-12-31T23:59:60Z` and
+`2017-01-01T05:29:60.5+05:30` are valid. Fractional seconds and lowercase `t`/`z` are accepted.
+`-00:00` retains RFC 3339's unknown-local-offset convention with a known UTC time.
+The offline table contains all 27 positive insertions through 2016-12-31, checked against
+[IERS Bulletin 72's table](https://hpiers.obspm.fr/iers/bul/bulc/Leap_Second.dat), July 2026.
+Unlisted `:60` dates, including future insertions, fail with `InvalidTimestamp` until the table
+is updated. Ordinary future timestamps remain valid. No negative leap seconds are recorded;
+a future deletion would require updating the validation rules as well.
+`NativeTimestamp::new` separately restricts seconds to `0..59`, including with unknown offsets.
+See [RFC 3339 sections 4.3 and 5.7](https://www.rfc-editor.org/rfc/rfc3339).
 
 The portable pattern profile supports literals, classes/ranges, groups, alternation, repetitions,
 whole-input anchors and common digit/word/whitespace escapes. Dot excludes line terminators.
