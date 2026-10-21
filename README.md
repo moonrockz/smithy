@@ -78,14 +78,18 @@ The two wasm files are not WASI programs. They import MoonBit host functions fro
 `__moonbit_fs_unstable` (`args_get`, `begin_read_string` and others). A runtime must provide these functions
 to run the file.
 
-- `smithy.wasm` also imports `wasi_snapshot_preview1.fd_write` and `fd_read`. It exports `memory` and `_start`.
-- `smithy-gc.wasm` needs a runtime with WebAssembly GC. It also imports `spectest.print_char`, a test host
-  function, and exports `_start`.
+- Both wasm files import WASI `fd_write`, `path_open` and `fd_close` for record-oriented
+  output, and export `memory` and `_start`. `smithy.wasm` also imports `fd_read`.
+- `smithy-gc.wasm` needs a runtime with WebAssembly GC. It also imports
+  `spectest.print_char`, a test host function.
 
 `wasmtime` cannot run them alone. We ran both files with wasmtime. Each stops at instantiation with
 `unknown import: __moonbit_fs_unstable::args_get has not been defined` (`smithy.wasm`) and
 `unknown import: __moonbit_fs_unstable::begin_read_string_array has not been defined` (`smithy-gc.wasm`).
-A host that supplies `__moonbit_fs_unstable` is needed. We did not run the files in such a host.
+A host that supplies the MoonBit imports and WASI I/O is needed. The pinned
+`moonrun` host runs both files in the CLI qualification suite, including JSONL
+pipe delivery, diagnostics and file output. See [CLI usage](apps/smithy/README.md#jsonl-diff-output)
+for the Wasm output directory boundary.
 
 ## Prerequisites
 

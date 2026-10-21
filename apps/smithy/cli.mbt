@@ -70,6 +70,10 @@ fn command_line() -> @argparse.Command {
             about="New Smithy model file or directory.",
             required=true,
           ),
+          @argparse.OptionArg(
+            "format",
+            about="Output format: text (default) or jsonl. JSONL flushes each stdout record after comparison.",
+          ),
           output,
         ],
       ),
@@ -162,6 +166,7 @@ struct Options {
   selector : String?
   old_model : String?
   new_model : String?
+  diff_format : DiffFormat
   offline : Bool
   cache_dir : String?
   config : String?
@@ -192,6 +197,7 @@ fn options(args : Array[String]) -> Options raise CliError {
   let config = value("config")
   let output = value("output")
   let output_dir = value("output-dir")
+  let diff_format = DiffFormat::parse(value("format").unwrap_or("text"))
   let check = matches.flags.get("check") == Some(true)
   let write = matches.flags.get("write") == Some(true)
   for (name, format) in [("--from", from), ("--to", to)] {
@@ -219,6 +225,7 @@ fn options(args : Array[String]) -> Options raise CliError {
     cache_dir: value("cache-dir"),
     old_model: value("old"),
     new_model: value("new"),
+    diff_format,
     command,
     files,
     from,
@@ -309,6 +316,7 @@ fn run(args : Array[String]) -> Int32 raise {
       opts.old_model.unwrap(),
       opts.new_model.unwrap(),
       opts.output,
+      opts.diff_format,
     )
   }
   if opts.command == "build" || opts.command == "clean" {

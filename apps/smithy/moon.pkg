@@ -21,14 +21,21 @@ import {
 
 import {
   "moonbit-community/zipc",
+  "moonbitlang/core/json",
 } for "wbtest"
 
 options(
-  "native-stub": [ "stdin_native.c" ],
+  link: { "wasm-gc": { "export-memory-name": "memory" } },
+  "native-stub": [ "stdin_native.c", "output_native.c" ],
   targets: {
     "stdin_native.mbt": [ "native" ],
     "stdin_js.mbt": [ "js" ],
     "stdin_wasm.mbt": [ "wasm" ],
     "stdin_wasm_gc.mbt": [ "wasm-gc" ],
+    "output_native.mbt": [ "native" ],
+    "output_js.mbt": [ "js" ],
+    "output_wasm.mbt": [ "wasm", "wasm-gc" ],
+    "output_memory_wasm.mbt": [ "wasm" ],
+    "output_memory_wasm_gc.mbt": [ "wasm-gc" ],
   },
 )

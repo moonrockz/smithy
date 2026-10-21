@@ -144,6 +144,9 @@ jobs:
       - name: Test public and authenticated acquisition on Windows
         run: moonx scripts/test-public-http.mbtx native js
 
+      - name: Test CLI behavior on Windows
+        run: moonx scripts/test-cli.mbtx native js
+
       - name: Upload the executable
         uses: actions/upload-artifact@v4
         with:
