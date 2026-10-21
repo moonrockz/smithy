@@ -101,7 +101,7 @@ fn command_line() -> @argparse.Command {
           ),
           input_command(
             "rpc",
-            "Validate one JSON-RPC 1.0 or 2.0 request, notification or response.",
+            "Validate JSON-RPC requests, notifications, responses or explicit 2.0 batches.",
             options=[
               @argparse.OptionArg(
                 "version",
@@ -151,6 +151,14 @@ fn command_line() -> @argparse.Command {
               ),
             ],
             flags=[
+              @argparse.FlagArg(
+                "batch",
+                about="Validate a complete JSON-RPC 2.0 request or response batch.",
+              ),
+              @argparse.FlagArg(
+                "no-response",
+                about="Validate absent batch response; requires --batch and --request.",
+              ),
               @argparse.FlagArg(
                 "envelope-only",
                 about="Check response envelope only; no modeled payload or ID correlation.",
@@ -345,8 +353,18 @@ fn options(args : Array[String]) -> Options raise CliError {
     let method_ = value("method")
     let operation = value("operation")
     let envelope = matches.flags.get("envelope-only") == Some(true)
-    if (value("message") is Some(_)) == (response is Some(_)) {
-      raise CliError("use exactly one of --message and --response", 2)
+    let batch = matches.flags.get("batch") == Some(true)
+    let no_response = matches.flags.get("no-response") == Some(true)
+    if no_response && (!batch || request is None) {
+      raise CliError("--no-response requires --batch and --request", 2)
+    }
+    let inputs = (if value("message") is Some(_) { 1 } else { 0 }) +
+      (if response is Some(_) { 1 } else { 0 }) +
+      (if no_response { 1 } else { 0 })
+    if inputs != 1 {
+      raise CliError(
+        "use exactly one of --message, --response and --no-response", 2,
+      )
     }
     let contexts = (if request is Some(_) { 1 } else { 0 }) +
       (if method_ is Some(_) { 1 } else { 0 }) +
@@ -358,7 +376,9 @@ fn options(args : Array[String]) -> Options raise CliError {
         2,
       )
     }
-    if response is None && (contexts > 0 || value("legacy-errors") is Some(_)) {
+    if response is None &&
+      !no_response &&
+      (contexts > 0 || value("legacy-errors") is Some(_)) {
       raise CliError(
         "response context and --legacy-errors require --response", 2,
       )
@@ -396,7 +416,9 @@ fn options(args : Array[String]) -> Options raise CliError {
       )
     }
     Some(RpcOptions::{
-      response: response is Some(_),
+      response: response is Some(_) || no_response,
+      batch,
+      no_response,
       request,
       context,
       legacy_errors,
@@ -416,7 +438,7 @@ fn options(args : Array[String]) -> Options raise CliError {
     let file = if rpc_mode {
       match value("response") {
         Some(file) => file
-        None => value("message").unwrap()
+        None => value("message").unwrap_or("<no response>")
       }
     } else {
       value("value").unwrap()

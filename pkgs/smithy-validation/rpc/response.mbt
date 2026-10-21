@@ -1,4 +1,29 @@
 ///|
+priv enum CheckedResponseContext {
+  Selected(ResponseContext?)
+  CheckedRequest(Json?, RequestResult, Bool)
+  InvalidBatch(ErrorCode)
+}
+
+///|
+fn PreparedService::check_response_context(
+  self : PreparedService,
+  context : ResponseContext?,
+) -> CheckedResponseContext {
+  match context {
+    Some(OriginalRequest(text)) => {
+      let parsed = Some(@validation.parse_json_value(text)) catch { _ => None }
+      let request = match parsed {
+        Some(value) => self.validate_json(value)
+        None => self.validate_request(text)
+      }
+      CheckedRequest(parsed, request, false)
+    }
+    _ => Selected(context)
+  }
+}
+
+///|
 fn PreparedService::finish_response(
   self : PreparedService,
   result : ResponseResult,
@@ -44,6 +69,20 @@ pub fn PreparedService::validate_response_json(
   self : PreparedService,
   value : Json,
   context~ : ResponseContext? = None,
+  legacy_errors~ : LegacyErrorMode = Opaque,
+) -> ResponseResult {
+  self.validate_response_checked(
+    value,
+    self.check_response_context(context),
+    legacy_errors~,
+  )
+}
+
+///|
+fn PreparedService::validate_response_checked(
+  self : PreparedService,
+  value : Json,
+  context : CheckedResponseContext,
   legacy_errors~ : LegacyErrorMode = Opaque,
 ) -> ResponseResult {
   let document = self.document.validate_json(value)
@@ -92,19 +131,19 @@ pub fn PreparedService::validate_response_json(
     }
   }
   match context {
-    None =>
+    Selected(None) =>
       emit(
         MissingContext,
         root,
         "I expected explicit method, operation, original-request or envelope-only context.",
       )
-    Some(EnvelopeOnly) =>
+    Selected(Some(EnvelopeOnly)) =>
       emit(
         LimitedScope,
         root,
         "I checked only the response envelope; payload contracts and request ID correlation were not checked.",
       )
-    Some(Method(name)) => {
+    Selected(Some(Method(name))) => {
       scope = MethodPayload
       method_ = self.methods.get(name)
       if method_ is None {
@@ -115,7 +154,7 @@ pub fn PreparedService::validate_response_json(
         )
       }
     }
-    Some(Operation(id)) => {
+    Selected(Some(Operation(id))) => {
       scope = MethodPayload
       method_ = self.methods.values().find_first(m => m.operation == id)
       if method_ is None {
@@ -126,15 +165,16 @@ pub fn PreparedService::validate_response_json(
         )
       }
     }
-    Some(OriginalRequest(text)) => {
+    Selected(Some(OriginalRequest(_))) => ()
+    InvalidBatch(code) => {
       scope = RequestContext
-      let parsed = Some(@validation.parse_json_value(text)) catch { _ => None }
-      let request = match parsed {
-        Some(value) => self.validate_json(value)
-        None => self.validate_request(text)
-      }
+      expected_code = Some(code)
+      expected_id = Some(Present(@smithy.Null))
+    }
+    CheckedRequest(parsed, request, batch_element) => {
+      scope = RequestContext
       original = Some(request)
-      if parsed is Some(Array(_)) {
+      if parsed is Some(Array(_)) && !batch_element {
         emit(
           UnsupportedMessage,
           root,
@@ -154,24 +194,11 @@ pub fn PreparedService::validate_response_json(
           )
         }
       } else {
-        let invalid_params_envelope = match parsed {
-          Some(Object(fields)) =>
-            match fields.get("params") {
-              Some(Array(_)) => false
-              Some(Object(_)) | None => self.version == V1_0
-              _ => true
-            }
-          _ => false
-        }
-        let envelope_invalid = invalid_params_envelope ||
-          request.findings
-          .iter()
-          .any(f => {
-            f.code == InvalidEnvelope ||
-            f.code == InvalidVersion ||
-            f.code == InvalidId ||
-            f.code == UnsupportedMessage
-          })
+        let envelope_invalid = invalid_request_envelope(
+          self.version,
+          parsed.unwrap_or(Json::null()),
+          request,
+        )
         if envelope_invalid {
           if self.version == V1_0 {
             emit(

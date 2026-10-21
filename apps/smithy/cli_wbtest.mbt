@@ -230,3 +230,47 @@ test "response CLI contexts and input scopes reject contradictory usage" {
     None,
   )
 }
+
+///|
+test "batch CLI selects request response and absent-response modes" {
+  let base = [
+    "validate", "rpc", "--version", "2.0", "--service", "example#Api", "--batch",
+  ]
+  let request = options(base + ["--message", "q.json", "m.smithy"])
+  assert_true(request.rpc_options.unwrap().batch)
+  assert_false(request.rpc_options.unwrap().response)
+  let absent = options(
+    base + ["--no-response", "--request", "q.json", "m.smithy"],
+  )
+  assert_true(absent.rpc_options.unwrap().response)
+  assert_true(absent.rpc_options.unwrap().no_response)
+  for
+    tail in [
+      ["--no-response", "m.smithy"],
+      [
+        "--no-response", "--request", "q.json", "--response", "r.json", "m.smithy",
+      ],
+      [
+        "--no-response", "--request", "q.json", "--message", "r.json", "m.smithy",
+      ],
+      ["--no-response", "--request", "-", "--from", "idl", "-"],
+    ] {
+    let code = try options(base + tail) catch {
+      CliError(_, code) => code
+    } noraise {
+      _ => 0
+    }
+    assert_eq(code, 2, msg=tail.join(" "))
+  }
+  let code = try
+    options([
+      "validate", "rpc", "--version", "2.0", "--service", "example#Api", "--no-response",
+      "--request", "q.json", "m.smithy",
+    ])
+  catch {
+    CliError(_, code) => code
+  } noraise {
+    _ => 0
+  }
+  assert_eq(code, 2)
+}

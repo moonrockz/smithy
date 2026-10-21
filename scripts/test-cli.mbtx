@@ -515,6 +515,93 @@ async fn exercise_rpc_responses(runner : Runner, root : String, skip_stdin : Boo
   }
 }
 
+async fn exercise_rpc_batches(runner : Runner, root : String, skip_stdin : Bool) -> Unit {
+  @fs.write_file(runner.dir + "/batches.smithy", @fs.read_file(root + "/examples/json-rpc/batches.smithy").text())
+  let base = ["validate", "rpc", "--version", "2.0", "--service", "batch#Api", "--batch", "batches.smithy", "--diagnostics", "json"]
+  let mixed = @fs.read_file(root + "/examples/json-rpc/batch-mixed.json").text()
+  let replies = @fs.read_file(root + "/examples/json-rpc/batch-replies.json").text()
+  let notifications = @fs.read_file(root + "/examples/json-rpc/batch-notifications.json").text()
+  let invalid_error = "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null}"
+  let parse_error = "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32700,\"message\":\"Parse error\"},\"id\":null}"
+  let large_call = "[{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":9007199254740993}]"
+  let null_reply = "[{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":9007199254740993}]"
+  for (request, response, status, code, pointer) in [
+    (mixed, Some(replies), 0, "", ""),
+    (notifications, None, 0, "", ""),
+    ("[{\"jsonrpc\":\"2.0\",\"method\":\"missing\"}]", None, 0, "", ""),
+    ("[\n{\"jsonrpc\":\"2.0\",\"method\":\"sum\",\"params\":[1,2,4],\"id\":\"1\"},\n{\"jsonrpc\":\"2.0\",\"method\"\n]", Some(parse_error), 0, "", ""),
+    ("[]", Some(invalid_error), 0, "", ""),
+    ("[1]", Some("[" + invalid_error + "]"), 0, "", ""),
+    ("[1,2,3]", Some("[" + invalid_error + "," + invalid_error + "," + invalid_error + "]"), 0, "", ""),
+    ("[[],null]", Some("[" + invalid_error + "," + invalid_error + "]"), 0, "", ""),
+    (large_call, Some(null_reply), 0, "", ""),
+    (large_call, Some("[{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":9007199254740992}]"), 1, "UnexpectedResponse", "/0/id"),
+    (large_call, None, 1, "MissingResponse", ""),
+    (notifications, Some("[]"), 1, "InvalidEnvelope", ""),
+    (notifications, Some("[{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":null}]"), 1, "UnexpectedResponse", "/0/id"),
+    (large_call, Some("[{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":9007199254740993}]"), 1, "TypeMismatch", "/0/result"),
+    (large_call, Some("[{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":9007199254740993},{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":9007199254740993}]"), 1, "DuplicateResponse", "/1/id"),
+    ("[{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":1},{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":1.0}]", Some("[{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":1}]"), 1, "AmbiguousId", ""),
+    (large_call, Some("["), 1, "InvalidJson", ""),
+    (large_call, Some("[{\"id\":1,\"id\":2}]"), 1, "DuplicateJsonKey", ""),
+    ("[{\"id\":1,\"id\":2}]", Some(parse_error), 1, "InvalidContext", ""),
+  ] {
+    @fs.write_file(runner.dir + "/batch-requests.json", request)
+    let args = if response is Some(response) {
+      @fs.write_file(runner.dir + "/batch-responses.json", response)
+      base + ["--response", "batch-responses.json", "--request", "batch-requests.json"]
+    } else { base + ["--no-response", "--request", "batch-requests.json"] }
+    let (out, _) = runner.command(args, status)
+    guard @json.parse(out) is Object(report) else { fail("Expected one complete batch report") }
+    assert_eq(report.get("valid"), Some(Json::boolean(status == 0)))
+    if code != "" {
+      guard report.get("findings") is Some(Array(findings)) else { fail("Missing batch findings") }
+      assert_true(findings.iter().any(f => f is Object(fields) && fields.get("code") == Some(Json::string(code)) && fields.get("pointer") == Some(Json::string(pointer))), msg=out)
+    }
+  }
+  for (request, status, code, pointer) in [
+    (notifications, 0, "", ""),
+    (mixed, 1, "InvalidVersion", "/3/jsonrpc"),
+    ("[]", 1, "InvalidEnvelope", ""),
+    ("[1]", 1, "InvalidEnvelope", "/0"),
+    ("[1,2,3]", 1, "InvalidEnvelope", "/2"),
+    ("[", 1, "InvalidJson", ""),
+    ("[{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,\"bad\"]}]", 1, "TypeMismatch", "/0/params/1"),
+    ("[" + "1,".repeat(99) + "1]", 1, "InvalidEnvelope", "/99"),
+    ("[" + "1,".repeat(100) + "1]", 1, "LimitExceeded", "/100"),
+    ("[".repeat(130) + "0" + "]".repeat(130), 1, "JsonInputLimit", ""),
+  ] {
+    @fs.write_file(runner.dir + "/batch-requests.json", request)
+    let (out, _) = runner.command(base + ["--message", "batch-requests.json"], status)
+    guard @json.parse(out) is Object(report) else { fail("Expected request batch report") }
+    assert_eq(report.get("valid"), Some(Json::boolean(status == 0)))
+    if code != "" {
+      guard report.get("findings") is Some(Array(findings)) else { fail("Missing request batch findings") }
+      assert_true(findings.iter().any(f => f is Object(fields) && fields.get("code") == Some(Json::string(code)) && fields.get("pointer") == Some(Json::string(pointer))), msg=out)
+    }
+  }
+  let legacy = base.copy(); legacy[3] = "1.0"
+  let (out, _) = runner.command(legacy + ["--message", "batch-requests.json"], 1)
+  assert_true(out.contains("UnsupportedMessage"))
+  @fs.write_file(runner.dir + "/batch-responses.json", null_reply)
+  for context in [["--method", "ping"], ["--operation", "batch#Ping"], ["--envelope-only"]] {
+    let (out, _) = runner.command(base + ["--response", "batch-responses.json"] + context, 0)
+    guard @json.parse(out) is Object(report) else { fail("Expected scoped batch report") }
+    assert_eq(report.get("scope"), Some(Json::string(if context[0] == "--envelope-only" { "envelope" } else { "methodPayload" })))
+  }
+  let (out, _) = runner.command(base + ["--response", "batch-responses.json"], 1)
+  assert_true(out.contains("MissingContext"))
+  runner.command(base + ["--no-response"], 2) |> ignore
+  runner.command(base + ["--message", "batch-requests.json", "--no-response", "--request", "batch-requests.json"], 2) |> ignore
+  if !skip_stdin && (runner.target != "wasm-gc" || @env.get_env_var("OS") != Some("Windows_NT")) {
+    runner.command(base + ["--message", "-"], 0, input=notifications) |> ignore
+    runner.command(base + ["--no-response", "--request", "-"], 0, input=notifications) |> ignore
+    @fs.write_file(runner.dir + "/batch-requests.json", large_call)
+    runner.command(base + ["--response", "-", "--request", "batch-requests.json"], 0, input=null_reply) |> ignore
+  }
+}
+
+///|
 async fn exercise_rpc(runner : Runner, root : String, skip_stdin : Bool) -> Unit {
   let model = @fs.read_file(root + "/examples/json-rpc/calculator.smithy").text()
   @fs.write_file(runner.dir + "/rpc.smithy", model)
@@ -610,6 +697,7 @@ async fn exercise(
   @fs.write_file("\{dir}/input.smithy", input)
   exercise_rpc(runner, root, skip_stdin)
   exercise_rpc_responses(runner, root, skip_stdin)
+  exercise_rpc_batches(runner, root, skip_stdin)
   @fs.write_file(
     "\{dir}/broken.smithy",
     "$version: \"2\"\nnamespace example\nstructure Broken { x: Missing }",

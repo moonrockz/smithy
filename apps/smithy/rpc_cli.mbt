@@ -1,6 +1,8 @@
 ///|
 struct RpcOptions {
   response : Bool
+  batch : Bool
+  no_response : Bool
   request : String?
   context : @rpc.ResponseContext?
   legacy_errors : @rpc.LegacyErrorMode
@@ -41,7 +43,9 @@ fn run_rpc_validation(
       return value_problem(opts, "InvalidConfiguration", error.to_string(), 2)
   }
   let text = try {
-    if opts.file == "-" {
+    if rpc_opts.no_response {
+      ""
+    } else if opts.file == "-" {
       read_stdin()
     } else {
       @fs.read_file_to_string(opts.file)
@@ -72,6 +76,39 @@ fn run_rpc_validation(
     Some(@rpc.OriginalRequest(request))
   } else {
     rpc_opts.context
+  }
+  if rpc_opts.batch {
+    if rpc_opts.response {
+      let batch_context = context.map(c => {
+        match c {
+          @rpc.EnvelopeOnly => @rpc.BatchEnvelopeOnly
+          @rpc.Method(name) => @rpc.BatchMethod(name)
+          @rpc.Operation(id) => @rpc.BatchOperation(id)
+          @rpc.OriginalRequest(text) => @rpc.OriginalBatch(text)
+        }
+      })
+      let result = prepared.validate_response_batch(
+        if rpc_opts.no_response {
+          None
+        } else {
+          Some(text)
+        },
+        context=batch_context,
+      )
+      if opts.diagnostics == JsonFindings {
+        println(@json.to_json(result).stringify())
+      } else {
+        print_rpc_findings(opts.file, result.findings)
+      }
+      return if result.is_valid() { 0 } else { 1 }
+    }
+    let result = prepared.validate_request_batch(text)
+    if opts.diagnostics == JsonFindings {
+      println(@json.to_json(result).stringify())
+    } else {
+      print_rpc_findings(opts.file, result.findings)
+    }
+    return if result.is_valid() { 0 } else { 1 }
   }
   if rpc_opts.response {
     let result = prepared.validate_response(
