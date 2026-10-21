@@ -67,6 +67,79 @@ as `\n`. See the [model diff library](../../pkgs/smithy-diff/README.mbt.md) for 
 comparison API, suppressions and preview-feature behavior. This command compares
 explicit old/new snapshots; Git and project modes are not implemented.
 
+### JSONL diff output
+
+Use `--format jsonl` for automation. `--format=jsonl` also works. Text remains
+the default, and `--format text` selects it explicitly. There is no separate
+streaming flag.
+
+```shell
+smithy diff --old previous/ --new current/ --format jsonl
+smithy diff --old previous/ --new current/ --format=jsonl --output changes.jsonl
+```
+
+Each unsuppressed event is one compact, newline-terminated UTF-8 JSON object,
+in the same deterministic order as text output. The output has no array wrapper,
+header, summary, progress text or blank records. For example:
+
+```json
+{"id":"ChangedMemberTarget","severity":"ERROR","shape":"example#Value$name","message":"The event message","source":{"file":"current/model.smithy","path":"","span":{"start":42,"length":12}}}
+```
+
+| Field | Value |
+|-------|-------|
+| `id` | Event identifier string |
+| `severity` | `NOTE`, `WARNING`, `DANGER` or `ERROR` |
+| `shape` | Absolute shape ID string, or `null` for a model-level event |
+| `message` | Complete message string; JSON decoding restores newlines and other escaped characters |
+| `source` | `null`, or an object containing `file`, `path` and `span` |
+| `source.file` | Physical source identifier, including archive entry paths when present |
+| `source.path` | JSON Pointer for JSON AST input, otherwise usually an empty string |
+| `source.span` | `null`, or nonnegative integer `start` and `length` in zero-based UTF-16 code units |
+
+Source locations retain the comparison engine's precision, usually a shape's
+location. They do not promise exact trait locations or line/column coordinates.
+Consumers should tolerate additional object fields.
+
+Both models are assembled and compared before output begins. The CLI then
+serializes one event at a time and flushes each complete stdout record through
+its application buffers. It honors sink backpressure without collecting the
+serialized output. Assembly and comparison still keep their models and results
+in memory. A downstream tool may have its own buffers.
+
+`--output FILE` uses the same records with ordinary file buffering, finishes
+the write and close before returning, and leaves stdout empty. Wasm and Wasm GC
+hosts must supply WASI `fd_write`, `path_open` and `fd_close`, including a working
+directory preopen at descriptor 3. The pinned `moonrun` host provides these;
+its WASI file paths must remain within that directory, including symlink targets.
+Native and Node.js output paths use the host filesystem directly.
+
+An unchanged comparison produces no records and creates an empty file when
+`--output` is used. Invalid models produce no diff records and preserve an
+existing output file. Diagnostics stay on stderr. Write, flush and close errors,
+including a closed downstream pipe, stop delivery and return 1. A failed output
+may contain only a prefix, including an incomplete final record; output is not
+atomic and does not request filesystem durability for every record.
+
+Exit statuses are the same in text and JSONL:
+
+- `0`: compatible or unchanged models, with no processing error.
+- `1`: an ERROR/DANGER difference, invalid models, or a processing/output failure.
+- `2`: invalid command usage, including an unknown or missing format value.
+
+A breaking diff writes all its events before returning 1 unless output fails.
+Use stderr to distinguish processing failures from compatibility findings.
+In Bash, enable `pipefail` so a successful `jq` does not hide Smithy's status:
+
+```bash
+set -o pipefail
+smithy diff --old previous/ --new current/ --format jsonl |
+  jq --unbuffered -c 'select(.severity == "ERROR" or .severity == "DANGER")'
+```
+
+With a successful `jq`, this pipeline returns Smithy's status. `--unbuffered`
+asks `jq` to flush each result too.
+
 `build` reads the configured local sources and imports, runs each concrete
 projection, and writes model, sources and build-info artifacts under its output
 directory. A `jsonSchema` plugin setting writes `schema.json` for each
@@ -147,9 +220,11 @@ output files are replaced. Use `--` before input paths beginning with `-`.
 Exit statuses are 0 for success, 1 for invalid models, I/O failures or formatting
 differences, and 2 for command-line usage errors. Native, Wasm and Node.js
 builds write diagnostics to stderr. Node.js builds use the Node 24 toolchain pinned by mise.
-The `wasm-gc` artifact uses the host's `spectest.print_char` for both output
-streams and reads stdin through `/dev/stdin`; use the Wasm or native build for
-portable command-line pipelines.
+On Wasm GC, diff diagnostics and top-level errors use WASI stderr. Other
+commands' legacy print-based diagnostics may still share stdout through
+`spectest.print_char`. JSONL diff records use WASI stdout and stay separate
+from diagnostics. Wasm GC reads stdin through `/dev/stdin`; use the Wasm or
+native build for portable stdin pipelines.
 
 Run `mise run test:cli` to check the built CLI on every backend, or pass target
 names to select backends. The root [README](../../README.md) lists release assets.

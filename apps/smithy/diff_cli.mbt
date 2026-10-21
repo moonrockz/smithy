@@ -19,7 +19,7 @@ fn diff_load(path : String) -> @smithy.Model? raise {
     if event.severity == "ERROR" ||
       event.severity == "DANGER" ||
       event.severity == "WARNING" {
-      eprintln(path + ": " + validation_event_text(event))
+      cli_stderr(path + ": " + validation_event_text(event))
     }
   }
   if failed {
@@ -34,6 +34,7 @@ fn run_diff(
   old_path : String,
   new_path : String,
   output : String?,
+  format : DiffFormat,
 ) -> Int32 raise {
   let old_model = diff_load(old_path)
   let new_model = diff_load(new_path)
@@ -41,6 +42,10 @@ fn run_diff(
     return 1
   }
   let result = @diff.compare(old_model, new_model)
+  if format == Jsonl {
+    write_diff_jsonl(result.events, output_sink(output))
+    return if result.is_breaking() { 1 } else { 0 }
+  }
   let lines = result.events
     .iter()
     .filter(e => e.severity != "SUPPRESSED")
