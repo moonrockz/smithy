@@ -195,8 +195,9 @@ Feature: Release tooling
 
       **Wasm files:**
 
-      - `smithy.wasm` needs a host that supplies the `__moonbit_fs_unstable` imports and `wasi_snapshot_preview1.fd_write`. `wasmtime` alone fails with `unknown import: __moonbit_fs_unstable::…`.
-      - `smithy-gc.wasm` needs a host with WebAssembly GC that supplies the `__moonbit_fs_unstable` imports and `spectest.print_char`. `wasmtime` alone fails with `unknown import: __moonbit_fs_unstable::…`.
+      - Both wasm files export `memory` and `_start` and need a host supplying the MoonBit `__moonbit_fs_unstable` imports and WASI `fd_write`, `path_open` and `fd_close`. JSONL file output uses a working-directory preopen at descriptor 3; the pinned `moonrun` provides these imports and bounds file output to that directory.
+      - `smithy.wasm` also imports WASI `fd_read` for stdin. `smithy-gc.wasm` additionally needs WebAssembly GC and `spectest.print_char`.
+      - `wasmtime` alone cannot instantiate either file because it lacks the MoonBit host imports.
 
       Highlights of 0.3.0.
 

@@ -219,9 +219,11 @@ output files are replaced. Use `--` before input paths beginning with `-`.
 Exit statuses are 0 for success, 1 for invalid models, I/O failures or formatting
 differences, and 2 for command-line usage errors. Native, Wasm and Node.js
 builds write diagnostics to stderr. Node.js builds use the Node 24 toolchain pinned by mise.
-The `wasm-gc` artifact uses the host's `spectest.print_char` for both output
-streams and reads stdin through `/dev/stdin`; use the Wasm or native build for
-portable command-line pipelines.
+On Wasm GC, diff diagnostics and top-level errors use WASI stderr. Other
+commands' legacy print-based diagnostics may still share stdout through
+`spectest.print_char`. JSONL diff records use WASI stdout and stay separate
+from diagnostics. Wasm GC reads stdin through `/dev/stdin`; use the Wasm or
+native build for portable stdin pipelines.
 
 Run `mise run test:cli` to check the built CLI on every backend, or pass target
 names to select backends. The root [README](../../README.md) lists release assets.

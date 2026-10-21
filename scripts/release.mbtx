@@ -217,7 +217,7 @@ fn changelog_section(changelog : String, version : Version) -> String? {
 /// The GitHub release notes: the install lines, then the changelog section.
 fn release_notes(version : Version, section : String) -> String {
   let install = "**Install:**\n\n- `mise use github:\{module_name}@\{version}`\n- `moon add moonrockz/smithy-syntax@\{version}`"
-  let wasm = "- `smithy.wasm` needs a host that supplies the `__moonbit_fs_unstable` imports and `wasi_snapshot_preview1.fd_write`. `wasmtime` alone fails with `unknown import: __moonbit_fs_unstable::…`.\n- `smithy-gc.wasm` needs a host with WebAssembly GC that supplies the `__moonbit_fs_unstable` imports and `spectest.print_char`. `wasmtime` alone fails with `unknown import: __moonbit_fs_unstable::…`."
+  let wasm = "- Both wasm files export `memory` and `_start` and need a host supplying the MoonBit `__moonbit_fs_unstable` imports and WASI `fd_write`, `path_open` and `fd_close`. JSONL file output uses a working-directory preopen at descriptor 3; the pinned `moonrun` provides these imports and bounds file output to that directory.\n- `smithy.wasm` also imports WASI `fd_read` for stdin. `smithy-gc.wasm` additionally needs WebAssembly GC and `spectest.print_char`.\n- `wasmtime` alone cannot instantiate either file because it lacks the MoonBit host imports."
   tidy_changelog(install + "\n\n**Wasm files:**\n\n" + wasm + "\n\n" + section)
 }
 
