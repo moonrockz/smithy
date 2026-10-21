@@ -56,6 +56,34 @@ fn command_line() -> @argparse.Command {
         options=[output],
       ),
       input_command("validate", "Assemble files and report model diagnostics."),
+      input_command(
+        "validate-value",
+        "Validate a JSON value against a selected Smithy data shape.",
+        options=[
+          @argparse.OptionArg(
+            "shape",
+            about="Absolute Smithy data shape or member ID.",
+            required=true,
+          ),
+          @argparse.OptionArg(
+            "value",
+            about="JSON value file, or '-' for stdin.",
+            required=true,
+          ),
+          @argparse.OptionArg(
+            "diagnostics",
+            about="Findings format: text or json; default text.",
+          ),
+          @argparse.OptionArg(
+            "unknown-members",
+            about="Unknown structure member policy: reject or ignore; default reject.",
+          ),
+          @argparse.OptionArg(
+            "member-names",
+            about="Member naming: smithy or json; default smithy.",
+          ),
+        ],
+      ),
       @argparse.Command(
         "diff",
         about="Compare two model files or directories and report compatibility changes.",
@@ -162,6 +190,7 @@ struct Options {
   selector : String?
   old_model : String?
   new_model : String?
+  value_validation : ValueOptions?
   offline : Bool
   cache_dir : String?
   config : String?
@@ -194,6 +223,42 @@ fn options(args : Array[String]) -> Options raise CliError {
   let output_dir = value("output-dir")
   let check = matches.flags.get("check") == Some(true)
   let write = matches.flags.get("write") == Some(true)
+  let value_validation = if command == "validate-value" {
+    let raw_shape = value("shape").unwrap()
+    guard @smithy.ShapeId::parse(raw_shape) is Some(target) else {
+      raise CliError("expected an absolute Smithy shape ID after --shape", 2)
+    }
+    let file = value("value").unwrap()
+    let diagnostics = match value("diagnostics").unwrap_or("text") {
+      "text" => TextFindings
+      "json" => JsonFindings
+      _ => raise CliError("expected text or json after --diagnostics", 2)
+    }
+    let unknown_members = match value("unknown-members").unwrap_or("reject") {
+      "reject" => @validation.Reject
+      "ignore" => @validation.Ignore
+      _ =>
+        raise CliError("expected reject or ignore after --unknown-members", 2)
+    }
+    let member_names = match value("member-names").unwrap_or("smithy") {
+      "smithy" => @validation.Smithy
+      "json" => @validation.JsonName
+      _ => raise CliError("expected smithy or json after --member-names", 2)
+    }
+    if file == "-" && files.contains("-") {
+      raise CliError(
+        "stdin '-' may only be read once across model and value inputs", 2,
+      )
+    }
+    Some(ValueOptions::{
+      target,
+      file,
+      diagnostics,
+      config: @validation.Config::new(unknown_members~, member_names~),
+    })
+  } else {
+    None
+  }
   for (name, format) in [("--from", from), ("--to", to)] {
     if format is Some(format) && format != "idl" && format != "json" {
       raise CliError("expected idl or json after \{name}, found '\{format}'", 2)
@@ -219,6 +284,7 @@ fn options(args : Array[String]) -> Options raise CliError {
     cache_dir: value("cache-dir"),
     old_model: value("old"),
     new_model: value("new"),
+    value_validation,
     command,
     files,
     from,
@@ -369,6 +435,9 @@ fn run(args : Array[String]) -> Int32 raise {
     return if failed { 1 } else { 0 }
   }
   let result = loader.assemble()
+  if opts.value_validation is Some(value_opts) {
+    return run_value_validation(value_opts, result)
+  }
   if opts.command == "validate" {
     let mut failed = result.model is None
     for event in result.validation_events() {

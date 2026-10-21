@@ -1,0 +1,148 @@
+/// Qualify an isolated consumer against normal local package archives.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/io",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/crypto",
+}
+
+///|
+async fn write(path : String, bytes : &@io.Data) -> Unit {
+  let parts = path.split("/").map(p => p.to_owned()).to_array()
+  parts.pop() |> ignore
+  @fs.mkdir(parts.join("/"), recursive=true, allow_exist=true)
+  @fs.write_file(path, bytes)
+}
+
+///|
+fn allowed(name : String) -> Bool {
+  !["moonrockz/ion", "moonrockz/wit", "moonrockz/wac", "moonrockz/wasm-devkit", "moonrockz/smithy-jsonschema", "moonrockz/smithy-openapi"].contains(name)
+}
+
+///|
+fn string_field(value : Json, key : String) -> String raise {
+  guard value is Object(fields) && fields.get(key) is Some(String(text)) else { fail("Missing package field " + key) }
+  text
+}
+
+///|
+fn manifest_version(source : String) -> String raise {
+  for line in source.split("\n") {
+    if line.trim_start().has_prefix("version = \"") { return line.split("\"").to_array()[1].to_owned() }
+  }
+  fail("Missing module version")
+}
+
+///|
+async fn seed(root : String, registry_home : String, fixture : String, name : String, version : String, seen : Set[String]) -> Unit {
+  assert_true(allowed(name), msg="Unexpected integration dependency " + name)
+  let coordinate = name + "@" + version
+  if seen.contains(coordinate) { return }
+  seen.add(coordinate)
+  let local_module = match name {
+    "moonrockz/smithy-validation" => Some("pkgs/smithy-validation")
+    "moonrockz/smithy" => Some("pkgs/smithy")
+    "moonrockz/smithy-syntax" => Some("pkgs/smithy-syntax")
+    "moonrockz/jmespath" => Some("pkgs/jmespath")
+    _ => None
+  }
+  let index_path = "registry/index/user/" + name + ".index"
+  let archive_path = "registry/cache/" + name + "/" + version + ".zip"
+  let (entry, bytes) = match local_module {
+    Some(path) => {
+      let manifest = @fs.read_file(root + "/" + path + "/moon.mod").text()
+      assert_eq(manifest_version(manifest), version)
+      let (code, _, err) = @process.collect_output("moon", ["-C", path, "package"], cwd=root)
+      assert_eq(code, 0, msg=err.text())
+      let bytes = @fs.read_file(root + "/_build/publish/" + name.replace_all(old="/", new="-") + "-" + version + ".zip").binary()
+      let deps : Map[String, Json] = Map([])
+      for line in manifest.split("\n") {
+        let text = line.trim_start()
+        if !text.has_prefix("\"") { continue }
+        let parts = text[1:].split("\"").next().unwrap().split("@").to_array()
+        if parts.length() == 2 { deps[parts[0].to_owned()] = Json::string(parts[1].to_owned()) }
+      }
+      (Json::object({ "name": Json::string(name), "version": Json::string(version), "deps": Json::object(deps), "checksum": Json::string(@crypto.bytes_to_hex_string(@crypto.sha256(bytes))) }), bytes)
+    }
+    None => {
+      let mut found : Json? = None
+      for line in @fs.read_file(registry_home + "/" + index_path).text().split("\n") {
+        if line.trim().is_empty() { continue }
+        let entry = @json.parse(line.to_owned())
+        if string_field(entry, "version") == version { found = Some(entry); break }
+      }
+      guard found is Some(entry) else { fail("Missing cached dependency " + coordinate) }
+      (entry, @fs.read_file(registry_home + "/" + archive_path).binary())
+    }
+  }
+  write(fixture + "/" + index_path, entry.stringify() + "\n")
+  write(fixture + "/" + archive_path, bytes)
+  if entry is Object(fields) && fields.get("deps") is Some(Object(deps)) {
+    for dependency, pin in deps {
+      guard pin is String(pin) else { fail("Expected a pinned dependency") }
+      seed(root, registry_home, fixture, dependency, pin, seen)
+    }
+  }
+}
+
+///|
+async fn audit_manifests(dir : String) -> Int {
+  let mut count = 0
+  for entry in @fs.readdir(dir) {
+    let path = dir + "/" + entry
+    if @fs.kind(path) is Directory {
+      count += audit_manifests(path)
+    } else if entry == "moon.mod" || entry == "moon.mod.json" {
+      let source = @fs.read_file(path).text()
+      for forbidden in ["moonrockz/ion", "moonrockz/wit", "moonrockz/wac", "moonrockz/wasm-devkit", "moonrockz/smithy-jsonschema", "moonrockz/smithy-openapi"] {
+        assert_false(source.contains(forbidden), msg="Unexpected dependency in " + path)
+      }
+      count += 1
+    }
+  }
+  count
+}
+
+///|
+async fn exercise(root : String, targets : Array[String]) -> Unit {
+  let dir = root + "/.dev/out/validation-consumer"
+  if @fs.exists(dir) { @fs.rmdir(dir, recursive=true) }
+  @fs.mkdir(dir, recursive=true)
+  let registry_home = @env.get_env_var("MOON_HOME").unwrap_or_else(() => @env.get_env_var("HOME").unwrap() + "/.moon")
+  let fixture = dir + "/moon"
+  let version = manifest_version(@fs.read_file(root + "/moon.mod").text())
+  let seen : Set[String] = Set([])
+  seed(root, registry_home, fixture, "moonrockz/smithy-validation", version, seen)
+  let consumer = dir + "/consumer"
+  write(consumer + "/moon.work", "members = [\".\"]\n")
+  write(consumer + "/moon.mod", "name = \"validation-consumer\"\nversion = \"0.0.0\"\nimport {\n  \"moonrockz/smithy@\{version}\",\n  \"moonrockz/smithy-validation@\{version}\",\n}\n")
+  write(consumer + "/moon.pkg", "pkgtype(kind: \"executable\")\nimport {\n  \"moonrockz/smithy\",\n  \"moonrockz/smithy-validation\" @validation,\n}\n")
+  let example = @fs.read_file(root + "/examples/validation-consumer/main.mbtx").text()
+  guard example.find("///|\nfn main") is Some(start) else { fail("Missing standalone example body") }
+  write(consumer + "/main.mbt", example[start:].to_owned())
+  let extra_env = { "MOON_HOME": fixture }
+  for target in targets {
+    assert_true(["native", "wasm", "js", "wasm-gc"].contains(target), msg="Unknown consumer target")
+    let (code, out, err) = @process.collect_output("moon", ["-C", consumer, "run", ".", "--target", target, "--deny-warn"], cwd=dir, extra_env~)
+    assert_eq(code, 0, msg=err.text())
+    assert_eq(out.text().trim().to_owned(), "valid=true invalid=Range at /count")
+    println("Isolated consumer passed: " + target)
+  }
+  let audited = audit_manifests(consumer + "/.mooncakes")
+  assert_true(audited >= 4, msg="Expected the full resolved model/validation module graph")
+  println("Audited " + audited.to_string() + " resolved manifests without optional integrations")
+}
+
+///|
+async fn main {
+  let targets = @env.args()[1:].to_owned()
+  exercise(@fs.realpath("."), if targets.is_empty() { ["native", "wasm", "js", "wasm-gc"] } else { targets })
+}
+
+///|
+async test "isolated validation consumer resolves no optional integrations" {
+  exercise(@fs.realpath(".."), ["native", "wasm", "js", "wasm-gc"])
+}

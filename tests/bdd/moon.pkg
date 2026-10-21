@@ -15,4 +15,5 @@ import {
   "moonbitlang/async",
   "moonbitlang/core/json",
   "moonrockz/smithy",
+  "moonrockz/smithy-validation" @validation,
 } for "wbtest"

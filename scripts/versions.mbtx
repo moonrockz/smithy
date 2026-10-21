@@ -30,6 +30,8 @@ let usage : String = "Usage: versions.mbtx check [X.Y.Z] | set X.Y.Z"
 /// version-like string in the same file (for example a specification version) is not touched.
 let version_files : Array[(String, String)] = [
   ("examples/resource-consumer/main.mbtx", "\"moonrockz/artifact-resources@"),
+  ("examples/validation-consumer/main.mbtx", "\"moonrockz/smithy@"),
+  ("examples/validation-consumer/main.mbtx", "\"moonrockz/smithy-validation@"),
   ("pkgs/smithy/smithy.mbt", "pub fn version() -> String {\n  \""),
   ("pkgs/smithy/smithy_test.mbt", "inspect(@smithy.version(), content=\""),
   ("pkgs/smithy-syntax/src/lib.mbt", "pub fn version() -> String {\n  \""),
