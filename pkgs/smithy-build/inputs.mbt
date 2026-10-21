@@ -1,6 +1,7 @@
 ///|
 /// Legacy local discovery or explicitly selected resources in a local container.
 pub(all) enum BuildInput {
+  GitHub(@resources.GitHubArchive, @resources.Selection, @resources.HttpUrl)
   Remote(@resources.PublicArchive, @resources.Selection)
   Local(@resources.RepositoryLocation)
   Selected(@resources.RepositoryLocation, @resources.Selection)
@@ -17,6 +18,8 @@ pub fn BuildInput::from_path(path : String) -> BuildInput raise BuildError {
 ///|
 pub fn BuildInput::location(self : BuildInput) -> @resources.RepositoryLocation {
   match self {
+    GitHub(archive, _, _) =>
+      @resources.RepositoryLocation::parse(archive.repository.to_string()).unwrap()
     Remote(archive, _) =>
       @resources.RepositoryLocation::parse(archive.url.to_string()).unwrap()
     Local(location) | Selected(location, _) => location
@@ -29,6 +32,13 @@ pub fn BuildInput::with_location(
   location : @resources.RepositoryLocation,
 ) -> BuildInput raise BuildError {
   match self {
+    GitHub(archive, selection, api) => {
+      guard @resources.GitHubRepository::parse(location.to_string())
+        is Some(repository) else {
+        raise InvalidBuildConfig("Expected GitHub repository owner/name")
+      }
+      GitHub({ ..archive, repository, }, selection, api)
+    }
     Remote(archive, selection) => {
       guard @resources.HttpUrl::parse(location.to_string()) is Some(url) else {
         raise InvalidBuildConfig(
@@ -45,6 +55,25 @@ pub fn BuildInput::with_location(
 ///|
 pub fn BuildInput::to_json(self : BuildInput) -> Json {
   match self {
+    GitHub(archive, selection, api) => {
+      let json = Remote(
+        {
+          url: api,
+          format: archive.format,
+          expected_digest: archive.expected_digest,
+        },
+        selection,
+      ).to_json()
+      guard json is Object(fields) else { abort("selection serialization") }
+      ignore(fields.remove("url"))
+      fields["github"] = {
+        "repository": archive.repository.to_string(),
+        "tag": archive.reference.tag.to_string(),
+        "asset": archive.reference.asset.to_string(),
+        "api": api.to_string(),
+      }
+      Json::object(fields)
+    }
     Remote(archive, selection) => {
       let json = Selected(self.location(), selection).to_json()
       guard json is Object(fields) else { abort("selection serialization") }
@@ -107,8 +136,11 @@ fn config_input(value : Json) -> BuildInput raise BuildError {
       "Expected a local input string or resource selection object",
     )
   }
-  let remote = fields.contains("url")
-  let allowed = if remote {
+  let github = fields.contains("github")
+  let remote = fields.contains("url") || github
+  let allowed = if github {
+    ["github", "format", "digest", "root", "paths", "globs"]
+  } else if remote {
     ["url", "format", "digest", "root", "paths", "globs"]
   } else {
     ["path", "root", "paths", "globs"]
@@ -118,10 +150,14 @@ fn config_input(value : Json) -> BuildInput raise BuildError {
       raise InvalidBuildConfig("Unknown resource selection field `" + key + "`")
     }
   }
-  guard config_optional_string(value, if remote { "url" } else { "path" })
-    is Some(path) &&
-    @resources.RepositoryLocation::parse(path) is Some(location) else {
-    raise InvalidBuildConfig("Expected a resource selection `path`")
+  let location = if remote {
+    None
+  } else {
+    guard config_optional_string(value, "path") is Some(path) &&
+      @resources.RepositoryLocation::parse(path) is Some(location) else {
+      raise InvalidBuildConfig("Expected a resource selection `path`")
+    }
+    Some(location)
   }
   guard config_optional_string(value, "root") is Some(root) &&
     @resources.ResourceRoot::parse(root) is Some(root) else {
@@ -172,11 +208,6 @@ fn config_input(value : Json) -> BuildInput raise BuildError {
     )
   }
   if remote {
-    guard @resources.HttpUrl::parse(path) is Some(url) else {
-      raise InvalidBuildConfig(
-        "Expected an absolute credential-free HTTP(S) URL without a fragment",
-      )
-    }
     let format = match
       config_optional_string(value, "format").unwrap_or("zip") {
       "zip" | "jar" => @resources.Zip
@@ -198,9 +229,54 @@ fn config_input(value : Json) -> BuildInput raise BuildError {
         Some(digest)
       }
     }
-    Remote({ url, format, expected_digest, }, selection)
+    if github {
+      guard config_field(value, "github") is Some(Object(github_fields)) else {
+        raise InvalidBuildConfig("Expected a github object")
+      }
+      for key, _ in github_fields {
+        if !["repository", "tag", "asset", "api"].contains(key) {
+          raise InvalidBuildConfig("Unknown GitHub field `" + key + "`")
+        }
+      }
+      let github_value = Json::object(github_fields)
+      guard config_optional_string(github_value, "repository")
+        is Some(repository) &&
+        @resources.GitHubRepository::parse(repository) is Some(repository) &&
+        config_optional_string(github_value, "tag") is Some(tag) &&
+        @resources.GitHubTag::parse(tag) is Some(tag) &&
+        config_optional_string(github_value, "asset") is Some(asset) &&
+        @resources.GitHubAssetName::parse(asset) is Some(asset) else {
+        raise InvalidBuildConfig(
+          "GitHub requires repository owner/name, an explicit tag and an exact asset name",
+        )
+      }
+      guard @resources.HttpUrl::parse(
+          config_optional_string(github_value, "api").unwrap_or(
+            "https://api.github.com",
+          ),
+        )
+        is Some(api) &&
+        !api.to_string().contains("?") else {
+        raise InvalidBuildConfig(
+          "Expected a credential-free GitHub API base URL without query or fragment",
+        )
+      }
+      GitHub(
+        { repository, reference: { tag, asset, }, format, expected_digest, },
+        selection,
+        api,
+      )
+    } else {
+      guard config_optional_string(value, "url") is Some(text) &&
+        @resources.HttpUrl::parse(text) is Some(url) else {
+        raise InvalidBuildConfig(
+          "Expected an absolute credential-free HTTP(S) URL without a fragment",
+        )
+      }
+      Remote({ url, format, expected_digest, }, selection)
+    }
   } else {
-    Selected(location, selection)
+    Selected(location.unwrap(), selection)
   }
 }
 

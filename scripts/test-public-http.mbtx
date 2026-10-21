@@ -11,6 +11,7 @@ import {
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/x@0.5.5/crypto",
   "moonbit-community/zipc@0.2.2",
+  "moonbit-community/flate@0.2.0/gzip",
 }
 
 ///|
@@ -66,6 +67,213 @@ async fn snapshot(dir : String) -> Map[String, String] {
 }
 
 ///|
+fn tar_member(name : String, data : Bytes) -> Bytes {
+  let header : Array[Byte] = Array::make(512, 0)
+  fn put(at : Int32, text : String) {
+    for i, byte in @utf8.encode(text) {
+      header[at + i] = byte
+    }
+  }
+  put(0, name)
+  put(100, "0000644")
+  put(108, "0000000")
+  put(116, "0000000")
+  let size = data.length().to_string(radix=8)
+  put(124, "0".repeat(11 - size.length()) + size)
+  put(136, "00000000000")
+  header[156] = b'0'
+  put(257, "ustar")
+  put(263, "00")
+  for i in 148..<156 {
+    header[i] = b' '
+  }
+  let mut sum = 0
+  for byte in header {
+    sum += byte.to_int()
+  }
+  let checksum = sum.to_string(radix=8)
+  put(148, "0".repeat(6 - checksum.length()) + checksum)
+  header[154] = 0
+  header[155] = b' '
+  Bytes::from_array(header) +
+  data +
+  Bytes::make((512 - data.length() % 512) % 512, 0)
+}
+
+///|
+fn github_selection(
+  base : String,
+  asset : String,
+  root : String,
+  digest : String,
+) -> String {
+  let value : Json = {
+    "github": {
+      "repository": "owner/models",
+      "tag": "v1-fixtures",
+      "asset": asset,
+      "api": base,
+    },
+    "format": if asset.has_suffix("tgz") {
+      "tgz"
+    } else {
+      "zip"
+    },
+    "digest": digest,
+    "root": root,
+    "globs": ["*.smithy"],
+  }
+  value.stringify()
+}
+
+///|
+async fn github_builds(
+  dir : String,
+  executable : String,
+  prefix : Array[String],
+  target : String,
+  base : String,
+  digests : Map[String, String],
+  requests : Array[String],
+  denied : Ref[Bool],
+) -> Unit {
+  let supported = target == "native" || target == "js"
+  let initial = requests.length()
+  for asset in ["models.zip", "models.tgz"] {
+    let stem = target + "-github-" + asset
+    let digest = digests[asset]
+    for remote in [false, true] {
+      let label = if remote { "remote" } else { "local" }
+      fn selected(root : String) -> String {
+        if remote {
+          github_selection(base, asset, root, digest)
+        } else {
+          selection("path", asset, root, digest)
+        }
+      }
+      let config = "{\"version\":\"2.0\",\"sources\":[" +
+        selected("models") +
+        "],\"imports\":[" +
+        selected("imports") +
+        "],\"projections\":{\"extra\":{\"imports\":[" +
+        selected("projection") +
+        "]}},\"outputDirectory\":\"" +
+        stem +
+        "-" +
+        label +
+        "\"}"
+      let config_path = dir + "/" + stem + "-" + label + ".json"
+      @fs.write_file(config_path, config)
+      let args = prefix +
+        [
+          "build",
+          "--config",
+          config_path,
+          "--cache-dir",
+          "github-cache-" + target,
+        ]
+      let output = command(
+        dir,
+        executable,
+        args,
+        expected=if remote && !supported { 1 } else { 0 },
+      )
+      if remote && !supported {
+        assert_true(output.contains("unsupported-transport"), msg=output)
+      }
+      if remote && supported {
+        let before = snapshot(dir + "/" + stem + "-remote")
+        let request_count = requests.length()
+        denied.val = true
+        command(
+          dir,
+          executable,
+          args + ["--offline"],
+          extra_env=if target == "native" { { "PATH": "" } } else { Map([]) },
+        )
+        |> ignore
+        denied.val = false
+        assert_eq(requests.length(), request_count)
+        assert_eq(snapshot(dir + "/" + stem + "-remote"), before)
+        for projection in ["source", "extra"] {
+          let local_model = @fs.read_file(
+            dir + "/" + stem + "-local/" + projection + "/model/model.json",
+          ).text()
+          assert_eq(
+            @fs.read_file(
+              dir + "/" + stem + "-remote/" + projection + "/model/model.json",
+            ).text(),
+            local_model,
+          )
+          assert_eq(
+            local_model.contains("example#Extra"),
+            projection == "extra",
+          )
+          // ZIP and tar/gzip also match the original local ZIP model.
+          assert_eq(
+            local_model,
+            @fs.read_file(
+              dir + "/" + target + "-local/" + projection + "/model/model.json",
+            ).text(),
+          )
+        }
+        let miss = command(
+          dir,
+          executable,
+          prefix +
+          [
+            "build",
+            "--config",
+            config_path,
+            "--offline",
+            "--cache-dir",
+            "github-missing-" + target,
+          ],
+          expected=1,
+        )
+        assert_true(miss.contains("offline-miss"), msg=miss)
+      }
+    }
+  }
+  assert_eq(requests.length() - initial, if supported { 6 } else { 0 })
+  if supported {
+    let config = "{\"version\":\"2.0\",\"sources\":[" +
+      github_selection(base, "models.zip", "broken", digests["models.zip"]) +
+      "]}"
+    let config_path = dir + "/" + target + "-github-diagnostic.json"
+    @fs.write_file(config_path, config)
+    let args = prefix +
+      [
+        "build",
+        "--config",
+        config_path,
+        "--cache-dir",
+        "github-cache-" + target,
+      ]
+    let diagnostic = command(dir, executable, args + ["--offline"], expected=1)
+    for
+      part in [
+        "github:owner/models",
+        "tag=v1-fixtures",
+        "release=7",
+        "asset=models.zip id=42",
+        digests["models.zip"],
+        "!/broken/bad.smithy",
+      ] {
+      assert_true(diagnostic.contains(part), msg=diagnostic)
+    }
+    @fs.write_file(
+      config_path,
+      "{\"version\":\"2.0\",\"sources\":[" +
+      github_selection(base, "models.zip", "models", "sha256:" + "0".repeat(64)) +
+      "]}",
+    )
+    let mismatch = command(dir, executable, args + ["--offline"], expected=1)
+    assert_true(mismatch.contains("integrity-failure"), msg=mismatch)
+  }
+}
+
+///|
 async fn exercise(root : String, targets : Array[String]) -> Unit {
   let dir = root + "/.dev/out/public-http"
   if @fs.exists(dir) {
@@ -73,6 +281,7 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
   }
   @fs.mkdir(dir, recursive=true, allow_exist=true)
   let zip = @zipc.Archive::empty()
+  let mut tar = b""
   for
     (path, text) in [
       (
@@ -88,6 +297,7 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
         "broken/bad.smithy", "$version: \"2\"\nnamespace example\nstructure Bad { value: Missing }",
       ),
     ] {
+    tar = tar + tar_member(path, @utf8.encode(text))
     ignore(
       zip.add(
         @zipc.Member::make(
@@ -97,6 +307,8 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
       ),
     )
   }
+  let tgz = @gzip.gzip_compress(tar + Bytes::make(1024, 0))
+  @fs.write_file(dir + "/models.tgz", tgz)
   let bytes = zip.to_bytes()
   let digest = "sha256:" + @crypto.bytes_to_hex_string(@crypto.sha256(bytes))
   @fs.write_file(dir + "/models.zip", bytes)
@@ -127,6 +339,8 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
           "/fragment" => Some("/bytes#download")
           "/absolute" => Some(base + "/bytes")
           "/archive" => Some("/models.zip?version=1")
+          "/github/models.zip" => Some("/models.zip?github=1")
+          "/github/models.tgz" => Some("/models.tgz")
           "/loop" => Some("/loop")
           "/file-redirect" => Some("file:///etc/passwd")
           "/credential-redirect" =>
@@ -161,7 +375,31 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
             }
           } else {
             conn.send_response(status, "Fixture")
-            if path.has_prefix("/models.zip") {
+            if path == "/repos/owner/models/releases/tags/v1-fixtures" {
+              conn.write(
+                b"{\"id\":7,\"tag_name\":\"v1-fixtures\",\"draft\":false}",
+              )
+            } else if path ==
+              "/repos/owner/models/releases/7/assets?per_page=100&page=1" {
+              let assets : Json = [
+                {
+                  "id": 42,
+                  "name": "models.zip",
+                  "state": "uploaded",
+                  "browser_download_url": base + "/github/models.zip",
+                  "digest": digest,
+                },
+                {
+                  "id": 43,
+                  "name": "models.tgz",
+                  "state": "uploaded",
+                  "browser_download_url": base + "/github/models.tgz",
+                },
+              ]
+              conn.write(@utf8.encode(assets.stringify()))
+            } else if path == "/models.tgz" {
+              conn.write(tgz)
+            } else if path.has_prefix("/models.zip") {
               conn.write(bytes)
             } else {
               conn.write(b"fixture\n200\nhttps://fake.invalid/a\x00")
@@ -454,7 +692,21 @@ async fn exercise(root : String, targets : Array[String]) -> Unit {
           assert_true(output.contains(code), msg=output)
         }
       }
-      println("Public HTTP fixtures passed: \{target}")
+      github_builds(
+        dir,
+        executable,
+        prefix,
+        target,
+        base,
+        {
+          "models.zip": digest,
+          "models.tgz": "sha256:" +
+          @crypto.bytes_to_hex_string(@crypto.sha256(tgz)),
+        },
+        requests,
+        denied,
+      )
+      println("Public HTTP and GitHub fixtures passed: \{target}")
     }
   })
 }

@@ -312,6 +312,8 @@ pub(all) struct Resolution {
 
 ///|
 pub(all) enum ProvenanceStep {
+  GitHubRequestStep(GitHubRepository, GitHubAssetRef)
+  GitHubStep(GitHubResolution)
   AcquisitionStep(Acquisition)
   ResolutionStep(Resolution)
   ContainerStep(Location)
@@ -414,6 +416,16 @@ pub fn Provenance::to_string(self : Provenance) -> String {
   let parts = []
   for step in self.history {
     match step {
+      GitHubRequestStep(repository, reference) =>
+        parts.push(
+          "github:" +
+          repository.to_string() +
+          " tag=" +
+          reference.tag.to_string() +
+          " asset=" +
+          reference.asset.to_string(),
+        )
+      GitHubStep(resolution) => parts.push(resolution.to_string())
       AcquisitionStep(acquisition) => {
         parts.push(acquisition.requested.to_string())
         parts.push(acquisition.resolved.to_string())
@@ -558,4 +570,15 @@ pub fn CacheDirectory::to_string(self : CacheDirectory) -> String {
 ///|
 pub fn CacheDirectory::location(self : CacheDirectory) -> Location {
   FilesystemDirectory(self)
+}
+
+///|
+pub fn Provenance::github_requested(
+  self : Provenance,
+  repository : GitHubRepository,
+  reference : GitHubAssetRef,
+) -> Provenance {
+  let history = [GitHubRequestStep(repository, reference)]
+  history.append(self.history)
+  { ..self, history, }
 }

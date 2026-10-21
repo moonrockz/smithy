@@ -19,7 +19,7 @@ converts and builds IDL and JSON models. See [CLI usage](apps/smithy/README.md).
 
 | Path | Module | Purpose |
 |------|--------|---------|
-| `pkgs/artifact-resources` | `moonrockz/artifact-resources` | Portable entry trees, resource loading, public HTTP archive acquisition and provider registry |
+| `pkgs/artifact-resources` | `moonrockz/artifact-resources` | Portable entry trees, resource loading, public HTTP/GitHub release acquisition, verified cache and provider registry |
 | `pkgs/jmespath` | `moonrockz/jmespath` | JMESPath parser, inspectable AST and JSON evaluator |
 | `pkgs/smithy` | `moonrockz/smithy` | Semantic model and multi-file IDL/JSON loader |
 | `pkgs/smithy-build` | `moonrockz/smithy-build` | Build configuration, projections and plugins |

@@ -1,5 +1,8 @@
 ///|
 pub(all) enum ResourceCode {
+  MissingRelease
+  AmbiguousAsset
+  RateLimited
   OfflineMiss
   CacheCorrupt
   CacheIo
@@ -32,6 +35,9 @@ pub(all) enum ResourceCode {
 ///|
 pub fn ResourceCode::to_string(self : ResourceCode) -> String {
   match self {
+    MissingRelease => "missing-release"
+    AmbiguousAsset => "ambiguous-asset"
+    RateLimited => "rate-limited"
     OfflineMiss => "offline-miss"
     CacheCorrupt => "cache-corrupt"
     CacheIo => "cache-io"

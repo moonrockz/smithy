@@ -121,3 +121,70 @@ test "resource config rejects ambiguous unsafe and empty selections" {
     assert_true(rejected, msg=value)
   }
 }
+
+///|
+test "pinned GitHub selections roundtrip through every build position" {
+  let input =
+    #|{"github":{"repository":"owner/models","tag":"v1/é","asset":"models.tgz"},"format":"tgz","digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000","root":"package","paths":["a.smithy"]}
+  let config = @build.BuildConfig::parse(
+    "{\"version\":\"2.0\",\"sources\":[" +
+    input +
+    "],\"imports\":[" +
+    input +
+    "],\"projections\":{\"extra\":{\"imports\":[" +
+    input +
+    "]}}}",
+  )
+  assert_eq(config.sources, config.imports)
+  assert_eq(config.sources, config.projections[0].imports)
+  let roundtrip = @build.BuildConfig::parse(
+    "{\"version\":\"2.0\",\"sources\":[" +
+    config.sources[0].to_json().stringify() +
+    "]}",
+  )
+  assert_eq(config.sources, roundtrip.sources)
+  assert_eq(config.sources[0].location().to_string(), "owner/models")
+  let replaced = config.sources[0].with_location(
+    @resources.RepositoryLocation::parse("other/repo").unwrap(),
+  )
+  assert_eq(replaced.location().to_string(), "other/repo")
+}
+
+///|
+test "GitHub configuration requires explicit valid references and exclusive source fields" {
+  for
+    github in [
+      "false", "{}", "{\"repository\":\"owner/models\",\"asset\":\"a.zip\"}", "{\"repository\":\"owner/models\",\"tag\":\"v1\"}",
+      "{\"repository\":\"../models\",\"tag\":\"v1\",\"asset\":\"a.zip\"}", "{\"repository\":\"owner/models\",\"tag\":\"v1\",\"asset\":\"../a.zip\"}",
+      "{\"repository\":\"owner/models\",\"tag\":\"v1\",\"asset\":\"a.zip\",\"latest\":true}",
+      "{\"repository\":\"owner/models\",\"tag\":\"v1\",\"asset\":\"a.zip\",\"api\":\"https://user:pass@host\"}",
+    ] {
+    let rejected = try
+      @build.BuildConfig::parse(
+        "{\"version\":\"2.0\",\"sources\":[{\"github\":" +
+        github +
+        ",\"root\":\".\",\"paths\":[\"a.smithy\"]}]}",
+      )
+    catch {
+      @build.InvalidBuildConfig(_) => true
+    } noraise {
+      _ => false
+    }
+    assert_true(rejected, msg=github)
+  }
+  for
+    extra in ["\"url\":\"https://example.test/a.zip\",", "\"path\":\"a.zip\","] {
+    let rejected = try
+      @build.BuildConfig::parse(
+        "{\"version\":\"2.0\",\"sources\":[{" +
+        extra +
+        "\"github\":{\"repository\":\"owner/models\",\"tag\":\"v1\",\"asset\":\"a.zip\"},\"root\":\".\",\"paths\":[\"a.smithy\"]}]}",
+      )
+    catch {
+      @build.InvalidBuildConfig(_) => true
+    } noraise {
+      _ => false
+    }
+    assert_true(rejected)
+  }
+}

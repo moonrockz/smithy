@@ -135,7 +135,7 @@ impl @moonspec.World for ArtifactWorld with fn configure(self, setup) {
         @resources.Location::parse("fixture-directory").unwrap(),
       )
     } else {
-      assert_eq(kind, "zip")
+      assert_true(kind == "zip" || kind == "github")
       let archive = @zipc.Archive::empty()
       for path, bytes in files {
         ignore(
@@ -147,10 +147,48 @@ impl @moonspec.World for ArtifactWorld with fn configure(self, setup) {
           ),
         )
       }
-      @resources.EntryTree::zip(
-        archive.to_bytes(),
-        @resources.Location::parse("fixture.zip").unwrap(),
-      )
+      let bytes = archive.to_bytes()
+      if kind == "github" {
+        let request : @resources.GitHubArchive = {
+          repository: @resources.GitHubRepository::parse("owner/models").unwrap(),
+          reference: {
+            tag: @resources.GitHubTag::parse("v1").unwrap(),
+            asset: @resources.GitHubAssetName::parse("models.zip").unwrap(),
+          },
+          format: @resources.Zip,
+          expected_digest: Some(@resources.ContentDigest::sha256(bytes)),
+        }
+        let values : Map[@resources.CacheKey, Bytes] = Map([])
+        let cache = @resources.VerifiedCache::new({
+          read: (key, _) => values.get(key),
+          publish: (key, data) => values[key] = data,
+        })
+        let online = request.open(
+          (url, _) => {
+            let body = if url.to_string().contains("/tags/") {
+              b"{\"id\":7,\"tag_name\":\"v1\",\"draft\":false}"
+            } else if url.to_string().contains("/assets?") {
+              b"[{\"id\":42,\"name\":\"models.zip\",\"state\":\"uploaded\",\"browser_download_url\":\"https://cdn.fixture.test/models.zip\"}]"
+            } else {
+              bytes
+            }
+            { resolved: url, status: 200, body, }
+          },
+          cache=Some(cache),
+        )
+        let offline = request.open(
+          (_, _) => abort("offline acquisition attempted transport"),
+          cache=Some(cache),
+          mode=@resources.Offline,
+        )
+        assert_eq(online.provenance(), offline.provenance())
+        offline
+      } else {
+        @resources.EntryTree::zip(
+          bytes,
+          @resources.Location::parse("fixture.zip").unwrap(),
+        )
+      }
     }
     let selection = @resources.Selection::new(
       @resources.ResourceRoot::parse("module/models").unwrap(),

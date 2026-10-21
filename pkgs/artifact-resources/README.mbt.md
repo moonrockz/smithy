@@ -191,7 +191,7 @@ Smithy's manifest consumer retains its stricter rules.
 The pure contracts run on all four targets. Filesystem acquisition requires
 the corresponding host filesystem implementation. Raw Wasm files need the
 MoonBit filesystem imports. Local loading makes no network requests.
-Remote repositories, caching and credential support are later
+Additional repository adapters and credential support are later
 slices. This module joins the repository's next normal shared release.
 
 ## Tar and gzip support
@@ -308,7 +308,7 @@ resolved URL followed by `!/entry/path`.
 
 Stable acquisition codes are `unsupported-transport`, `transport-failure`,
 `acquisition-timeout`, `resource-limit`, `authentication-required` for 401/403,
-`missing-asset` for 404/410, `http-status` for other non-200 responses, and
+`missing-asset` for 404/410, `rate-limited` for 429, `http-status` for other non-200 responses, and
 `integrity-failure` for a mismatched expected digest. HTTP failures stop before
 archive discovery. Redirect exhaustion and invalid TLS certificates are
 transport failures. There are no credentials or automatic retries.
@@ -383,3 +383,73 @@ I/O checks. Cache diagnostic locations retain the typed directory through
 
 API migration: exhaustive `Location` matches must handle the new
 `FilesystemDirectory(CacheDirectory)` case.
+
+
+## Pinned GitHub release assets
+
+`GitHubArchive` resolves a named archive from a public GitHub release. Supply a
+validated `GitHubRepository` in `owner/name` form, a `GitHubAssetRef` with distinct
+`GitHubTag` and `GitHubAssetName` values, an explicit `ArchiveFormat` and an optional
+expected `ContentDigest`. Tags are URL-encoded as one path segment. Asset names
+match exactly, including case. There is no latest-release lookup, wildcard asset
+selection, dependency resolution or credential handling.
+
+`GitHubArchive::open(transport, api~, acquisition_limits~, limits~, cache~, mode~)`
+uses the [release-by-tag API](https://docs.github.com/en/rest/releases/releases#get-a-release-by-tag-name)
+and the [paginated release-assets API](https://docs.github.com/en/rest/releases/assets#list-release-assets).
+It validates the returned release ID, requested tag and published state, then
+checks every asset page for one exact name. Asset metadata must contain a positive
+ID, uploaded state and credential-free HTTP(S) browser download URL. IDs are
+positive integers in JSON's exact range, up to 9007199254740991. Each metadata
+response is bounded to the smaller of 1 MiB and the acquisition byte limit.
+Enumeration is limited to ten pages of 100 assets and fails closed if the final
+page is full. Transfer timeouts apply per request. Archive expansion and resource
+selection retain the shared limits. Download redirects use the common transport.
+No bundled code or package hooks run.
+
+The default API base is `https://api.github.com`. `api` can select a compatible
+public API endpoint, including a loopback fixture server. It must be a
+credential-free HTTP(S) base without query or fragment. GitHub.com is the
+supported public service; enterprise authentication and compatibility are outside
+this provider's current contract. The acquisition host matrix is the same as
+public HTTP archives: native Linux/macOS/Windows and Node.js with curl; Wasm and
+Wasm GC need a supplied transport. Archive reading, provider policy and in-memory
+cache use work on all four targets. Local inputs need no network.
+
+The provider verifies both an expected SHA-256 and GitHub's asset `digest` when
+present. A conflicting expected/API digest fails before downloading. Older assets
+with absent or null API digests still receive a computed SHA-256; pin an expected
+digest for reproducibility. `GitHubStep(GitHubResolution)` records the repository,
+requested tag/name, typed release/asset IDs and download URL. The shared
+`AcquisitionStep` records requested/resolved download URLs and content digest.
+Each selected resource retains this history and its physical archive entry path.
+`GitHubRequestStep` retains the requested coordinate in resolution errors.
+
+`register_github(registry, transport, api~, format~, expected_digest~,
+acquisition_limits~, limits~, cache~, mode~)` registers provider ID `github`.
+Repository locations are `owner/name`; use `GitHubAssetRef::key()` to obtain the
+artifact key and `from_key()` to decode it. The key serializes tag and name as
+separate JSON array elements. The registry identity renders the resolved release and
+asset IDs, while provenance keeps them structured. Discovery and archive readers
+contain no GitHub-specific logic.
+
+Release metadata, every asset page and archive bytes use the verified HTTP cache.
+An online cache hit makes no request; `Offline` resolves and opens only cached
+metadata and bytes. Cache corruption, changed expected digests and missing entries
+fail closed. GitHub tags and assets can change upstream, so caches have no TTL or
+automatic refresh. Select a fresh cache directory to resolve them again.
+
+Stable provider codes are `missing-release` for a release 404/410, `missing-asset`
+for an absent name or download 404/410, `ambiguous-asset` for duplicate exact names,
+`invalid-resolution` for malformed or mismatched metadata, `rate-limited` for 429
+or a GitHub API 403 reporting a rate limit, and `authentication-required` for
+other 401/403 responses. Private repositories can appear as `missing-release`
+because GitHub conceals them. Transport, cache, archive, integrity and selection
+errors retain their shared codes. Rate limits fail immediately with no automatic
+retry or authenticated fallback.
+
+Run the [GitHub release example](../../examples/github-release/README.md) online,
+then offline. `mise run test:http` verifies selected ZIP and tar/gzip assets against
+local equivalents in sources, global imports and projection imports using a
+controlled server. Portable package tests cover pagination, ambiguity, missing
+metadata, rate limits, authentication refusals, integrity and offline resolution.
