@@ -22,6 +22,7 @@ import {
   "moonrockz/smithy-diff@0.5.0",
   "moonrockz/smithy-jsonschema@0.5.0",
   "moonrockz/smithy-openapi@0.5.0",
+  "moonrockz/smithy-openrpc@0.5.0",
   "moonrockz/smithy-syntax@0.5.0",
   "moonbitlang/x@0.5.5",
   "moonbit-community/zipc@0.2.2",

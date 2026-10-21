@@ -1,6 +1,8 @@
 ///|
 priv struct PreparedMethod {
   operation : @smithy.ShapeId
+  input : @smithy.ShapeId
+  positional : Array[@smithy.ShapeId]
   validator : @validation.PreparedValidator
   mode : ParameterMode
   order : Array[String]
@@ -174,6 +176,7 @@ pub fn PreparedService::prepare(
           names[smithy_name] = wire_name
         }
         let order = []
+        let positional = []
         let seen : Set[String] = Set([])
         match contract.get("positional") {
           Some(Array(values)) =>
@@ -187,6 +190,7 @@ pub fn PreparedService::prepare(
               }
               seen.add(member_name)
               order.push(wire_name)
+              positional.push(input.with_member(member_name).unwrap())
             }
           None => ()
           _ => invalid(id, "I expected a positional member-name array.")
@@ -312,6 +316,8 @@ pub fn PreparedService::prepare(
         }
         methods[name] = {
           operation: id,
+          input,
+          positional,
           validator: @validation.PreparedValidator::prepare(
             model,
             input,

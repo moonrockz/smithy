@@ -21,3 +21,9 @@ An ordered location within an application value, distinguishing array indices, f
 
 **Wire method name**:
 The name a JSON-RPC message uses to select an operation, independently of the operation's Smithy shape ID.
+
+**OpenRPC document version**:
+The version of the API-description format, independent of the described service's API version and JSON-RPC wire version.
+
+**Schema dialect**:
+The JSON Schema version that defines the meaning of exported parameter and result schemas.

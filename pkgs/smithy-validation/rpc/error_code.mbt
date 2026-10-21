@@ -19,6 +19,11 @@ pub fn ErrorCode::to_string(self : ErrorCode) -> String {
 }
 
 ///|
+pub fn ErrorCode::number(self : ErrorCode) -> @smithy.NodeNumber {
+  self.number
+}
+
+///|
 fn error_code(text : String) -> ErrorCode {
   ErrorCode::from_number(@smithy.NodeNumber::parse(text).unwrap()).unwrap()
 }

@@ -8,6 +8,7 @@ members = [
   "./pkgs/smithy-diff",
   "./pkgs/smithy-jsonschema",
   "./pkgs/smithy-openapi",
+  "./pkgs/smithy-openrpc",
   "./pkgs/smithy-syntax",
   "./apps/smithy",
   "./docs/cookbook",

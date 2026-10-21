@@ -159,6 +159,10 @@ run = "moonx scripts/test-scripts.mbtx"
 description = "Run the moonspec acceptance features (tests/bdd, js target)"
 run = "moon test tests/bdd --target js"
 
+[tasks."test:openrpc"]
+description = "Qualify OpenRPC artifacts, official schemas, runtime contracts and isolated consumers"
+run = "moonx scripts/test-openrpc.mbtx"
+
 [tasks.check]
 description = "Run lint, validate, test and build"
 run = "moonx scripts/check.mbtx"

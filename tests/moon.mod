@@ -20,6 +20,7 @@ import {
   "moonrockz/smithy-build@0.5.0",
   "moonrockz/smithy-diff@0.5.0",
   "moonrockz/smithy-openapi@0.5.0",
+  "moonrockz/smithy-openrpc@0.5.0",
   "moonrockz/smithy-syntax@0.5.0",
   "moonrockz/expect@0.6.1",
   "moonrockz/moonspec@0.11.0",
