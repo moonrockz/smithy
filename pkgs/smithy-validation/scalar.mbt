@@ -55,6 +55,77 @@ fn strict_blob_length(text : String) -> Int32? {
 }
 
 ///|
+/// Positive UTC insertion dates from IERS Leap_Second.dat, Bulletin 72
+/// (July 2026): https://hpiers.obspm.fr/iers/bul/bulc/Leap_Second.dat.
+/// The initial 1972-01-01 offset is a baseline, not an inserted second.
+/// Update this table when IERS announces another insertion. No negative
+/// leap seconds are recorded; ordinary seconds 00..59 remain accepted.
+fn positive_leap_second(year : Int32, month : Int32, day : Int32) -> Bool {
+  match (year, month, day) {
+    (1972, 6, 30)
+    | (1972, 12, 31)
+    | (1973, 12, 31)
+    | (1974, 12, 31)
+    | (1975, 12, 31)
+    | (1976, 12, 31)
+    | (1977, 12, 31)
+    | (1978, 12, 31)
+    | (1979, 12, 31)
+    | (1981, 6, 30)
+    | (1982, 6, 30)
+    | (1983, 6, 30)
+    | (1985, 6, 30)
+    | (1987, 12, 31)
+    | (1989, 12, 31)
+    | (1990, 12, 31)
+    | (1992, 6, 30)
+    | (1993, 6, 30)
+    | (1994, 6, 30)
+    | (1995, 12, 31)
+    | (1997, 6, 30)
+    | (1998, 12, 31)
+    | (2005, 12, 31)
+    | (2008, 12, 31)
+    | (2012, 6, 30)
+    | (2015, 6, 30)
+    | (2016, 12, 31) => true
+    _ => false
+  }
+}
+
+///|
+fn leap_second_minute(
+  year : Int32,
+  month : Int32,
+  day : Int32,
+  hour : Int32,
+  minute : Int32,
+  offset_minutes : Int32,
+) -> Bool {
+  // RFC 3339 offsets are local minus UTC. With offsets below 24 hours,
+  // the insertion minute can be 23:59 on this UTC day or the previous day.
+  let utc_minute = hour * 60 + minute - offset_minutes
+  if utc_minute == 1439 {
+    return positive_leap_second(year, month, day)
+  }
+  guard utc_minute == -1 else { return false }
+  if day > 1 {
+    return positive_leap_second(year, month, day - 1)
+  }
+  let (previous_year, previous_month) = if month == 1 {
+    (year - 1, 12)
+  } else {
+    (year, month - 1)
+  }
+  let mut previous_day = 31
+  while previous_day > 28 &&
+        !calendar_day(previous_year, previous_month, previous_day) {
+    previous_day -= 1
+  }
+  positive_leap_second(previous_year, previous_month, previous_day)
+}
+
+///|
 fn date_time(text : String) -> Bool {
   let mut i = 0
   let digits = fn(start : Int32, count : Int32) -> Int32? {
@@ -88,7 +159,7 @@ fn date_time(text : String) -> Bool {
     digits(14, 2) is Some(minute) &&
     minute < 60 &&
     digits(17, 2) is Some(second) &&
-    second < 60 else {
+    second <= 60 else {
     return false
   }
   i = 19
@@ -107,7 +178,8 @@ fn date_time(text : String) -> Bool {
   guard i < text.length() else { return false }
   let zone = text.code_unit_at(i)
   if zone == 90 || zone == 122 {
-    return i + 1 == text.length()
+    return i + 1 == text.length() &&
+      (second < 60 || leap_second_minute(year, month, day, hour, minute, 0))
   }
   guard (zone == 43 || zone == 45) &&
     i + 6 == text.length() &&
@@ -118,5 +190,6 @@ fn date_time(text : String) -> Bool {
     minutes < 60 else {
     return false
   }
-  true
+  let offset = (hours * 60 + minutes) * (if zone == 43 { 1 } else { -1 })
+  second < 60 || leap_second_minute(year, month, day, hour, minute, offset)
 }

@@ -29,6 +29,14 @@ The CLI delegates to this same API. Tests cover library policies, generated adap
 the actual CLI on all four targets, acceptance scenarios and an isolated packaged consumer with its
 own workspace and registry cache. The consumer cannot obtain new APIs from the enclosing workspace.
 
+Date-time validation parses the full RFC 3339 string before checking seconds. A `:60` value must
+resolve, after subtracting its numeric offset and adjusting the calendar day, to 23:59 on a
+recorded positive UTC insertion date. The offline IERS table contains 27 insertions through
+2016-12-31 and must be updated for future announcements. No negative leap seconds are recorded;
+future deletions would also require a rule update. Fractional text is never converted to a host
+date or floating-point value. Neutral NativeTimestamp values retain their separate `0..59` second
+boundary. The same string policy applies to library and CLI validation.
+
 Optional format modules depend inward on model/validation contracts. A future Ion profile can use
 the exposed native payloads without an Ion-to-JSON conversion. WIT conversion remains independent.
 This module implements no RPC envelopes, handlers or transports. The finalized

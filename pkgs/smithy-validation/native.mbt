@@ -32,6 +32,8 @@ fn calendar_day(year : Int32, month : Int32, day : Int32) -> Bool {
 }
 
 ///|
+/// Construct a neutral timestamp with seconds 0..59. Leap-second notation
+/// is supported by the RFC 3339 string validator, not this native value type.
 pub fn NativeTimestamp::new(
   year : Int32,
   month~ : Int32? = None,
