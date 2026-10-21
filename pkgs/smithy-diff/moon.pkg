@@ -1,0 +1,10 @@
+import {
+  "moonrockz/smithy",
+}
+
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-diff" @diff,
+  "moonbitlang/core/json",
+  "moonbitlang/x/fs",
+} for "test"

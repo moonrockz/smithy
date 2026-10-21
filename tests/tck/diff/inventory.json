@@ -1,0 +1,890 @@
+{
+  "referenceSha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef",
+  "files": [
+    {
+      "path": "LICENSE",
+      "upstreamPath": "LICENSE",
+      "gitBlob": "67db8588217f266eb561f75fae738656325deac9"
+    },
+    {
+      "path": "upstream/diffs/jsonName/change-jsonName-value.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/jsonName/change-jsonName-value.a.smithy",
+      "gitBlob": "eeb8fa5777c380328dce2f37049d58b620a8b05d"
+    },
+    {
+      "path": "upstream/diffs/jsonName/change-jsonName-value.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/jsonName/change-jsonName-value.b.smithy",
+      "gitBlob": "bc8a11f5345a577cd6fa785fecb58d303dc52226"
+    },
+    {
+      "path": "upstream/diffs/jsonName/change-jsonName-value.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/jsonName/change-jsonName-value.events",
+      "gitBlob": "fd069102c5193a44a4d84b09f578e9b870e36e7b"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/added-required-member-preview-member.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/added-required-member-preview-member.a.smithy",
+      "gitBlob": "9eeba50e2199bfe0c756e033b3015890e14848fe"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/added-required-member-preview-member.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/added-required-member-preview-member.b.smithy",
+      "gitBlob": "91d018b3a485cc69c0346a532b62d4a72d35d82f"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/added-required-member-preview-member.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/added-required-member-preview-member.events",
+      "gitBlob": "4111c690d97c0c07f8ed0455afcde869ca98f19e"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/added-required-member.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/added-required-member.a.smithy",
+      "gitBlob": "70031df58848504e80f23efff0a46a55c23f7a11"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/added-required-member.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/added-required-member.b.smithy",
+      "gitBlob": "851b07321105bc92913942431a6ebb6122ee7e94"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/added-required-member.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/added-required-member.events",
+      "gitBlob": "0ff40250b9f0b1051eea1f04d685ded3614ae7e5"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-default.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-default.a.smithy",
+      "gitBlob": "867bafd517e9038ad9771ced5163dda15422f86f"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-default.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-default.b.smithy",
+      "gitBlob": "f50ddf575a7a0834fcf46dc656eb798e651c02d3"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-default.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-default.events",
+      "gitBlob": "2831f62add1f3b29755c99d1bde1212b2195e88c"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-enum-trait.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-enum-trait.a.smithy",
+      "gitBlob": "4bd48f21df1d047e63cd8c1313db4da9375aa385"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-enum-trait.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-enum-trait.b.smithy",
+      "gitBlob": "b09bbfd6e2f7aac69fccb93ce9b4ced95cf8137e"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-enum-trait.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-enum-trait.events",
+      "gitBlob": "9f8d9275f41398b6d957452e710ca548bede2ec0"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-length-trait-shared-ga-removed.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-length-trait-shared-ga-removed.a.smithy",
+      "gitBlob": "8137c13c3bdb6e017098a45681eab38427df3417"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-length-trait-shared-ga-removed.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-length-trait-shared-ga-removed.b.smithy",
+      "gitBlob": "143f98a82455654880598890c26ebc0a8d358584"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-length-trait-shared-ga-removed.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-length-trait-shared-ga-removed.events",
+      "gitBlob": "e7e6061efd6a1bf481bdf8403a2502bcec6243d3"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-length-trait-shared.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-length-trait-shared.a.smithy",
+      "gitBlob": "8b96b33906cbb4bb008576437aaa2a041d3e5d62"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-length-trait-shared.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-length-trait-shared.b.smithy",
+      "gitBlob": "b12eb7f1b809ed19dd990d4340eca712579f041d"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-length-trait-shared.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-length-trait-shared.events",
+      "gitBlob": "184ecb626e6e4dffa9b725333c379c5bb4986fc3"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-length-trait.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-length-trait.a.smithy",
+      "gitBlob": "73ecbbf8c48703a31b0fbe669be163e3385f5313"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-length-trait.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-length-trait.b.smithy",
+      "gitBlob": "8ed83f2222d3d09f509ff05235b95db42ceef290"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-length-trait.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-length-trait.events",
+      "gitBlob": "8b00314522b94a7f9b9b769d9ae133389ccedf5b"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-order.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-order.a.smithy",
+      "gitBlob": "d0eb56f251eca6162e3dd6334b8682a88c6accac"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-order.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-order.b.smithy",
+      "gitBlob": "9a231d0d89474ead2aa66a841d8e3682650ea4e9"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-order.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-order.events",
+      "gitBlob": "cccd5970255699a59d59ef65a12d665e43ff1bf6"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target-no-reason.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target-no-reason.a.smithy",
+      "gitBlob": "cd25dfedf8a27f3478ee9f7589bdf5683ae2c7ff"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target-no-reason.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target-no-reason.b.smithy",
+      "gitBlob": "4437d339dc83f276b26bd3ac73408a62d8448c0b"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target-no-reason.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target-no-reason.events",
+      "gitBlob": "d480b97c801c89c042d8fbc5f379ac8b5d1b6a64"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target-preview-member.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target-preview-member.a.smithy",
+      "gitBlob": "a6ffa5388bb7084319c8efcc6db0133966d9b0bd"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target-preview-member.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target-preview-member.b.smithy",
+      "gitBlob": "23d9001ae323196552ba980a75edc072f3245938"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target-preview-member.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target-preview-member.events",
+      "gitBlob": "d7e70f40cd1c9dbbc949b597b5054ef4cd107f4c"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target-preview-service.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target-preview-service.a.smithy",
+      "gitBlob": "adf8f095828c9fb9f11a178d906bb00e5b0b6610"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target-preview-service.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target-preview-service.b.smithy",
+      "gitBlob": "844aa3986b447238fab38dba8a860d9aecff66da"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target-preview-service.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target-preview-service.events",
+      "gitBlob": "49b6731975c45bba91d183695e97645d6d6734ce"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target-shared-different-preview-features.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target-shared-different-preview-features.a.smithy",
+      "gitBlob": "96e54defae4c060e5fff70daa5e2a06fada758ed"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target-shared-different-preview-features.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target-shared-different-preview-features.b.smithy",
+      "gitBlob": "a4ff4ed0fd2d1e91ee74166c4b41e776ed156e6f"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target-shared-different-preview-features.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target-shared-different-preview-features.events",
+      "gitBlob": "6ae1c569999e64abb11499006bc3bec52b4ddbf3"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target.a.smithy",
+      "gitBlob": "2b68f52602ef0b545de363d6d25df5d2024a21b7"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target.b.smithy",
+      "gitBlob": "87df2e488c4739b253ad6dcb95dd440f4aa21e77"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-member-target.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-member-target.events",
+      "gitBlob": "982e3a72badf8727ed8babdc925eaa38973f1719"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-nullability-preview-member.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-nullability-preview-member.a.smithy",
+      "gitBlob": "ecb5f289affe9b0a4ec6cb17de1b8bc97986ba68"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-nullability-preview-member.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-nullability-preview-member.b.smithy",
+      "gitBlob": "221f0cd1751508bd5876578d42886cb98c6d2b93"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-nullability-preview-member.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-nullability-preview-member.events",
+      "gitBlob": "92087031ccafbc4cff9816b34314d40700012a2d"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-nullability.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-nullability.a.smithy",
+      "gitBlob": "8194765938654b53d16ebefa9915489cc67e8216"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-nullability.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-nullability.b.smithy",
+      "gitBlob": "e5f575bd1b93addb58566cbd7d6fd46489c2c391"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-nullability.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-nullability.events",
+      "gitBlob": "9012ed5fecb42c268ce6460b004199bf23186105"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-operation-input.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-operation-input.a.smithy",
+      "gitBlob": "9c440dc1288db458d6093aa43ddd875d4533aae4"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-operation-input.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-operation-input.b.smithy",
+      "gitBlob": "453c92451c9d35b834a22696e64e4953bd65341e"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-operation-input.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-operation-input.events",
+      "gitBlob": "d9516b8b220fa73cf3c67a0f672b82e72c7b0b23"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-resource-identifiers.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-resource-identifiers.a.smithy",
+      "gitBlob": "cc16c7a823a83fa146d71269af783f9184b56e50"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-resource-identifiers.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-resource-identifiers.b.smithy",
+      "gitBlob": "bcc831d6230b3fa1433f0e14a0bdd655971a2e08"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-resource-identifiers.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-resource-identifiers.events",
+      "gitBlob": "7eebfbe37074215806b8aa8a7bcbac796f3831b9"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-shape-type.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-shape-type.a.smithy",
+      "gitBlob": "f66a84959c9758b387a15914b0954e4fa1691878"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-shape-type.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-shape-type.b.smithy",
+      "gitBlob": "808e4e9299a13d5c574ef0dad7ff812e3d21f90f"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/changed-shape-type.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/changed-shape-type.events",
+      "gitBlob": "d53574f4a4c6e6620df691909e60428570445e70"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/modified-trait-preview.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/modified-trait-preview.a.smithy",
+      "gitBlob": "29cb3b8ce9dc952d91b1ecf316afc97b1d6dfc7b"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/modified-trait-preview.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/modified-trait-preview.b.smithy",
+      "gitBlob": "b2c243748de0da8898b166ff66212a7d5a363b68"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/modified-trait-preview.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/modified-trait-preview.events",
+      "gitBlob": "b5a55a29f064b30ac32ca35b18d00617b5d502ea"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/removed-entity-binding-ga-parent.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/removed-entity-binding-ga-parent.a.smithy",
+      "gitBlob": "a77fab17bb89fa24b0cd3c486c3ce73330b046b4"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/removed-entity-binding-ga-parent.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/removed-entity-binding-ga-parent.b.smithy",
+      "gitBlob": "1f8e946523b716ac79fc4d4766f550ccfaf2db6e"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/removed-entity-binding-ga-parent.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/removed-entity-binding-ga-parent.events",
+      "gitBlob": "2f799961cd52df164383267b36da063247851720"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/removed-entity-binding-preview-parent.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/removed-entity-binding-preview-parent.a.smithy",
+      "gitBlob": "0be64826096590a793bed4b3adc6793fc6efd212"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/removed-entity-binding-preview-parent.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/removed-entity-binding-preview-parent.b.smithy",
+      "gitBlob": "7ae87ecb9095548987a5da5665d3644238f0cf83"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/removed-entity-binding-preview-parent.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/removed-entity-binding-preview-parent.events",
+      "gitBlob": "4f37f52d28e1ff18473917cb7ed94828f0b79c3b"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/removed-shape-preview-member.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/removed-shape-preview-member.a.smithy",
+      "gitBlob": "50dd582f0ff2206180e9adb16c3a94690da1604e"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/removed-shape-preview-member.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/removed-shape-preview-member.b.smithy",
+      "gitBlob": "7fe84da678fc7aec36470b3a8c8ac5ac74d3119d"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/removed-shape-preview-member.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/removed-shape-preview-member.events",
+      "gitBlob": "c66ab972c0b634c1958b8d65a4c40a4bcae88a65"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/removed-shape.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/removed-shape.a.smithy",
+      "gitBlob": "88314927afc4d11e05bca42d236824c76b4814bc"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/removed-shape.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/removed-shape.b.smithy",
+      "gitBlob": "530e3eb70d18f9ae7131890cd6a54ba71ec92544"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/removed-shape.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/removed-shape.events",
+      "gitBlob": "61a60e6f8504ce7578e017eea5a1b9c697566695"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/trait-breaking-change.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/trait-breaking-change.a.smithy",
+      "gitBlob": "62f22dd7168469b59cf3dbc0c998bf1a7512da8a"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/trait-breaking-change.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/trait-breaking-change.b.smithy",
+      "gitBlob": "15b381879795efc00042486d44411bc73417292f"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/trait-breaking-change.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/trait-breaking-change.events",
+      "gitBlob": "36387f1cd975b4179866b26b160964bd9f2cd372"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/unstable-features-since.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/unstable-features-since.a.smithy",
+      "gitBlob": "7d8b2757a3927fd10d1a1a139b0c98ef0740e454"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/unstable-features-since.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/unstable-features-since.b.smithy",
+      "gitBlob": "9630ae9a8d426df71c86143b8950d64730b8303b"
+    },
+    {
+      "path": "upstream/diffs/previewFeatures/unstable-features-since.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/previewFeatures/unstable-features-since.events",
+      "gitBlob": "93a1a3335447d9200a6c9b6e8ee47fbb97d8c437"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/move-operation-from-resource-to-service.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/move-operation-from-resource-to-service.a.smithy",
+      "gitBlob": "50cc5036edcb63d6525dac0069f3dc41f137a9f3"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/move-operation-from-resource-to-service.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/move-operation-from-resource-to-service.b.smithy",
+      "gitBlob": "95c192e68bd5c1795187fb45c3ff5dfe292cf065"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/move-operation-from-resource-to-service.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/move-operation-from-resource-to-service.events",
+      "gitBlob": "12408d05995e2ad1c6ee51d142fd09d26185b623"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/move-operation-to-nested-resource.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/move-operation-to-nested-resource.a.smithy",
+      "gitBlob": "dcfbb7e8497e3d092619301f37101c47c201fc72"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/move-operation-to-nested-resource.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/move-operation-to-nested-resource.b.smithy",
+      "gitBlob": "232b1181fbe0f9fb1c425f1b14f0079d31c0b089"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/move-operation-to-nested-resource.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/move-operation-to-nested-resource.events",
+      "gitBlob": "5b98da1cc23d6fa4b7904b5520e6eaaaf3b029af"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/move-operation-to-resource.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/move-operation-to-resource.a.smithy",
+      "gitBlob": "95c192e68bd5c1795187fb45c3ff5dfe292cf065"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/move-operation-to-resource.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/move-operation-to-resource.b.smithy",
+      "gitBlob": "50cc5036edcb63d6525dac0069f3dc41f137a9f3"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/move-operation-to-resource.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/move-operation-to-resource.events",
+      "gitBlob": "30bb8f6bbcde11e26597dd5bfd2870e9f1d3a5ec"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/remove-operation-from-service.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/remove-operation-from-service.a.smithy",
+      "gitBlob": "6af0403b50a22037ee76ad6fb060c949e4709790"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/remove-operation-from-service.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/remove-operation-from-service.b.smithy",
+      "gitBlob": "d9753408a6b07f78af31f4b5e487189a1de549b7"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/remove-operation-from-service.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/remove-operation-from-service.events",
+      "gitBlob": "70d673ce1a4cfb641d0218281e322cbb972fa004"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/remove-resource-from-resource.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/remove-resource-from-resource.a.smithy",
+      "gitBlob": "10abd88aa756ad4aaf8254cc4eb10d49cbb08c60"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/remove-resource-from-resource.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/remove-resource-from-resource.b.smithy",
+      "gitBlob": "21b05af81d983a1ee53413ee92014a3739ac692e"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/remove-resource-from-resource.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/remove-resource-from-resource.events",
+      "gitBlob": "4bd53004089fca7a9e7c3986a5c9785afc0aacea"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/remove-resource-from-service.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/remove-resource-from-service.a.smithy",
+      "gitBlob": "bd1d45d0e022c16d12904f6638ef45f5c1ae7aa0"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/remove-resource-from-service.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/remove-resource-from-service.b.smithy",
+      "gitBlob": "d074f75940d2322a7b87a0a53f5877aa44a4804d"
+    },
+    {
+      "path": "upstream/diffs/removedEntityBinding/remove-resource-from-service.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/removedEntityBinding/remove-resource-from-service.events",
+      "gitBlob": "501efc75995a171bc901b1ca0776c1d3e3e208ba"
+    },
+    {
+      "path": "upstream/diffs/tags/change-tags-content.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/tags/change-tags-content.a.smithy",
+      "gitBlob": "ffe2c1d2c5ae06d8954dfa4ca52316d35e07d3d2"
+    },
+    {
+      "path": "upstream/diffs/tags/change-tags-content.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/tags/change-tags-content.b.smithy",
+      "gitBlob": "9a01a41d42d2e8610e0ef290c03176392b90bfb2"
+    },
+    {
+      "path": "upstream/diffs/tags/change-tags-content.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/diffs/tags/change-tags-content.events",
+      "gitBlob": "5c53e99230fc5362821ba676c0e61466670fe1b7"
+    },
+    {
+      "path": "upstream/evaluators/box-added-to-member.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/box-added-to-member.smithy",
+      "gitBlob": "df3f297c850bfd72127fbba4cf92e053e29a57a4"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/double-nesting-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/double-nesting-a.smithy",
+      "gitBlob": "1b5e71f4236866b6985a8986b5df90fc88a5406f"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/double-nesting-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/double-nesting-b.smithy",
+      "gitBlob": "f3a816b53e33f7eedf3bdbaef743ebc2e2ebdcba"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-list-added-compatible-member-trait-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-list-added-compatible-member-trait-a.smithy",
+      "gitBlob": "a024b2e507949c2075c4ad394c41ecad20dd3cf0"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-list-added-compatible-member-trait-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-list-added-compatible-member-trait-b.smithy",
+      "gitBlob": "68b317611b3268855df587c621d1510563497197"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-list-added-incompatible-member-trait-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-list-added-incompatible-member-trait-a.smithy",
+      "gitBlob": "a024b2e507949c2075c4ad394c41ecad20dd3cf0"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-list-added-incompatible-member-trait-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-list-added-incompatible-member-trait-b.smithy",
+      "gitBlob": "bc8d6295dfba43754120fa2fe7af341149f87c82"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-list-compatible-changed-member-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-list-compatible-changed-member-a.smithy",
+      "gitBlob": "a024b2e507949c2075c4ad394c41ecad20dd3cf0"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-list-compatible-changed-member-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-list-compatible-changed-member-b.smithy",
+      "gitBlob": "d28ccdff1e091097452c0d17274b85e72ab51322"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-list-incompatible-changed-member-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-list-incompatible-changed-member-a.smithy",
+      "gitBlob": "a024b2e507949c2075c4ad394c41ecad20dd3cf0"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-list-incompatible-changed-member-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-list-incompatible-changed-member-b.smithy",
+      "gitBlob": "1d34eb5b99c759b10e6c8cb442ed399fc24be16c"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-list-unchanged-member-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-list-unchanged-member-a.smithy",
+      "gitBlob": "a024b2e507949c2075c4ad394c41ecad20dd3cf0"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-list-unchanged-member-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-list-unchanged-member-b.smithy",
+      "gitBlob": "c61692e8d3e2e1e21628e790d72380e509f1f9b2"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-key-added-compatible-trait-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-key-added-compatible-trait-a.smithy",
+      "gitBlob": "66fb1a03a37fc4e7882a50cb0403d0c74a087b09"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-key-added-compatible-trait-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-key-added-compatible-trait-b.smithy",
+      "gitBlob": "10053781899113ad95ebe767355e3bfd06f92869"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-key-added-incompatible-trait-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-key-added-incompatible-trait-a.smithy",
+      "gitBlob": "66fb1a03a37fc4e7882a50cb0403d0c74a087b09"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-key-added-incompatible-trait-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-key-added-incompatible-trait-b.smithy",
+      "gitBlob": "0d365f1be53a4bde96dfc233965a00b37b757cbf"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-key-compatible-changed-target-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-key-compatible-changed-target-a.smithy",
+      "gitBlob": "66fb1a03a37fc4e7882a50cb0403d0c74a087b09"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-key-compatible-changed-target-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-key-compatible-changed-target-b.smithy",
+      "gitBlob": "fee26f65ef6d7263bfaf4fb71fba4e3d7f1f890b"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-key-incompatible-changed-target-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-key-incompatible-changed-target-a.smithy",
+      "gitBlob": "66fb1a03a37fc4e7882a50cb0403d0c74a087b09"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-key-incompatible-changed-target-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-key-incompatible-changed-target-b.smithy",
+      "gitBlob": "4bf76a7cf1694177c4ecd175e11ea0d68e15a142"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-unchanged-member-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-unchanged-member-a.smithy",
+      "gitBlob": "66fb1a03a37fc4e7882a50cb0403d0c74a087b09"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-unchanged-member-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-unchanged-member-b.smithy",
+      "gitBlob": "0e7f9eb06e29417e671921710d21bc9e95817b7c"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-value-added-compatible-trait-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-value-added-compatible-trait-a.smithy",
+      "gitBlob": "66fb1a03a37fc4e7882a50cb0403d0c74a087b09"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-value-added-compatible-trait-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-value-added-compatible-trait-b.smithy",
+      "gitBlob": "97b5fbbcd1cf0ea35e8cfa92ef3db3e877c45d4b"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-value-added-incompatible-trait-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-value-added-incompatible-trait-a.smithy",
+      "gitBlob": "66fb1a03a37fc4e7882a50cb0403d0c74a087b09"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-value-added-incompatible-trait-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-value-added-incompatible-trait-b.smithy",
+      "gitBlob": "a87db7c8f49185d67c537dd8520e0945bb608153"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-value-compatible-changed-target-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-value-compatible-changed-target-a.smithy",
+      "gitBlob": "66fb1a03a37fc4e7882a50cb0403d0c74a087b09"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-value-compatible-changed-target-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-value-compatible-changed-target-b.smithy",
+      "gitBlob": "77a42f2aa433241658d5bca23298ce344cc06849"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-value-incompatible-changed-target-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-value-incompatible-changed-target-a.smithy",
+      "gitBlob": "66fb1a03a37fc4e7882a50cb0403d0c74a087b09"
+    },
+    {
+      "path": "upstream/evaluators/changed-member-target/nested-map-value-incompatible-changed-target-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/changed-member-target/nested-map-value-incompatible-changed-target-b.smithy",
+      "gitBlob": "dc565e4d3825d4b3a44195f599913a42420d4c4e"
+    },
+    {
+      "path": "upstream/evaluators/paginated-trait-tests.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/paginated-trait-tests.smithy",
+      "gitBlob": "b306354fab04cd29fb23d96f547a01c108c54255"
+    },
+    {
+      "path": "upstream/evaluators/trait-breaking-change/trait-added.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-breaking-change/trait-added.smithy",
+      "gitBlob": "c6af27638863ae5f3c16f05612d9dfa0449ed60f"
+    },
+    {
+      "path": "upstream/evaluators/trait-breaking-change/trait-any.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-breaking-change/trait-any.smithy",
+      "gitBlob": "72a29b4d9dc731f5ca3dc0ba3c740e63bc945529"
+    },
+    {
+      "path": "upstream/evaluators/trait-breaking-change/trait-list-members.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-breaking-change/trait-list-members.smithy",
+      "gitBlob": "383d4a722e2287335f8786501557ee340ef68678"
+    },
+    {
+      "path": "upstream/evaluators/trait-breaking-change/trait-map-keys.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-breaking-change/trait-map-keys.smithy",
+      "gitBlob": "cb941897cd23f01a4f7a1dd805e443a50c854baf"
+    },
+    {
+      "path": "upstream/evaluators/trait-breaking-change/trait-map-values.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-breaking-change/trait-map-values.smithy",
+      "gitBlob": "a32aaa037fa10c086c9c8068947b0347486817c2"
+    },
+    {
+      "path": "upstream/evaluators/trait-breaking-change/trait-message.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-breaking-change/trait-message.smithy",
+      "gitBlob": "aa921506b16a6adbc08dd8fb6580e26b64b54864"
+    },
+    {
+      "path": "upstream/evaluators/trait-breaking-change/trait-presence.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-breaking-change/trait-presence.smithy",
+      "gitBlob": "4fbf3ecc5ca2d0d3adf24390207862e88a7de380"
+    },
+    {
+      "path": "upstream/evaluators/trait-breaking-change/trait-removed.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-breaking-change/trait-removed.smithy",
+      "gitBlob": "cbca24d5fd0b974957ff435498b0e2b0179f82ef"
+    },
+    {
+      "path": "upstream/evaluators/trait-breaking-change/trait-severity.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-breaking-change/trait-severity.smithy",
+      "gitBlob": "b4bfac8ab51e89540c63eb5c76a45b94e1f0fb57"
+    },
+    {
+      "path": "upstream/evaluators/trait-breaking-change/trait-structure-members.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-breaking-change/trait-structure-members.smithy",
+      "gitBlob": "78f3aa862c16ab2436c46d2319802a0298fbf684"
+    },
+    {
+      "path": "upstream/evaluators/trait-breaking-change/trait-union-members.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-breaking-change/trait-union-members.smithy",
+      "gitBlob": "9437352cc917fc7eaea64eda0cff7d4e9712d263"
+    },
+    {
+      "path": "upstream/evaluators/trait-modified-all-severities-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-modified-all-severities-a.smithy",
+      "gitBlob": "d1673fc350ba7468acead8c5dcf0e87eede226dd"
+    },
+    {
+      "path": "upstream/evaluators/trait-modified-all-severities-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-modified-all-severities-b.smithy",
+      "gitBlob": "a73fe9dc701c0cfa24ecdfc44be2b10490a86180"
+    },
+    {
+      "path": "upstream/evaluators/trait-modified-contents-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-modified-contents-a.smithy",
+      "gitBlob": "8abad5726b7e09380518d2d5c87a846ca5853d17"
+    },
+    {
+      "path": "upstream/evaluators/trait-modified-contents-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-modified-contents-b.smithy",
+      "gitBlob": "10df0b6ba5620c70837c7c315987bd78db72c4c0"
+    },
+    {
+      "path": "upstream/evaluators/trait-modified-contents-list-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-modified-contents-list-a.smithy",
+      "gitBlob": "23f3792eef9e60553634d7d8b54e821a2682db17"
+    },
+    {
+      "path": "upstream/evaluators/trait-modified-contents-list-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-modified-contents-list-b.smithy",
+      "gitBlob": "e975ee025f8b1a77023643a2ed2fbb6db39f3290"
+    },
+    {
+      "path": "upstream/evaluators/trait-modified-contents-map-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-modified-contents-map-a.smithy",
+      "gitBlob": "d4cb7c10d3af13a7335259a87fdaaa15161c554f"
+    },
+    {
+      "path": "upstream/evaluators/trait-modified-contents-map-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-modified-contents-map-b.smithy",
+      "gitBlob": "5eb9712a6c7f6f31e8356cd1f030224509dae1a7"
+    },
+    {
+      "path": "upstream/evaluators/trait-modified-contents-set-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-modified-contents-set-a.smithy",
+      "gitBlob": "53b549528e7951dd19562923aeccad826bfda337"
+    },
+    {
+      "path": "upstream/evaluators/trait-modified-contents-set-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-modified-contents-set-b.smithy",
+      "gitBlob": "1173d78437f34bc9971df3ff7ced356ce8244d0e"
+    },
+    {
+      "path": "upstream/evaluators/trait-modified-contents-union-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-modified-contents-union-a.smithy",
+      "gitBlob": "8ad847f5d7efda0228689f60155d700d2046ffba"
+    },
+    {
+      "path": "upstream/evaluators/trait-modified-contents-union-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-modified-contents-union-b.smithy",
+      "gitBlob": "a96657bd44890348fcce2180d86c93d1f4a9b858"
+    },
+    {
+      "path": "upstream/evaluators/trait-test-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-test-a.smithy",
+      "gitBlob": "b0645766c427cdaa67134e7339167ce3cc910951"
+    },
+    {
+      "path": "upstream/evaluators/trait-test-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/evaluators/trait-test-b.smithy",
+      "gitBlob": "e08dfab1479e423d4f8bbd7495cb370ec52191cd"
+    },
+    {
+      "path": "upstream/suppressions-a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/suppressions-a.smithy",
+      "gitBlob": "4095cadf743452c76d685dc34bd1286a54ebd935"
+    },
+    {
+      "path": "upstream/suppressions-b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/suppressions-b.smithy",
+      "gitBlob": "b08378e4eedb32c30319c2ce43963eb6df324f54"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/invalid/diff1.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/invalid/diff1.a.smithy",
+      "gitBlob": "967d0ce282e0a777c7f80a889373787b2a3f4da3"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/invalid/diff1.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/invalid/diff1.b.smithy",
+      "gitBlob": "967d0ce282e0a777c7f80a889373787b2a3f4da3"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/invalid/diff1.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/invalid/diff1.events",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/invalid/diff2.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/invalid/diff2.a.smithy",
+      "gitBlob": "7c61d42339bf438a633ee84404a07343f8f8de40"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/invalid/diff2.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/invalid/diff2.b.smithy",
+      "gitBlob": "967d0ce282e0a777c7f80a889373787b2a3f4da3"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/invalid/diff2.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/invalid/diff2.events",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/invalid/nested/diff3.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/invalid/nested/diff3.a.smithy",
+      "gitBlob": "7c61d42339bf438a633ee84404a07343f8f8de40"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/invalid/nested/diff3.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/invalid/nested/diff3.b.smithy",
+      "gitBlob": "967d0ce282e0a777c7f80a889373787b2a3f4da3"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/invalid/nested/diff3.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/invalid/nested/diff3.events",
+      "gitBlob": "648705cc258d42f7a874d7adcb928bf226ccafb4"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/valid/diff1.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/valid/diff1.a.smithy",
+      "gitBlob": "967d0ce282e0a777c7f80a889373787b2a3f4da3"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/valid/diff1.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/valid/diff1.b.smithy",
+      "gitBlob": "967d0ce282e0a777c7f80a889373787b2a3f4da3"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/valid/diff1.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/valid/diff1.events",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/valid/diff2.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/valid/diff2.a.smithy",
+      "gitBlob": "7c61d42339bf438a633ee84404a07343f8f8de40"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/valid/diff2.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/valid/diff2.b.smithy",
+      "gitBlob": "967d0ce282e0a777c7f80a889373787b2a3f4da3"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/valid/diff2.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/valid/diff2.events",
+      "gitBlob": "110f7e34601b6fd491177f3e8f2e88a52f239b88"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/valid/nested/diff3.a.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/valid/nested/diff3.a.smithy",
+      "gitBlob": "7c61d42339bf438a633ee84404a07343f8f8de40"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/valid/nested/diff3.b.smithy",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/valid/nested/diff3.b.smithy",
+      "gitBlob": "967d0ce282e0a777c7f80a889373787b2a3f4da3"
+    },
+    {
+      "path": "upstream/testrunner/testrunner/valid/nested/diff3.events",
+      "upstreamPath": "smithy-diff/src/test/resources/software/amazon/smithy/diff/testrunner/testrunner/valid/nested/diff3.events",
+      "gitBlob": "110f7e34601b6fd491177f3e8f2e88a52f239b88"
+    }
+  ]
+}

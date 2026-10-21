@@ -3,6 +3,10 @@ test "invalid command options fail with usage status" {
   for
     args in [
       ["wat"],
+      ["diff"],
+      ["diff", "--old", "a.smithy"],
+      ["diff", "--new", "b.smithy"],
+      ["diff", "--old", "a.smithy", "--new", "b.smithy", "extra.smithy"],
       ["convert", "a.smithy"],
       ["convert", "--to", "xml", "a.smithy"],
       ["format", "--check", "--write", "a.smithy"],

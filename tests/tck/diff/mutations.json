@@ -1,0 +1,300 @@
+[
+  {
+    "id": "trait-added",
+    "old": "upstream/evaluators/trait-breaking-change/trait-added.smithy",
+    "new": "upstream/evaluators/trait-breaking-change/trait-added.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#Example",
+        "trait": "smithy.example#exampleTrait",
+        "value": {}
+      }
+    ]
+  },
+  {
+    "id": "trait-any",
+    "old": "upstream/evaluators/trait-breaking-change/trait-any.smithy",
+    "new": "upstream/evaluators/trait-breaking-change/trait-any.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#Example",
+        "trait": "smithy.example#exampleTrait"
+      }
+    ]
+  },
+  {
+    "id": "trait-list-members",
+    "old": "upstream/evaluators/trait-breaking-change/trait-list-members.smithy",
+    "new": "upstream/evaluators/trait-breaking-change/trait-list-members.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#Example",
+        "trait": "smithy.example#exampleTrait",
+        "value": [
+          "a",
+          "B",
+          "c"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "trait-map-keys",
+    "old": "upstream/evaluators/trait-breaking-change/trait-map-keys.smithy",
+    "new": "upstream/evaluators/trait-breaking-change/trait-map-keys.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#Example",
+        "trait": "smithy.example#exampleTrait",
+        "value": {
+          "a": "A"
+        }
+      }
+    ]
+  },
+  {
+    "id": "trait-map-values",
+    "old": "upstream/evaluators/trait-breaking-change/trait-map-values.smithy",
+    "new": "upstream/evaluators/trait-breaking-change/trait-map-values.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#Example",
+        "trait": "smithy.example#exampleTrait",
+        "value": {
+          "a": "A",
+          "b": "_B_"
+        }
+      }
+    ]
+  },
+  {
+    "id": "trait-message",
+    "old": "upstream/evaluators/trait-breaking-change/trait-message.smithy",
+    "new": "upstream/evaluators/trait-breaking-change/trait-message.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#Example",
+        "trait": "smithy.example#exampleTrait"
+      }
+    ]
+  },
+  {
+    "id": "trait-presence",
+    "old": "upstream/evaluators/trait-breaking-change/trait-presence.smithy",
+    "new": "upstream/evaluators/trait-breaking-change/trait-presence.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#Example",
+        "trait": "smithy.example#exampleTrait"
+      }
+    ]
+  },
+  {
+    "id": "trait-removed",
+    "old": "upstream/evaluators/trait-breaking-change/trait-removed.smithy",
+    "new": "upstream/evaluators/trait-breaking-change/trait-removed.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#Example",
+        "trait": "smithy.example#exampleTrait"
+      }
+    ]
+  },
+  {
+    "id": "trait-severity",
+    "old": "upstream/evaluators/trait-breaking-change/trait-severity.smithy",
+    "new": "upstream/evaluators/trait-breaking-change/trait-severity.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#Example",
+        "trait": "smithy.example#exampleTrait"
+      }
+    ]
+  },
+  {
+    "id": "trait-structure-members",
+    "old": "upstream/evaluators/trait-breaking-change/trait-structure-members.smithy",
+    "new": "upstream/evaluators/trait-breaking-change/trait-structure-members.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#Example",
+        "trait": "smithy.example#exampleTrait",
+        "value": {}
+      }
+    ]
+  },
+  {
+    "id": "trait-union-members",
+    "old": "upstream/evaluators/trait-breaking-change/trait-union-members.smithy",
+    "new": "upstream/evaluators/trait-breaking-change/trait-union-members.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#Example",
+        "trait": "smithy.example#exampleTrait",
+        "value": {
+          "foo": "bye"
+        }
+      }
+    ]
+  },
+  {
+    "id": "paginated-removed",
+    "old": "upstream/evaluators/paginated-trait-tests.smithy",
+    "new": "upstream/evaluators/paginated-trait-tests.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#ListThings",
+        "trait": "smithy.api#paginated"
+      }
+    ]
+  },
+  {
+    "id": "paginated-remove-inputToken",
+    "old": "upstream/evaluators/paginated-trait-tests.smithy",
+    "new": "upstream/evaluators/paginated-trait-tests.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#ListThings",
+        "trait": "smithy.api#paginated",
+        "value": {
+          "outputToken": "token",
+          "items": "things",
+          "pageSize": "maxResults"
+        }
+      }
+    ]
+  },
+  {
+    "id": "paginated-update-inputToken",
+    "old": "upstream/evaluators/paginated-trait-tests.smithy",
+    "new": "upstream/evaluators/paginated-trait-tests.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#ListThings",
+        "trait": "smithy.api#paginated",
+        "value": {
+          "inputToken": "otherToken",
+          "outputToken": "token",
+          "items": "things",
+          "pageSize": "maxResults"
+        }
+      }
+    ]
+  },
+  {
+    "id": "paginated-remove-outputToken",
+    "old": "upstream/evaluators/paginated-trait-tests.smithy",
+    "new": "upstream/evaluators/paginated-trait-tests.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#ListThings",
+        "trait": "smithy.api#paginated",
+        "value": {
+          "inputToken": "token",
+          "items": "things",
+          "pageSize": "maxResults"
+        }
+      }
+    ]
+  },
+  {
+    "id": "paginated-update-outputToken",
+    "old": "upstream/evaluators/paginated-trait-tests.smithy",
+    "new": "upstream/evaluators/paginated-trait-tests.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#ListThings",
+        "trait": "smithy.api#paginated",
+        "value": {
+          "inputToken": "token",
+          "outputToken": "otherToken",
+          "items": "things",
+          "pageSize": "maxResults"
+        }
+      }
+    ]
+  },
+  {
+    "id": "paginated-remove-items",
+    "old": "upstream/evaluators/paginated-trait-tests.smithy",
+    "new": "upstream/evaluators/paginated-trait-tests.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#ListThings",
+        "trait": "smithy.api#paginated",
+        "value": {
+          "inputToken": "token",
+          "outputToken": "token",
+          "pageSize": "maxResults"
+        }
+      }
+    ]
+  },
+  {
+    "id": "paginated-update-items",
+    "old": "upstream/evaluators/paginated-trait-tests.smithy",
+    "new": "upstream/evaluators/paginated-trait-tests.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#ListThings",
+        "trait": "smithy.api#paginated",
+        "value": {
+          "inputToken": "token",
+          "outputToken": "token",
+          "items": "otherThings",
+          "pageSize": "maxResults"
+        }
+      }
+    ]
+  },
+  {
+    "id": "paginated-remove-pageSize",
+    "old": "upstream/evaluators/paginated-trait-tests.smithy",
+    "new": "upstream/evaluators/paginated-trait-tests.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#ListThings",
+        "trait": "smithy.api#paginated",
+        "value": {
+          "inputToken": "token",
+          "outputToken": "token",
+          "items": "things"
+        }
+      }
+    ]
+  },
+  {
+    "id": "paginated-update-pageSize",
+    "old": "upstream/evaluators/paginated-trait-tests.smithy",
+    "new": "upstream/evaluators/paginated-trait-tests.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#ListThings",
+        "trait": "smithy.api#paginated",
+        "value": {
+          "inputToken": "token",
+          "outputToken": "token",
+          "items": "things",
+          "pageSize": "otherMaxResults"
+        }
+      }
+    ]
+  },
+  {
+    "id": "box-added",
+    "old": "upstream/evaluators/box-added-to-member.smithy",
+    "new": "upstream/evaluators/box-added-to-member.smithy",
+    "mutations": [
+      {
+        "shape": "smithy.example#Example$baz",
+        "trait": "smithy.api#box",
+        "value": {}
+      },
+      {
+        "shape": "smithy.example#Example$bam",
+        "trait": "smithy.api#box",
+        "value": {}
+      }
+    ]
+  }
+]

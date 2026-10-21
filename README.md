@@ -13,7 +13,9 @@ schema and validates its targets, names and required fields. `pkgs/jmespath`
 provides a standalone JMESPath parser and evaluator. Smithy checks contract
 expression syntax, member references, function arguments and boolean result
 types during assembly. Smithy selectors can query the assembled model. The CLI assembles, validates, selects, formats,
-converts and builds IDL and JSON models. See [CLI usage](apps/smithy/README.md).
+converts and builds IDL and JSON models. It also compares model snapshots with
+`smithy diff --old previous/ --new current/`. See [CLI usage](apps/smithy/README.md)
+and the [model diff API](pkgs/smithy-diff/README.mbt.md).
 The build plugins convert assembled models to JSON Schema and services to OpenAPI
 3.0.2 or 3.1.0. See [OpenAPI usage](pkgs/smithy-openapi/README.mbt.md).
 
@@ -24,6 +26,7 @@ The build plugins convert assembled models to JSON Schema and services to OpenAP
 | `pkgs/artifact-resources` | `moonrockz/artifact-resources` | Portable entry trees, resource loading, public HTTP/GitHub/npm/Maven acquisition, verified cache, supplied credentials and provider registry |
 | `pkgs/jmespath` | `moonrockz/jmespath` | JMESPath parser, inspectable AST and JSON evaluator |
 | `pkgs/smithy` | `moonrockz/smithy` | Semantic model and multi-file IDL/JSON loader |
+| `pkgs/smithy-diff` | `moonrockz/smithy-diff` | Compare models and report compatibility changes |
 | `pkgs/smithy-build` | `moonrockz/smithy-build` | Build configuration, projections and plugins |
 | `pkgs/smithy-jsonschema` | `moonrockz/smithy-jsonschema` | Convert assembled value shapes to JSON Schema |
 | `pkgs/smithy-openapi` | `moonrockz/smithy-openapi` | Convert services to OpenAPI with REST JSON and RPC v2 JSON protocols |
@@ -162,6 +165,7 @@ smithy/
 ├── apps/smithy/               # CLI (moonrockz/smithy-cli)
 ├── pkgs/smithy/               # library (moonrockz/smithy)
 ├── pkgs/smithy-build/         # build projections and plugins
+├── pkgs/smithy-diff/          # Model compatibility differences
 ├── pkgs/smithy-jsonschema/    # JSON Schema converter
 ├── pkgs/smithy-openapi/       # OpenAPI service converter and protocols
 ├── pkgs/artifact-resources/   # reusable local artifact/resource library

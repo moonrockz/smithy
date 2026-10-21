@@ -15,7 +15,11 @@ pub impl Eq for NodeNumber with fn equal(self, other) {
 }
 
 ///|
-fn NodeNumber::numeric_compare(self : NodeNumber, other : NodeNumber) -> Int32 {
+/// Compare exact numeric values without converting through Double.
+pub fn NodeNumber::numeric_compare(
+  self : NodeNumber,
+  other : NodeNumber,
+) -> Int32 {
   if self == other {
     return 0
   }

@@ -303,7 +303,9 @@ fn validation_template(
 }
 
 ///|
-fn Model::decorate_validation_event(
+/// Apply this model's suppressions and severity overrides to an event. ERROR
+/// and already-suppressed events retain their severity, as in Smithy validation.
+pub fn Model::decorate_validation_event(
   self : Model,
   event : ValidationEvent,
 ) -> ValidationEvent {

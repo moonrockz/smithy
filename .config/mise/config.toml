@@ -123,6 +123,14 @@ run = "moonx scripts/reference-build.mbtx"
 description = "Vendor hash-verified OpenAPI reference fixtures (args: upstream source directory)"
 run = "moonx scripts/vendor-openapi.mbtx"
 
+[tasks."tck:vendor:diff"]
+description = "Vendor hash-verified model diff fixtures from the pinned Java source snapshot"
+run = "moonx scripts/vendor-diff.mbtx"
+
+[tasks."tck:reference:diff"]
+description = "Verify model diff cases with the pinned Java implementation (requires a JDK; optional --check)"
+run = "moonx scripts/reference-diff.mbtx"
+
 [tasks."tck:reference:openapi"]
 description = "Verify OpenAPI expectations against pinned Java sources (args: source directory, --check)"
 run = "moonx scripts/reference-openapi.mbtx"
