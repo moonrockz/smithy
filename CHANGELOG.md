@@ -8,7 +8,7 @@ is 0.x, a minor release can contain breaking changes.
 
 ## [0.5.0] - 2026-10-21
 
-<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+Validate JSON files against Smithy shapes with `smithy validate-value` or reuse prepared contracts from the new `moonrockz/smithy-validation` package. Structured findings identify exact instance paths, preserve numeric precision and enforce bounded traversal and pattern work across supported targets. This release also adds OpenAPI export and model compatibility diffs. The shared JSON-RPC/OpenRPC design is documented for the next protocol-validation slices; date-time value validation currently excludes leap-second notation.
 
 ### 🚀 Features
 
