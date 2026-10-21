@@ -65,7 +65,7 @@ async fn seed(root : String, registry_home : String, fixture : String, name : St
         let parts = text[1:].split("\"").next().unwrap().split("@").to_array()
         if parts.length() == 2 { deps[parts[0].to_owned()] = Json::string(parts[1].to_owned()) }
       }
-      (Json::object({ "name": Json::string(name), "version": Json::string(version), "deps": Json::object(deps), "checksum": Json::string(@crypto.bytes_to_hex_string(@crypto.sha256(bytes))) }), bytes)
+      (Json::object({ "name": Json::string(name), "version": Json::string(version), "deps": Json::object(deps), "checksum": Json::string(@crypto.bytes_to_hex_string(@crypto.sha256(bytes))) }), Some(bytes))
     }
     None => {
       let mut found : Json? = None
@@ -75,11 +75,16 @@ async fn seed(root : String, registry_home : String, fixture : String, name : St
         if string_field(entry, "version") == version { found = Some(entry); break }
       }
       guard found is Some(entry) else { fail("Missing cached dependency " + coordinate) }
-      (entry, @fs.read_file(registry_home + "/" + archive_path).binary())
+      // A clean CI cache need not contain every transitive minimum version.
+      // Moon downloads a selected uncached version and verifies its checksum.
+      let cached = registry_home + "/" + archive_path
+      (entry, if @fs.exists(cached) { Some(@fs.read_file(cached).binary()) } else { None })
     }
   }
-  write(fixture + "/" + index_path, entry.stringify() + "\n")
-  write(fixture + "/" + archive_path, bytes)
+  let index = fixture + "/" + index_path
+  let previous = if @fs.exists(index) { @fs.read_file(index).text() } else { "" }
+  write(index, previous + entry.stringify() + "\n")
+  if bytes is Some(bytes) { write(fixture + "/" + archive_path, bytes) }
   if entry is Object(fields) && fields.get("deps") is Some(Object(deps)) {
     for dependency, pin in deps {
       guard pin is String(pin) else { fail("Expected a pinned dependency") }
