@@ -158,3 +158,58 @@ settings. The CLI handles acquisition before calling the common model selector.
 The same cache/offline settings apply to metadata and archive bytes.
 See the [provider contract](../artifact-resources/README.mbt.md#pinned-github-release-assets)
 and [runnable example](../../examples/github-release/README.md).
+
+
+## Public npm and Maven inputs
+
+Sources, global imports and projection imports accept exact npm package inputs:
+
+```json
+{
+  "npm": { "package": "@scope/models", "version": "1.2.3" },
+  "root": "package/models",
+  "globs": ["**/*.smithy"]
+}
+```
+
+`npm.registry` defaults to `https://registry.npmjs.org`; an explicit public base
+URL can replace it. Selection is required and the archive format is always tgz.
+Scoped/unscoped names, strict exact SemVer, registry integrity checks and optional
+top-level SHA-256 `digest` are supported. npm is never installed or invoked.
+
+An exact Maven JAR defaults to Smithy manifest discovery:
+
+```json
+{
+  "maven": {
+    "repository": "https://repo.maven.apache.org/maven2",
+    "group": "software.amazon.smithy",
+    "artifact": "smithy-aws-traits",
+    "version": "1.72.0",
+    "checksum": "sha1"
+  }
+}
+```
+
+`repository` defaults to Maven Central. Optional `classifier` selects a classified
+JAR; `checksum` selects `sha1` or `sha256` sidecars and defaults to `sha1`. A
+top-level `digest` supplies the expected SHA-256 and takes precedence over sidecars.
+Add `root` and `paths`/`globs` for explicit selection instead of manifest discovery.
+The same acquired tree and model-selection path serve every build position.
+
+Only one of `path`, `url`, `github`, `npm` or `maven` may select an input. Unknown
+coordinate fields, credentials, explicit format overrides, dependency ranges,
+mutable snapshots and transitive resolution settings are rejected. The legacy
+root-level `maven.dependencies` configuration remains unsupported; these selected
+inputs acquire direct artifacts and do not resolve a dependency graph.
+
+Library callers construct `BuildInput::Npm(NpmArchive, Selection)` or
+`BuildInput::Maven(MavenArchive, Selection?)`. `None` selects manifest discovery
+for Maven. Exhaustive matches must handle both variants. `location()` returns the
+registry/repository base; `with_location()` validates a replacement base and
+`to_json()` preserves coordinates, checksum policy, digest and selection.
+
+See the [provider contracts](../artifact-resources/README.mbt.md#public-npm-packages),
+[npm example](../../examples/npm-registry/README.md) and
+[Maven example](../../examples/maven-repository/README.md). All remote inputs share
+`cacheDirectory`, `offline` and the CLI cache flags.

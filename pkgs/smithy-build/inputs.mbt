@@ -1,6 +1,8 @@
 ///|
 /// Legacy local discovery or explicitly selected resources in a local container.
 pub(all) enum BuildInput {
+  Npm(@resources.NpmArchive, @resources.Selection)
+  Maven(@resources.MavenArchive, @resources.Selection?)
   GitHub(@resources.GitHubArchive, @resources.Selection, @resources.HttpUrl)
   Remote(@resources.PublicArchive, @resources.Selection)
   Local(@resources.RepositoryLocation)
@@ -18,6 +20,10 @@ pub fn BuildInput::from_path(path : String) -> BuildInput raise BuildError {
 ///|
 pub fn BuildInput::location(self : BuildInput) -> @resources.RepositoryLocation {
   match self {
+    Npm(archive, _) =>
+      @resources.RepositoryLocation::parse(archive.registry.to_string()).unwrap()
+    Maven(archive, _) =>
+      @resources.RepositoryLocation::parse(archive.repository.to_string()).unwrap()
     GitHub(archive, _, _) =>
       @resources.RepositoryLocation::parse(archive.repository.to_string()).unwrap()
     Remote(archive, _) =>
@@ -32,6 +38,20 @@ pub fn BuildInput::with_location(
   location : @resources.RepositoryLocation,
 ) -> BuildInput raise BuildError {
   match self {
+    Npm(archive, selection) => {
+      guard @resources.RepositoryUrl::parse(location.to_string())
+        is Some(registry) else {
+        raise InvalidBuildConfig("Expected an npm registry base URL")
+      }
+      Npm({ ..archive, registry, }, selection)
+    }
+    Maven(archive, selection) => {
+      guard @resources.RepositoryUrl::parse(location.to_string())
+        is Some(repository) else {
+        raise InvalidBuildConfig("Expected a Maven repository base URL")
+      }
+      Maven({ ..archive, repository, }, selection)
+    }
     GitHub(archive, selection, api) => {
       guard @resources.GitHubRepository::parse(location.to_string())
         is Some(repository) else {
@@ -55,6 +75,47 @@ pub fn BuildInput::with_location(
 ///|
 pub fn BuildInput::to_json(self : BuildInput) -> Json {
   match self {
+    Npm(archive, selection) => {
+      let json = Selected(self.location(), selection).to_json()
+      guard json is Object(fields) else { abort("selection serialization") }
+      ignore(fields.remove("path"))
+      fields["npm"] = {
+        "registry": archive.registry.to_string(),
+        "package": archive.reference.name.to_string(),
+        "version": archive.reference.version.to_string(),
+      }
+      if archive.expected_digest is Some(digest) {
+        fields["digest"] = Json::string(digest.to_string())
+      }
+      Json::object(fields)
+    }
+    Maven(archive, selection) => {
+      let fields = match selection {
+        Some(selection) => {
+          let json = Selected(self.location(), selection).to_json()
+          guard json is Object(fields) else { abort("selection serialization") }
+          ignore(fields.remove("path"))
+          fields
+        }
+        None => Map([])
+      }
+      let coordinates = archive.coordinates
+      let maven : Map[String, Json] = {
+        "repository": Json::string(archive.repository.to_string()),
+        "group": Json::string(coordinates.group.to_string()),
+        "artifact": Json::string(coordinates.artifact.to_string()),
+        "version": Json::string(coordinates.version.to_string()),
+        "checksum": Json::string(archive.checksum.algorithm().to_string()),
+      }
+      if coordinates.classifier is Some(classifier) {
+        maven["classifier"] = Json::string(classifier.to_string())
+      }
+      fields["maven"] = Json::object(maven)
+      if archive.expected_digest is Some(digest) {
+        fields["digest"] = Json::string(digest.to_string())
+      }
+      Json::object(fields)
+    }
     GitHub(archive, selection, api) => {
       let json = Remote(
         {
@@ -127,38 +188,7 @@ fn parse_entry_path(text : String) -> @resources.EntryPath raise BuildError {
 }
 
 ///|
-fn config_input(value : Json) -> BuildInput raise BuildError {
-  if value is String(path) {
-    return BuildInput::from_path(path)
-  }
-  guard value is Object(fields) else {
-    raise InvalidBuildConfig(
-      "Expected a local input string or resource selection object",
-    )
-  }
-  let github = fields.contains("github")
-  let remote = fields.contains("url") || github
-  let allowed = if github {
-    ["github", "format", "digest", "root", "paths", "globs"]
-  } else if remote {
-    ["url", "format", "digest", "root", "paths", "globs"]
-  } else {
-    ["path", "root", "paths", "globs"]
-  }
-  for key, _ in fields {
-    if !allowed.contains(key) {
-      raise InvalidBuildConfig("Unknown resource selection field `" + key + "`")
-    }
-  }
-  let location = if remote {
-    None
-  } else {
-    guard config_optional_string(value, "path") is Some(path) &&
-      @resources.RepositoryLocation::parse(path) is Some(location) else {
-      raise InvalidBuildConfig("Expected a resource selection `path`")
-    }
-    Some(location)
-  }
+fn config_selection(value : Json) -> @resources.Selection raise BuildError {
   guard config_optional_string(value, "root") is Some(root) &&
     @resources.ResourceRoot::parse(root) is Some(root) else {
     raise InvalidBuildConfig(
@@ -207,6 +237,164 @@ fn config_input(value : Json) -> BuildInput raise BuildError {
       "A resource selection requires between 1 and 256 paths or globs",
     )
   }
+  selection
+}
+
+///|
+fn config_digest(value : Json) -> @resources.ContentDigest? raise BuildError {
+  match config_optional_string(value, "digest") {
+    None => None
+    Some(text) => {
+      guard @resources.ContentDigest::parse(text) is Some(digest) else {
+        raise InvalidBuildConfig(
+          "Expected digest sha256: followed by 64 hexadecimal digits",
+        )
+      }
+      Some(digest)
+    }
+  }
+}
+
+///|
+fn config_repository_input(
+  value : Json,
+  provider : String,
+) -> BuildInput raise BuildError {
+  guard value is Object(fields) &&
+    config_field(value, provider) is Some(Object(settings)) else {
+    raise InvalidBuildConfig("Expected a " + provider + " input object")
+  }
+  for key, _ in fields {
+    if ![provider, "digest", "root", "paths", "globs"].contains(key) {
+      raise InvalidBuildConfig(
+        "Unknown " + provider + " input field `" + key + "`",
+      )
+    }
+  }
+  let nested = Json::object(settings)
+  let allowed = if provider == "npm" {
+    ["registry", "package", "version"]
+  } else {
+    ["repository", "group", "artifact", "version", "classifier", "checksum"]
+  }
+  for key, _ in settings {
+    if !allowed.contains(key) {
+      raise InvalidBuildConfig(
+        "Unknown " + provider + " coordinate field `" + key + "`",
+      )
+    }
+  }
+  let expected_digest = config_digest(value)
+  if provider == "npm" {
+    guard @resources.RepositoryUrl::parse(
+        config_optional_string(nested, "registry").unwrap_or(
+          "https://registry.npmjs.org",
+        ),
+      )
+      is Some(registry) &&
+      config_optional_string(nested, "package") is Some(name) &&
+      @resources.NpmPackageName::parse(name) is Some(name) &&
+      config_optional_string(nested, "version") is Some(version) &&
+      @resources.NpmVersion::parse(version) is Some(version) else {
+      raise InvalidBuildConfig(
+        "npm requires a public registry base, package name and exact semantic version",
+      )
+    }
+    Npm(
+      { registry, reference: { name, version, }, expected_digest, },
+      config_selection(value),
+    )
+  } else {
+    guard @resources.RepositoryUrl::parse(
+        config_optional_string(nested, "repository").unwrap_or(
+          "https://repo.maven.apache.org/maven2",
+        ),
+      )
+      is Some(repository) &&
+      config_optional_string(nested, "group") is Some(group) &&
+      @resources.MavenGroupId::parse(group) is Some(group) &&
+      config_optional_string(nested, "artifact") is Some(artifact) &&
+      @resources.MavenArtifactId::parse(artifact) is Some(artifact) &&
+      config_optional_string(nested, "version") is Some(version) &&
+      @resources.MavenVersion::parse(version) is Some(version) else {
+      raise InvalidBuildConfig(
+        "Maven requires a public repository base and exact group/artifact/version JAR coordinates",
+      )
+    }
+    let classifier = match config_optional_string(nested, "classifier") {
+      None => None
+      Some(text) => {
+        guard @resources.MavenClassifier::parse(text) is Some(value) else {
+          raise InvalidBuildConfig("Invalid Maven classifier")
+        }
+        Some(value)
+      }
+    }
+    let checksum = match
+      config_optional_string(nested, "checksum").unwrap_or("sha1") {
+      "sha1" => @resources.Sha1Sidecar
+      "sha256" => @resources.Sha256Sidecar
+      _ => raise InvalidBuildConfig("Expected Maven checksum sha1 or sha256")
+    }
+    let selection = if ["root", "paths", "globs"].any(key => {
+        fields.contains(key)
+      }) {
+      Some(config_selection(value))
+    } else {
+      None
+    }
+    Maven(
+      {
+        repository,
+        coordinates: { group, artifact, version, classifier, },
+        checksum,
+        expected_digest,
+      },
+      selection,
+    )
+  }
+}
+
+///|
+fn config_input(value : Json) -> BuildInput raise BuildError {
+  if value is String(path) {
+    return BuildInput::from_path(path)
+  }
+  guard value is Object(fields) else {
+    raise InvalidBuildConfig(
+      "Expected a local input string or resource selection object",
+    )
+  }
+  if fields.contains("npm") {
+    return config_repository_input(value, "npm")
+  }
+  if fields.contains("maven") {
+    return config_repository_input(value, "maven")
+  }
+  let github = fields.contains("github")
+  let remote = fields.contains("url") || github
+  let allowed = if github {
+    ["github", "format", "digest", "root", "paths", "globs"]
+  } else if remote {
+    ["url", "format", "digest", "root", "paths", "globs"]
+  } else {
+    ["path", "root", "paths", "globs"]
+  }
+  for key, _ in fields {
+    if !allowed.contains(key) {
+      raise InvalidBuildConfig("Unknown resource selection field `" + key + "`")
+    }
+  }
+  let location = if remote {
+    None
+  } else {
+    guard config_optional_string(value, "path") is Some(path) &&
+      @resources.RepositoryLocation::parse(path) is Some(location) else {
+      raise InvalidBuildConfig("Expected a resource selection `path`")
+    }
+    Some(location)
+  }
+  let selection = config_selection(value)
   if remote {
     let format = match
       config_optional_string(value, "format").unwrap_or("zip") {
@@ -218,17 +406,7 @@ fn config_input(value : Json) -> BuildInput raise BuildError {
           "Expected URL archive format zip, jar, tar, tgz or tar.gz",
         )
     }
-    let expected_digest = match config_optional_string(value, "digest") {
-      None => None
-      Some(text) => {
-        guard @resources.ContentDigest::parse(text) is Some(digest) else {
-          raise InvalidBuildConfig(
-            "Expected digest sha256: followed by 64 hexadecimal digits",
-          )
-        }
-        Some(digest)
-      }
-    }
+    let expected_digest = config_digest(value)
     if github {
       guard config_field(value, "github") is Some(Object(github_fields)) else {
         raise InvalidBuildConfig("Expected a github object")

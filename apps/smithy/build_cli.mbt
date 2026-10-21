@@ -98,6 +98,71 @@ fn build_add_input(
   source~ : Bool = false,
   projection~ : String? = None,
 ) -> Unit raise {
+  if input is @build.Npm(archive, selection) {
+    let tree = @resources.register_npm(
+        @resources.Registry::new(),
+        @http_resources.transport,
+        expected_digest=archive.expected_digest,
+        cache~,
+        mode~,
+      )
+      .add_repository({
+        id: @resources.RepositoryId::parse("input").unwrap(),
+        provider: @resources.ProviderId::parse("npm").unwrap(),
+        location: input.location(),
+      })
+      .resolve({
+        repository: @resources.RepositoryId::parse("input").unwrap(),
+        key: archive.reference.key(),
+      }).tree catch {
+        @resources.ResourceError(code, origin, message) =>
+          raise @build.InvalidBuildConfig(
+            "Could not acquire resource `" +
+            origin.to_string() +
+            "` [" +
+            code.to_string() +
+            "]: " +
+            message,
+          )
+      }
+    build_add_selected(loader, runner, tree, selection, source~, projection~)
+    return
+  }
+  if input is @build.Maven(archive, selection) {
+    let tree = @resources.register_maven(
+        @resources.Registry::new(),
+        @http_resources.transport,
+        checksum=archive.checksum,
+        expected_digest=archive.expected_digest,
+        cache~,
+        mode~,
+      )
+      .add_repository({
+        id: @resources.RepositoryId::parse("input").unwrap(),
+        provider: @resources.ProviderId::parse("maven").unwrap(),
+        location: input.location(),
+      })
+      .resolve({
+        repository: @resources.RepositoryId::parse("input").unwrap(),
+        key: archive.coordinates.key(),
+      }).tree catch {
+        @resources.ResourceError(code, origin, message) =>
+          raise @build.InvalidBuildConfig(
+            "Could not acquire resource `" +
+            origin.to_string() +
+            "` [" +
+            code.to_string() +
+            "]: " +
+            message,
+          )
+      }
+    let resources = match selection {
+      Some(selection) => @build.selected_models(tree, selection)
+      None => @build.declared_models(tree)
+    }
+    build_add_resources(loader, runner, resources, source~, projection~)
+    return
+  }
   if input is @build.GitHub(archive, selection, api) {
     let tree = @resources.register_github(
         @resources.Registry::new(),
@@ -164,10 +229,12 @@ fn build_add_input(
   }
   let path = build_path(base, input.location().to_string())
   let selection = match input {
-    @build.Local(_) => None
+    @build.Local(_) | @build.Maven(_, None) => None
     @build.Selected(_, selection)
     | @build.Remote(_, selection)
-    | @build.GitHub(_, selection, _) => Some(selection)
+    | @build.GitHub(_, selection, _)
+    | @build.Npm(_, selection)
+    | @build.Maven(_, Some(selection)) => Some(selection)
   }
   build_add_files(
     loader,
@@ -313,8 +380,25 @@ fn build_add_selected(
   source~ : Bool,
   projection~ : String?,
 ) -> Unit raise {
+  build_add_resources(
+    loader,
+    runner,
+    @build.selected_models(tree, selection),
+    source~,
+    projection~,
+  )
+}
+
+///|
+fn build_add_resources(
+  loader : @smithy.Loader,
+  runner : @build.BuildRunner,
+  resources : Array[@resources.Resource],
+  source~ : Bool,
+  projection~ : String?,
+) -> Unit raise {
   let added : Set[@resources.EntryPath] = Set([])
-  for resource in @build.selected_models(tree, selection) {
+  for resource in resources {
     let text = resource.text()
     let origin = if resource.provenance
       .steps()
@@ -570,7 +654,10 @@ fn run_build(
     protected_paths.append(projection.imports)
   }
   for path in protected_paths {
-    if path is @build.Remote(_, _) || path is @build.GitHub(_, _, _) {
+    if path is @build.Remote(_, _) ||
+      path is @build.GitHub(_, _, _) ||
+      path is @build.Npm(_, _) ||
+      path is @build.Maven(_, _) {
       continue
     }
     let input = build_path(base, path.location().to_string())

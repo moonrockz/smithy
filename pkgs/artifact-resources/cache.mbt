@@ -116,6 +116,7 @@ pub fn acquire(
   limits~ : AcquisitionLimits = AcquisitionLimits::new().unwrap(),
   cache~ : VerifiedCache? = None,
   mode~ : AcquisitionMode = Online,
+  verify~ : IntegrityVerifier = (_, _) => (),
 ) -> AcquiredBytes raise ResourceError {
   let origin = Provenance::new(requested.location())
   if cache is Some(cache) &&
@@ -154,6 +155,7 @@ pub fn acquire(
         "Expected \{expected}, received \{metadata.digest}",
       )
     }
+    verify(body, at)
     return { metadata, body, }
   }
   if mode == Offline {
@@ -193,6 +195,7 @@ pub fn acquire(
       "Expected \{expected}, received \{metadata.digest}",
     )
   }
+  verify(response.body, at)
   if cache is Some(cache) {
     (cache.store.publish)(CacheKey::content(metadata.digest), response.body)
     let json : Json = {

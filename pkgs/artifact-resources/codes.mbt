@@ -1,5 +1,8 @@
 ///|
 pub(all) enum ResourceCode {
+  MissingPackageVersion
+  MissingArtifact
+  UnsupportedIntegrity
   MissingRelease
   AmbiguousAsset
   RateLimited
@@ -35,6 +38,9 @@ pub(all) enum ResourceCode {
 ///|
 pub fn ResourceCode::to_string(self : ResourceCode) -> String {
   match self {
+    MissingPackageVersion => "missing-package-version"
+    MissingArtifact => "missing-artifact"
+    UnsupportedIntegrity => "unsupported-integrity"
     MissingRelease => "missing-release"
     AmbiguousAsset => "ambiguous-asset"
     RateLimited => "rate-limited"

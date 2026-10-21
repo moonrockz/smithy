@@ -453,3 +453,109 @@ then offline. `mise run test:http` verifies selected ZIP and tar/gzip assets aga
 local equivalents in sources, global imports and projection imports using a
 controlled server. Portable package tests cover pagination, ambiguity, missing
 metadata, rate limits, authentication refusals, integrity and offline resolution.
+
+
+## Public npm packages
+
+`NpmArchive` resolves `NpmPackageRef`, an `NpmPackageName` plus an exact
+`NpmVersion`, against a validated `RepositoryUrl`. Scoped and unscoped lowercase
+ASCII names are supported, with letter/digit component starts and subsequent
+letters, digits, hyphens, underscores or dots. Versions use strict three-component SemVer, including
+prerelease and build identifiers. Ranges, `v` prefixes and dist-tags such as
+`latest` are rejected. Names and versions are encoded as URL path segments.
+The provider uses the [npm exact-version endpoint](https://github.com/npm/registry/blob/main/docs/REGISTRY-API.md#getpackageversion),
+checks the returned name/version and follows its credential-free `dist.tarball`.
+Package metadata is bounded to the smaller of 1 MiB and the acquisition byte
+limit. Tarballs use the shared tar/gzip reader and its existing limits. Nothing
+is installed, extracted or executed; package scripts and dependencies are data.
+
+`dist.integrity` uses a documented subset of [npm SRI](https://github.com/npm/ssri):
+SHA-512, SHA-256 and SHA-1, with canonical padded standard base64 and ASCII space,
+tab, CR or LF separators. Integrity text is bounded to 8192 characters.
+Only the strongest supported algorithm participates;
+any matching digest at that strength succeeds. Unknown algorithms are ignored
+when supported tokens exist. Malformed supported tokens, option suffixes or
+unsupported-only sets fail with `unsupported-integrity`. If `integrity` is
+absent, a 40-digit hexadecimal `dist.shasum` supplies legacy SHA-1 verification.
+A present but invalid or unsupported integrity value never falls back to shasum.
+An optional expected `ContentDigest` independently pins SHA-256 and must also
+match. Verification runs before parsing or publishing archive content to cache,
+and again on every cache hit.
+
+`register_npm(registry, transport, expected_digest~, acquisition_limits~, limits~,
+cache~, mode~)` registers provider ID `npm`. Repository locations are registry
+base URLs. Obtain artifact keys from `NpmPackageRef::key()`. Both metadata and
+verified content use the common cache; `Offline` forbids transport calls.
+`NpmStep(NpmResolution)` retains registry, exact package/version, tarball URL and
+integrity requirements. Acquisition history retains redirects and compressed
+content SHA-256; resource origins retain the physical entry path. Resolution
+failures retain `NpmRequestStep`.
+
+The [npm registry example](../../examples/npm-registry/README.md) includes a
+complete public model build and an independent library consumer. Default host
+support matches public HTTP: native Linux/macOS/Windows and Node.js with curl.
+Wasm and Wasm GC support the portable provider, integrity and archive code with a
+supplied transport/cache store. Public compatible registries can be configured;
+credentials and private registries remain a separate milestone.
+
+## Pinned Maven JARs
+
+`MavenArchive` acquires a direct JAR from a configured `RepositoryUrl` using
+`MavenCoordinates`: distinct validated `MavenGroupId`, `MavenArtifactId`,
+`MavenVersion` and optional `MavenClassifier` values. It follows the
+[Maven repository layout](https://maven.apache.org/repositories/layout.html):
+`group/segments/artifact/version/artifact-version[-classifier].jar`.
+`MavenCoordinates::path()` returns a distinct `MavenArtifactPath`, separate from
+entry paths inside the JAR. Coordinates use a bounded portable ASCII subset; traversal, URL metacharacters,
+version ranges, `LATEST`, `RELEASE`, `SNAPSHOT` suffixes and timestamped snapshot
+versions are rejected.
+Only JAR artifacts are supported. POMs, transitive dependencies, version selection,
+repository fallback and mutable snapshot metadata are outside this provider.
+Each input explicitly selects one repository; repositories are not searched in
+implicit order. The default configured repository is Maven Central at
+`https://repo.maven.apache.org/maven2`.
+
+A caller-supplied SHA-256 `expected_digest` takes precedence and avoids sidecar
+requests. Otherwise `MavenChecksum::Sha1Sidecar` retrieves `.jar.sha1`, or
+`Sha256Sidecar` retrieves `.jar.sha256`. The CLI defaults to SHA-1 sidecars for
+legacy repository compatibility. These are repository integrity checks; an
+independently supplied SHA-256 pins the expected content. See Maven's
+[checksum strategies](https://maven.apache.org/resolver/expected-checksums.html).
+Sidecars must contain only the bare hexadecimal digest, optionally surrounded by
+whitespace, and are bounded to the smaller of 4 KiB and the acquisition byte
+limit. There is no algorithm fallback, so the chosen sidecar URL and JAR can be
+reused deterministically offline. Missing, malformed or mismatched checksums
+fail before archive parsing. Mismatched JARs never enter the content cache.
+
+`register_maven(registry, transport, checksum~, expected_digest~,
+acquisition_limits~, limits~, cache~, mode~)` registers provider ID `maven`.
+Repository locations are base URLs; keys come from `MavenCoordinates::key()`.
+`MavenStep(MavenResolution)` retains repository, coordinates, JAR URL and a
+structured `MavenVerification`: caller digest or sidecar acquisition plus checksum.
+The common acquisition history records the JAR redirects and SHA-256.
+`MavenRequestStep` retains the requested coordinates when resolution fails.
+The library returns the common ZIP entry tree; Smithy manifest discovery remains
+in the Smithy integration. Host support and cache/offline policy match npm and
+public HTTP.
+
+The [Maven example](../../examples/maven-repository/README.md) builds a model using
+public AWS trait definitions and includes an independent resource consumer.
+
+Stable repository diagnostics include `missing-package-version` for an npm
+package/version 404/410, `missing-artifact` for a Maven JAR or sidecar 404/410,
+`invalid-resolution` for mismatched or malformed metadata/coordinates,
+`unsupported-integrity` for unsupported npm integrity metadata, and the shared
+`authentication-required`, `rate-limited`, `integrity-failure`, cache, transport,
+archive and selection codes. Authentication-required responses do not trigger a
+credential lookup. Private repositories may conceal resources with 404 responses.
+
+The generic `IntegrityVerifier` callback accepted by `acquire` and
+`PublicArchive::open` runs after shared SHA-256 verification and before fresh
+cache publication or archive parsing. Cached content is rehashed first, then the
+callback runs. This lets providers add checksum policies without changing readers
+or other providers. The default verifier performs no additional checks.
+
+API migration: exhaustive `ProvenanceStep` matches must handle
+`NpmRequestStep`, `NpmStep`, `MavenRequestStep` and `MavenStep`; `ResourceCode`
+matches must handle `MissingPackageVersion`, `MissingArtifact` and
+`UnsupportedIntegrity`.
