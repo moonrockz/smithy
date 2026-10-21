@@ -1,5 +1,8 @@
 ///|
-fn fixture_suite(resolved_host~ : Bool = true) -> @protocoltests.Suite raise {
+fn fixture_suite(
+  resolved_host~ : Bool = true,
+  request_id~ : String = "GreetingRequest",
+) -> @protocoltests.Suite raise {
   let source =
     #|$version: "2"
     #|namespace example
@@ -26,6 +29,7 @@ fn fixture_suite(resolved_host~ : Bool = true) -> @protocoltests.Suite raise {
   } else {
     source.replace_all(old="resolvedHost: \"api.example.com\",", new="")
   }
+  let source = source.replace_all(old="GreetingRequest", new=request_id)
   let loaded = @protocoltests.loader()
     .add_idl("fixture.smithy", source)
     .assemble()
@@ -312,5 +316,19 @@ test "empty vendor params preserve the pinned Java warning policy" {
       @protocoltests.Suite::from_model(loaded.model.unwrap()).cases().length(),
       1,
     )
+  }
+}
+
+///|
+test "case IDs use the standard trait grammar rather than shape-ID grammar" {
+  assert_true(@protocoltests.CaseId::parse("__") is Some(_))
+  assert_true(
+    fixture_suite(request_id="__")
+    .cases()
+    .iter()
+    .any(c => c.id().to_string() == "__"),
+  )
+  for invalid in ["a", "_", "0a", "has-dash", "a$b"] {
+    assert_true(@protocoltests.CaseId::parse(invalid) is None)
   }
 }

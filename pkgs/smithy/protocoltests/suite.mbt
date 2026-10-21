@@ -7,11 +7,17 @@ pub(all) suberror SuiteError {
 pub struct CaseId(String) derive(Eq, Debug)
 
 ///|
+/// Validate the pinned test trait's case-ID constraint independently of shape IDs.
 pub fn CaseId::parse(text : String) -> CaseId? {
-  match @smithy.ShapeId::parse("smithy.test#" + text) {
-    Some(id) if id.member_name() is None => Some(CaseId(text))
-    _ => None
+  guard text.length() >= 2 else { return None }
+  let mut first = true
+  for c in text.iter() {
+    let alpha = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+    let digit = c >= '0' && c <= '9'
+    guard alpha || c == '_' || (!first && digit) else { return None }
+    first = false
   }
+  Some(CaseId(text))
 }
 
 ///|
