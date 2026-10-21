@@ -73,14 +73,14 @@ fn PreparedService::finish(
     shape: self.service,
     operation: result.operation,
     offset: None,
-    message: "I reached the request finding limit before reporting every violation.",
+    message: "I reached the message finding limit before reporting every violation.",
   })
   { ..result, findings, complete: false, }
 }
 
 ///|
 /// Validate exactly one JSON-RPC request or notification, without executing it.
-/// Responses, batches and exchanges have no validation entry point in this slice.
+/// Use validate_response for responses. Batches and exchanges are separate checks.
 pub fn PreparedService::validate_request(
   self : PreparedService,
   text : String,

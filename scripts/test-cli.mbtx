@@ -412,6 +412,109 @@ async fn exercise_diff_jsonl(runner : Runner, root : String) -> Unit {
 }
 
 ///|
+async fn exercise_rpc_responses(runner : Runner, root : String, skip_stdin : Bool) -> Unit {
+  let model = @fs.read_file(root + "/examples/json-rpc/responses.smithy").text()
+  @fs.write_file(runner.dir + "/responses.smithy", model)
+  let base = ["validate", "rpc", "--version", "2.0", "--service", "example#Replies", "--response", "reply.json", "responses.smithy", "--diagnostics", "json"]
+  for (version, method_, response, status, code, pointer, shape) in [
+    ("2.0", "subtract", "{\"jsonrpc\":\"2.0\",\"result\":19,\"id\":1}", 0, "", "", ""),
+    ("2.0", "subtract", "{\"jsonrpc\":\"2.0\",\"result\":\"19\",\"id\":1}", 1, "TypeMismatch", "/result", "example#SubtractOutput$value"),
+    ("2.0", "subtract", "{\"jsonrpc\":\"2.0\",\"result\":21,\"id\":1}", 1, "Range", "/result", "example#SubtractOutput$value"),
+    ("2.0", "get_data", "{\"jsonrpc\":\"2.0\",\"result\":[\"hello\",5],\"id\":1}", 0, "", "", ""),
+    ("2.0", "get_data", "{\"jsonrpc\":\"2.0\",\"result\":[],\"id\":1}", 1, "Length", "/result", "example#DataOutput$items"),
+    ("2.0", "get_object", "{\"jsonrpc\":\"2.0\",\"result\":{\"count\":1},\"id\":1}", 0, "", "", ""),
+    ("2.0", "get_object", "{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}", 1, "RequiredMember", "/result/count", "example#ObjectOutput$count"),
+    ("2.0", "ping", "{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":1}", 0, "", "", ""),
+    ("2.0", "ping", "{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}", 1, "TypeMismatch", "/result", "example#Ping"),
+    ("2.0", "subtract", "{\"result\":19,\"id\":1}", 1, "InvalidVersion", "/jsonrpc", "example#Subtract"),
+    ("2.0", "subtract", "{\"jsonrpc\":\"2.0\",\"result\":19}", 1, "InvalidId", "/id", "example#Subtract"),
+    ("2.0", "subtract", "{\"jsonrpc\":\"2.0\",\"result\":19,\"error\":null,\"id\":1}", 1, "InvalidEnvelope", "", "example#Subtract"),
+    ("2.0", "subtract", "{\"jsonrpc\":\"2.0\",\"error\":null,\"id\":1}", 1, "InvalidError", "/error", "example#Subtract"),
+    ("2.0", "subtract", "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":1001,\"message\":\"failure\",\"data\":\"detail\"},\"id\":1}", 0, "", "", ""),
+    ("2.0", "subtract", "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":1001,\"message\":\"failure\",\"data\":1},\"id\":1}", 1, "TypeMismatch", "/error/data", "example#Problem$detail"),
+    ("2.0", "subtract", "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":1002,\"message\":\"failure\"},\"id\":1}", 1, "UnknownError", "/error/code", "example#Subtract"),
+    ("2.0", "subtract", "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Internal error\"},\"id\":1}", 0, "", "", ""),
+    ("1.0", "echo", "{\"result\":\"Hello JSON-RPC\",\"error\":null,\"id\":1}", 0, "", "", ""),
+    ("1.0", "postMessage", "{\"result\":1,\"error\":null,\"id\":99}", 0, "", "", ""),
+    ("1.0", "postMessage", "{\"result\":1,\"error\":null,\"id\":101}", 0, "", "", ""),
+    ("1.0", "subtract", "{\"result\":19,\"error\":null,\"id\":{\"exact\":[9007199254740993]}}", 0, "", "", ""),
+    ("1.0", "subtract", "{\"result\":19,\"id\":1}", 1, "InvalidEnvelope", "", "example#Subtract"),
+    ("1.0", "subtract", "{\"result\":19,\"error\":\"failure\",\"id\":1}", 1, "InvalidEnvelope", "/result", "example#Subtract"),
+  ] {
+    @fs.write_file(runner.dir + "/reply.json", response)
+    let args = base.copy(); args[3] = version
+    let (out, _) = runner.command(args + ["--method", method_], status)
+    guard @json.parse(out) is Object(report) else { fail("Expected one complete response report") }
+    assert_eq(report.get("scope"), Some(Json::string("methodPayload")))
+    assert_eq(report.get("valid"), Some(Json::boolean(status == 0)))
+    if code != "" {
+      guard report.get("findings") is Some(Array([Object(finding), ..])) else { fail("Expected response finding") }
+      assert_eq(finding.get("code"), Some(Json::string(code)))
+      assert_eq(finding.get("pointer"), Some(Json::string(pointer)))
+      assert_eq(finding.get("shape"), Some(Json::string(shape)))
+    }
+  }
+  for (request, response, status, code) in [
+    ("{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,23],\"id\":9007199254740993}", "{\"jsonrpc\":\"2.0\",\"result\":19,\"id\":9007199254740993}", 0, ""),
+    ("{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,23],\"id\":9007199254740993}", "{\"jsonrpc\":\"2.0\",\"result\":19,\"id\":9007199254740992}", 1, "IdMismatch"),
+    ("{\"jsonrpc\":\"2.0\",\"method\":\"foobar\",\"id\":\"1\"}", "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"Method not found\"},\"id\":\"1\"}", 0, ""),
+    ("{\"jsonrpc\":\"2.0\",\"method\":1,\"params\":\"bar\"}", "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null}", 0, ""),
+    ("{\"a\":truX}", "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32700,\"message\":\"Parse error\"},\"id\":null}", 0, ""),
+    ("{\"jsonrpc\":\"2.0\",\"method\":\"ping\"}", "{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":null}", 1, "UnexpectedResponse"),
+  ] {
+    @fs.write_file(runner.dir + "/request.json", request)
+    @fs.write_file(runner.dir + "/reply.json", response)
+    let (out, _) = runner.command(base + ["--request", "request.json"], status)
+    guard @json.parse(out) is Object(report) else { fail("Expected request-context response report") }
+    assert_eq(report.get("scope"), Some(Json::string("requestContext")))
+    if code != "" {
+      guard report.get("findings") is Some(Array([Object(finding), ..])) else { fail("Expected context finding") }
+      assert_eq(finding.get("code"), Some(Json::string(code)))
+    }
+  }
+  @fs.write_file(runner.dir + "/reply.json", "{\"jsonrpc\":\"2.0\",\"result\":\"unchecked\",\"id\":1}")
+  let (missing, _) = runner.command(base, 1)
+  assert_true(missing.contains("MissingContext"))
+  let (limited, _) = runner.command(base + ["--envelope-only"], 0)
+  assert_true(limited.contains("LimitedScope") && limited.contains("\"scope\":\"envelope\""))
+  runner.command(base + ["--operation", "example#Subtract"], 1) |> ignore
+  let text_args = base[:9].to_owned()
+  let (out, stderr) = runner.command(text_args + ["--method", "subtract"], 1)
+  // moonrun's wasm-gc print host routes eprintln through stdout.
+  let err = if runner.target == "wasm-gc" { out + stderr } else { stderr }
+  assert_true(err.contains("/result") && err.contains("TypeMismatch"))
+  @fs.write_file(runner.dir + "/reply.json", "{\"result\":null,\"error\":{\"code\":1001,\"message\":\"failed\",\"data\":1},\"id\":1}")
+  let legacy = base.copy(); legacy[3] = "1.0"
+  let (out, _) = runner.command(legacy + ["--method", "subtract", "--legacy-errors", "code-message-data"], 1)
+  assert_true(out.contains("/error/data") && out.contains("example#Problem$detail"))
+  let (out, _) = runner.command(legacy + ["--method", "subtract"], 0)
+  assert_true(out.contains("LimitedScope") && out.contains("legacyError"))
+  @fs.write_file(runner.dir + "/request.json", "{\"method\":\"subtract\",\"params\":[42,23],\"id\":{\"exact\":[9007199254740993]}}")
+  @fs.write_file(runner.dir + "/reply.json", "{\"result\":19,\"error\":null,\"id\":{\"exact\":[9007199254740993]}}")
+  runner.command(legacy + ["--request", "request.json"], 0) |> ignore
+  @fs.write_file(runner.dir + "/reply.json", "{\"result\":19,\"error\":null,\"id\":{\"exact\":[9007199254740992]}}")
+  let (out, _) = runner.command(legacy + ["--request", "request.json"], 1)
+  assert_true(out.contains("IdMismatch"))
+  for (method_, params) in [("subtract", "[42,\"bad\"]"), ("missing", "[]")] {
+    @fs.write_file(runner.dir + "/request.json", "{\"method\":\"" + method_ + "\",\"params\":" + params + ",\"id\":1}")
+    @fs.write_file(runner.dir + "/reply.json", "{\"result\":null,\"error\":\"legacy failure\",\"id\":1}")
+    runner.command(legacy + ["--request", "request.json"], 0) |> ignore
+    @fs.write_file(runner.dir + "/reply.json", "{\"result\":19,\"error\":null,\"id\":1}")
+    let (out, _) = runner.command(legacy + ["--request", "request.json"], 1)
+    assert_true(out.contains("InvalidContext"))
+  }
+  let missing_file = base.copy(); missing_file[7] = "missing-reply.json"
+  runner.command(missing_file + ["--envelope-only"], 1) |> ignore
+  runner.command(base + ["--request", "missing-request.json"], 1) |> ignore
+  if !skip_stdin && (runner.target != "wasm-gc" || @env.get_env_var("OS") != Some("Windows_NT")) {
+    let request_stdin = base + ["--request", "-"]
+    @fs.write_file(runner.dir + "/reply.json", "{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":1}")
+    runner.command(request_stdin, 0, input="{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":1}") |> ignore
+    let response_stdin = base.copy(); response_stdin[7] = "-"
+    runner.command(response_stdin + ["--method", "ping"], 0, input="{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":1}") |> ignore
+  }
+}
+
 async fn exercise_rpc(runner : Runner, root : String, skip_stdin : Bool) -> Unit {
   let model = @fs.read_file(root + "/examples/json-rpc/calculator.smithy").text()
   @fs.write_file(runner.dir + "/rpc.smithy", model)
@@ -464,7 +567,7 @@ async fn exercise_rpc(runner : Runner, root : String, skip_stdin : Bool) -> Unit
   let double_stdin = legacy.copy(); double_stdin[7] = "-"; double_stdin[8] = "-"
   runner.command(double_stdin + ["--from", "idl"], 2) |> ignore
   @fs.write_file(runner.dir + "/bad-value.json", "{\"a\":truX}")
-  let (out, _) = runner.command(["validate-value", "--shape", "example#Example", "--value", "bad-value.json", "--diagnostics", "json", "input.smithy"], 1)
+  let (out, _) = runner.command(["validate", "value", "--shape", "example#Example", "--value", "bad-value.json", "--diagnostics", "json", "input.smithy"], 1)
   guard @json.parse(out) is { "findings": [ { "offset": Number(offset, ..), .. }, .. ], .. } else { fail("Expected value parse offset") }
   assert_eq(offset, 8.0)
 }
@@ -506,6 +609,7 @@ async fn exercise(
   let input = "$version: \"2\"\nmetadata values = [9007199254740993]\nnamespace example\n// comment\nstructure  Example {\nname : String\n}\n"
   @fs.write_file("\{dir}/input.smithy", input)
   exercise_rpc(runner, root, skip_stdin)
+  exercise_rpc_responses(runner, root, skip_stdin)
   @fs.write_file(
     "\{dir}/broken.smithy",
     "$version: \"2\"\nnamespace example\nstructure Broken { x: Missing }",
@@ -538,12 +642,13 @@ async fn exercise(
   assert_true(version.has_prefix("smithy "))
   let (help, _) = runner.command(["--help"], 0)
   assert_true(help.contains("Usage: smithy") && help.contains("Commands:"))
+  assert_false(help.contains("validate-value"))
   for args in [[], ["help"], ["-h"]] {
     let (out, _) = runner.command(args, 0)
     assert_eq(out, help)
   }
   for command in [
-    "ast", "validate", "validate-value", "select", "diff", "format", "convert", "build", "clean", "version",
+    "ast", "validate", "select", "diff", "format", "convert", "build", "clean", "version",
   ] {
     let (help, _) = runner.command([command, "--help"], 0)
     assert_true(help.contains("Usage: smithy \{command}"))
@@ -560,9 +665,17 @@ async fn exercise(
       assert_false(help.contains("--stream"))
     }
   }
+  for args in [["validate", "value", "--help"], ["validate", "value", "-h"], ["help", "validate", "value"]] {
+    let (help, _) = runner.command(args, 0)
+    assert_true(help.contains("Usage: smithy validate value") && help.contains("--shape") && help.contains("--value"))
+    assert_false(help.contains("--service"))
+  }
+  runner.command(["validate-value"], 2) |> ignore
   let value_model = "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }\n"
   @fs.write_file("\{dir}/value-model.smithy", value_model)
-  let value_args = ["validate-value", "--shape", "example#Input", "--value", "value.json", "value-model.smithy"]
+  let value_args = ["validate", "value", "--shape", "example#Input", "--value", "value.json", "value-model.smithy"]
+  runner.command(["validate", "--from", "json", "value"] + value_args[2:].to_owned(), 2) |> ignore
+  runner.command(["validate", "value-model.smithy", "value"] + value_args[2:].to_owned(), 2) |> ignore
   for (text, expected_code, finding) in [
     ("{\"count\":2}", 0, ""),
     ("{\"count\":0}", 1, "Range"),
@@ -589,7 +702,7 @@ async fn exercise(
   }
   @fs.write_file("\{dir}/value.json", "{\"count\":2}")
   @fs.write_file("\{dir}/timestamp.smithy", "$version: \"2\"\nnamespace example\n@timestampFormat(\"date-time\")\ntimestamp Time\nstructure Input { @required at: Time }\n")
-  let timestamp_args = ["validate-value", "--shape", "example#Input", "--value", "timestamp.json", "timestamp.smithy"]
+  let timestamp_args = ["validate", "value", "--shape", "example#Input", "--value", "timestamp.json", "timestamp.smithy"]
   for (text, expected_code) in [
     ("2016-12-31T23:59:60Z", 0),
     ("2017-01-01T05:29:60.5+05:30", 0),
@@ -611,24 +724,24 @@ async fn exercise(
       assert_eq(finding.get("shape"), Some(Json::string("example#Input$at")))
     }
   }
-  runner.command(["validate-value", "--shape", "example#Missing", "--value", "value.json", "value-model.smithy"], 2) |> ignore
-  runner.command(["validate-value", "--shape", "not-an-id", "--value", "value.json", "value-model.smithy"], 2) |> ignore
-  runner.command(["validate-value", "--shape", "example#Input", "value-model.smithy"], 2) |> ignore
+  runner.command(["validate", "value", "--shape", "example#Missing", "--value", "value.json", "value-model.smithy"], 2) |> ignore
+  runner.command(["validate", "value", "--shape", "not-an-id", "--value", "value.json", "value-model.smithy"], 2) |> ignore
+  runner.command(["validate", "value", "--shape", "example#Input", "value-model.smithy"], 2) |> ignore
   runner.command(value_args + ["--diagnostics", "xml"], 2) |> ignore
-  runner.command(["validate-value", "--shape", "example#Input", "--value", "missing.json", "value-model.smithy"], 1) |> ignore
+  runner.command(["validate", "value", "--shape", "example#Input", "--value", "missing.json", "value-model.smithy"], 1) |> ignore
   if !skip_stdin && (target != "wasm-gc" || @env.get_env_var("OS") != Some("Windows_NT")) {
-    runner.command(["validate-value", "--shape", "example#Input", "--value", "-", "value-model.smithy"], 0, input="{\"count\":2}") |> ignore
-    runner.command(["validate-value", "--shape", "example#Input", "--value", "value.json", "--from", "idl", "-"], 0, input=value_model) |> ignore
+    runner.command(["validate", "value", "--shape", "example#Input", "--value", "-", "value-model.smithy"], 0, input="{\"count\":2}") |> ignore
+    runner.command(["validate", "value", "--shape", "example#Input", "--value", "value.json", "--from", "idl", "-"], 0, input=value_model) |> ignore
   }
-  runner.command(["validate-value", "--shape", "example#Input", "--value", "-", "--from", "idl", "-"], 2) |> ignore
+  runner.command(["validate", "value", "--shape", "example#Input", "--value", "-", "--from", "idl", "-"], 2) |> ignore
   @fs.write_file("\{dir}/precise.smithy", "$version: \"2\"\nnamespace example\n@range(min: 0.10000000000000000001)\nbigDecimal Precise\n")
   @fs.write_file("\{dir}/precise.json", "0.10000000000000000000")
-  runner.command(["validate-value", "--shape", "example#Precise", "--value", "precise.json", "precise.smithy"], 1) |> ignore
+  runner.command(["validate", "value", "--shape", "example#Precise", "--value", "precise.json", "precise.smithy"], 1) |> ignore
   assert_eq(@fs.read_file("\{dir}/value-model.smithy").text(), value_model)
-  let (invalid_model, _) = runner.command(["validate-value", "--shape", "example#Broken", "--value", "value.json", "--diagnostics", "json", "broken.smithy"], 1)
+  let (invalid_model, _) = runner.command(["validate", "value", "--shape", "example#Broken", "--value", "value.json", "--diagnostics", "json", "broken.smithy"], 1)
   guard @json.parse(invalid_model) is Object(model_result) && model_result.get("findings") is Some(Array([Object(model_finding), ..])) else { fail("Expected model diagnostics") }
   assert_eq(model_finding.get("source"), Some(Json::string("broken.smithy")))
-  let (missing_model, missing_model_err) = runner.command(["validate-value", "--shape", "example#Input", "--value", "value.json", "--diagnostics", "json", "missing.smithy"], 1)
+  let (missing_model, missing_model_err) = runner.command(["validate", "value", "--shape", "example#Input", "--value", "value.json", "--diagnostics", "json", "missing.smithy"], 1)
   guard @json.parse(missing_model) is Object(missing_result) && missing_result.get("findings") is Some(Array([Object(missing_finding), ..])) else { fail("Expected structured model read diagnostics") }
   assert_eq(missing_finding.get("source"), Some(Json::string("missing.smithy")))
   assert_eq(missing_finding.get("code"), Some(Json::string("InputRead")))
@@ -636,7 +749,7 @@ async fn exercise(
   for (configuration, severity) in [("selector: \"structure\"", "DANGER"), ("selector: \"[\"", "ERROR")] {
     @fs.write_file("\{dir}/value-invalid-event.smithy", "$version: \"2\"\nmetadata validators = [{name: \"EmitEachSelector\", configuration: {" + configuration + "}}]\nnamespace example\nstructure Input {}\n")
     @fs.write_file("\{dir}/value-empty.json", "{}")
-    let (event_out, event_err) = runner.command(["validate-value", "--shape", "example#Input", "--value", "value-empty.json", "--diagnostics", "json", "value-invalid-event.smithy"], 1)
+    let (event_out, event_err) = runner.command(["validate", "value", "--shape", "example#Input", "--value", "value-empty.json", "--diagnostics", "json", "value-invalid-event.smithy"], 1)
     guard @json.parse(event_out) is Object(event_result) && event_result.get("findings") is Some(Array([Object(event_finding), ..])) else { fail("Expected model validation event") }
     assert_eq(event_finding.get("severity"), Some(Json::string(severity)))
     assert_eq(event_result.get("valid"), Some(Json::boolean(false)))

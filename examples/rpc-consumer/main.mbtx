@@ -1,4 +1,4 @@
-/// Validate JSON-RPC requests with the standalone library.
+/// Validate JSON-RPC requests and responses with the standalone library.
 import {
   "moonrockz/smithy@0.5.0",
   "moonrockz/smithy-validation@0.5.0/rpc",
@@ -14,5 +14,11 @@ fn main raise {
   assert_true(good.is_valid())
   assert_false(bad.is_valid())
   assert_eq(bad.findings[0].path.pointer(), "/params/0")
+  let reply = service.validate_response("{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":9007199254740993}", context=Some(@rpc.OriginalRequest("{\"jsonrpc\":\"2.0\",\"method\":\"count\",\"params\":[2],\"id\":9007199254740993}")))
+  assert_true(reply.is_valid())
+  assert_eq(reply.scope, @rpc.RequestContext)
+  let wrong_reply = service.validate_response("{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":9007199254740992}", context=Some(@rpc.OriginalRequest("{\"jsonrpc\":\"2.0\",\"method\":\"count\",\"params\":[2],\"id\":9007199254740993}")))
+  assert_false(wrong_reply.is_valid())
+  assert_eq(wrong_reply.findings[0].code, @rpc.IdMismatch)
   println("rpc valid=\{good.is_valid()} invalid=\{bad.findings[0].code.to_string()} at \{bad.findings[0].path.pointer()}")
 }

@@ -37,10 +37,14 @@ Use `smithy --help` for the command list, and `smithy convert --help` or
 `--help`. Options accept both `--to json` and `--to=json`; output also accepts
 `-o model.json` and `-omodel.json`.
 
+Compound commands use subcommands: `smithy validate value` and `smithy validate rpc`.
+`validate value` replaces the former `validate-value` command. Put its options and
+model inputs after `value`, or after `rpc` for JSON-RPC validation.
+
 ```shell
 smithy ast model.smithy extra.json
 smithy validate model.smithy extra.json
-smithy validate-value --shape example#Input --value request.json model.smithy
+smithy validate value --shape example#Input --value request.json model.smithy
 smithy validate rpc --version 2.0 --service example#Calculator --message call.json api.smithy
 smithy diff --old previous/ --new current/
 smithy build --config smithy-build.json
@@ -329,7 +333,7 @@ mise exec -- moon run apps/smithy --target js -- build --config examples/public-
 
 ## Validate application values
 
-`validate` checks Smithy model definitions. `validate-value` checks application JSON against a selected
+`validate` checks Smithy model definitions. `validate value` checks application JSON against a selected
 assembled data shape, using the same engine as the `moonrockz/smithy-validation` library.
 
 ```smithy
@@ -346,8 +350,8 @@ structure Input {
 Save that model as `model.smithy` and a value such as `{"count":2}` as `request.json`:
 
 ```shell
-smithy validate-value --shape example#Input --value request.json model.smithy
-smithy validate-value --shape example#Input --value request.json --diagnostics json model.smithy
+smithy validate value --shape example#Input --value request.json model.smithy
+smithy validate value --shape example#Input --value request.json --diagnostics json model.smithy
 ```
 
 The first command succeeds quietly. With `{"count":0}`, it reports a `Range` finding at `/count` on
@@ -368,21 +372,32 @@ Exact numeric tokens survive parsing, including decimals and integers above Doub
 The [library policies](../../pkgs/smithy-validation/README.mbt.md) document nulls, sparse collections,
 scalar formats, regex restrictions and unsupported runtime contract conditions.
 
-## Validate JSON-RPC requests
+## Validate JSON-RPC messages
 
-`smithy validate rpc` checks a JSON-RPC 1.0 or 2.0 request or notification against a selected
+`smithy validate rpc` checks a JSON-RPC 1.0 or 2.0 request, notification or contextual response against a selected
 Smithy service. The command loads the optional `smithy.rpc` traits automatically.
 
 ```shell
 smithy validate rpc --version 2.0 --service example#Calculator --message call.json api.smithy
 smithy validate rpc --version 2.0 --service example#Calculator --message invalid.json --diagnostics json api.smithy
+smithy validate rpc --version 2.0 --service example#Calculator --response reply.json --method subtract api.smithy
+smithy validate rpc --version 2.0 --service example#Calculator --response reply.json --request call.json --diagnostics json api.smithy
 ```
 
 Invalid messages exit 1; invalid command options or service mappings exit 2. ID advisories
 alone still exit 0. JSON diagnostics include exact message paths, operation and member IDs,
-and parse offsets. Responses, batches and exchanges remain unsupported by this command.
+and parse offsets. Batches and exchanges remain unsupported by this command.
 See the [RPC library and runnable calculator examples](../../pkgs/smithy-validation/rpc/README.mbt.md)
 for trait definitions, version rules, parameter mapping, stdin and dependency isolation.
+
+Response mode uses `--response` in place of `--message`. Supply exactly one context option:
+`--method` for a wire method, `--operation` for a Smithy operation ID, `--request` for the original
+request file, or explicit `--envelope-only`. Missing context fails. Only original-request context
+checks exact ID correlation and whether the supplied notification can have a response. Envelope-only
+mode emits a `LimitedScope` advisory and does not check modeled payloads. JSON diagnostics emit
+one complete stdout report with `scope`, `kind`, `operation`, exact ID and structured findings.
+Version 1.0 errors remain opaque by default; `--legacy-errors code-message-data` opts into modeled
+application error data checks. Only one model/message/response/original-request input can use stdin.
 
 ## Public GitHub release assets
 

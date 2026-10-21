@@ -38,6 +38,7 @@ and test. `mise run check` runs lint, validate, test and build, which is what CI
 - Commits use Conventional Commits, in plain English, with no AI attribution and no `Co-Authored-By` lines.
 - Run `mise run format` before you commit MoonBit code.
 - New packages go under `pkgs/` (libraries) or `apps/` (executables), and into `moon.work`.
+- Compound CLI commands use nested subcommands, such as `smithy validate value` and `smithy validate rpc`.
 
 ## Domain modeling
 
