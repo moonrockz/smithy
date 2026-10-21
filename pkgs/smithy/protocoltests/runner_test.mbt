@@ -294,3 +294,23 @@ test "a caller cannot replace standard traits with a weaker definition" {
   }
   assert_true(rejected)
 }
+
+///|
+test "empty vendor params preserve the pinned Java warning policy" {
+  for vendor in ["", ", vendorParams: {}"] {
+    let source = "$version: \"2\"\nnamespace example\n@trait @protocolDefinition structure Protocol {}\nstructure Vendor { @required count: Integer }\n@smithy.test#httpRequestTests([{id: \"VendorCase\", protocol: Protocol, method: \"POST\", uri: \"/\", vendorParamsShape: Vendor" +
+      vendor +
+      "}])\noperation Test {}"
+    let loaded = @protocoltests.loader()
+      .add_idl("vendor.smithy", source)
+      .assemble()
+    let events = loaded.validation_events()
+    assert_eq(events.map(e => e.id + "|" + e.severity), [
+      "HttpRequestTestsInput|WARNING",
+    ])
+    assert_eq(
+      @protocoltests.Suite::from_model(loaded.model.unwrap()).cases().length(),
+      1,
+    )
+  }
+}

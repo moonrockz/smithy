@@ -11,6 +11,10 @@ model, input/output/error params, and vendor params. Request and response IDs
 have separate uniqueness scopes, independent of protocol. Native params use
 plain-text blobs, epoch-second timestamps and optional nulls.
 
+When `vendorParamsShape` is set, omitted or explicitly empty `vendorParams` emits
+a warning, matching the pinned Java validator. Nonempty vendor params are checked
+against that shape.
+
 `Suite::from_model(model)` reassembles a snapshot with the standard trait contract
 and refuses error or danger events. Each case retains a
 validated `CaseId`, protocol `ShapeId` and `Subject` distinguishing operation
