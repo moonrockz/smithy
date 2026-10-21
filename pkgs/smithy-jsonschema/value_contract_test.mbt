@@ -102,3 +102,87 @@ test "value schemas preserve member replacement constraints and closed union car
     },
   )
 }
+
+///|
+test "value schemas constrain every primitive prelude scalar and its intrinsic bounds" {
+  let loaded = @smithy.Loader::new()
+    .add_idl(
+      "primitives.smithy",
+      (
+        #|$version: "2"
+        #|namespace primitives
+        #|structure Input {
+        #| @default(false) flag: PrimitiveBoolean
+        #| @default(0) byte: PrimitiveByte
+        #| @default(0) short: PrimitiveShort
+        #| @default(0) integer: PrimitiveInteger
+        #| @default(0) long: PrimitiveLong
+        #| @default(0) float: PrimitiveFloat
+        #| @default(0) double: PrimitiveDouble
+        #| @default(0) @range(min: 1) bounded: PrimitiveInteger
+        #|}
+      ),
+    )
+    .assemble()
+  assert_false(loaded.has_errors())
+  let index = @jsonschema.SchemaIndex::for_values(loaded.model.unwrap())
+  for
+    (name, expected) in [
+      ("flag", "boolean"),
+      ("byte", "integer"),
+      ("short", "integer"),
+      ("integer", "integer"),
+      ("long", "integer"),
+      ("float", "number"),
+      ("double", "number"),
+    ] {
+    let schema = index.schema_for_member(
+      @smithy.ShapeId::parse("primitives#Input$" + name).unwrap(),
+    )
+    assert_true(
+      schema is Object(fields) &&
+      fields.get("type") == Some(Json::string(expected)),
+    )
+    if name != "flag" {
+      assert_true(
+        schema is Object(fields) &&
+        fields.contains("minimum") &&
+        fields.contains("maximum"),
+      )
+    }
+  }
+  assert_true(
+    index.schema_for_member(
+      @smithy.ShapeId::parse("primitives#Input$bounded").unwrap(),
+    )
+    is { "minimum": Number(1, ..), "maximum": Number(2147483647, ..), .. },
+  )
+}
+
+///|
+test "value schemas explicitly reject union strategies that discard member contracts" {
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "union.smithy",
+    (
+      #|$version: "2"
+      #|namespace choices
+      #|union Choice { text: String, count: Integer }
+    ),
+  )
+  .assemble().model.unwrap()
+  for strategy in ["structure", "object"] {
+    let settings = @jsonschema.Config::new(union_strategy=strategy)
+    let mut rejected = false
+    ignore(@jsonschema.SchemaIndex::for_values(model, config=settings)) catch {
+      @jsonschema.InvalidConfiguration(message) => {
+        rejected = true
+        assert_true(message.contains("oneOf"))
+      }
+      _ => fail("Expected unsupported value profile option")
+    }
+    assert_true(rejected)
+    // The reference-compatible API still supports its existing strategies.
+    assert_true(@jsonschema.convert(model, config=settings) is Object(_))
+  }
+}

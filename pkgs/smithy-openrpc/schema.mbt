@@ -43,14 +43,48 @@ fn schema_policy(
             warnings.push({ code: SchemaLimitation, shape: subject, message, })
           }
         }
-        for _, value in entries {
-          pending.push(value)
-        }
+        pending.append(schema_children(entries))
       }
       Array(values) => pending.append(values)
       _ => ()
     }
   }
+}
+
+///|
+/// Schema keywords distinguish schemas from property-name dictionaries and
+/// literal data. A property can have any name, including a schema keyword.
+fn schema_children(entries : Map[String, Json]) -> Array[Json] {
+  let children : Array[Json] = []
+  for key in ["properties", "patternProperties", "definitions", "$defs"] {
+    if entries.get(key) is Some(Object(schemas)) {
+      for _, schema in schemas {
+        children.push(schema)
+      }
+    }
+  }
+  for
+    key in [
+      "additionalProperties", "additionalItems", "contains", "not", "if", "then",
+      "else", "propertyNames", "items",
+    ] {
+    if entries.get(key) is Some(schema) {
+      children.push(schema)
+    }
+  }
+  for key in ["allOf", "anyOf", "oneOf"] {
+    if entries.get(key) is Some(Array(schemas)) {
+      children.append(schemas)
+    }
+  }
+  if entries.get("dependencies") is Some(Object(dependencies)) {
+    for _, schema in dependencies {
+      if schema is Object(_) || schema is False || schema is True {
+        children.push(schema)
+      }
+    }
+  }
+  children
 }
 
 ///|
@@ -144,9 +178,7 @@ fn collect_refs(value : Json) -> Array[String] {
         if entries.get("$ref") is Some(String(reference)) {
           refs.push(reference)
         }
-        for _, value in entries {
-          pending.push(value)
-        }
+        pending.append(schema_children(entries))
       }
       Array(values) => pending.append(values)
       _ => ()

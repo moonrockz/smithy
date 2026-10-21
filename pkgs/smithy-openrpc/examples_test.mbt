@@ -93,3 +93,52 @@ test "invalid modeled examples fail with the affected operation instead of publi
   }
   assert_true(rejected)
 }
+
+///|
+test "unknown example members fail before positional selection or JSON name remapping" {
+  for mode in ["positional", "named", "either"] {
+    let loaded = @rpc.loader()
+      .add_idl(
+        "unknown.smithy",
+        (
+          #|$version: "2"
+          #|namespace unknown
+          #|use smithy.rpc#jsonRpc
+          #|use smithy.rpc#method
+          #|@jsonRpc(versions: ["2.0"])
+          #|service Api { version: "1", operations: [Op] }
+        ) +
+        "\n@method(name: \"op\", params: \"" +
+        mode +
+        "\"" +
+        (if mode == "named" { "" } else { ", positional: [\"value\"]" }) +
+        ", nullResult: true)\n" +
+        (
+          #|@examples([{title:"unknown",input:{value:"hello",typo:"silently lost"}}])
+          #|operation Op { input: Input }
+          #|structure Input { @jsonName("typo") value: String }
+        ),
+      )
+      .assemble()
+    let model = loaded.model.unwrap()
+    for naming in [@validation.Smithy, @validation.JsonName] {
+      let mut rejected = false
+      ignore(
+        @openrpc.convert(
+          model,
+          @openrpc.Config::new(
+            @openrpc.ServiceId::parse("unknown#Api").unwrap(),
+            member_names=naming,
+          ),
+        ),
+      ) catch {
+        @openrpc.InvalidContract(_, message) => {
+          rejected = true
+          assert_true(message.contains("typo"))
+        }
+        _ => fail("Expected invalid modeled example")
+      }
+      assert_true(rejected)
+    }
+  }
+}

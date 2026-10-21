@@ -189,3 +189,22 @@ fn value_collection_contract(
     }
   }
 }
+
+///|
+fn value_prelude_kind(target : String) -> String {
+  match target {
+    "smithy.api#String" => "string"
+    "smithy.api#Blob" => "blob"
+    "smithy.api#Boolean" | "smithy.api#PrimitiveBoolean" => "boolean"
+    "smithy.api#Byte" | "smithy.api#PrimitiveByte" => "byte"
+    "smithy.api#Short" | "smithy.api#PrimitiveShort" => "short"
+    "smithy.api#Integer" | "smithy.api#PrimitiveInteger" => "integer"
+    "smithy.api#Long" | "smithy.api#PrimitiveLong" => "long"
+    "smithy.api#Float" | "smithy.api#PrimitiveFloat" => "float"
+    "smithy.api#Double" | "smithy.api#PrimitiveDouble" => "double"
+    "smithy.api#BigInteger" => "bigInteger"
+    "smithy.api#BigDecimal" => "bigDecimal"
+    "smithy.api#Timestamp" => "timestamp"
+    _ => "document"
+  }
+}

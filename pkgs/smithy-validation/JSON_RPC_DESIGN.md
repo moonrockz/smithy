@@ -207,7 +207,7 @@ A build plugin named `openrpc` writes deterministic `openrpc.json`. Settings sel
 info metadata, naming and extension policy. Use the existing JSON Schema converter/reference index
 with `#/components/schemas`, preserving effective member constraints and valid references.
 `PreparedService::contracts()` supplies detached, sorted method/error mappings to the exporter.
-JSON Schema's opt-in `value_contracts` mode preserves runtime member replacement semantics,
+JSON Schema's opt-in `SchemaIndex::for_values` and `convert_values` APIs preserve runtime member replacement semantics,
 intrinsic numeric bounds, closed structures, union cardinality and sparse collections. Recursive
 constrained members receive collision-checked shared definitions rather than recursive expansion.
 

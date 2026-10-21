@@ -30,7 +30,14 @@ fn example_value(
             depth + 1,
           )
         } else {
-          out[name] = value
+          raise InvalidContract(
+            id,
+            "I found unknown modeled example member `" +
+            name +
+            "` on `" +
+            target.id.to_string() +
+            "`.",
+          )
         }
       }
       @smithy.Object(out)

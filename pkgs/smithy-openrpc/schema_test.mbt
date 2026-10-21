@@ -197,3 +197,47 @@ test "an empty top-level JSON wire name cannot become an invalid OpenRPC descrip
     is { "openrpc": String("1.3.2"), .. },
   )
 }
+
+///|
+test "extension policies preserve properties whose wire names match schema metadata" {
+  let loaded = @rpc.loader()
+    .add_idl(
+      "names.smithy",
+      (
+        #|$version: "2"
+        #|namespace metadata
+        #|use smithy.rpc#jsonRpc
+        #|use smithy.rpc#method
+        #|@jsonRpc(versions: ["2.0"])
+        #|service Api { version: "1", operations: [Op] }
+        #|@method(name: "op", params: "named")
+        #|operation Op { output: Output }
+        #|structure Output { @required @jsonName("x-smithy-byteLength") value: String }
+      ),
+    )
+    .assemble()
+  assert_false(loaded.has_errors())
+  for policy in [@openrpc.Preserve, @openrpc.Omit] {
+    let converted = @openrpc.convert_result(
+      loaded.model.unwrap(),
+      @openrpc.Config::new(
+        @openrpc.ServiceId::parse("metadata#Api").unwrap(),
+        member_names=@validation.JsonName,
+        extensions=policy,
+      ),
+    )
+    assert_true(
+      object(method_(converted.document, "op")["result"])["schema"]
+      is {
+        "properties": {
+          "x-smithy-byteLength": { "type": String("string"), .. },
+          ..
+        },
+        ..
+      },
+    )
+    assert_false(
+      converted.warnings.iter().any(w => w.code == @openrpc.SchemaLimitation),
+    )
+  }
+}

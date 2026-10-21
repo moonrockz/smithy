@@ -166,20 +166,24 @@ fn target_schema(
   if target.has_prefix("smithy.api#") {
     let parts = target.split("#").to_array()
     let kind = if parts.length() == 2 { parts[1].to_owned() } else { "" }
-    let keyword = match kind {
-      "String" => "string"
-      "Blob" => "blob"
-      "Boolean" => "boolean"
-      "Byte" => "byte"
-      "Short" => "short"
-      "Integer" => "integer"
-      "Long" => "long"
-      "Float" => "float"
-      "Double" => "double"
-      "BigInteger" => "bigInteger"
-      "BigDecimal" => "bigDecimal"
-      "Timestamp" => "timestamp"
-      _ => "document"
+    let keyword = if config.value_contracts {
+      value_prelude_kind(target)
+    } else {
+      match kind {
+        "String" => "string"
+        "Blob" => "blob"
+        "Boolean" => "boolean"
+        "Byte" => "byte"
+        "Short" => "short"
+        "Integer" => "integer"
+        "Long" => "long"
+        "Float" => "float"
+        "Double" => "double"
+        "BigInteger" => "bigInteger"
+        "BigDecimal" => "bigDecimal"
+        "Timestamp" => "timestamp"
+        _ => "document"
+      }
     }
     if keyword == "timestamp" {
       if config.settings.default_timestamp_format == "date-time" {
@@ -334,11 +338,7 @@ fn member_schema(
     }
   }
   if config.value_contracts && target.has_prefix("smithy.api#") {
-    let kind = match target {
-      "smithy.api#BigInteger" => "bigInteger"
-      "smithy.api#BigDecimal" => "bigDecimal"
-      _ => target.split("#").to_array()[1].to_owned().to_lower()
-    }
+    let kind = value_prelude_kind(target)
     value_numeric_bounds(schema, kind)
     if kind == "blob" {
       let traits = match entry {
@@ -775,6 +775,7 @@ fn convert_with_profile(
   value_contracts~ : Bool = false,
 ) -> Json raise {
   let config : ConversionConfig = { settings: config, value_contracts, }
+  validate_value_config(config)
   if !["propertyNames", "patternProperties"].contains(
       config.settings.map_strategy,
     ) ||

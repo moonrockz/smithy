@@ -38,6 +38,8 @@ them. Shared data and constrained member variants use definitions so recursive
 collections remain finite. It does not change the reference-compatible defaults.
 Wire-specific limitations such as decoded blob lengths and timestamp policies
 still require the exporting protocol's diagnostics and extensions.
+Value conversion requires `union_strategy="oneOf"`; other union strategies
+raise `InvalidConfiguration` because they discard runtime member contracts.
 
 ## Build plugin
 

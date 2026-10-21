@@ -115,6 +115,7 @@ pub fn SchemaIndex::shape(
     settings: config.unwrap_or(self.config),
     value_contracts: self.value_contracts,
   }
+  validate_value_config(effective)
   if id.to_string() == "smithy.api#Unit" {
     return if effective.value_contracts {
       Json::object({
@@ -143,6 +144,7 @@ pub fn SchemaIndex::schema_for_member(
     settings: config.unwrap_or(self.config),
     value_contracts: self.value_contracts,
   }
+  validate_value_config(effective)
   guard id.member_name() is Some(name) &&
     self.shapes.get(id.root().to_string()) is Some(Object(parent)) else {
     raise InvalidConfiguration("Unknown schema member `" + id.to_string() + "`")
