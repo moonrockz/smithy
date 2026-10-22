@@ -187,7 +187,8 @@ jobs:
   # only on a push to main and a manual run, and only when no trusted run has smoked the same inputs
   # (scripts/smoke.mbtx). A change outside the inputs, such as docs or tests, carries the evidence
   # forward. Pull requests skip both jobs: the Release workflow smokes release-file changes, and a
-  # release always smokes the bytes that it publishes.
+  # release always smokes the bytes that it publishes. On main, a failed smoke files or updates the
+  # `smoke-breach` issue, and a passing smoke closes it.
   smoke-plan:
     name: Smoke evidence
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -236,13 +237,15 @@ jobs:
     if: needs.smoke-plan.outputs.evidence != 'true'
     uses: ./.github/workflows/smoke.yml
     permissions:
+      actions: read
+      checks: read
       contents: read
       issues: write
     with:
       version: ${{ needs.smoke-plan.outputs.version }}
       fingerprint: ${{ needs.smoke-plan.outputs.fingerprint }}
       record: true
-      report-failure: ${{ github.event_name == 'push' }}
+      breach-issues: ${{ github.ref == 'refs/heads/main' }}
 
   # The only check that branch protection needs. Add every new job to `needs`.
   # `if: always()` is required: without it this job is skipped when a needed job fails, and

@@ -215,8 +215,12 @@ description = "Write the smoke evidence for a dist/ that passed smoke (args: dis
 run = "moonx scripts/smoke.mbtx record"
 
 [tasks."smoke:report"]
-description = "Open the 'Smoke failed on main' issue, or comment on the open one (needs GH_TOKEN; CI only)"
-run = "moonx scripts/smoke.mbtx report"
+description = "File or update the smoke-breach issue for the failed smoke of this run; the same breach changes nothing (needs GH_TOKEN, FINGERPRINT, VERSION; CI only)"
+run = "moonx scripts/smoke-breach.mbtx report"
+
+[tasks."smoke:resolve"]
+description = "Close the open smoke-breach issues after a passing smoke (needs GH_TOKEN; CI only)"
+run = "moonx scripts/smoke-breach.mbtx resolve"
 
 [tasks."release:github"]
 description = "Create the GitHub release from dist/, or upload the assets it lacks (args: X.Y.Z; needs GITHUB_SHA and RUNNER_TEMP)"

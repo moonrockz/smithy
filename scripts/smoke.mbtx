@@ -9,10 +9,9 @@
 ///   smoke.mbtx fingerprint            print the fingerprint and the version; write them to GITHUB_OUTPUT
 ///   smoke.mbtx inputs                 list the input entries of the fingerprint
 ///   smoke.mbtx record <dist> <out>    write <out>/evidence.json for the dist/ that passed smoke
-///   smoke.mbtx report                 open an issue for a failed smoke, or comment on the open one
 ///
 /// `record` needs FINGERPRINT and the GitHub run variables. It fails when HEAD has another
-/// fingerprint. `report` needs GH_TOKEN and the GitHub run variables. The script exits with a
+/// fingerprint. `scripts/smoke-breach.mbtx` files the issues for a failed smoke. The script exits with a
 /// non-zero code on failure.
 import {
   "moonbitlang/async@0.22.5",
@@ -30,7 +29,7 @@ import {
 }
 
 ///|
-let usage : String = "Usage: smoke.mbtx fingerprint | inputs | record <dist> <out> | report"
+let usage : String = "Usage: smoke.mbtx fingerprint | inputs | record <dist> <out>"
 
 ///|
 /// The first line of the fingerprint text. Change it when the meaning of the fingerprint changes.
@@ -62,9 +61,6 @@ let test_only_suffixes : Array[String] = [
 let platforms : Array[String] = [
   "linux-x64", "linux-arm64", "darwin-arm64", "darwin-x64", "windows-x64",
 ]
-
-///|
-let report_title : String = "Smoke failed on main"
 
 ///|
 fn fail_with(message : String) -> Unit {
@@ -192,19 +188,6 @@ fn evidence_json(
 }
 
 ///|
-fn report_body(
-  run~ : String,
-  commit~ : String,
-  git_ref~ : String,
-  event~ : String,
-) -> String {
-  "Smoke failed in \{run} (\{event}, \{git_ref}, commit \{commit}).\n\n" +
-  "A release binary did not run, or printed the wrong version, on one of its platforms. " +
-  "A release of these inputs will fail its smoke job. Fix the cause, then close this issue. " +
-  "Run the Release workflow with `dry_run` to smoke again."
-}
-
-///|
 fn env_or(name : String, default : String) -> String {
   match @env.get_env_var(name) {
     Some(value) if value != "" => value
@@ -319,38 +302,6 @@ async fn run_record(dist : String, out : String) -> Unit {
 }
 
 ///|
-async fn run_report() -> Unit {
-  let repo = env_or("GITHUB_REPOSITORY", "")
-  if repo == "" {
-    fail_with("GITHUB_REPOSITORY is not set")
-  }
-  let body = report_body(
-    run=run_url(),
-    commit=env_or("GITHUB_SHA", ""),
-    git_ref=env_or("GITHUB_REF", ""),
-    event=env_or("GITHUB_EVENT_NAME", ""),
-  )
-  let (code, out) = output_of("gh", [
-    "issue", "list", "--repo", repo, "--state", "open", "--search", "\"\{report_title}\" in:title",
-    "--json", "number,title", "--jq", ".[] | select(.title == \"\{report_title}\") | .number",
-  ])
-  if code != 0 {
-    fail_with("`gh issue list` failed: \{out.trim()}")
-  }
-  let number = out.trim().split("\n").next().map(s => s.to_owned()).unwrap_or("")
-  let args = if number != "" {
-    ["issue", "comment", number, "--repo", repo, "--body", body]
-  } else {
-    ["issue", "create", "--repo", repo, "--title", report_title, "--body", body]
-  }
-  let (code, out) = output_of("gh", args)
-  if code != 0 {
-    fail_with("`gh \{args[0]} \{args[1]}` failed: \{out.trim()}")
-  }
-  println(out.trim())
-}
-
-///|
 async fn main {
   let args = @env.args()[1:].to_owned()
   match args {
@@ -360,7 +311,6 @@ async fn main {
         println("\{e.mode} \{e.object}\t\{e.path}")
       }
     ["record", dist, out] => run_record(dist, out)
-    ["report"] => run_report()
     _ => {
       eprintln(usage)
       @sys.exit(2)
@@ -456,20 +406,6 @@ impl @moonspec.World for SmokeWorld with fn configure(self, setup) {
           checksums=checksums.replace_all(old="|", new="\n"),
         ),
       ).to_equal(doc.content)
-    },
-  )
-  setup.then5(
-    "the report for run {string} of commit {string} on {string} by {string} is:",
-    fn(
-      run : String,
-      commit : String,
-      git_ref : String,
-      event : String,
-      doc : @moonspec.DocString,
-    ) raise {
-      @expect.expect(report_body(run~, commit~, git_ref~, event~)).to_equal(
-        doc.content,
-      )
     },
   )
 }

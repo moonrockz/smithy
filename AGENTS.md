@@ -131,8 +131,7 @@ Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every 
   - A pull request that changes a release file (the `pull_request` paths in `release.yml`) runs `plan`, and
     `build-windows`, `build` and `smoke` only when no smoke evidence exists for its inputs. CI owns `validate`.
     A feature pull request does not start the Release workflow.
-  - The nightly schedule does the same on main, and records the evidence. A failed smoke opens or updates the
-    issue "Smoke failed on main".
+  - The nightly schedule does the same on main, and records the evidence.
   - A manual run with `dry_run` is a full rehearsal: `validate`, `build-windows`, `build` and `smoke`. Use it to
     smoke again on demand.
 - **Smoke evidence.** `mise run smoke:fingerprint` hashes the `git ls-tree` entries of the smoke inputs at HEAD:
@@ -145,6 +144,12 @@ Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every 
   outside the inputs, such as docs or tests, carries the evidence forward. The evidence never replaces the smoke
   of a release: the builds are not proven reproducible. GitHub removes a cache entry after 7 days without
   access; the next run then smokes again.
+- **Smoke breach issues.** When smoke fails in a trusted run on main or on a release tag, the `report` job of
+  `smoke.yml` (`mise run smoke:report`, `scripts/smoke-breach.mbtx`) files one GitHub issue with the label
+  `smoke-breach`. A hidden marker in the body holds the signature of the breach: the fingerprint and the result
+  of each failed platform, not the run. The same breach again changes nothing. A changed breach edits the open
+  issue and adds a comment. A breach that comes back reopens its closed issue. When smoke passes in a trusted
+  run, `record` closes the open issue (`mise run smoke:resolve`). Pull requests never file an issue.
 - **Re-run failed jobs.** After a transient failure, use "Re-run failed jobs" on the run (or
   `gh run rerun <run-id> --failed`). GitHub runs the failed job again, and the jobs after it. The jobs that passed
   keep their outputs and the `dist` artifact (30 days), so the retry ships the bytes that `smoke` checked.
