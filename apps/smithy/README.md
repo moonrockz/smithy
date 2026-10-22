@@ -523,8 +523,8 @@ are not messages. The native and WASI (`wasm`) binaries read stdin as it arrives
 
 The exit status is 0 when no finding is an error, and 1 otherwise. When the document has an `expect`
 list, the status is 0 when the findings match it and 1 when they do not. A malformed transcript gives
-`InvalidTranscript` findings and exits 1. Invalid options, a missing or conflicting version, and an
-invalid model or protocol exit 2.
+`InvalidTranscript` findings and exits 1. An invalid model exits 1. Invalid options, a missing or
+conflicting version, and an invalid protocol exit 2.
 
 ## Public GitHub release assets
 
