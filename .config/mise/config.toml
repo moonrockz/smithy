@@ -202,6 +202,22 @@ run = "moonx scripts/release.mbtx notes"
 description = "Decide what the Release workflow does (reads GITHUB_EVENT_NAME, GITHUB_REF_TYPE, GITHUB_REF_NAME, DRY_RUN; writes GITHUB_OUTPUT)"
 run = "moonx scripts/release.mbtx plan"
 
+[tasks."smoke:fingerprint"]
+description = "Print the fingerprint of the smoke inputs at HEAD and the version (writes GITHUB_OUTPUT)"
+run = "moonx scripts/smoke.mbtx fingerprint"
+
+[tasks."smoke:inputs"]
+description = "List the files at HEAD that are inputs of the smoke fingerprint"
+run = "moonx scripts/smoke.mbtx inputs"
+
+[tasks."smoke:record"]
+description = "Write the smoke evidence for a dist/ that passed smoke (args: dist dir, out dir; needs FINGERPRINT; CI only)"
+run = "moonx scripts/smoke.mbtx record"
+
+[tasks."smoke:report"]
+description = "Open the 'Smoke failed on main' issue, or comment on the open one (needs GH_TOKEN; CI only)"
+run = "moonx scripts/smoke.mbtx report"
+
 [tasks."release:github"]
 description = "Create the GitHub release from dist/, or upload the assets it lacks (args: X.Y.Z; needs GITHUB_SHA and RUNNER_TEMP)"
 run = "moonx scripts/release.mbtx github"

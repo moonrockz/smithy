@@ -293,8 +293,8 @@ enum Plan {
 } derive(Eq, Debug)
 
 ///|
-/// Decide whether a Release run releases. A pull request run and a run with `dry_run` only check:
-/// they never release, whatever the tags and the changelog say. Any other run must be on main. A tag
+/// Decide whether a Release run releases. A pull request run, a scheduled run and a run with `dry_run`
+/// only check: they never release, whatever the tags and the changelog say. Any other run must be on main. A tag
 /// push must name the version in moon.mod. The version is released when its GitHub release does not
 /// exist: a tag that a failed run left behind does not block a re-run. A release needs its section in
 /// CHANGELOG.md, with the highlights written.
@@ -309,7 +309,7 @@ fn plan(
   has_section : Bool,
   highlights~ : Bool,
 ) -> Result[Plan, String] {
-  if event == "pull_request" || dry_run {
+  if checks_only(event, dry_run) {
     return Ok(DryRun(version))
   }
   let tag = "v\{version}"
@@ -338,12 +338,47 @@ fn plan(
 }
 
 ///|
-/// Lines for $GITHUB_OUTPUT.
-fn plan_outputs(p : Plan) -> String {
+/// A run that never releases: a pull request, a scheduled run, or a manual run with `dry_run`.
+fn checks_only(event : String, dry_run : Bool) -> Bool {
+  event == "pull_request" || event == "schedule" || dry_run
+}
+
+///|
+/// The jobs that a Release run needs after plan. `build` covers build-windows, build and smoke.
+/// `record` saves the smoke evidence when every platform passed.
+struct Checks {
+  validate : Bool
+  build : Bool
+  record : Bool
+} derive(Eq, Debug)
+
+///|
+/// Choose the jobs of a run. A release always validates, builds and smokes the bytes that it publishes,
+/// whatever evidence exists. A manual dry run is a full rehearsal. A pull request and a scheduled run
+/// leave validate to CI, and build and smoke only when no trusted run smoked the same inputs
+/// (`evidence`, see `scripts/smoke.mbtx`). A pull request run is not trusted, so it records nothing.
+fn checks(p : Plan, event : String, evidence : Bool) -> Checks {
   match p {
-    Release(v) => "release=true\ndry_run=false\nversion=\{v}\ntag=v\{v}\n"
-    DryRun(v) => "release=false\ndry_run=true\nversion=\{v}\ntag=v\{v}\n"
-    Skip(_) => "release=false\ndry_run=false\n"
+    Release(_) => { validate: true, build: true, record: true }
+    Skip(_) => { validate: false, build: false, record: false }
+    DryRun(_) =>
+      match event {
+        "pull_request" => { validate: false, build: !evidence, record: false }
+        "schedule" => { validate: false, build: !evidence, record: !evidence }
+        _ => { validate: true, build: true, record: true }
+      }
+  }
+}
+
+///|
+/// Lines for $GITHUB_OUTPUT.
+fn plan_outputs(p : Plan, c : Checks) -> String {
+  let jobs = "validate=\{c.validate}\nbuild=\{c.build}\nrecord=\{c.record}\n"
+  match p {
+    Release(v) =>
+      "release=true\ndry_run=false\nversion=\{v}\ntag=v\{v}\n" + jobs
+    DryRun(v) => "release=false\ndry_run=true\nversion=\{v}\ntag=v\{v}\n" + jobs
+    Skip(_) => "release=false\ndry_run=false\n" + jobs
   }
 }
 
@@ -1001,6 +1036,8 @@ async fn run_plan() -> Unit {
   let ref_type = @env.get_env_var("GITHUB_REF_TYPE").unwrap_or("")
   let ref_name = @env.get_env_var("GITHUB_REF_NAME").unwrap_or("")
   let dry_run = @env.get_env_var("DRY_RUN").unwrap_or("") == "true"
+  // The cache-hit output of the evidence lookup: "true" only for an exact hit.
+  let evidence = @env.get_env_var("EVIDENCE").unwrap_or("") == "true"
   let changelog = if @fs.exists(changelog_path) {
     @fs.read_file(changelog_path).text()
   } else {
@@ -1009,10 +1046,9 @@ async fn run_plan() -> Unit {
   let section = changelog_section(changelog, version)
   let highlights = section.map(has_highlights).unwrap_or(true)
   // A run that only checks needs no facts from the remote.
-  let checks_only = event == "pull_request" || dry_run
   let mut on_main = false
   let mut released = false
-  if !checks_only {
+  if !checks_only(event, dry_run) {
     let (fetch_code, fetch_out) = output_of("git", [
       "fetch", "--quiet", "origin", "main",
     ])
@@ -1053,11 +1089,12 @@ async fn run_plan() -> Unit {
         DryRun(v) => println("Dry run of \{v}: nothing is published")
         Skip(reason) => println(reason)
       }
+      let outputs = plan_outputs(p, checks(p, event, evidence))
       match @env.get_env_var("GITHUB_OUTPUT") {
-        Some(path) if path != "" =>
-          @fs.write_file(path, plan_outputs(p), append=true)
-        _ => println(plan_outputs(p).trim_end())
+        Some(path) if path != "" => @fs.write_file(path, outputs, append=true)
+        _ => ()
       }
+      println(outputs.trim_end())
     }
   }
 }
@@ -1398,6 +1435,7 @@ struct ReleaseWorld {
   mut ref_name : String
   mut on_main : Bool
   mut dry_run : Bool
+  mut evidence : Bool
   mut released : Bool
   mut has_section : Bool
   mut local_assets : Array[String]
@@ -1420,6 +1458,7 @@ fn ReleaseWorld::new(dist_source : String) -> ReleaseWorld {
     ref_name: "",
     on_main: true,
     dry_run: false,
+    evidence: false,
     released: false,
     has_section: true,
     local_assets: [],
@@ -1672,6 +1711,33 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
   setup.given1("the dry run input is: {string}", fn(answer : String) {
     self.dry_run = yes(answer)
   })
+  setup.given1("the smoke evidence exists: {string}", fn(answer : String) {
+    self.evidence = yes(answer)
+  })
+  setup.then4(
+    "the jobs for a {string} are validate {string}, build {string} and record {string}",
+    fn(kind : String, validate : String, build : String, record : String) raise {
+      // A skip comes from a version that is already released.
+      let r = plan(
+        self.event,
+        self.ref_type,
+        self.ref_name,
+        true,
+        self.dry_run,
+        version_of("0.0.1"),
+        kind == "skip",
+        true,
+        highlights=true,
+      )
+      @expect.expect(plan_name(r).has_prefix(kind)).to_equal(true)
+      guard r is Ok(p) else { fail("no plan: \{plan_name(r)}") }
+      @expect.expect(checks(p, self.event, self.evidence)).to_equal({
+        validate: yes(validate),
+        build: yes(build),
+        record: yes(record),
+      })
+    },
+  )
   setup.given1("the GitHub release exists: {string}", fn(answer : String) {
     self.released = yes(answer)
   })
@@ -1729,7 +1795,9 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
       "dry run" => DryRun(v)
       _ => Skip("skipped")
     }
-    @expect.expect(plan_outputs(p)).to_equal(doc.content + "\n")
+    @expect.expect(plan_outputs(p, checks(p, self.event, self.evidence))).to_equal(
+      doc.content + "\n",
+    )
   })
   setup.given2("the local assets are {string} and the GitHub release has {string}", fn(
     here : String,

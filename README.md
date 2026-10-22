@@ -167,6 +167,7 @@ mise run clean
 mise run build:release         # 4 native binaries (zig), 2 wasm files, dist/ (needs the Windows exe: mise run build:windows)
 mise run test:native-zig       # native tests with zig as the C compiler
 mise run release:status        # main, tags, GitHub release and mooncakes.io agree
+mise run smoke:fingerprint     # fingerprint of the smoke inputs (mise run smoke:inputs lists them)
 mise run hooks:install         # git hooks (lefthook)
 ```
 
@@ -188,6 +189,7 @@ smithy/
 ├── .config/mise/config.toml   # tools and tasks
 ├── .github/workflows/ci.yml   # lint, build and test on every target
 ├── .github/workflows/release.yml # plan, validate, build, smoke, publish, release
+├── .github/workflows/smoke.yml # smoke the release binaries, record evidence (CI and Release)
 ├── .claude/skills/release-manager/ # release skill and troubleshooting
 ├── lefthook.yml               # git hooks
 ├── apps/smithy/               # CLI (moonrockz/smithy-cli)

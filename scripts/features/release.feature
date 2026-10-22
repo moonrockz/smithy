@@ -320,6 +320,8 @@ Feature: Release tooling
       | event             | type   | name   | main | dry | released | section | plan                                                                                  |
       | pull_request      | branch | 12/merge | no   | no  | no       | no      | dry run 0.0.1                                                                         |
       | pull_request      | branch | 12/merge | no   | no  | yes      | yes     | dry run 0.0.1                                                                         |
+      | schedule          | branch | main   | yes  | no  | no       | no      | dry run 0.0.1                                                                         |
+      | schedule          | branch | main   | yes  | no  | yes      | yes     | dry run 0.0.1                                                                         |
       | workflow_dispatch | branch | main   | yes  | yes | no       | yes     | dry run 0.0.1                                                                         |
       | workflow_dispatch | branch | main   | yes  | yes | yes      | no      | dry run 0.0.1                                                                         |
       | push              | branch | main   | yes  | no  | no       | yes     | release 0.0.1                                                                         |
@@ -347,29 +349,63 @@ Feature: Release tooling
     And the changelog section has highlights: "no"
     Then the plan for version "0.0.1" is "dry run 0.0.1"
 
+  Scenario Outline: The jobs that a run needs
+    A release always builds and smokes the bytes it publishes. A pull request and a scheduled run
+    build and smoke only when no trusted run has smoked the same inputs. CI owns validate on both.
+    A manual dry run is a full rehearsal. Only a run that is not a pull request records evidence.
+    Given the event is "<event>", the ref type is "branch" and the ref name is "main"
+    And the dry run input is: "<dry>"
+    And the smoke evidence exists: "<evidence>"
+    Then the jobs for a "<plan>" are validate "<validate>", build "<build>" and record "<record>"
+
+    Examples:
+      | event             | dry | plan    | evidence | validate | build | record |
+      | push              | no  | release | no       | yes      | yes   | yes    |
+      | push              | no  | release | yes      | yes      | yes   | yes    |
+      | workflow_dispatch | yes | dry run | no       | yes      | yes   | yes    |
+      | workflow_dispatch | yes | dry run | yes      | yes      | yes   | yes    |
+      | pull_request      | no  | dry run | no       | no       | yes   | no     |
+      | pull_request      | no  | dry run | yes      | no       | no    | no     |
+      | schedule          | no  | dry run | no       | no       | yes   | yes    |
+      | schedule          | no  | dry run | yes      | no       | no    | no     |
+      | push              | no  | skip    | no       | no       | no    | no     |
+
   Scenario: Outputs for the workflow
+    Given the event is "push", the ref type is "branch" and the ref name is "main"
     Then the outputs for a "release" of "0.0.1" are:
       """
       release=true
       dry_run=false
       version=0.0.1
       tag=v0.0.1
+      validate=true
+      build=true
+      record=true
       """
 
-  Scenario: Outputs for a dry run
+  Scenario: Outputs for a dry run of a pull request with evidence
+    Given the event is "pull_request", the ref type is "branch" and the ref name is "7/merge"
+    And the smoke evidence exists: "yes"
     Then the outputs for a "dry run" of "0.0.1" are:
       """
       release=false
       dry_run=true
       version=0.0.1
       tag=v0.0.1
+      validate=false
+      build=false
+      record=false
       """
 
   Scenario: Outputs for a skip
+    Given the event is "push", the ref type is "branch" and the ref name is "main"
     Then the outputs for a "skip" of "0.0.1" are:
       """
       release=false
       dry_run=false
+      validate=false
+      build=false
+      record=false
       """
 
   Scenario Outline: The gh commands of the GitHub release step
