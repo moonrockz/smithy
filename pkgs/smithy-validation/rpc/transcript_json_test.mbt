@@ -105,7 +105,7 @@ test "malformed documents give located findings" {
   )
   assert_eq(
     problem_at("{\"expect\": [{\"code\": \"InvalidId\", \"entry\": -1}]}"),
-    [(1, 13, true)],
+    [(1, 13, true), (1, 1, true)],
   )
 }
 
@@ -210,4 +210,61 @@ test "batch fixture is valid" {
     #|  ]
     #|}
   assert_eq(feed_document(batches, batch_link()).1, [])
+}
+
+///|
+test "a transcript object needs exactly one entries member" {
+  // A misspelled key leaves the document with no entries.
+  let misspelled =
+    #|{"version": "2.0", "complete": true, "entires": []}
+  let (document, problems) = @rpc.read_json_transcript(misspelled)
+  assert_eq(document.entries, [])
+  assert_eq(
+    problems.map(p => {
+      (p.code.to_string(), p.severity == @validation.Error, p.location)
+    }),
+    [
+      ("InvalidTranscript", false, Some({ line: 1, column: 38, })),
+      ("InvalidTranscript", true, Some({ line: 1, column: 1, })),
+    ],
+  )
+  assert_eq(
+    problems[0].message,
+    "I do not know the transcript member \"entires\"; I ignored it.",
+  )
+  assert_eq(
+    problems[1].message,
+    "I expected an \"entries\" member in the transcript object, and I found none.",
+  )
+  // A second entries member is an error, and its entries are not read.
+  let twice =
+    #|{
+    #|  "entries": [{"from": "client", "message": 1}],
+    #|  "entries": [{"from": "client", "message": 2}]
+    #|}
+  let (document, problems) = @rpc.read_json_transcript(twice)
+  assert_eq(document.entries.map(e => e.message), ["1"])
+  assert_eq(problems.length(), 1)
+  assert_eq(problems[0].code, InvalidTranscript)
+  assert_eq(problems[0].severity, @validation.Error)
+  assert_eq(problems[0].location, Some({ line: 3, column: 3, }))
+  assert_eq(
+    problems[0].message,
+    "I expected one \"entries\" member in the transcript object, and I found a second one.",
+  )
+}
+
+///|
+test "unknown top-level members are advisories" {
+  let text =
+    #|{"version": "2.0", "comment": "x", "entries": []}
+  let (document, problems) = @rpc.read_json_transcript(text)
+  assert_eq(document.version, Some(@rpc.V2_0))
+  assert_eq(problems.length(), 1)
+  assert_eq(problems[0].code, InvalidTranscript)
+  assert_eq(problems[0].severity, @validation.Advisory)
+  assert_eq(problems[0].location, Some({ line: 1, column: 20, }))
+  // An advisory never fails a valid document.
+  let run = @rpc.run_transcript(editor(), document, problems)
+  assert_false(run.findings.iter().any(f => f.severity == @validation.Error))
 }

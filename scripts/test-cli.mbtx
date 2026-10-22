@@ -891,6 +891,15 @@ async fn exercise_rpc_transcripts(runner : Runner, root : String, skip_stdin : B
   @fs.write_file(runner.dir + "/broken.json", "{\"version\":\"2.0\",\"entries\":[{\"from\":\"client\"}]}")
   let (out, _) = runner.command(editor + ["broken.json", "--diagnostics", "json"], 1)
   assert_true(out.contains("InvalidTranscript"), msg=out)
+  // A misspelled "entries" key is an error, not an empty valid transcript.
+  @fs.write_file(runner.dir + "/misspelled.json", "{\"version\":\"2.0\",\"complete\":true,\"entires\":[{\"from\":\"client\",\"message\":{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}}]}")
+  let (out, _) = runner.command(editor + ["misspelled.json", "--diagnostics", "json"], 1)
+  assert_true(out.contains("InvalidTranscript") && out.contains("entires"), msg=out)
+  runner.command(editor + ["misspelled.json"], 1) |> ignore
+  // An unknown top-level key is an advisory only.
+  @fs.write_file(runner.dir + "/commented.json", "{\"version\":\"2.0\",\"comment\":\"x\",\"entries\":[{\"from\":\"client\",\"message\":{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}}]}")
+  let (out, _) = runner.command(editor + ["commented.json", "--diagnostics", "json"], 0)
+  assert_true(out.contains("\"advisory\"") && out.contains("comment"), msg=out)
   @fs.write_file(runner.dir + "/unversioned.json", "[{\"from\":\"client\",\"message\":{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}}]")
   runner.command(editor + ["unversioned.json"], 2) |> ignore
   runner.command(editor + ["unversioned.json", "--version", "2.0"], 0) |> ignore

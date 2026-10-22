@@ -475,7 +475,8 @@ my-server --stdio 2>&1 >/dev/null | smithy validate rpc transcript --protocol ex
 ```
 
 The transcript is a JSON document with `entries` (each `{"from": peer, "message": value}`) and optional
-`version`, `complete` and `expect` fields, or a bare array of entries. The checker correlates each reply
+`version`, `complete` and `expect` fields, or a bare array of entries. A document without `entries`
+is an `InvalidTranscript` error; an unknown top-level key is an advisory. The checker correlates each reply
 with its call per sender, and reports unsolicited, duplicate and wrong-responder replies, replies to
 notifications and calls without a reply.
 

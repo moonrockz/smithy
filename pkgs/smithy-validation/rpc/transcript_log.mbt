@@ -141,9 +141,9 @@ fn JsonPointer::locate(
       let members = object_members(text, span) catch { _ => return None }
       // The last member with the name wins, as in a parsed object.
       let mut found : Span? = None
-      for pair in members {
-        if pair.0 == token {
-          found = Some(pair.1)
+      for item in members {
+        if item.key == token {
+          found = Some(item.value)
         }
       }
       guard found is Some(next) else { return None }

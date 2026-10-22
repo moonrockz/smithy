@@ -313,7 +313,8 @@ reported as unsolicited and the message says so. The last finding within the bud
 (boolean) and `expect`, or a bare array of entries. Each `message` is the exact source text of its
 value, so numbers and IDs stay as written, and each entry's location is the line and column of that
 value. The reader never raises: a problem is an `InvalidTranscript` finding with a location, and an
-entry with a problem is dropped. It does not know the protocol, so a peer name that the protocol
+entry with a problem is dropped. An object without `entries`, or with a second `entries`, is an error;
+an unknown top-level key is an advisory, so it never fails a valid document. It does not know the protocol, so a peer name that the protocol
 lacks is reported by the checker as `UnknownPeer`.
 
 `expect` lists `{code, entry?, related?}` items. `match_expected` pairs each item with one distinct

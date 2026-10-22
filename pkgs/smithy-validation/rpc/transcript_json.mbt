@@ -147,11 +147,19 @@ fn expect_unit(
 }
 
 ///|
-/// The members of the object whose span is `span`, as key and value span.
+/// An object member: its name, the offset of the name and the value span.
+priv struct Member {
+  key : String
+  at : Int32
+  value : Span
+}
+
+///|
+/// The members of the object whose span is `span`, in document order.
 fn object_members(
   text : String,
   span : Span,
-) -> Array[(String, Span)] raise JsonDocumentError {
+) -> Array[Member] raise JsonDocumentError {
   let members = []
   let mut i = expect_unit(text, span.start, '{', "'{'")
   i = skip_blank(text, i)
@@ -165,6 +173,7 @@ fn object_members(
         ("I expected a member name, and I found \{describe_unit(text, i)}.", i),
       )
     }
+    let key_start = i
     let key_end = skip_string(text, i)
     let invalid_name = Problem(
       ("I expected a valid member name, and I found an invalid string.", i),
@@ -184,7 +193,7 @@ fn object_members(
         ("I expected a member value, and I found \{describe_unit(text, i)}.", i),
       )
     }
-    members.push((key, { start: i, end: value_end, }))
+    members.push({ key, at: key_start, value: { start: i, end: value_end, }, })
     i = skip_blank(text, value_end)
     if i < text.length() && text[i] == ',' {
       i += 1
@@ -292,8 +301,8 @@ fn read_entry(
   }
   let mut sender : PeerName? = None
   let mut message : Span? = None
-  for pair in object_members(text, span) {
-    let (key, value) = pair
+  for item in object_members(text, span) {
+    let { key, value, .. } = item
     if key == "from" {
       match parse_span(text, value) {
         String(name) =>
@@ -388,8 +397,9 @@ fn read_expected(
 }
 
 ///|
-/// Reads a transcript document: an object with `entries` and optional
-/// `version`, `complete` and `expect`, or a bare array of entries. Each
+/// Reads a transcript document: an object with one `entries` member and
+/// optional `version`, `complete` and `expect`, or a bare array of entries. An
+/// unknown member of the object gives an advisory. Each
 /// message keeps its exact source text. It never raises; problems are
 /// InvalidTranscript findings with a location, and an entry with a problem is
 /// dropped.
@@ -447,8 +457,9 @@ pub fn read_json_transcript(
     if text[start] == '[' {
       read_entries({ start, end, })
     } else {
-      for pair in object_members(text, { start, end, }) {
-        let (key, value) = pair
+      let mut entries_at : Int32? = None
+      for item in object_members(text, { start, end, }) {
+        let { key, at, value, } = item
         try {
           match key {
             "version" =>
@@ -475,13 +486,40 @@ pub fn read_json_transcript(
                     ),
                   )
               }
-            "entries" => read_entries(value)
+            "entries" =>
+              if entries_at is None {
+                entries_at = Some(at)
+                read_entries(value)
+              } else {
+                raise Problem(
+                  (
+                    "I expected one \"entries\" member in the transcript object, and I found a second one.",
+                    at,
+                  ),
+                )
+              }
             "expect" => expect = Some(read_expected(text, value))
-            _ => ()
+            _ =>
+              findings.push({
+                ..invalid_document(
+                  text,
+                  at,
+                  "I do not know the transcript member \"\{key}\"; I ignored it.",
+                ),
+                severity: @validation.Advisory,
+              })
           }
         } catch {
           error => problem(error)
         }
+      }
+      if entries_at is None {
+        raise Problem(
+          (
+            "I expected an \"entries\" member in the transcript object, and I found none.",
+            start,
+          ),
+        )
       }
     }
   } catch {
