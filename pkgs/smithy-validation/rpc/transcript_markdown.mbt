@@ -185,6 +185,12 @@ fn read_front_matter(
 }
 
 ///|
+/// Whitespace in an info string: space, tab, line tabulation and form feed.
+fn is_info_space(c : UInt16) -> Bool {
+  c == ' ' || c == '\t' || c == '\u{0B}' || c == '\u{0C}'
+}
+
+///|
 /// Reads a Markdown transcript. Fenced blocks whose info string starts with
 /// `jsonrpc` are entries, and `jsonrpc-expect` blocks hold the expected
 /// findings; all other text is ignored. Optional front matter gives `version`
@@ -232,9 +238,13 @@ pub fn read_markdown_transcript(
     offset = line.next
     number += 1
     guard parse_fence(line_text(text, line)) is Some(open) else { continue }
-    let words = open.info.split(" ").map(w => w.to_owned()).collect()
-    let word = if words.length() > 0 { words[0] } else { "" }
-    let rest = open.info[word.length():].to_owned()
+    // The first word ends at any whitespace, such as a space or a tab.
+    let mut word_end = 0
+    while word_end < open.info.length() && !is_info_space(open.info[word_end]) {
+      word_end += 1
+    }
+    let word = open.info[:word_end].to_owned()
+    let rest = open.info[word_end:].to_owned()
     let is_entry = word == "jsonrpc"
     let is_expect = word == "jsonrpc-expect"
     // Find the closing fence; the body is every line between.

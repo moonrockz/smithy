@@ -195,3 +195,19 @@ test "a named receiver is kept and a wrong one is an unknown peer" {
   // The skipped entry is not tracked as a call: entries 0 and 2 stay outstanding.
   assert_eq(run.summary.outstanding, 2)
 }
+
+///|
+test "info strings split on any whitespace" {
+  let text = "```jsonrpc\tclient\t->\tserver\n{\"method\": \"echo\", \"params\": [\"a\"], \"id\": 1}\n```\n" +
+    "```jsonrpc \t server\n{\"result\": \"a\", \"error\": null, \"id\": 1}\n```\n" +
+    "```jsonrpc-expect\t\n[]\n```\n"
+  let (document, problems) = @rpc.read_markdown_transcript(text)
+  assert_eq(problems, [])
+  assert_eq(
+    document.entries.map(e => {
+      (e.sender.to_string(), e.receiver.map(r => r.to_string()))
+    }),
+    [("client", Some("server")), ("server", None)],
+  )
+  assert_eq(document.expect, Some([]))
+}
