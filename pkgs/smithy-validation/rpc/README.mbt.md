@@ -405,7 +405,11 @@ test "read entries from a log" {
   assert_eq(rest, [])
   assert_eq(findings, [])
   assert_eq(last.map(e => e.sender), [server])
-  assert_eq(reader.counts(), { lines: 3, not_json: 1, skipped: 0, entries: 2, })
+  let counts = reader.counts()
+  assert_eq(counts.lines, 3)
+  assert_eq(counts.not_json, 1)
+  assert_eq(counts.skipped, 0)
+  assert_eq(counts.entries, 2)
   assert_false(reader.single_sender())
 }
 ```

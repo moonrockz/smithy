@@ -151,7 +151,7 @@ pub fn ExpectedFinding::related(self : ExpectedFinding) -> Int32? {
 }
 
 ///|
-pub(all) struct ExpectationResult {
+pub struct ExpectationResult {
   /// Expected findings that no actual finding matched.
   missing : Array[ExpectedFinding]
   /// Actual findings that no expectation matched, with any severity.

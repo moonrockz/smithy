@@ -385,7 +385,7 @@ pub fn LogMapping::from_json(
 /// `lines`; a line that is blank or not JSON after its prefix is `not_json`,
 /// a JSON record that the selector rejects is `skipped`, and a line that
 /// gives an entry is in `entries`. Lines with a finding are only in `lines`.
-pub(all) struct LogCounts {
+pub struct LogCounts {
   lines : Int32
   not_json : Int32
   skipped : Int32

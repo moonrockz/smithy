@@ -210,7 +210,7 @@ fn sent(entries : Array[@rpc.TranscriptEntry]) -> Array[(String, String)] {
 test "log noise content-length lines and plain text are counted not reported" {
   let (entries, findings, counts) = read_log(in_out(), editor_jsonl())
   assert_eq(findings, [])
-  assert_eq(counts, { lines: 19, not_json: 8, skipped: 2, entries: 9, })
+  assert_eq(tally(counts), (19, 8, 2, 9))
   let (document, _) = @rpc.read_json_transcript(editor_json())
   assert_eq(sent(entries), sent(document.entries))
   // The location is the line, and the column where the message value starts.
@@ -229,7 +229,7 @@ test "dir-message records map directions to peers" {
     editor_dir_ndjson(),
   )
   assert_eq(findings, [])
-  assert_eq(counts, { lines: 9, not_json: 0, skipped: 0, entries: 9, })
+  assert_eq(tally(counts), (9, 0, 0, 9))
   assert_eq(entries.map(e => e.sender.to_string()), [
     "client", "server", "server", "client", "client", "server", "client", "server",
     "client",
@@ -282,7 +282,7 @@ test "dir-message records map directions to peers" {
     findings[2].message,
     "I expected a message at /message, and I found no such field on line 3.",
   )
-  assert_eq(counts, { lines: 5, not_json: 0, skipped: 1, entries: 1, })
+  assert_eq(tally(counts), (5, 0, 1, 1))
 }
 
 ///|
@@ -292,7 +292,7 @@ test "prefixes and escaped messages are extracted" {
     mcp_like_jsonl(),
   )
   assert_eq(findings, [])
-  assert_eq(counts, { lines: 10, not_json: 2, skipped: 1, entries: 7, })
+  assert_eq(tally(counts), (10, 2, 1, 7))
   assert_eq(sent(entries), [
     (
       "client", "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"initialize\", \"params\": {\"processId\": 42}}",
@@ -326,7 +326,7 @@ test "prefixes and escaped messages are extracted" {
     ("client", "{\"jsonrpc\": \"2.0\", \"method\": \"exit\"}"),
   ])
   assert_eq(entries[0].location, Some({ line: 1, column: 20, }))
-  assert_eq(counts, { lines: 3, not_json: 1, skipped: 1, entries: 1, })
+  assert_eq(tally(counts), (3, 1, 1, 1))
   // Too few fields is not JSON; an escaped field that is not a string is
   // reported.
   let fielded =
@@ -345,7 +345,7 @@ test "prefixes and escaped messages are extracted" {
       "I expected a message at /text, and I found no such field on line 3.",
     ),
   ])
-  assert_eq(counts, { lines: 3, not_json: 1, skipped: 0, entries: 0, })
+  assert_eq(tally(counts), (3, 1, 0, 0))
 }
 
 ///|
@@ -396,7 +396,7 @@ test "line endings bom split characters and a missing final newline" {
     "{\"jsonrpc\": \"2.0\", \"method\": \"exit\"}",
   )
   assert_eq(expected.0[1].location, Some({ line: 3, column: 1, }))
-  assert_eq(expected.2, { lines: 3, not_json: 1, skipped: 0, entries: 2, })
+  assert_eq(tally(expected.2), (3, 1, 0, 2))
   for size in 1..<=5 {
     assert_eq(read_in_units(raw, crlf, size), expected)
   }
@@ -410,7 +410,7 @@ test "line endings bom split characters and a missing final newline" {
   assert_eq(entries.length(), 1)
   assert_eq(entries[0].location, Some({ line: 1, column: 1, }))
   assert_eq(reader.end(), ([], []))
-  assert_eq(reader.counts(), { lines: 2, not_json: 1, skipped: 0, entries: 1, })
+  assert_eq(tally(reader.counts()), (2, 1, 0, 1))
   // A final carriage return with no newline is a line ending too.
   assert_eq(
     read_log(raw, "{\"jsonrpc\": \"2.0\", \"method\": \"exit\"}\r").0,
@@ -457,7 +457,7 @@ test "overlong lines are reported and skipped" {
     findings[0].message,
     "I expected a log line of at most \{limit} bytes, and I found more on line 2; I skipped the line.",
   )
-  assert_eq(reader.counts(), { lines: 4, not_json: 0, skipped: 0, entries: 2, })
+  assert_eq(tally(reader.counts()), (4, 0, 0, 2))
   // Bytes are UTF-8 bytes: four 2-byte characters exceed 7 bytes.
   let (_, findings, _) = read_log(raw, "éééé", line_bytes=7)
   assert_eq(findings.length(), 1)
@@ -485,7 +485,7 @@ test "raw mapping is single sender" {
   assert_eq(findings, [])
   assert_eq(entries.map(e => e.location.unwrap().line), [1, 2, 3, 4, 5])
   assert_true(entries.iter().all(e => e.sender == peer("client")))
-  assert_eq(counts, { lines: 8, not_json: 0, skipped: 3, entries: 5, })
+  assert_eq(tally(counts), (8, 0, 3, 5))
 }
 
 ///|
@@ -606,4 +606,10 @@ test "mapping json is validated" {
       @rpc.LogMapping::new(sender=@rpc.SenderSource::Field("/dir", Map([])))
     }),
   )
+}
+
+///|
+/// The lines, not_json, skipped and entries counts of a reader.
+fn tally(counts : @rpc.LogCounts) -> (Int32, Int32, Int32, Int32) {
+  (counts.lines, counts.not_json, counts.skipped, counts.entries)
 }

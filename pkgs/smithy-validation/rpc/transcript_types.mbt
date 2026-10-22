@@ -178,7 +178,7 @@ pub fn TranscriptLimits::new(
 }
 
 ///|
-pub(all) struct TranscriptSummary {
+pub struct TranscriptSummary {
   /// Findings known only at the end of input.
   findings : Array[TranscriptFinding]
   entries : Int32

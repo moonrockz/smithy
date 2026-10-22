@@ -277,9 +277,16 @@ test "formats agree apart from locations" {
     for completeness in [@rpc.Complete, @rpc.Partial] {
       let runs = documents.map(d => {
         let run = @rpc.run_transcript(protocol, d, [], completeness~)
+        let summary = run.summary
         (
           unlocated(run.findings),
-          { ..run.summary, findings: unlocated(run.summary.findings), },
+          unlocated(summary.findings),
+          (
+            summary.entries,
+            summary.outstanding,
+            summary.correlation,
+            summary.complete,
+          ),
         )
       })
       assert_eq(runs[1], runs[0])

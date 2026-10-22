@@ -1,6 +1,6 @@
 ///|
 /// The outcome of checking a transcript document.
-pub(all) struct TranscriptRun {
+pub struct TranscriptRun {
   /// Reader findings first, then checker findings, then the end-of-input ones.
   findings : Array[TranscriptFinding]
   summary : TranscriptSummary
