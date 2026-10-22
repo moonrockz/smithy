@@ -241,23 +241,48 @@ fn array_elements(
 }
 
 ///|
-fn source_location(text : String, at : Int32) -> SourceLocation {
-  let mut line = 1
-  let mut column = 1
-  for i in 0..<at {
-    if text[i] == '\n' {
-      line += 1
-      column = 1
-    } else {
-      column += 1
-    }
+/// Gives the one-based line and column of code unit offsets. It continues
+/// from the last offset, so offsets in increasing order cost one scan of the
+/// text; an earlier offset starts the scan again.
+priv struct Locator {
+  text : String
+  mut offset : Int32
+  mut line : Int32
+  mut column : Int32
+}
+
+///|
+fn Locator::new(text : String) -> Locator {
+  { text, offset: 0, line: 1, column: 1, }
+}
+
+///|
+fn Locator::locate(self : Locator, at : Int32) -> SourceLocation {
+  if at < self.offset {
+    self.offset = 0
+    self.line = 1
+    self.column = 1
   }
-  { line, column, }
+  while self.offset < at && self.offset < self.text.length() {
+    if self.text[self.offset] == '\n' {
+      self.line += 1
+      self.column = 1
+    } else {
+      self.column += 1
+    }
+    self.offset += 1
+  }
+  { line: self.line, column: self.column, }
+}
+
+///|
+fn source_location(text : String, at : Int32) -> SourceLocation {
+  Locator::new(text).locate(at)
 }
 
 ///|
 fn invalid_document(
-  text : String,
+  locator : Locator,
   at : Int32,
   message : String,
 ) -> TranscriptFinding {
@@ -265,7 +290,7 @@ fn invalid_document(
     code: InvalidTranscript,
     severity: @validation.Error,
     entry: None,
-    location: Some(source_location(text, at)),
+    location: Some(locator.locate(at)),
     sender: None,
     related: [],
     finding: None,
@@ -289,6 +314,7 @@ fn parse_span(text : String, span : Span) -> Json raise JsonDocumentError {
 ///|
 fn read_entry(
   text : String,
+  locator : Locator,
   span : Span,
 ) -> TranscriptEntry raise JsonDocumentError {
   if text[span.start] != '{' {
@@ -335,7 +361,7 @@ fn read_entry(
     sender,
     receiver: None,
     message: text[message.start:message.end].to_owned(),
-    location: Some(source_location(text, message.start)),
+    location: Some(locator.locate(message.start)),
   }
 }
 
@@ -407,9 +433,11 @@ pub fn read_json_transcript(
   text : String,
 ) -> (TranscriptDocument, Array[TranscriptFinding]) {
   let findings = []
+  // Entries and problems come in offset order, so one scan locates them all.
+  let locator = Locator::new(text)
   fn problem(error : JsonDocumentError) -> Unit {
     let Problem((message, at)) = error
-    findings.push(invalid_document(text, at, message))
+    findings.push(invalid_document(locator, at, message))
   }
 
   let start = skip_blank(
@@ -432,7 +460,7 @@ pub fn read_json_transcript(
       }
     }
     for element in elements {
-      entries.push(read_entry(text, element)) catch {
+      entries.push(read_entry(text, locator, element)) catch {
         error => problem(error)
       }
     }
@@ -502,7 +530,7 @@ pub fn read_json_transcript(
             _ =>
               findings.push({
                 ..invalid_document(
-                  text,
+                  locator,
                   at,
                   "I do not know the transcript member \"\{key}\"; I ignored it.",
                 ),

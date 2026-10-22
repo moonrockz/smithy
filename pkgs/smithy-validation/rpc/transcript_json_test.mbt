@@ -268,3 +268,22 @@ test "unknown top-level members are advisories" {
   let run = @rpc.run_transcript(editor(), document, problems)
   assert_false(run.findings.iter().any(f => f.severity == @validation.Error))
 }
+
+///|
+test "many entries are located in one scan" {
+  let lines = ["["]
+  let count = 20000
+  for i in 0..<count {
+    let comma = if i + 1 < count { "," } else { "" }
+    lines.push("  {\"from\": \"client\", \"message\": \{i}}\{comma}")
+  }
+  lines.push("]")
+  let (document, problems) = @rpc.read_json_transcript(lines.join("\n"))
+  assert_eq(problems, [])
+  assert_eq(document.entries.length(), count)
+  assert_eq(document.entries[0].location, Some({ line: 2, column: 33, }))
+  assert_eq(
+    document.entries[count - 1].location,
+    Some({ line: count + 1, column: 33, }),
+  )
+}
