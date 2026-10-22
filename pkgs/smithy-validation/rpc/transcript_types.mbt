@@ -22,6 +22,8 @@ pub(all) struct TranscriptEntry {
 } derive(Eq, Debug)
 
 ///|
+/// Constructor names differ from FindingCode so that unqualified FindingCode
+/// constructors stay unambiguous; `to_string` gives the stable code names.
 pub(all) enum TranscriptCode {
   /// A message-level finding from the request or response validator.
   Message(FindingCode)
@@ -30,13 +32,16 @@ pub(all) enum TranscriptCode {
   ActiveCallLimit
   FindingLimit
   UnsolicitedResponse
-  DuplicateResponse
-  MissingResponse
+  /// Renders as "DuplicateResponse".
+  DuplicateReply
+  /// Renders as "MissingResponse".
+  MissingReply
   OutstandingCall
   ResponseToNotification
   WrongResponder
   ActiveIdReused
-  AmbiguousId
+  /// Renders as "AmbiguousId".
+  AmbiguousReplyId
   WrongReplyForm
   /// A problem in the transcript document rather than in a message.
   InvalidTranscript
@@ -51,13 +56,13 @@ pub fn TranscriptCode::to_string(self : TranscriptCode) -> String {
     ActiveCallLimit => "ActiveCallLimit"
     FindingLimit => "FindingLimit"
     UnsolicitedResponse => "UnsolicitedResponse"
-    DuplicateResponse => "DuplicateResponse"
-    MissingResponse => "MissingResponse"
+    DuplicateReply => "DuplicateResponse"
+    MissingReply => "MissingResponse"
     OutstandingCall => "OutstandingCall"
     ResponseToNotification => "ResponseToNotification"
     WrongResponder => "WrongResponder"
     ActiveIdReused => "ActiveIdReused"
-    AmbiguousId => "AmbiguousId"
+    AmbiguousReplyId => "AmbiguousId"
     WrongReplyForm => "WrongReplyForm"
     InvalidTranscript => "InvalidTranscript"
   }

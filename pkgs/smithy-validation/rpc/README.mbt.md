@@ -269,13 +269,13 @@ Correlation follows these rules:
   name the call in `related`. The call is then answered.
 - A null-ID reply answers the earliest unreadable entry (invalid JSON, or an invalid envelope with
   no usable ID) of the other peer, else an active explicit-null 2.0 call. When both exist, it
-  answers the earlier one and adds an `AmbiguousId` advisory.
-- Otherwise a reply is a `DuplicateResponse` (with the first reply in `related`), a
+  answers the earlier one and adds an `AmbiguousReplyId` advisory (code `AmbiguousId`).
+- Otherwise a reply is a `DuplicateReply` (code `DuplicateResponse`, with the first reply in `related`), a
   `WrongResponder` (the ID is active for the sender itself), a `ResponseToNotification` (a 1.0
   null-ID reply after a 1.0 notification), or an `UnsolicitedResponse`. These replies are still
   checked as envelopes, and only their error findings are kept.
 - A call that reuses an ID still active for its sender is `ActiveIdReused`.
-- `finish` reports each active call and each 2.0 unreadable entry as `MissingResponse` (error)
+- `finish` reports each active call and each 2.0 unreadable entry as `MissingReply` (code `MissingResponse`, error)
   when the transcript is `Complete`, and as `OutstandingCall` (advisory) when it is `Partial`, the
   default. Notifications never need a reply.
 - A peer that accepts nothing receives no methods: a request to it is `UnknownMethod` on the

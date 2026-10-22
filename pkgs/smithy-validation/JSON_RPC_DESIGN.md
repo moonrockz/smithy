@@ -176,11 +176,13 @@ nothing. Transcript checking builds on this description.
 `TranscriptChecker` takes a `ProtocolDescription` and checks entries, each a sender and the original
 message text, one at a time or in groups. Findings are `TranscriptFinding` values with a
 `TranscriptCode`: `Message(FindingCode)` wraps a message-level finding, and the other codes are
-correlation and limit findings. `FindingSeverity` stays `Error | Advisory`; the outstanding calls of a
+correlation and limit findings. `DuplicateReply`, `MissingReply` and `AmbiguousReplyId` render as the
+stable codes `DuplicateResponse`, `MissingResponse` and `AmbiguousId`, and their names differ from the
+`FindingCode` constructors so that unqualified uses stay unambiguous. `FindingSeverity` stays `Error | Advisory`; the outstanding calls of a
 partial transcript are advisories. Each sender has its own ID space, and a reply matches a call by
 caller, responder and exact ID, with the batch ID normalization for scalars and structural equality for
 structured 1.0 IDs. A matched reply is validated with `OriginalRequest` context. A null-ID reply answers
-the earliest unreadable entry of the other peer, then an explicit-null 2.0 call, with an `AmbiguousId`
+the earliest unreadable entry of the other peer, then an explicit-null 2.0 call, with an `AmbiguousReplyId`
 advisory when both exist. Other replies are duplicate, wrong-responder, reply-to-notification or
 unsolicited findings. Completeness is declared: `finish` reports missing replies only for a `Complete`
 transcript. Tables are bounded by `TranscriptLimits`, so memory does not grow with the length of a

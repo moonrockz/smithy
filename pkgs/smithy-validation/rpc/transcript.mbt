@@ -621,7 +621,7 @@ fn TranscriptChecker::reply(
         }
         self.report(
           step,
-          AmbiguousId,
+          AmbiguousReplyId,
           [first.entry, second.entry],
           "I linked the null-id reply at entry \{step.index} from \{responder_name.to_string()} to entry \{first.entry}; entry \{second.entry} from \{caller_name.to_string()} also waits for a null-id reply.",
           severity=@validation.Advisory,
@@ -643,7 +643,7 @@ fn TranscriptChecker::reply(
     if caller.answered.get(key) is Some(first) {
       self.report(
         step,
-        DuplicateResponse,
+        DuplicateReply,
         [first.reply],
         "I expected one reply to each call from \{caller_name.to_string()}; entry \{step.index} answers \{render_id(id)} again, first answered at entry \{first.reply}.",
       )
@@ -766,7 +766,7 @@ pub fn TranscriptChecker::finish(self : TranscriptChecker) -> TranscriptSummary 
     let (code, severity, message) = match self.completeness {
       Complete =>
         (
-          TranscriptCode::MissingResponse,
+          MissingReply,
           @validation.Error,
           "I expected a reply from \{receiver} to entry \{pending.entry} from \{sender.to_string()} with \{render_id(pending.id)}; the complete transcript has none.",
         )

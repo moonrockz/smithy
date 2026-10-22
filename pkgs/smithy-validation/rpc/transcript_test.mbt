@@ -402,3 +402,17 @@ test "transcript findings render as JSON" {
   assert_eq(third.get("line"), Some(Json::number(3)))
   assert_eq(third.get("column"), Some(Json::number(5)))
 }
+
+///|
+test "transcript codes keep the stable code names" {
+  assert_eq(@rpc.DuplicateReply.to_string(), "DuplicateResponse")
+  assert_eq(@rpc.MissingReply.to_string(), "MissingResponse")
+  assert_eq(@rpc.AmbiguousReplyId.to_string(), "AmbiguousId")
+  assert_eq(
+    @rpc.TranscriptCode::Message(@rpc.MissingResponse).to_string(),
+    "MissingResponse",
+  )
+  // FindingCode constructors stay unambiguous without a qualifier.
+  let codes = [@rpc.DuplicateResponse, @rpc.MissingResponse, @rpc.AmbiguousId]
+  assert_eq(codes.length(), 3)
+}
