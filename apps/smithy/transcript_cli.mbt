@@ -10,6 +10,7 @@ priv enum TranscriptFormat {
 priv struct TranscriptOptions {
   /// The transcript file, or "-" for stdin.
   file : String
+  format : TranscriptFormat
   /// The --version flag; the document can also give the version.
   version : @rpc.ProtocolVersion?
   /// The --complete or --partial flag; it overrides the document.
@@ -20,7 +21,7 @@ priv struct TranscriptOptions {
 fn transcript_command() -> @argparse.Command {
   input_command(
     "transcript",
-    "Validate a JSON-RPC transcript between the two peers of a protocol. JSON documents only for now.",
+    "Validate a JSON-RPC transcript between the two peers of a protocol. JSON and Markdown documents; JSONL is not supported yet.",
     files_about="Model files, then the transcript file or '-' for stdin. Use '--' before paths beginning with '-'.",
     options=[
       @argparse.OptionArg(
@@ -34,7 +35,7 @@ fn transcript_command() -> @argparse.Command {
       ),
       @argparse.OptionArg(
         "input-format",
-        about="Transcript format: json, markdown or jsonl; default from .json, .md, .jsonl or .ndjson, and jsonl for stdin. Only json is supported now.",
+        about="Transcript format: json, markdown or jsonl; default from .json, .md, .jsonl or .ndjson, and jsonl for stdin. Only json and markdown are supported now.",
       ),
       @argparse.OptionArg(
         "diagnostics",
@@ -113,17 +114,16 @@ fn transcript_options(
   } else {
     None
   }
-  match transcript_format(file, value("input-format")) {
-    JsonTranscript => ()
-    MarkdownTranscript =>
-      raise CliError("I cannot read Markdown transcripts yet; use JSON", 2)
+  let format = transcript_format(file, value("input-format"))
+  match format {
+    JsonTranscript | MarkdownTranscript => ()
     JsonlTranscript =>
       raise CliError(
         "I cannot read JSONL transcripts yet; use JSON, with --input-format json for stdin",
         2,
       )
   }
-  { file, version, completeness, }
+  { file, format, version, completeness, }
 }
 
 ///|
@@ -166,7 +166,10 @@ fn run_transcript_validation(
         opts, "InputRead", "I could not read the JSON-RPC transcript input.", 1,
       )
   }
-  let (document, read_findings) = @rpc.read_json_transcript(text)
+  let (document, read_findings) = match transcript.format {
+    MarkdownTranscript => @rpc.read_markdown_transcript(text)
+    _ => @rpc.read_json_transcript(text)
+  }
   guard transcript_version(
       transcript.version,
       document.version,
@@ -213,23 +216,18 @@ fn run_transcript_validation(
     error =>
       return value_problem(opts, "InvalidConfiguration", error.to_string(), 2)
   }
-  let completeness = match transcript.completeness {
-    Some(chosen) => chosen
-    None => document.completeness.unwrap_or(@rpc.Partial)
-  }
-  let checker = @rpc.TranscriptChecker::new(protocol, completeness~)
-  let findings = read_findings + checker.feed_all(document.entries)
-  let summary = checker.finish()
-  findings.append(summary.findings)
-  let expectations = document.expect.map(expect => {
-    @rpc.match_expected(expect, findings)
-  })
+  let run = @rpc.run_transcript(
+    protocol,
+    document,
+    read_findings,
+    completeness?=transcript.completeness,
+  )
   print_transcript_report(
     opts,
-    findings,
-    Some(summary),
-    expectations,
-    complete=summary.complete,
+    run.findings,
+    Some(run.summary),
+    run.expectations,
+    complete=run.summary.complete,
   )
 }
 

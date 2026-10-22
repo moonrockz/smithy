@@ -834,6 +834,8 @@ async fn exercise_rpc_transcripts(runner : Runner, root : String, skip_stdin : B
   for (protocol, model, transcript, status, valid, code) in [
     ("example.peers#EchoChat", "peers.smithy", "echo.json", 0, true, ""),
     ("example.peers#EchoChat", "peers.smithy", "chat.json", 0, true, ""),
+    ("example.peers#EchoChat", "peers.smithy", "echo.md", 0, true, ""),
+    ("example.peers#EchoChat", "peers.smithy", "chat.md", 0, true, ""),
     ("example.peers#Editor", "peers.smithy", "editor.json", 0, true, ""),
     ("example.peers#Editor", "peers.smithy", "editor-negative.json", 0, false, "UnsolicitedResponse"),
     ("batch#Link", "batches.smithy", "batches.json", 0, true, ""),
@@ -897,7 +899,13 @@ async fn exercise_rpc_transcripts(runner : Runner, root : String, skip_stdin : B
   runner.command(["validate", "rpc", "transcript", "--protocol", "example.peers#Missing", "peers.smithy", "unsolicited.json"], 2) |> ignore
   runner.command(editor + ["missing-transcript.json"], 1) |> ignore
   @fs.write_file(runner.dir + "/notes.md", "# notes")
+  // A Markdown file with no jsonrpc blocks and no version is a usage error.
   runner.command(editor + ["notes.md"], 2) |> ignore
+  runner.command(editor + ["notes.md", "--version", "2.0"], 0) |> ignore
+  @fs.write_file(runner.dir + "/broken.md", "---\nversion: 2.0\n---\n```jsonrpc\n{}\n```\n")
+  let (out, _) = runner.command(editor + ["broken.md", "--diagnostics", "json"], 1)
+  assert_true(out.contains("InvalidTranscript") && out.contains("\"line\":4"), msg=out)
+  runner.command(editor + ["--input-format", "jsonl", "notes.md"], 2) |> ignore
   for args in [["validate", "rpc", "transcript", "--help"], ["help", "validate", "rpc", "transcript"]] {
     let (help, _) = runner.command(args, 0)
     assert_true(help.contains("Usage: smithy validate rpc transcript") && help.contains("--protocol"), msg=help)

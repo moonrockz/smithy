@@ -166,7 +166,7 @@ when the document gives none, and must agree with it. `--complete` or `--partial
 document; partial is the default. Text findings name the file, line, column, entry and sender; JSON
 diagnostics are one report with the summary, the findings and the expectation result. The exit
 status is 0 for no error findings, or for an `expect` list that matches, 1 otherwise, and 2 for usage
-and contract errors. Markdown and JSONL transcripts and stdin streaming remain planned.
+and contract errors. Markdown transcripts (`examples/json-rpc/transcripts/*.md`) are read with the same command; JSONL transcripts and stdin streaming remain planned.
 
 ## Two-peer protocols
 
@@ -208,6 +208,15 @@ are `InvalidTranscript` findings with a line and column; a bad entry is dropped.
 names a code by its rendered `to_string` (for example `DuplicateResponse`), and `match_expected`
 matches items to distinct findings (maximum bipartite matching, so order does not matter). A match
 needs no missing item and no unlisted error.
+
+### Markdown transcript documents
+
+`read_markdown_transcript` reads fenced `jsonrpc A -> B` (or `jsonrpc A`) blocks as entries, `jsonrpc-expect`
+blocks as the expect list, and optional front matter keys `version` and `complete`. It ignores other
+fences and prose. A message is the block body as written, located at its first line. A `jsonrpc` fence with
+no direction, a receiver equal to the sender, and an unterminated fence are `InvalidTranscript` findings.
+A receiver other than `other(A)` is not detected yet, because an entry stores only its sender.
+`run_transcript` is the shared read-check-match pipeline of the CLI and the BDD world.
 
 ## Rule and original-example coverage
 

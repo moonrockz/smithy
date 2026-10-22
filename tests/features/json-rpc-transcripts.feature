@@ -98,3 +98,33 @@ Feature: JSON-RPC transcripts
     When I check the transcript file "editor-negative.json"
     Then the transcript is invalid
     And the transcript matches its expected findings
+
+  Scenario: Markdown transcripts
+    Given the "example.peers#EchoChat" protocol in "peers.smithy"
+    When I check the transcript file "echo.md"
+    Then the transcript is valid
+    And the transcript has no findings
+    When I check the transcript file "chat.md"
+    Then the transcript is valid
+    And the transcript has no findings
+
+  Scenario: A Markdown transcript with expected findings
+    Given the "example.peers#Editor" protocol in "peers.smithy"
+    When I check the Markdown transcript:
+      """markdown
+      ---
+      version: "2.0"
+      ---
+      A reply with no call.
+
+      ```jsonrpc server -> client
+      {"jsonrpc": "2.0", "id": 9, "result": "full"}
+      ```
+
+      ```jsonrpc-expect
+      [{"code": "UnsolicitedResponse", "entry": 0}]
+      ```
+      """
+    Then the transcript is invalid
+    And the transcript has the error "UnsolicitedResponse" at entry 0
+    And the transcript matches its expected findings

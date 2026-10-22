@@ -419,7 +419,6 @@ test "transcript CLI usage and contract errors exit 2" {
         "editor.json",
       ],
       ["--protocol", "example.peers#Editor", "peers.smithy", "editor.txt"],
-      ["--protocol", "example.peers#Editor", "peers.smithy", "editor.md"],
       ["--protocol", "example.peers#Editor", "peers.smithy", "editor.jsonl"],
       ["--protocol", "example.peers#Editor", "peers.smithy", "-"],
       [

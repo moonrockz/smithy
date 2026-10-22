@@ -3,6 +3,7 @@ struct TranscriptWorld {
   mut model : @smithy.Model?
   mut protocol : @smithy.ShapeId?
   mut text : String
+  mut markdown : Bool
   mut findings : Array[@rpc.TranscriptFinding]
   mut summary : @rpc.TranscriptSummary?
   mut expectations : @rpc.ExpectationResult?
@@ -14,6 +15,7 @@ fn TranscriptWorld::new() -> TranscriptWorld {
     model: None,
     protocol: None,
     text: "",
+    markdown: false,
     findings: [],
     summary: None,
     expectations: None,
@@ -26,28 +28,25 @@ fn TranscriptWorld::new() -> TranscriptWorld {
 fn TranscriptWorld::check(
   self : TranscriptWorld,
   text : String,
+  markdown~ : Bool = false,
   completeness~ : @rpc.Completeness? = None,
 ) -> Unit raise {
-  let (document, read) = @rpc.read_json_transcript(text)
+  let (document, read) = if markdown {
+    @rpc.read_markdown_transcript(text)
+  } else {
+    @rpc.read_json_transcript(text)
+  }
   let protocol = @rpc.ProtocolDescription::from_smithy(
     self.model.unwrap(),
     self.protocol.unwrap(),
     document.version.unwrap(),
   )
-  let completeness = match completeness {
-    Some(chosen) => chosen
-    None => document.completeness.unwrap_or(Partial)
-  }
-  let checker = @rpc.TranscriptChecker::new(protocol, completeness~)
-  let findings = read + checker.feed_all(document.entries)
-  let summary = checker.finish()
-  findings.append(summary.findings)
+  let run = @rpc.run_transcript(protocol, document, read, completeness?)
   self.text = text
-  self.findings = findings
-  self.summary = Some(summary)
-  self.expectations = document.expect.map(expect => {
-    @rpc.match_expected(expect, findings)
-  })
+  self.markdown = markdown
+  self.findings = run.findings
+  self.summary = Some(run.summary)
+  self.expectations = run.expectations
 }
 
 ///|
@@ -78,13 +77,19 @@ impl @moonspec.World for TranscriptWorld with fn configure(self, setup) {
   setup.when1("I check the transcript file {string}", fn(file : String) raise {
     self.check(
       @xfs.read_file_to_string("../examples/json-rpc/transcripts/" + file),
+      markdown=file.has_suffix(".md"),
     )
   })
   setup.when1("I check the transcript:", fn(doc : @moonspec.DocString) raise {
     self.check(doc.content)
   })
+  setup.when1("I check the Markdown transcript:", fn(
+    doc : @moonspec.DocString,
+  ) raise {
+    self.check(doc.content, markdown=true)
+  })
   setup.when0("I check the same transcript as complete", fn() raise {
-    self.check(self.text, completeness=Some(Complete))
+    self.check(self.text, markdown=self.markdown, completeness=Some(Complete))
   })
   setup.then0("the transcript is valid", fn() raise {
     assert_true(self.summary.unwrap().complete)
