@@ -47,6 +47,10 @@ priv enum PendingForm {
   /// As the one null-ID invalid-request error that an empty request batch
   /// needs.
   InvalidWholeBatch
+  /// Against the envelope only. A 1.0 unreadable entry or a 1.0 call with an
+  /// invalid envelope or an incomplete check gives no original request to
+  /// check against, and version 1.0 has no standard invalid-request error.
+  EnvelopeOnlyReply
 }
 
 ///|
@@ -394,10 +398,15 @@ fn TranscriptChecker::request(
   value : Json,
 ) -> Unit {
   let version = self.protocol.version()
+  let mut form = SingleMessage
   let class = match self.protocol.service_for(receiver) {
     Some(service) => {
       let result = service.validate_json(value)
       self.report_messages(step, result.findings, [])
+      if version == V1_0 &&
+        (!result.complete || invalid_request_envelope(version, value, result)) {
+        form = EnvelopeOnlyReply
+      }
       classify(version, value, result)
     }
     None => {
@@ -438,7 +447,7 @@ fn TranscriptChecker::request(
       }
     }
     Unreadable => self.track_unreadable(step)
-    Call(key, id) => self.track_call(step, key, id)
+    Call(key, id) => self.track_call(step, key, id, form)
   }
 }
 
@@ -496,6 +505,7 @@ fn TranscriptChecker::track_call(
   step : Step,
   key : CallKey,
   id : RequestId,
+  form : PendingForm,
 ) -> Unit {
   let sender = step.entry.sender
   let state = self.state(sender)
@@ -522,7 +532,7 @@ fn TranscriptChecker::track_call(
           text: step.entry.message,
           location: step.entry.location,
           id,
-          form: SingleMessage,
+          form,
         }
       }
   }
@@ -550,6 +560,10 @@ fn TranscriptChecker::track_unreadable(
       )
       return
     }
+  }
+  let form = match (self.protocol.version(), form) {
+    (V1_0, SingleMessage) => EnvelopeOnlyReply
+    _ => form
   }
   state.unreadable.push_back({
     entry: step.index,
@@ -731,7 +745,8 @@ fn TranscriptChecker::reply(
 }
 
 ///|
-/// Validates a linked reply against the call it answers.
+/// Validates a linked reply against the call it answers. A borrowed service
+/// and an EnvelopeOnlyReply call give the envelope errors only.
 fn TranscriptChecker::answer(
   self : TranscriptChecker,
   step : Step,

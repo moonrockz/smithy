@@ -422,3 +422,42 @@ test "a named receiver must be the other peer" {
   assert_eq(found.map(f => f.entry), [Some(1), Some(2)])
   assert_eq(checker.finish().outstanding, 1)
 }
+
+///|
+test "version 1 replies to unreadable entries and invalid calls check the envelope" {
+  let error_reply = "{\"result\": null, \"error\": \"bad request\", \"id\": null}"
+  // A null-id reply links the unreadable entry and adds no context finding.
+  let checker = @rpc.TranscriptChecker::new(chat(), completeness=Complete)
+  assert_eq(codes(checker.feed(entry("client", "{"))), ["InvalidJson"])
+  assert_eq(checker.feed(entry("server", error_reply)), [])
+  assert_eq(checker.finish().findings, [])
+  // A call with an invalid 1.0 envelope and a usable id is linked by its id.
+  let invalid = @rpc.TranscriptChecker::new(chat(), completeness=Complete)
+  let found = invalid.feed(entry("client", "{\"method\": \"echo\", \"id\": 1}"))
+  assert_true(found.length() > 0)
+  assert_true(found.iter().all(f => f.code.to_string() != "InvalidContext"))
+  assert_eq(
+    invalid.feed(
+      entry(
+        "server", "{\"result\": null, \"error\": \"bad request\", \"id\": 1}",
+      ),
+    ),
+    [],
+  )
+  assert_eq(invalid.finish().findings, [])
+  // Envelope errors in such a reply are still reported, linked to the call.
+  let broken = @rpc.TranscriptChecker::new(chat(), completeness=Complete)
+  broken.feed(entry("client", "{")) |> ignore
+  let found = broken.feed(entry("server", "{\"result\": 1, \"id\": null}"))
+  assert_true(found.length() > 0)
+  assert_true(
+    found
+    .iter()
+    .all(f => {
+      f.severity == @validation.Error &&
+      f.related == [0] &&
+      f.code.to_string() != "InvalidContext" &&
+      f.code.to_string() != "LimitedScope"
+    }),
+  )
+}
