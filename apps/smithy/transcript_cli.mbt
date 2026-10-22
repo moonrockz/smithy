@@ -308,9 +308,10 @@ fn run_transcript_validation(
       transcript.file,
     )
     is Some(version) else {
-    // A document that I could not read may have lost its version; its
-    // findings explain the problem better than a usage error.
-    if !read_findings.is_empty() {
+    // A document that I could not read may have lost its version; its error
+    // findings explain the problem better than a usage error. Advisories
+    // alone do not, so they fall through to the usage error.
+    if read_findings.any(f => f.severity == @validation.Error) {
       return print_transcript_report(
         opts,
         read_findings,

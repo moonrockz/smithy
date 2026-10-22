@@ -499,11 +499,23 @@ pub fn read_json_transcript(
       read_entries({ start, end, })
     } else {
       let mut entries_at : Int32? = None
+      let mut version_at : Int32? = None
+      let mut complete_at : Int32? = None
+      let mut expect_at : Int32? = None
       for item in object_members(text, { start, end, }) {
         let { key, at, value, } = item
         try {
           match key {
-            "version" =>
+            "version" => {
+              if version_at is Some(_) {
+                raise Problem(
+                  (
+                    "I expected one \"version\" member in the transcript object, and I found a second one.",
+                    at,
+                  ),
+                )
+              }
+              version_at = Some(at)
               match parse_span(text, value) {
                 String("1.0") => version = Some(V1_0)
                 String("2.0") => version = Some(V2_0)
@@ -515,7 +527,17 @@ pub fn read_json_transcript(
                     ),
                   )
               }
-            "complete" =>
+            }
+            "complete" => {
+              if complete_at is Some(_) {
+                raise Problem(
+                  (
+                    "I expected one \"complete\" member in the transcript object, and I found a second one.",
+                    at,
+                  ),
+                )
+              }
+              complete_at = Some(at)
               match parse_span(text, value) {
                 True => completeness = Some(Complete)
                 False => completeness = Some(Partial)
@@ -527,6 +549,7 @@ pub fn read_json_transcript(
                     ),
                   )
               }
+            }
             "entries" =>
               if entries_at is None {
                 entries_at = Some(at)
@@ -539,7 +562,18 @@ pub fn read_json_transcript(
                   ),
                 )
               }
-            "expect" => expect = Some(read_expected(text, value))
+            "expect" => {
+              if expect_at is Some(_) {
+                raise Problem(
+                  (
+                    "I expected one \"expect\" member in the transcript object, and I found a second one.",
+                    at,
+                  ),
+                )
+              }
+              expect_at = Some(at)
+              expect = Some(read_expected(text, value))
+            }
             _ =>
               findings.push({
                 ..invalid_document(

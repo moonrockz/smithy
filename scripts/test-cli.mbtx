@@ -884,6 +884,19 @@ async fn exercise_rpc_transcripts(runner : Runner, root : String, skip_stdin : B
   assert_true(out.contains("\"outstanding\":1") && out.contains("OutstandingCall"), msg=out)
   let (out, _) = runner.command(editor + ["partial.json", "--complete", "--diagnostics", "json"], 1)
   assert_true(out.contains("MissingResponse"), msg=out)
+  // An advisory reader finding does not hide the missing version: exit 2 with the hint.
+  @fs.write_file(runner.dir + "/noversion.json", "{\"comment\":\"x\",\"entries\":[{\"from\":\"client\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"shutdown\"}}]}")
+  let (out, stderr) = runner.command(editor + ["noversion.json"], 2)
+  let err = if runner.target == "wasm-gc" { out + stderr } else { stderr }
+  assert_true(err.contains("--version"), msg=err)
+  // A document with an error finding and no version still exits 1.
+  @fs.write_file(runner.dir + "/noversion-error.json", "{\"entries\":[{\"from\":\"client\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"shutdown\"}}],\"entries\":[]}")
+  runner.command(editor + ["noversion-error.json"], 1) |> ignore
+  // Markdown without a version behaves the same way.
+  @fs.write_file(runner.dir + "/noversion.md", "# Chat\n\n```jsonrpc client -> server\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"shutdown\"}\n```\n")
+  let (out, stderr) = runner.command(editor + ["noversion.md"], 2)
+  let err = if runner.target == "wasm-gc" { out + stderr } else { stderr }
+  assert_true(err.contains("--version"), msg=err)
   // An expect list that does not match exits 1 and names the missing finding.
   @fs.write_file(runner.dir + "/mismatch.json", "{\"version\":\"2.0\",\"expect\":[{\"code\":\"WrongResponder\",\"entry\":0}],\"entries\":[{\"from\":\"server\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":\"full\"}}]}")
   let (out, _) = runner.command(editor + ["mismatch.json", "--diagnostics", "json"], 1)

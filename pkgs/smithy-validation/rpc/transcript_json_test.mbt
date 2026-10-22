@@ -302,3 +302,25 @@ test "document values nest at most 128 levels" {
   assert_eq(problems.length(), 1)
   assert_true(problems[0].message.has_prefix("I expected an object"))
 }
+
+///|
+test "a duplicate version, complete or expect member is an error" {
+  for
+    case in [
+      ("version", "\"1.0\"", "\"2.0\""),
+      ("complete", "true", "false"),
+      ("expect", "[]", "[]"),
+    ] {
+    let (name, first, second) = case
+    let text = "{\n  \"\{name}\": \{first},\n  \"\{name}\": \{second},\n  \"entries\": []\n}"
+    let (_, problems) = @rpc.read_json_transcript(text)
+    assert_eq(problems.length(), 1, msg=name)
+    assert_eq(problems[0].code, InvalidTranscript, msg=name)
+    assert_eq(problems[0].severity, @validation.Error, msg=name)
+    assert_eq(problems[0].location, Some({ line: 3, column: 3, }), msg=name)
+    assert_eq(
+      problems[0].message,
+      "I expected one \"\{name}\" member in the transcript object, and I found a second one.",
+    )
+  }
+}
