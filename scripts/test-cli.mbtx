@@ -892,6 +892,12 @@ async fn exercise_rpc_transcripts(runner : Runner, root : String, skip_stdin : B
   // A document with an error finding and no version still exits 1.
   @fs.write_file(runner.dir + "/noversion-error.json", "{\"entries\":[{\"from\":\"client\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"shutdown\"}}],\"entries\":[]}")
   runner.command(editor + ["noversion-error.json"], 1) |> ignore
+  // A malformed document without a version follows --expect: a match exits 0, a mismatch exits 1.
+  @fs.write_file(runner.dir + "/broken.json", "{\"entries\":[")
+  @fs.write_file(runner.dir + "/broken-match.expect.json", "[{\"code\":\"InvalidTranscript\"}]")
+  @fs.write_file(runner.dir + "/broken-miss.expect.json", "[{\"code\":\"WrongResponder\"}]")
+  runner.command(editor + ["broken.json", "--expect", "broken-match.expect.json"], 0) |> ignore
+  runner.command(editor + ["broken.json", "--expect", "broken-miss.expect.json"], 1) |> ignore
   // Markdown without a version behaves the same way.
   @fs.write_file(runner.dir + "/noversion.md", "# Chat\n\n```jsonrpc client -> server\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"shutdown\"}\n```\n")
   let (out, stderr) = runner.command(editor + ["noversion.md"], 2)

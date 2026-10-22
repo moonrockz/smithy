@@ -498,7 +498,7 @@ state or capability is an invalid protocol (exit 2). See `examples/json-rpc/life
   error findings).
 - `--expect <file.json>` gives the expected findings for any input format: a JSON array of
   `{"code", "entry"?, "related"?}` items, the form of a document's `expect` list. A document that also
-  has an `expect` list, and an expect file that I cannot read or that is malformed, exit 2.
+  has an `expect` list, and an expect file that cannot be read or that is malformed, exit 2.
 - `--legacy-errors opaque|code-message-data` selects the JSON-RPC 1.0 error mapping, as for
   `validate rpc`. The default, `opaque`, accepts any error value with a `LimitedScope` advisory;
   `code-message-data` checks each error against the operation's modeled errors. It requires version
@@ -542,8 +542,8 @@ a line for each missing or unexpected finding and adds `matched:true` or `matche
 summary line.
 
 The exit status is 0 when no finding is an error, and 1 otherwise. When the document has an `expect`
-list, or `--expect` gives one, the status is 0 when the findings match it and 1 when they do not. A malformed transcript gives
-`InvalidTranscript` findings and exits 1. An invalid model exits 1. Invalid options, a missing or
+list, or `--expect` gives one, the status is 0 when the findings match it and 1 when they
+do not. A malformed transcript gives `InvalidTranscript` findings and exits 1. An invalid model exits 1. Invalid options, a missing or
 conflicting version, and an invalid protocol exit 2.
 
 ## Public GitHub release assets

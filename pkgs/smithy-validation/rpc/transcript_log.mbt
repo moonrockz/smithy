@@ -400,7 +400,7 @@ pub struct LogCounts {
 
 ///|
 /// Turns log text, given in chunks of any size, into transcript entries. It
-/// does no I/O and never raises: problems are InvalidTranscript findings with
+/// does no I/O and never raises on its input: problems are InvalidTranscript findings with
 /// a location, and the line with a problem is dropped. Memory is bounded by
 /// `line_bytes`.
 pub struct LogReader {

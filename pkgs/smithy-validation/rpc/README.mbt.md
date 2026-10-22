@@ -345,7 +345,7 @@ gives no finding and excuses nothing, because the receiver may process the eleme
 null ID never names a batch call, because in a batch it also answers each invalid element, so a
 null-id cancellation names only an active null-id single call; otherwise it is the advisory. The
 reply of a cancelled call may use the declared code: the checker drops the `UnknownError` finding for
-that code on that reply. In a reply batch, only the element that answers the cancelled call is
+that code on that reply. In a reply batch, only the first element is
 excused.
 
 `from_smithy` checks the traits: a state that the session does not declare, an unknown capability, a

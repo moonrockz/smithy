@@ -129,7 +129,8 @@ fn TranscriptChecker::apply_rule(
 /// Marks the call that a cancellation names. The canceller cancels its own
 /// call: an active call, or a call in an earlier pending request batch. A
 /// call that is not active gives an advisory, because a cancellation may race
-/// the reply. A null id names an active null-id call only, never a batch call. `batch` holds the reply keys of the request batch that the
+/// the reply. A null id names an active null-id call only, never a batch
+/// call. `batch` holds the reply keys of the request batch that the
 /// cancellation is an element of.
 fn TranscriptChecker::cancel(
   self : TranscriptChecker,

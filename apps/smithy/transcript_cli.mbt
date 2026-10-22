@@ -272,7 +272,7 @@ fn run_transcript_validation(
         opts,
         read_findings,
         None,
-        None,
+        expected.map(e => @rpc.match_expected(e, read_findings)),
         complete=false,
       )
     }
