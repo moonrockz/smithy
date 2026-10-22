@@ -74,14 +74,21 @@ fn batch_keys(
 }
 
 ///|
-/// The reply IDs of a request batch for a peer with no service, from the id
-/// members only.
+/// The reply IDs of a request batch that was not checked completely, from the
+/// id members only. An element with no id and a string method is a
+/// notification; any other element with no usable id is answered with a null ID.
 fn unchecked_batch_keys(
   version : ProtocolVersion,
   values : Array[Json],
 ) -> Set[CallKey] {
   let keys = Set([])
   for value in values {
+    if value is Object(fields) && !fields.contains("id") {
+      if !(fields.get("method") is Some(String(_))) {
+        keys.add(Scalar(NullId))
+      }
+      continue
+    }
     match classify_unchecked(version, value) {
       Call(key, _) => keys.add(key)
       Unreadable => keys.add(Scalar(NullId))
@@ -104,8 +111,14 @@ fn TranscriptChecker::request_batch(
     Some(service) => {
       let checked = service.validate_request_batch(step.entry.message)
       self.report_messages(step, checked.findings, [])
-      if checked.entries.is_empty() {
+      if !checked.complete {
+        // A limit stopped the check, so the entries can be a prefix.
+        self.complete = false
+      }
+      if values.is_empty() {
         None
+      } else if !checked.complete || checked.entries.is_empty() {
+        Some(unchecked_batch_keys(version, values))
       } else {
         Some(batch_keys(version, values, checked))
       }
@@ -133,7 +146,7 @@ fn TranscriptChecker::request_batch(
     return
   }
   match keys {
-    // An empty or unreadable batch is answered by one null-ID error object.
+    // An empty batch is answered by one null-ID error object.
     None => self.track_unreadable(step, form=InvalidWholeBatch)
     // An all-notification batch needs no reply.
     Some(keys) if keys.is_empty() => ()

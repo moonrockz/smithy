@@ -44,8 +44,8 @@ fn render_id(id : RequestId) -> String {
 priv enum PendingForm {
   /// Against the original message text.
   SingleMessage
-  /// As the one null-ID invalid-request error that an empty or unreadable
-  /// request batch needs.
+  /// As the one null-ID invalid-request error that an empty request batch
+  /// needs.
   InvalidWholeBatch
 }
 

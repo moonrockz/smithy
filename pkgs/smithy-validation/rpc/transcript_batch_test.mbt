@@ -252,3 +252,31 @@ test "batches to a peer that accepts nothing are unknown methods" {
   assert_eq(finding.shape.to_string(), "example.peers#OneWay")
   assert_eq(checker.finish().findings, [])
 }
+
+///|
+test "batches checked only in part still link their reply batch" {
+  let checker = @rpc.TranscriptChecker::new(batch_link(), completeness=Complete)
+  // Each call has two type mismatches, so 60 calls exceed the 100 findings of the service.
+  let calls = []
+  let replies = []
+  for i in 0..<60 {
+    calls.push(
+      "{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[\"a\",\"b\"],\"id\":\{i}}",
+    )
+    replies.push(difference(i.to_string()))
+  }
+  calls.push("{\"foo\":\"boo\"}")
+  calls.push("{\"jsonrpc\":\"2.0\",\"method\":\"notify_hello\",\"params\":[7]}")
+  replies.push(null_error("-32600"))
+  let found = checker.feed_all([
+    entry("client", "[" + calls.join(",") + "]"),
+    entry("server", "[" + replies.join(",") + "]"),
+  ])
+  let reply = found.filter(f => f.entry == Some(1))
+  assert_eq(codes(reply), ["InvalidContext"])
+  assert_eq(reply[0].related, [0])
+  let summary = checker.finish()
+  assert_eq(summary.findings, [])
+  assert_eq(summary.outstanding, 0)
+  assert_false(summary.complete)
+}
