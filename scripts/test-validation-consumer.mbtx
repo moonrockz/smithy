@@ -32,16 +32,24 @@ enum ConsumerProfile {
 let integration_modules : Array[String] = [
   "moonrockz/ion", "moonrockz/smithy-ion-validation", "moonrockz/wit", "moonrockz/wac",
   "moonrockz/wasm-devkit", "moonrockz/smithy-jsonschema", "moonrockz/smithy-openapi",
-  "moonrockz/smithy-openrpc",
+  "moonrockz/smithy-openrpc", "moonrockz/openrpc",
 ]
+
+///|
+/// The published OpenRPC document library, as approved on mooncakes.io.
+let openrpc_module = "moonrockz/openrpc@0.2.0"
+
+///|
+let openrpc_checksum = "8f5c8785377676aefd3e038aed21853e533354f9a378c70306f3efad7238a659"
 
 ///|
 fn allowed(name : String, profile : ConsumerProfile) -> Bool {
   match name {
     "moonrockz/ion" | "moonrockz/smithy-ion-validation" =>
       profile == IonConsumer
-    "moonrockz/smithy-jsonschema" | "moonrockz/smithy-openrpc" =>
-      profile == OpenRpcConsumer
+    "moonrockz/smithy-jsonschema"
+    | "moonrockz/smithy-openrpc"
+    | "moonrockz/openrpc" => profile == OpenRpcConsumer
     "moonrockz/wit"
     | "moonrockz/wac"
     | "moonrockz/wasm-devkit"
@@ -157,6 +165,13 @@ async fn seed(
       }
       guard found is Some(entry) else {
         fail("Missing cached dependency " + coordinate)
+      }
+      if coordinate == openrpc_module {
+        assert_eq(
+          string_field(entry, "checksum"),
+          openrpc_checksum,
+          msg="Unexpected registry archive for " + coordinate,
+        )
       }
       // A clean CI cache need not contain every transitive minimum version.
       // Moon downloads a selected uncached version and verifies its checksum.
@@ -354,6 +369,19 @@ async fn exercise(
       audited >= 4,
       msg="Expected the full resolved model/validation module graph",
     )
+    if profile == OpenRpcConsumer {
+      assert_true(
+        resolved.contains("moonrockz/openrpc"),
+        msg="Expected the published OpenRPC library in the resolved graph",
+      )
+      assert_eq(
+        "moonrockz/openrpc@" +
+        manifest_version(
+          @fs.read_file(consumer + "/.mooncakes/moonrockz/openrpc/moon.mod").text(),
+        ),
+        openrpc_module,
+      )
+    }
     if profile == IonConsumer {
       assert_true(
         resolved.contains("moonrockz/smithy-ion-validation") &&
@@ -404,6 +432,8 @@ test "ordinary validation excludes the optional Ion adapter" {
   assert_false(allowed("moonrockz/ion", JsonConsumer))
   assert_false(allowed("moonrockz/smithy-ion-validation", OpenRpcConsumer))
   assert_false(allowed("moonrockz/ion", OpenRpcConsumer))
+  assert_false(allowed("moonrockz/openrpc", JsonConsumer))
+  assert_true(allowed("moonrockz/openrpc", OpenRpcConsumer))
 }
 
 ///|
@@ -413,7 +443,7 @@ test "Ion consumer allows its adapter but excludes WIT and unrelated integration
   for
     name in [
       "moonrockz/wit", "moonrockz/wac", "moonrockz/wasm-devkit", "moonrockz/smithy-openapi",
-      "moonrockz/smithy-jsonschema", "moonrockz/smithy-openrpc",
+      "moonrockz/smithy-jsonschema", "moonrockz/smithy-openrpc", "moonrockz/openrpc",
     ] {
     assert_false(allowed(name, IonConsumer))
   }

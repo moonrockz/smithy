@@ -261,3 +261,47 @@ test "export rejects wire-name collisions before emitting methods" {
   }
   assert_true(rejected)
 }
+
+///|
+test "a component graph beyond the library schema bounds still converts" {
+  // 350 structures with 12 references each exceed the 4,096 reference edges
+  // that moonrockz/openrpc checks per schema position.
+  let count = 350
+  let source = StringBuilder()
+  source.write_string(
+    (
+      #|$version: "2"
+      #|namespace big
+      #|use smithy.rpc#jsonRpc
+      #|use smithy.rpc#method
+      #|@jsonRpc(versions: ["2.0"])
+      #|service Api { version: "1", operations: [Op] }
+      #|@method(name: "op", params: "named", resultMember: "value")
+      #|operation Op { input: In, output: Out }
+      #|structure In { first: S0 }
+      #|structure Out { value: S0 }
+      #|
+    ),
+  )
+  for i in 0..<count {
+    source.write_string("structure S\{i} {\n")
+    for j in 0..<12 {
+      source.write_string("  f\{j}: S\{(i + j + 1) % count}\n")
+    }
+    source.write_string("}\n")
+  }
+  let loaded = @rpc.loader()
+    .add_idl("big.smithy", source.to_string())
+    .assemble()
+  guard loaded.model is Some(model) else {
+    fail(loaded.diagnostics.map(d => d.message).join("\n"))
+  }
+  let document = @openrpc.convert(
+    model,
+    @openrpc.Config::new(@openrpc.ServiceId::parse("big#Api").unwrap()),
+  )
+  guard document is { "components": { "schemas": Object(schemas), .. }, .. } else {
+    fail("Expected shared schemas")
+  }
+  assert_eq(schemas.length(), count)
+}

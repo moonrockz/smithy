@@ -144,26 +144,36 @@ fn descriptor(
   required : Bool,
   config : Config,
   warnings : Array[ConversionWarning],
-) -> Json raise OpenRpcError {
+  roots : Array[Json],
+) -> @rpcdoc.ContentDescriptor raise OpenRpcError {
   if name.is_empty() {
     raise UnsupportedMapping(
       id, "I cannot export an empty OpenRPC content descriptor name; use a nonempty jsonName or select Smithy member naming.",
     )
   }
-  let out : Map[String, Json] = {
-    "name": Json::string(name),
-    "required": Json::boolean(required),
-    "schema": value_schema(index, id, config, warnings),
-  }
-  if model.shapes.get(id) is Some(shape) {
-    if trait_text(shape, "smithy.api#documentation") is Some(text) {
-      out["description"] = Json::string(text)
-    }
-    if shape.trait_value("smithy.api#deprecated") is Some(_) {
-      out["deprecated"] = Json::boolean(true)
-    }
-  }
-  Json::object(out)
+  let schema = value_schema(index, id, config, warnings)
+  roots.push(schema)
+  let shape = model.shapes.get(id)
+  built(
+    @rpcdoc.ContentDescriptor::new(
+      name,
+      draft07_schema(schema, id),
+      required=Some(required),
+      description=shape.bind(shape => {
+        trait_text(shape, "smithy.api#documentation")
+      }),
+      deprecated=if shape.bind(shape => {
+          shape.trait_value("smithy.api#deprecated")
+        })
+        is Some(_) {
+        Some(true)
+      } else {
+        None
+      },
+      limits=limits(),
+    ),
+    id,
+  )
 }
 
 ///|
@@ -190,7 +200,7 @@ fn collect_refs(value : Json) -> Array[String] {
 ///|
 fn used_schemas(
   index : @jsonschema.SchemaIndex,
-  methods : Array[Json],
+  roots : Array[Json],
   service : @smithy.ShapeId,
 ) -> Map[String, Json] raise OpenRpcError {
   let available = fields(
@@ -199,28 +209,6 @@ fn used_schemas(
     .unwrap_or(Json::null()),
   )
   let selected : Map[String, Json] = Map([])
-  let roots : Array[Json] = []
-  for method_ in methods {
-    let method_ = fields(method_)
-    if method_.get("params") is Some(Array(params)) {
-      for param in params {
-        if fields(param).get("schema") is Some(schema) {
-          roots.push(schema)
-        }
-      }
-    }
-    if method_.get("result") is Some(result) &&
-      fields(result).get("schema") is Some(schema) {
-      roots.push(schema)
-    }
-    if method_.get("x-smithy-error-data") is Some(Array(errors)) {
-      for error in errors {
-        if fields(error).get("schema") is Some(schema) {
-          roots.push(schema)
-        }
-      }
-    }
-  }
   let pending = collect_refs(Json::array(roots))
   let prefix = "#/components/schemas/"
   while pending.pop() is Some(reference) {

@@ -14,6 +14,24 @@ order, named parameter policy, direct result selectors and application errors.
 The converter never fetches references or executes model-controlled code.
 The library has no Ion, WIT, WAC or wasm-devkit dependency.
 
+The document itself is built with the published
+[`moonrockz/openrpc`](https://mooncakes.io/docs/moonrockz/openrpc) library at
+`0.2.0`. Its checked constructors build the typed OpenRPC model. Its draft-07
+model holds every generated schema, and its exact JSON keeps numeric tokens.
+Before returning, the converter validates the document with the
+`MetaschemaCompatibility` profile against the model, schema-document, reference,
+OpenRPC 1.3.2 normative and official-metaschema checks. That profile reports
+only an optional parameter before a required one as a warning, because Smithy
+keeps the explicit positional order. Any other finding fails conversion with the
+operation of the affected method, or the service, as its shape. Smithy-specific
+mapping, extension loss policies and warnings stay in this package.
+
+`Conversion.document` is the library's JSON for that document. Object members
+follow the library's field order, not the order of earlier releases; values are
+unchanged. The library checks each schema graph within fixed bounds
+(moonrockz/moon-lander#56). When a very large component graph exceeds them, the
+unchecked part does not fail conversion.
+
 ```mbt check
 ///|
 test {
