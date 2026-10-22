@@ -918,6 +918,119 @@ async fn exercise_rpc_transcripts(runner : Runner, root : String, skip_stdin : B
 }
 
 ///|
+/// Gives the JSON Lines of a streamed transcript: the findings, then the
+/// summary object of the last line.
+fn transcript_stream(out : String) -> (Array[Json], Map[String, Json]) raise {
+  let records = jsonl_records(out)
+  guard records.pop() is Some({ "summary": Object(summary), .. }) else {
+    fail("Expected a final summary line: \{out}")
+  }
+  (records, summary)
+}
+
+///|
+/// Check JSONL logs through the built CLI: presets, a mapping file, a
+/// one-sender log, usage errors, and findings that arrive before end of input.
+async fn exercise_rpc_log_streams(runner : Runner, root : String, skip_stdin : Bool) -> Unit {
+  @fs.write_file(runner.dir + "/peers.smithy", @fs.read_file(root + "/examples/json-rpc/peers.smithy").text())
+  for name in ["editor.jsonl", "editor-dir.ndjson", "mcp-like.jsonl", "mcp-like.mapping.json"] {
+    @fs.write_file(runner.dir + "/" + name, @fs.read_file(root + "/examples/json-rpc/transcripts/" + name).text())
+  }
+  let editor = ["validate", "rpc", "transcript", "--protocol", "example.peers#Editor", "--version", "2.0", "peers.smithy"]
+  let directions = ["--log-preset", "dir-message", "--direction", "in=client", "--direction", "out=server"]
+  // The default dir-message map is request = client and response = server.
+  let (out, _) = runner.command(editor + ["editor-dir.ndjson", "--diagnostics", "json"], 0)
+  let (findings, summary) = transcript_stream(out)
+  assert_eq(findings.length(), 0, msg=out)
+  assert_eq(summary.get("valid"), Some(Json::boolean(true)), msg=out)
+  assert_eq(summary.get("correlation"), Some(Json::boolean(true)), msg=out)
+  assert_eq(summary.get("entries"), Some(Json::number(9.0)), msg=out)
+  assert_eq(summary.get("lines"), Some(Json::number(9.0)), msg=out)
+  // A mapping file reads a prefixed log with escaped messages.
+  let (out, _) = runner.command(editor + ["--log-mapping", "mcp-like.mapping.json", "mcp-like.jsonl", "--diagnostics", "json"], 0)
+  let (findings, summary) = transcript_stream(out)
+  assert_eq(findings.length(), 0, msg=out)
+  for (key, count) in [("lines", 10.0), ("not_json", 2.0), ("skipped", 1.0), ("entries", 7.0), ("outstanding", 0.0)] {
+    assert_eq(summary.get(key), Some(Json::number(count)), msg="\{key}: \{out}")
+  }
+  // A raw log has one sender, so correlation is off and the summary says so.
+  @fs.write_file(runner.dir + "/client.jsonl", "starting\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"processId\":42}}\n{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}\n")
+  let raw = editor + ["--log-preset", "raw", "--sender", "client", "client.jsonl"]
+  let (out, _) = runner.command(raw + ["--diagnostics", "json", "--complete"], 0)
+  let (findings, summary) = transcript_stream(out)
+  assert_eq(findings.length(), 0, msg=out)
+  assert_eq(summary.get("correlation"), Some(Json::boolean(false)), msg=out)
+  assert_eq(summary.get("outstanding"), Some(Json::number(0.0)), msg=out)
+  assert_eq(summary.get("not_json"), Some(Json::number(1.0)), msg=out)
+  let (_, err) = runner.command(raw, 0)
+  assert_true(err.contains("client.jsonl: summary: valid:true complete:true entries:2 outstanding:0 correlation:false lines:3 not_json:1 skipped:0"), msg=err)
+  // Findings stream one per line before the summary, and exit 1.
+  @fs.write_file(runner.dir + "/unsolicited.jsonl", "{\"dir\":\"response\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":\"full\"}}\n{\"dir\":\"sideways\",\"message\":{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}}\n")
+  let (out, _) = runner.command(editor + ["unsolicited.jsonl", "--diagnostics", "json"], 1)
+  let (findings, summary) = transcript_stream(out)
+  guard findings is [{ "code": "UnsolicitedResponse", "entry": Number(0.0, ..), "line": Number(1.0, ..), .. }, { "code": "InvalidTranscript", "line": Number(2.0, ..), .. }] else {
+    fail("Expected an unsolicited reply and an unmapped direction: \{out}")
+  }
+  assert_eq(summary.get("valid"), Some(Json::boolean(false)), msg=out)
+  let (_, err) = runner.command(editor + ["unsolicited.jsonl"], 1)
+  assert_true(err.contains("unsolicited.jsonl:1:29: entry 0 server: error UnsolicitedResponse: "), msg=err)
+  assert_true(err.contains("unsolicited.jsonl: summary: valid:false"), msg=err)
+  // Usage and contract errors exit 2.
+  @fs.write_file(runner.dir + "/bad.mapping.json", "{\"sender\": \"nobody\"}")
+  for args in [
+    ["editor.jsonl"] + directions.map(arg => if arg == "out=server" { "out=nobody" } else { arg }),
+    ["--log-preset", "raw", "--sender", "nobody", "client.jsonl"],
+    ["--log-preset", "raw", "client.jsonl"],
+    ["--log-preset", "raw", "--log-mapping", "mcp-like.mapping.json", "client.jsonl"],
+    ["--log-mapping", "bad.mapping.json", "mcp-like.jsonl"],
+    ["--log-mapping", "missing.mapping.json", "mcp-like.jsonl"],
+  ] {
+    runner.command(editor + args, 2) |> ignore
+  }
+  runner.command(["validate", "rpc", "transcript", "--protocol", "example.peers#Editor", "peers.smithy", "editor-dir.ndjson"], 2) |> ignore
+  for args in [["validate", "rpc", "transcript", "--help"], ["help", "validate", "rpc", "transcript"]] {
+    let (help, _) = runner.command(args, 0)
+    assert_true(help.contains("--log-preset") && help.contains("--direction") && help.contains("read all of stdin first"), msg=help)
+  }
+  if skip_stdin || (runner.target == "wasm-gc" && @env.get_env_var("OS") == Some("Windows_NT")) {
+    return
+  }
+  // A mixed log through stdin, with the direction values of its writer.
+  let text = @fs.read_file(root + "/examples/json-rpc/transcripts/editor.jsonl").text()
+  let (out, _) = runner.command(editor + directions + ["--diagnostics", "json", "-"], 0, input=text)
+  let (findings, summary) = transcript_stream(out)
+  assert_eq(findings.length(), 0, msg=out)
+  for (key, count) in [("lines", 19.0), ("not_json", 8.0), ("skipped", 2.0), ("entries", 9.0)] {
+    assert_eq(summary.get(key), Some(Json::number(count)), msg="\{key}: \{out}")
+  }
+  assert_eq(summary.get("correlation"), Some(Json::boolean(true)), msg=out)
+  if runner.target != "native" {
+    return
+  }
+  // Native reads stdin as it arrives: the first finding comes out while the
+  // writer still holds the pipe open.
+  @async.with_timeout(15000, () => {
+    @async.with_task_group(group => {
+      let (stdin, writer) = @process.write_to_process()
+      let (reader, stdout) = @process.read_from_process()
+      defer reader.close()
+      let status = group.spawn(() => {
+        @process.run(runner.executable, editor + ["--diagnostics", "json", "-"], cwd=runner.dir, stdin~, stdout~)
+      })
+      writer.write("{\"dir\":\"request\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"missing/method\"}}\n")
+      guard reader.read_until("\n") is Some(first) else { fail("Expected a finding before end of input") }
+      guard @json.parse(first) is { "entry": Number(0.0, ..), "severity": "error", .. } else {
+        fail("Expected an error finding for entry 0: \{first}")
+      }
+      writer.close()
+      let rest = reader.read_all().text()
+      assert_eq(status.wait(), 1, msg=rest)
+      assert_true(rest.contains("\"summary\""), msg=rest)
+    })
+  })
+}
+
+///|
 async fn exercise(
   root : String,
   target : String,
@@ -957,6 +1070,7 @@ async fn exercise(
   exercise_rpc_responses(runner, root, skip_stdin)
   exercise_rpc_batches(runner, root, skip_stdin)
   exercise_rpc_transcripts(runner, root, skip_stdin)
+  exercise_rpc_log_streams(runner, root, skip_stdin)
   exercise_ion(runner, skip_stdin)
   @fs.write_file(
     "\{dir}/broken.smithy",

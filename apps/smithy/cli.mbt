@@ -366,7 +366,14 @@ fn options(args : Array[String]) -> Options raise CliError {
     let file = inputs[inputs.length() - 1]
     (
       inputs[:inputs.length() - 1].to_owned(),
-      Some(transcript_options(file, value, matches.flags)),
+      Some(
+        transcript_options(
+          file,
+          value,
+          matches.flags,
+          directions=matches.values.get("direction").unwrap_or([]),
+        ),
+      ),
     )
   } else {
     (matches.values.get("file").unwrap_or([]), None)
@@ -847,4 +854,65 @@ fn run(args : Array[String]) -> Int32 raise {
 ///|
 fn read_stdin() -> String raise {
   @utf8.decode(stdin_bytes())
+}
+
+///|
+/// Decodes UTF-8 that arrives in chunks. An incomplete sequence at the end of a
+/// chunk waits for the next chunk, so a character split between two reads
+/// decodes once. Invalid bytes become U+FFFD; nothing panics.
+priv struct Utf8Chunks {
+  /// The start of a sequence that the last chunk did not finish: 0 to 3 bytes.
+  mut held : Bytes
+}
+
+///|
+fn Utf8Chunks::new() -> Utf8Chunks {
+  { held: b"", }
+}
+
+///|
+/// Gives the text of every sequence that is complete after `chunk`.
+fn Utf8Chunks::push(self : Utf8Chunks, chunk : Bytes) -> String {
+  let bytes = if self.held.length() == 0 { chunk } else { self.held + chunk }
+  let keep = incomplete_utf8_tail(bytes)
+  let end = bytes.length() - keep
+  self.held = bytes[end:].to_owned()
+  @utf8.decode_lossy(bytes[:end])
+}
+
+///|
+/// Gives the held bytes at end of input, as U+FFFD.
+fn Utf8Chunks::end(self : Utf8Chunks) -> String {
+  let held = self.held
+  self.held = b""
+  @utf8.decode_lossy(held)
+}
+
+///|
+/// The number of bytes at the end of `bytes` that start a UTF-8 sequence but do
+/// not finish it. Earlier bytes end on a sequence boundary, so they decode the
+/// same alone as with the bytes that follow.
+fn incomplete_utf8_tail(bytes : Bytes) -> Int32 {
+  let n = bytes.length()
+  for back in 1..<=3 {
+    if back > n {
+      return 0
+    }
+    let lead = bytes[n - back].to_int()
+    if (lead & 0xC0) == 0x80 {
+      // A continuation byte: look further back for its lead byte.
+      continue
+    }
+    let length = if lead >= 0xC2 && lead <= 0xDF {
+      2
+    } else if lead >= 0xE0 && lead <= 0xEF {
+      3
+    } else if lead >= 0xF0 && lead <= 0xF4 {
+      4
+    } else {
+      1
+    }
+    return if back < length { back } else { 0 }
+  }
+  0
 }

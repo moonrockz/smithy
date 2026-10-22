@@ -5,10 +5,14 @@
 #include <io.h>
 #endif
 
+/* Defined in ion_input_native.c: read(2) with EINTR and EAGAIN handling. */
+int smithy_ion_input_read(int fd, unsigned char *buffer, int size);
+
+/* Reads what stdin has now, up to size bytes. Unlike fread, read(2) returns as
+   soon as a pipe has data, so a live writer is not held until end of input. */
 MOONBIT_FFI_EXPORT int smithy_stdin_chunk(moonbit_bytes_t buffer, int size) {
 #ifdef _WIN32
-  _setmode(_fileno(stdin), _O_BINARY);
+  _setmode(0, _O_BINARY);
 #endif
-  size_t count = fread(buffer, 1, (size_t)size, stdin);
-  return ferror(stdin) ? -1 : (int)count;
+  return smithy_ion_input_read(0, buffer, size);
 }

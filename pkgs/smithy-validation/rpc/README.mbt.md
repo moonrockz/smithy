@@ -463,8 +463,13 @@ smithy validate rpc transcript --protocol example.peers#Editor --diagnostics jso
 The positionals are the model files, then the transcript file or `-`. `--protocol` is required.
 `--version` is required when the document gives no version, and must agree with it otherwise.
 `--complete` or `--partial` overrides `complete` in the document; partial is the default.
-`--input-format json|markdown|jsonl` defaults from the extension, and to `jsonl` for stdin; only
-`json` and `markdown` are supported now (the library reads JSONL with `LogReader`). Text findings go to stderr as
+`--input-format json|markdown|jsonl` defaults from the extension, and to `jsonl` for stdin. A JSONL
+log needs `--version`, and `--log-preset raw --sender <peer>`, `--log-preset dir-message` (the default,
+with repeatable `--direction value=peer`) or `--log-mapping <file.json>` (the `LogMapping::from_json`
+form). The command feeds each chunk through `LogReader` and `TranscriptChecker` and writes each finding
+when it is known; with `--diagnostics json` the output is JSON Lines, one finding per line and then a
+`{"summary": {...}}` line with the reader counts. A raw log turns correlation off. The js and wasm-gc
+binaries read all of stdin first. Text findings go to stderr as
 `<file>:<line>:<column>: entry <n> <sender>: <severity> <code>: <message>`. JSON diagnostics are one
 report with `valid`, `complete`, `entries`, `outstanding`, `correlation`, `findings` and, for an
 `expect` list, `expectations` (`matched`, `missing`, `unexpected`). The command exits 0 when no

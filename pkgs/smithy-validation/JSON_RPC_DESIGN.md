@@ -166,7 +166,14 @@ when the document gives none, and must agree with it. `--complete` or `--partial
 document; partial is the default. Text findings name the file, line, column, entry and sender; JSON
 diagnostics are one report with the summary, the findings and the expectation result. The exit
 status is 0 for no error findings, or for an `expect` list that matches, 1 otherwise, and 2 for usage
-and contract errors. Markdown transcripts (`examples/json-rpc/transcripts/*.md`) are read with the same command. The library reads JSONL logs with `LogReader`; the command does not read them yet, and stdin streaming remains planned.
+and contract errors. Markdown transcripts (`examples/json-rpc/transcripts/*.md`) are read with the same command. JSONL logs (`--input-format jsonl`, `.jsonl`, `.ndjson` or stdin) need `--version`, and take
+`--log-preset raw|dir-message`, `--sender`, repeatable `--direction value=peer` or `--log-mapping`. The
+command decodes stdin chunks at the CLI boundary, carrying an incomplete UTF-8 sequence to the next
+chunk and replacing invalid bytes with U+FFFD, and passes each chunk through `LogReader` and
+`TranscriptChecker`. It writes reader and checker findings in line order as they are known, then a
+summary with the `LogCounts`; JSON diagnostics are JSON Lines. When `single_sender()` is true the
+checker runs with correlation off. Native and WASI read stdin live; js and wasm-gc read all of stdin
+first and give the same findings.
 
 ## Two-peer protocols
 
