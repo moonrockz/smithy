@@ -27,6 +27,7 @@ See [value validation](pkgs/smithy-validation/README.mbt.md).
 Its [RPC package](pkgs/smithy-validation/rpc/README.mbt.md) checks JSON-RPC 1.0 and 2.0 requests,
 notifications and contextual responses against modeled service methods through `smithy validate rpc`.
 Explicit JSON-RPC 2.0 batch checks preserve element paths and associate unordered replies by exact IDs.
+`smithy validate rpc transcript` checks two-peer exchanges in JSON or Markdown transcripts and JSONL logs.
 
 `moonrockz/smithy-ion-validation` validates immutable Ion values directly with a documented
 native type profile. See [Ion validation](pkgs/smithy-ion-validation/README.mbt.md) and the

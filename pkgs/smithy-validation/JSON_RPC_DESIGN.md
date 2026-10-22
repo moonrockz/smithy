@@ -134,8 +134,11 @@ permitted with an advisory. Advisories do not invalidate an otherwise valid mess
 ResponseContext explicitly provides an operation or original request. Operation-only context can
 validate payload shapes but cannot prove ID correlation. A bare response identifies no method;
 envelope-only checks must state that limited scope. Original-request context permits exact ID checks.
-ExchangeContext holds explicit direction, calls, notifications and supplied associations. Transcript
-completeness must be declared before reporting missing responses. Duplicate IDs may leave otherwise
+For exchanges, `ProtocolDescription` names the two peers of a `@jsonRpcProtocol` structure and the
+service each one accepts, so each transcript entry has an explicit direction. `TranscriptChecker`
+correlates calls, notifications and replies per sender (see the
+[RPC guide](rpc/README.mbt.md#transcripts)). Transcript completeness must be declared before reporting
+missing responses. Duplicate IDs may leave otherwise
 well-formed calls ambiguous for correlation; distinguish that finding from an invented envelope MUST.
 
 Unknown envelope extension fields are ignored by the base profile unless an explicit extension
