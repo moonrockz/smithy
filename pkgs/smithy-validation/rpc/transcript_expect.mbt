@@ -8,73 +8,112 @@ pub struct ExpectedFinding {
 } derive(Eq, Debug)
 
 ///|
+/// The successor of each rpc FindingCode in a walk of all variants. The match
+/// has no wildcard arm, so a new variant does not compile until it is placed
+/// here. `Value` carries the validation codes, which the next walk covers.
+fn next_rpc_code(code : FindingCode) -> FindingCode? {
+  match code {
+    InvalidJson => Some(DuplicateJsonKey)
+    DuplicateJsonKey => Some(JsonInputLimit)
+    JsonInputLimit => Some(InvalidEnvelope)
+    InvalidEnvelope => Some(InvalidVersion)
+    InvalidVersion => Some(InvalidId)
+    InvalidId => Some(DiscouragedId)
+    DiscouragedId => Some(UnknownMethod)
+    UnknownMethod => Some(InvalidParams)
+    InvalidParams => Some(UnsupportedMessage)
+    UnsupportedMessage => Some(MissingContext)
+    MissingContext => Some(LimitedScope)
+    LimitedScope => Some(InvalidContext)
+    InvalidContext => Some(IdMismatch)
+    IdMismatch => Some(UnexpectedResponse)
+    UnexpectedResponse => Some(InvalidError)
+    InvalidError => Some(UnknownError)
+    UnknownError => Some(AmbiguousId)
+    AmbiguousId => Some(DuplicateResponse)
+    DuplicateResponse => Some(MissingResponse)
+    MissingResponse => None
+    Value(_) => None
+  }
+}
+
+///|
+fn next_value_code(code : @validation.FindingCode) -> @validation.FindingCode? {
+  match code {
+    TypeMismatch => Some(RequiredMember)
+    RequiredMember => Some(UnknownMember)
+    UnknownMember => Some(DuplicateMember)
+    DuplicateMember => Some(InvalidNumber)
+    InvalidNumber => Some(NumericBounds)
+    NumericBounds => Some(Range)
+    Range => Some(Length)
+    Length => Some(Pattern)
+    Pattern => Some(UniqueItems)
+    UniqueItems => Some(EnumValue)
+    EnumValue => Some(UnionMember)
+    UnionMember => Some(InvalidEncoding)
+    InvalidEncoding => Some(InvalidTimestamp)
+    InvalidTimestamp => Some(UnsupportedValue)
+    UnsupportedValue => Some(LimitExceeded)
+    LimitExceeded => None
+  }
+}
+
+///|
+/// `Message` carries the codes of the two walks above.
+fn next_transcript_code(code : TranscriptCode) -> TranscriptCode? {
+  match code {
+    UnknownPeer => Some(EntryLimit)
+    EntryLimit => Some(ActiveCallLimit)
+    ActiveCallLimit => Some(FindingLimit)
+    FindingLimit => Some(UnsolicitedResponse)
+    UnsolicitedResponse => Some(DuplicateReply)
+    DuplicateReply => Some(MissingReply)
+    MissingReply => Some(OutstandingCall)
+    OutstandingCall => Some(ResponseToNotification)
+    ResponseToNotification => Some(WrongResponder)
+    WrongResponder => Some(ActiveIdReused)
+    ActiveIdReused => Some(AmbiguousReplyId)
+    AmbiguousReplyId => Some(WrongReplyForm)
+    WrongReplyForm => Some(InvalidTranscript)
+    InvalidTranscript => None
+    Message(_) => None
+  }
+}
+
+///|
+fn[T] walk_codes(first : T, next : (T) -> T?) -> Array[T] {
+  let all = [first]
+  let mut current = next(first)
+  while current is Some(code) {
+    all.push(code)
+    current = next(code)
+  }
+  all
+}
+
+///|
+fn rpc_code_names() -> Array[String] {
+  walk_codes(InvalidJson, next_rpc_code).map(c => Message(c).to_string())
+}
+
+///|
+fn value_code_names() -> Array[String] {
+  walk_codes(@validation.TypeMismatch, next_value_code).map(c => {
+    Message(Value(c)).to_string()
+  })
+}
+
+///|
+fn transcript_code_names() -> Array[String] {
+  walk_codes(UnknownPeer, next_transcript_code).map(c => c.to_string())
+}
+
+///|
 fn known_code_names() -> Array[String] {
-  let rpc_codes : Array[FindingCode] = [
-    InvalidJson,
-    DuplicateJsonKey,
-    JsonInputLimit,
-    InvalidEnvelope,
-    InvalidVersion,
-    InvalidId,
-    DiscouragedId,
-    UnknownMethod,
-    InvalidParams,
-    UnsupportedMessage,
-    MissingContext,
-    LimitedScope,
-    InvalidContext,
-    IdMismatch,
-    UnexpectedResponse,
-    InvalidError,
-    UnknownError,
-    AmbiguousId,
-    DuplicateResponse,
-    MissingResponse,
-  ]
-  let value_codes : Array[@validation.FindingCode] = [
-    TypeMismatch,
-    RequiredMember,
-    UnknownMember,
-    DuplicateMember,
-    InvalidNumber,
-    NumericBounds,
-    Range,
-    Length,
-    Pattern,
-    UniqueItems,
-    EnumValue,
-    UnionMember,
-    InvalidEncoding,
-    InvalidTimestamp,
-    UnsupportedValue,
-    LimitExceeded,
-  ]
-  let transcript_codes : Array[TranscriptCode] = [
-    UnknownPeer,
-    EntryLimit,
-    ActiveCallLimit,
-    FindingLimit,
-    UnsolicitedResponse,
-    DuplicateReply,
-    MissingReply,
-    OutstandingCall,
-    ResponseToNotification,
-    WrongResponder,
-    ActiveIdReused,
-    AmbiguousReplyId,
-    WrongReplyForm,
-    InvalidTranscript,
-  ]
-  let names = []
-  for code in rpc_codes {
-    names.push(Message(code).to_string())
-  }
-  for code in value_codes {
-    names.push(Message(Value(code)).to_string())
-  }
-  for code in transcript_codes {
-    names.push(code.to_string())
-  }
+  let names = rpc_code_names()
+  names.append(value_code_names())
+  names.append(transcript_code_names())
   names
 }
 
