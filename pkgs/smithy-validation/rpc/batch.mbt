@@ -54,6 +54,31 @@ fn invalid_request_envelope(
 }
 
 ///|
+/// The ID that the reply to one request batch element carries, and whether the
+/// element is invalid. An invalid element without a usable ID is answered with
+/// a null ID. A valid notification needs no reply, so it gives None.
+fn batch_reply_id(
+  version : ProtocolVersion,
+  value : Json,
+  request : RequestResult,
+) -> (RequestId, Bool)? {
+  let invalid = invalid_request_envelope(version, value, request)
+  if !invalid && request.kind == Some(Notification) {
+    return None
+  }
+  let id = if invalid &&
+    (
+      request.id == Absent ||
+      request.findings.iter().any(f => f.code == InvalidId)
+    ) {
+    Present(@smithy.Null)
+  } else {
+    request.id
+  }
+  Some((id, invalid))
+}
+
+///|
 priv struct BatchReport {
   service : @smithy.ShapeId
   limit : Int32
@@ -392,22 +417,9 @@ pub fn PreparedService::validate_response_batch_json(
               original_values = Some(values)
               for entry in checked.entries {
                 let request = entry.result
-                let invalid = invalid_request_envelope(
-                  self.version,
-                  values[entry.index],
-                  request,
-                )
-                if !invalid && request.kind == Some(Notification) {
+                guard batch_reply_id(self.version, values[entry.index], request)
+                  is Some((id, invalid)) else {
                   continue
-                }
-                let id = if invalid &&
-                  (
-                    request.id == Absent ||
-                    request.findings.iter().any(f => f.code == InvalidId)
-                  ) {
-                  Present(@smithy.Null)
-                } else {
-                  request.id
                 }
                 if batch_id(id) is Some(key) {
                   let group = calls.get_or_default(key, {

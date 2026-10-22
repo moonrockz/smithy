@@ -37,7 +37,8 @@ Use `smithy --help` for the command list, and `smithy convert --help` or
 `--help`. Options accept both `--to json` and `--to=json`; output also accepts
 `-o model.json` and `-omodel.json`.
 
-Compound commands use subcommands: `smithy validate value` and `smithy validate rpc`.
+Compound commands use subcommands: `smithy validate value`, `smithy validate rpc` and
+`smithy validate rpc transcript`.
 `validate value` replaces the former `validate-value` command. Put its options and
 model inputs after `value`, or after `rpc` for JSON-RPC validation.
 
@@ -423,7 +424,8 @@ smithy validate rpc --version 2.0 --service example#Calculator --response reply.
 
 Invalid messages exit 1; invalid command options or service mappings exit 2. ID advisories
 alone still exit 0. JSON diagnostics include exact message paths, operation and member IDs,
-and parse offsets. Explicit JSON-RPC 2.0 batches use `--batch`; exchanges remain a separate capability.
+and parse offsets. Explicit JSON-RPC 2.0 batches use `--batch`; exchanges between two peers use
+`validate rpc transcript` (see below).
 See the [RPC library and runnable calculator examples](../../pkgs/smithy-validation/rpc/README.mbt.md)
 for trait definitions, version rules, parameter mapping, stdin and dependency isolation.
 
@@ -447,6 +449,87 @@ in the response array. A response batch may correctly report invalid requests an
 An empty response array always fails. Duplicate call IDs are advisory during request validation
 and fail ambiguous correlation. Version 1.0 batch arrays report `UnsupportedMessage`; its
 multi-message transport framing is separate. Batches introduce no handler execution or scheduling.
+
+## Validate JSON-RPC transcripts
+
+`smithy validate rpc transcript` checks a conversation between the two peers of a
+`@smithy.rpc#jsonRpcProtocol` structure. The positionals are the model files, then the transcript file
+or `-` for stdin. Options and model inputs go after `transcript`.
+
+```shell
+smithy validate rpc transcript --protocol example.peers#Editor \
+  examples/json-rpc/peers.smithy examples/json-rpc/transcripts/editor.json
+smithy validate rpc transcript --protocol example.peers#Editor --complete --diagnostics json \
+  examples/json-rpc/peers.smithy examples/json-rpc/transcripts/editor-negative.json
+smithy validate rpc transcript --protocol batch#Link \
+  examples/json-rpc/batches.smithy examples/json-rpc/transcripts/batches.json
+smithy validate rpc transcript --protocol example.lifecycle#Lifecycle \
+  examples/json-rpc/lifecycle.smithy examples/json-rpc/transcripts/lifecycle-violation.json
+smithy validate rpc transcript --protocol example.peers#Editor --version 2.0 \
+  --direction in=client --direction out=server \
+  examples/json-rpc/peers.smithy examples/json-rpc/transcripts/editor.jsonl
+smithy validate rpc transcript --protocol example.peers#Editor --version 2.0 \
+  --log-mapping examples/json-rpc/transcripts/mcp-like.mapping.json \
+  examples/json-rpc/peers.smithy examples/json-rpc/transcripts/mcp-like.jsonl
+# my-server is any process that logs dir-message records to stderr.
+my-server --stdio 2>&1 >/dev/null | smithy validate rpc transcript --protocol example.peers#Editor \
+  --version 2.0 --diagnostics json examples/json-rpc/peers.smithy -
+```
+
+The transcript is a JSON document with `entries` (each `{"from": peer, "message": value}`) and optional
+`version`, `complete` and `expect` fields, or a bare array of entries. A document without `entries`
+is an `InvalidTranscript` error; an unknown top-level key is an advisory. The checker correlates each reply
+with its call per sender, and reports unsolicited, duplicate and wrong-responder replies, replies to
+notifications and calls without a reply. A protocol with `@jsonRpcSession` also checks the order of
+methods (`StateViolation`), the advertised capabilities (`CapabilityNotAdvertised`) and cancellations
+of calls that are not active (`CancelInactiveCall`, advisory). An order trait that names an undeclared
+state or capability is an invalid protocol (exit 2). See `examples/json-rpc/lifecycle.smithy`.
+
+- `--protocol` names the protocol structure. It is required.
+- `--version 1.0|2.0` is required when the document gives no version. When both give it, they must agree.
+- `--complete` makes a call without a reply an error (`MissingResponse`). `--partial`, the default, makes
+  it an advisory (`OutstandingCall`). Either flag overrides `complete` in the document.
+- `--input-format json|markdown|jsonl` defaults from the extension: `.json`, `.md`, `.jsonl` or `.ndjson`,
+  and `jsonl` for stdin. A Markdown transcript has fenced `jsonrpc` blocks.
+- `--diagnostics text|json`. Text mode writes one line per finding to stderr:
+  `<file>:<line>:<column>: entry <n> <sender>: <severity> <code>: <message>`. JSON mode writes one
+  report to stdout: `valid`, `complete`, `entries`, `outstanding`, `correlation`, `findings` and, when the
+  document has an `expect` list, `expectations` with `matched`, `missing` and `unexpected` (the unlisted
+  error findings).
+
+### JSONL logs
+
+A JSONL log mixes protocol messages with other output. Lines that are not JSON, and JSON records that
+are not messages, are counted and skipped. A log has no header, so `--version` is required.
+
+- `--log-preset dir-message`, the default, reads `{"dir": ..., "message": ...}` records. Each
+  `--direction value=peer` names the sender for one `dir` value; repeat it for each value. Without it,
+  `request` is the first peer of the protocol and `response` the second, as in Morphir NDJSON logs.
+- `--log-preset raw --sender <peer>` reads lines that are JSON-RPC messages, all sent by one peer. A log
+  with one sender has no replies to correlate, so correlation is off and the summary says
+  `correlation:false`.
+- `--log-mapping <file.json>` reads other log formats. The keys are `prefix`, `selector`, `message` and
+  `sender`; see `examples/json-rpc/transcripts/mcp-like.mapping.json` and the
+  [RPC guide](../../pkgs/smithy-validation/rpc/README.mbt.md#jsonl-logs). It conflicts with
+  `--log-preset`, `--sender` and `--direction`.
+
+A peer name that is not a peer of the protocol, a bad mapping file and conflicting options exit 2. A
+line that the mapping cannot read, such as a `dir` value with no `--direction`, is an
+`InvalidTranscript` error finding.
+
+The command writes each finding as soon as it is known, so it can check a process while the process
+runs. Text mode writes the finding lines and then a summary line to stderr, for example
+`log.jsonl: summary: valid:true complete:true entries:9 outstanding:0 correlation:true lines:19 not_json:8 skipped:2`.
+JSON mode writes JSON Lines to stdout: one finding object per line, then
+`{"summary": {"valid", "complete", "entries", "outstanding", "correlation", "lines", "not_json", "skipped"}}`.
+`lines` counts every line, `not_json` the lines that are not JSON, and `skipped` the JSON records that
+are not messages. The native and WASI (`wasm`) binaries read stdin as it arrives. The `js` and
+`wasm-gc` binaries read all of stdin first; they give the same findings, but only at the end of input.
+
+The exit status is 0 when no finding is an error, and 1 otherwise. When the document has an `expect`
+list, the status is 0 when the findings match it and 1 when they do not. A malformed transcript gives
+`InvalidTranscript` findings and exits 1. An invalid model exits 1. Invalid options, a missing or
+conflicting version, and an invalid protocol exit 2.
 
 ## Public GitHub release assets
 

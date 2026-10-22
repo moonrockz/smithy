@@ -339,3 +339,286 @@ test "batch CLI selects request response and absent-response modes" {
   }
   assert_eq(code, 2)
 }
+
+///|
+test "transcript CLI reads the protocol, flags and the last positional" {
+  let opts = options([
+    "validate", "rpc", "transcript", "--protocol", "example.peers#Editor", "peers.smithy",
+    "extra.json", "editor.json",
+  ])
+  assert_eq(opts.files, ["peers.smithy", "extra.json"])
+  assert_eq(opts.rpc_version, None)
+  assert_eq(opts.rpc_options is None, true)
+  let transcript = opts.transcript.unwrap()
+  assert_eq(transcript.file, "editor.json")
+  assert_eq(transcript.version, None)
+  assert_eq(transcript.completeness, None)
+  let value_opts = opts.value_validation.unwrap()
+  assert_eq(value_opts.target.to_string(), "example.peers#Editor")
+  assert_eq(value_opts.file, "editor.json")
+  assert_true(value_opts.diagnostics == TextFindings)
+  let opts = options([
+    "validate", "rpc", "transcript", "--protocol", "example.peers#Editor", "--version",
+    "2.0", "--complete", "--diagnostics", "json", "--input-format", "json", "--from",
+    "idl", "-", "log.txt",
+  ])
+  let transcript = opts.transcript.unwrap()
+  assert_eq(opts.files, ["-"])
+  assert_eq(transcript.version, Some(@rpc.V2_0))
+  assert_eq(transcript.completeness, Some(@rpc.Complete))
+  assert_true(opts.value_validation.unwrap().diagnostics == JsonFindings)
+  let partial = options([
+    "validate", "rpc", "transcript", "--protocol", "example.peers#Editor", "--partial",
+    "--input-format=json", "peers.smithy", "-",
+  ])
+  assert_eq(partial.transcript.unwrap().completeness, Some(@rpc.Partial))
+  assert_eq(partial.transcript.unwrap().file, "-")
+}
+
+///|
+test "transcript input formats follow the extension, and stdin defaults to JSONL" {
+  assert_true(transcript_format("t.json", None) is JsonTranscript)
+  assert_true(transcript_format("t.md", None) is MarkdownTranscript)
+  assert_true(transcript_format("t.jsonl", None) is JsonlTranscript)
+  assert_true(transcript_format("t.ndjson", None) is JsonlTranscript)
+  assert_true(transcript_format("-", None) is JsonlTranscript)
+  assert_true(transcript_format("-", Some("json")) is JsonTranscript)
+  assert_true(
+    transcript_format("t.json", Some("markdown")) is MarkdownTranscript,
+  )
+  for args in [["t.txt", ""], ["t.json", "xml"]] {
+    let format = if args[1] == "" { None } else { Some(args[1]) }
+    let code = try transcript_format(args[0], format) catch {
+      CliError(_, code) => code
+    } noraise {
+      _ => 0
+    }
+    assert_eq(code, 2, msg=args.join(" "))
+  }
+}
+
+///|
+test "transcript CLI usage and contract errors exit 2" {
+  let base = ["validate", "rpc", "transcript"]
+  for
+    tail in [
+      ["peers.smithy", "editor.json"],
+      ["--protocol", "example.peers#Editor", "editor.json"],
+      ["--protocol", "Editor", "peers.smithy", "editor.json"],
+      ["--protocol", "example.peers#Editor$x", "peers.smithy", "editor.json"],
+      [
+        "--protocol", "example.peers#Editor", "--version", "1.1", "peers.smithy",
+        "editor.json",
+      ],
+      [
+        "--protocol", "example.peers#Editor", "--complete", "--partial", "peers.smithy",
+        "editor.json",
+      ],
+      [
+        "--protocol", "example.peers#Editor", "--input-format", "xml", "peers.smithy",
+        "editor.json",
+      ],
+      ["--protocol", "example.peers#Editor", "peers.smithy", "editor.txt"],
+      ["--protocol", "example.peers#Editor", "peers.smithy", "editor.jsonl"],
+      ["--protocol", "example.peers#Editor", "peers.smithy", "-"],
+      [
+        "--protocol", "example.peers#Editor", "--input-format", "json", "--from",
+        "idl", "-", "-",
+      ],
+      [
+        "--protocol", "example.peers#Editor", "--diagnostics", "xml", "peers.smithy",
+        "editor.json",
+      ],
+      [
+        "--protocol", "example.peers#Editor", "--service", "example#Api", "peers.smithy",
+        "editor.json",
+      ],
+    ] {
+    let code = try options(base + tail) catch {
+      CliError(_, code) => code
+    } noraise {
+      _ => 0
+    }
+    assert_eq(code, 2, msg=tail.join(" "))
+  }
+  // Options and inputs of `rpc` do not reach the nested transcript command.
+  for
+    args in [
+      [
+        "validate", "rpc", "--version", "2.0", "transcript", "--protocol", "example.peers#Editor",
+        "peers.smithy", "editor.json",
+      ],
+      [
+        "validate", "rpc", "--diagnostics", "json", "transcript", "--protocol", "example.peers#Editor",
+        "peers.smithy", "editor.json",
+      ],
+    ] {
+    let code = try options(args) catch {
+      CliError(_, code) => code
+    } noraise {
+      _ => 0
+    }
+    assert_eq(code, 2, msg=args.join(" "))
+  }
+}
+
+///|
+test "rpc keeps its required options when no transcript is named" {
+  for
+    tail in [
+      ["--service", "example#Api", "--message", "m.json", "m.smithy"],
+      ["--version", "2.0", "--message", "m.json", "m.smithy"],
+      ["--version", "2.0", "--service", "example#Api", "--message", "m.json"],
+    ] {
+    let code = try options(["validate", "rpc"] + tail) catch {
+      CliError(_, code) => code
+    } noraise {
+      _ => 0
+    }
+    assert_eq(code, 2, msg=tail.join(" "))
+  }
+}
+
+///|
+test "transcript version comes from the flag or the document and must agree" {
+  assert_eq(
+    transcript_version(Some(@rpc.V2_0), None, "t.json"),
+    Some(@rpc.V2_0),
+  )
+  assert_eq(
+    transcript_version(None, Some(@rpc.V1_0), "t.json"),
+    Some(@rpc.V1_0),
+  )
+  assert_eq(
+    transcript_version(Some(@rpc.V1_0), Some(@rpc.V1_0), "t.json"),
+    Some(@rpc.V1_0),
+  )
+  assert_eq(transcript_version(None, None, "t.json"), None)
+  let code = try
+    transcript_version(Some(@rpc.V1_0), Some(@rpc.V2_0), "t.json")
+  catch {
+    CliError(_, code) => code
+  } noraise {
+    _ => 0
+  }
+  assert_eq(code, 2)
+}
+
+///|
+fn transcript_usage_status(args : Array[String]) -> Int32 {
+  try options(["validate", "rpc", "transcript"] + args) catch {
+    CliError(_, code) => code
+  } noraise {
+    _ => 0
+  }
+}
+
+///|
+test "JSONL transcripts read the log options" {
+  let base = [
+    "--protocol", "example.peers#Editor", "--version", "2.0", "peers.smithy",
+  ]
+  let log = options(["validate", "rpc", "transcript"] + base + ["log.jsonl"]).transcript.unwrap().log
+  // Without a preset or a mapping file, a log is dir-message with the default map.
+  assert_true(log is Some(DirMessageLog(None)))
+  let log = options(
+      ["validate", "rpc", "transcript"] +
+      base +
+      [
+        "--log-preset", "dir-message", "--direction", "in=client", "--direction",
+        "out=server", "-",
+      ],
+    ).transcript.unwrap().log
+  guard log is Some(DirMessageLog(Some(directions))) else {
+    fail("expected the --direction map")
+  }
+  assert_eq(directions.to_array().map(pair => (pair.0, pair.1.to_string())), [
+    ("in", "client"),
+    ("out", "server"),
+  ])
+  let log = options(
+      ["validate", "rpc", "transcript"] +
+      base +
+      ["--log-preset", "raw", "--sender", "client", "log.jsonl"],
+    ).transcript.unwrap().log
+  guard log is Some(RawLog(sender)) else { fail("expected the raw preset") }
+  assert_eq(sender.to_string(), "client")
+  let log = options(
+      ["validate", "rpc", "transcript"] +
+      base +
+      ["--log-mapping", "log.mapping.json", "log.ndjson"],
+    ).transcript.unwrap().log
+  assert_true(log is Some(MappingFile("log.mapping.json")))
+  // JSON and Markdown documents take no log options.
+  let document = options(["validate", "rpc", "transcript"] + base + ["t.json"])
+  assert_true(document.transcript.unwrap().log is None)
+}
+
+///|
+test "JSONL log option conflicts and a raw preset without --sender exit 2" {
+  let base = ["--protocol", "example.peers#Editor", "peers.smithy"]
+  let version = ["--version", "2.0"]
+  for
+    args in [
+      // JSONL has no document header, so the version is required.
+      ["log.jsonl"],
+      ["--log-preset", "raw", "--sender", "client", "-"],
+      // The preset and the mapping file conflict.
+      version + ["--log-preset", "raw", "--log-mapping", "m.json", "log.jsonl"],
+      version +
+      ["--log-preset", "dir-message", "--log-mapping", "m.json", "log.jsonl"],
+      // raw needs a sender, and only raw takes one.
+      version + ["--log-preset", "raw", "log.jsonl"],
+      version + ["--sender", "client", "log.jsonl"],
+      version +
+      ["--log-preset", "dir-message", "--sender", "client", "log.jsonl"],
+      version + ["--log-mapping", "m.json", "--sender", "client", "log.jsonl"],
+      // Only dir-message takes directions.
+      version +
+      [
+        "--log-preset", "raw", "--sender", "client", "--direction", "in=client",
+        "log.jsonl",
+      ],
+      version +
+      ["--log-mapping", "m.json", "--direction", "in=client", "log.jsonl"],
+      // A direction is value=peer, once per value.
+      version + ["--direction", "in", "log.jsonl"],
+      version + ["--direction", "=client", "log.jsonl"],
+      version + ["--direction", "in=", "log.jsonl"],
+      version + ["--direction", "in=not a peer", "log.jsonl"],
+      version +
+      ["--direction", "in=client", "--direction", "in=server", "log.jsonl"],
+      version + ["--log-preset", "xml", "log.jsonl"],
+      version + ["--log-preset", "raw", "--sender", "not a peer", "log.jsonl"],
+      // Log options need JSONL input.
+      version + ["--log-preset", "dir-message", "t.json"],
+      version + ["--direction", "in=client", "t.md"],
+      version + ["--log-mapping", "m.json", "t.json"],
+      version + ["--sender", "client", "--input-format", "json", "-"],
+    ] {
+    assert_eq(transcript_usage_status(base + args), 2, msg=args.join(" "))
+  }
+}
+
+///|
+test "UTF-8 split between stdin chunks decodes once" {
+  let whole = b"a\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80\n\xff\xc3(\xe2\x82\n\xef\xbb\xbfz\xf0\x9f"
+  let expected = @utf8.decode_lossy(whole)
+  for split in 0..<=whole.length() {
+    let chunks = Utf8Chunks::new()
+    let text = chunks.push(whole[:split].to_owned()) +
+      chunks.push(whole[split:].to_owned()) +
+      chunks.end()
+    assert_eq(text, expected, msg="split at \{split}")
+  }
+  // One byte per chunk also decodes each character once.
+  let chunks = Utf8Chunks::new()
+  let text = StringBuilder()
+  for byte in whole {
+    text.write_string(chunks.push(Bytes::from_array([byte])))
+  }
+  text.write_string(chunks.end())
+  assert_eq(text.to_string(), expected)
+  assert_true(expected.contains("\u{FFFD}"))
+  assert_true(expected.has_prefix("aé€😀\n"))
+}

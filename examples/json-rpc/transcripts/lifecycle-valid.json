@@ -1,0 +1,20 @@
+{
+  "version": "2.0",
+  "complete": true,
+  "entries": [
+    { "from": "host", "message": {"jsonrpc": "2.0", "id": 1, "method": "ping"} },
+    { "from": "extension", "message": {"jsonrpc": "2.0", "id": 1, "result": null} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": {"host": "studio"}} },
+    { "from": "extension", "message": {"jsonrpc": "2.0", "id": 2, "result": {"capabilities": {"progress": true, "cancellation": true}}} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "method": "initialized"} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "id": 3, "method": "compile", "params": {"source": "a"}} },
+    { "from": "extension", "message": {"jsonrpc": "2.0", "method": "progress", "params": {"message": "parsing"}} },
+    { "from": "extension", "message": {"jsonrpc": "2.0", "id": 3, "result": "ok"} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "id": 4, "method": "compile", "params": {"source": "b"}} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "method": "$/cancelRequest", "params": {"id": 4}} },
+    { "from": "extension", "message": {"jsonrpc": "2.0", "id": 4, "error": {"code": -32800, "message": "Request cancelled"}} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "id": 5, "method": "shutdown"} },
+    { "from": "extension", "message": {"jsonrpc": "2.0", "id": 5, "result": null} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "method": "exit"} }
+  ]
+}

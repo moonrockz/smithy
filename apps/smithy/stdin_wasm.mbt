@@ -9,7 +9,8 @@ extern "wasm" fn bytes_address(bytes : Bytes) -> Int32 =
 fn fd_read(fd : Int32, iov : Bytes, size : Int32, count : Bytes) -> Int32 = "wasi_snapshot_preview1" "fd_read"
 
 ///|
-fn stdin_bytes() -> Bytes raise {
+/// Gives each WASI read of stdin to `consume` as it arrives, until end of input.
+fn read_stdin_chunks(consume : (Bytes) -> Unit raise) -> Unit raise {
   // Bytes point at their payload on the linear-memory backend. Keep buffer
   // alive through the read and copy each chunk before reusing it.
   let buffer = Bytes::make(8192, 0)
@@ -25,7 +26,6 @@ fn stdin_bytes() -> Bytes raise {
     b'\x00',
   ])
   let count = Bytes::make(4, 0)
-  let out : Array[Byte] = []
   while true {
     let error = fd_read(0, iov, 1, count)
     if error != 0 {
@@ -36,9 +36,17 @@ fn stdin_bytes() -> Bytes raise {
       break
     }
     guard n <= 8192 else { raise CliError("invalid stdin read length", 1) }
-    for byte in buffer[:n.reinterpret_as_int()] {
-      out.push(byte)
-    }
+    consume(buffer[:n.reinterpret_as_int()].to_owned())
   }
-  Bytes::from_array(out)
+}
+
+///|
+fn stdin_bytes() -> Bytes raise {
+  let bytes : Array[Byte] = []
+  read_stdin_chunks(chunk => {
+    for byte in chunk {
+      bytes.push(byte)
+    }
+  })
+  Bytes::from_array(bytes)
 }

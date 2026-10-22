@@ -155,9 +155,355 @@ normalized exact coefficients/exponents, so `1`, `1.0` and `1e0` correlate witho
 expanding large exponents. Numeric IDs remain distinct from strings.
 
 Both batch APIs report `UnsupportedMessage` under 1.0. Multiple 1.0 objects in HTTP/stream framing
-are a separate transport concern. Batches do not define scheduling, handler execution, peer
-direction, outstanding calls across batches or partial transcript completeness. Exchanges remain
-a separate capability.
+are a separate transport concern. The batch APIs check one supplied association. They do not
+define scheduling, handler execution, peer direction or outstanding calls across batches;
+`TranscriptChecker` links batches between two peers (see Transcripts).
+
+## Two-peer protocols
+
+A `@jsonRpcProtocol` structure names two peers and the service each peer accepts. A peer with no
+`accepts` accepts nothing. `ProtocolDescription::from_smithy` selects a version and prepares one
+`PreparedService` per receiving peer. See `examples/json-rpc/peers.smithy`.
+
+```mbt check
+///|
+test "describe a two-peer protocol" {
+  let loaded = @rpc.loader()
+    .add_idl(
+      "peers.smithy",
+      (
+        #|$version: "2"
+        #|namespace demo
+        #|use smithy.rpc#jsonRpc
+        #|use smithy.rpc#jsonRpcProtocol
+        #|use smithy.rpc#method
+        #|@jsonRpcProtocol(versions: ["2.0"], peers: [{name: "client"}, {name: "server", accepts: Api}])
+        #|structure Link {}
+        #|@jsonRpc(versions: ["2.0"])
+        #|service Api { version: "1", operations: [Ping] }
+        #|@method(name: "ping", params: "named", nullResult: true)
+        #|operation Ping {}
+      ),
+    )
+    .assemble()
+  guard loaded.model is Some(model) else { fail("model did not load") }
+  let link = @rpc.ProtocolDescription::from_smithy(
+    model,
+    @smithy.ShapeId::parse("demo#Link").unwrap(),
+    @rpc.V2_0,
+  )
+  let server = @rpc.PeerName::parse("server").unwrap()
+  assert_true(link.service_for(server) is Some(_))
+  assert_eq(link.other(server).map(p => p.to_string()), Some("client"))
+}
+```
+
+## Transcripts
+
+`TranscriptChecker` checks a conversation between the two peers of a `ProtocolDescription`.
+Each `TranscriptEntry` names its sender and holds the original message text. The receiver is
+the other peer; an entry may also name one (`receiver: Some(peer)`, as a Markdown `A -> B` does),
+and the checker reports a named receiver that is not the other peer as `UnknownPeer`. `feed` returns the findings for one entry at once, and `feed_all` accepts a
+group of any size; both give the same findings in the same order. `finish` returns the
+end-of-input findings and a summary. It is idempotent, and a feed after it is ignored. The
+checker does no I/O and never raises: problems are `TranscriptFinding` values.
+
+```mbt check
+///|
+test "check a two-peer transcript" {
+  let loaded = @rpc.loader()
+    .add_idl(
+      "peers.smithy",
+      (
+        #|$version: "2"
+        #|namespace demo
+        #|use smithy.rpc#jsonRpc
+        #|use smithy.rpc#jsonRpcProtocol
+        #|use smithy.rpc#method
+        #|@jsonRpcProtocol(versions: ["2.0"], peers: [{name: "client"}, {name: "server", accepts: Api}])
+        #|structure Link {}
+        #|@jsonRpc(versions: ["2.0"])
+        #|service Api { version: "1", operations: [Ping] }
+        #|@method(name: "ping", params: "named", nullResult: true)
+        #|operation Ping {}
+      ),
+    )
+    .assemble()
+  guard loaded.model is Some(model) else { fail("model did not load") }
+  let link = @rpc.ProtocolDescription::from_smithy(
+    model,
+    @smithy.ShapeId::parse("demo#Link").unwrap(),
+    @rpc.V2_0,
+  )
+  let client = @rpc.PeerName::parse("client").unwrap()
+  let server = @rpc.PeerName::parse("server").unwrap()
+  let checker = @rpc.TranscriptChecker::new(link, completeness=Complete)
+  let found = checker.feed_all([
+    {
+      sender: client,
+      receiver: None,
+      message: "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}",
+      location: None,
+    },
+    {
+      sender: server,
+      receiver: None,
+      message: "{\"jsonrpc\":\"2.0\",\"id\":1.0,\"result\":null}",
+      location: None,
+    },
+    {
+      sender: server,
+      receiver: None,
+      message: "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":null}",
+      location: None,
+    },
+  ])
+  assert_eq(found.map(f => f.code.to_string()), ["UnsolicitedResponse"])
+  assert_eq(found[0].entry, Some(2))
+  assert_eq(checker.finish().outstanding, 0)
+}
+```
+
+Correlation follows these rules:
+
+- Each sender has its own ID space. A reply matches a call by caller, responder and exact ID.
+  `1`, `1.0` and `10e-1` are the same ID; the string `"1"` is not. Structured 1.0 IDs compare
+  structurally.
+- A matched reply is validated with `OriginalRequest` context from its call, and its findings
+  name the call in `related`. The call is then answered.
+- A null-ID reply answers the earliest unreadable entry (invalid JSON, or an invalid envelope with
+  no usable ID) of the other peer, else an active explicit-null 2.0 call. When both exist, it
+  answers the earlier one and adds an `AmbiguousReplyId` advisory (code `AmbiguousId`).
+- Otherwise a reply is a `DuplicateReply` (code `DuplicateResponse`, with the first reply in `related`), a
+  `WrongResponder` (the ID is active for the sender itself), a `ResponseToNotification` (a 1.0
+  null-ID reply after a 1.0 notification), or an `UnsolicitedResponse`. These replies are still
+  checked as envelopes, and only their error findings are kept.
+- A call that reuses an ID still active for its sender is `ActiveIdReused`.
+- `finish` reports each active call and each 2.0 unreadable entry as `MissingReply` (code `MissingResponse`, error)
+  when the transcript is `Complete`, and as `OutstandingCall` (advisory) when it is `Partial`, the
+  default. Notifications never need a reply.
+- A peer that accepts nothing receives no methods: a request to it is `UnknownMethod` on the
+  protocol shape.
+- With `correlation=false` the checker validates each message only; replies keep the
+  `LimitedScope` advisory and no call is tracked.
+- A 2.0 array entry is a batch. It is a reply batch when an element is an object with `result`
+  or `error` and no element has `method`. Any other array, `[]` too, is a request batch.
+- A request batch is one unit. It is checked with `validate_request_batch` and waits for one
+  reply batch. An all-notification batch needs no reply. An empty batch waits for one null-ID
+  `-32600` error object, as an unreadable entry does.
+- A reply batch answers the earliest pending batch of the other peer whose IDs include every reply
+  ID. It is checked with `OriginalBatch` context, so missing replies inside the batch are reported
+  at once, and its findings name the batch in `related`. A reply batch that fits no batch is an
+  `UnsolicitedResponse`. A single reply to a call inside a pending batch is `WrongReplyForm`.
+- At `finish`, each pending batch is one `MissingReply` or `OutstandingCall`, with the batch in
+  `related`. A 1.0 array entry is `UnsupportedMessage`, because 1.0 has no batches.
+
+`TranscriptLimits::new` bounds memory and output: `active_calls` (1024, per sender, also for
+unreadable entries and pending batches), `answered_ids` (4096, per sender, also for remembered 1.0 notifications),
+`entry_bytes` (1 MiB) and `findings` (10,000). An unknown sender gives `UnknownPeer` and an
+oversized entry gives `EntryLimit`; both entries are skipped. A call beyond `active_calls` gives
+`ActiveCallLimit` and is not tracked. When the answered memory forgets an ID, a late duplicate is
+reported as unsolicited and the message says so. The last finding within the budget is
+`FindingLimit`. The two limit findings set `complete` to false in the summary.
+
+## Session order
+
+A protocol can opt in to order and capability checks with `@jsonRpcSession` on its
+`@jsonRpcProtocol` structure. Without it, the checker does not read the order traits, so a protocol
+with no session gives the same findings as before, even when its operations carry them.
+`examples/json-rpc/lifecycle.smithy` is a MEP-like protocol between a host and an extension, and
+`example.peers#OrderedEditor` in `examples/json-rpc/peers.smithy` gives the Editor services the LSP
+order: initialize first, then shutdown, then exit.
+
+- `@jsonRpcSession(states: [...], capabilities: [...])` names the session states; the first one is the
+  initial state. Each capability source has a `name`, the `method` whose successful result advertises
+  it, and a JSON Pointer `pointer` into that result. The capability is advertised unless the value
+  there is absent, `null` or `false`.
+- `@jsonRpcLifecycle` on an operation gives `allowedIn` (absent means every state), the transitions
+  `onCall` (when the request or notification is accepted), `onSuccess` and `onError` (when its reply
+  arrives), and `requires`, the capabilities that must be advertised. A method without the trait is
+  allowed in every state.
+- `@jsonRpcCancels(idMember, code)` on an operation names the input member that holds the ID of the
+  call to cancel, and the error code that the cancelled call may answer with.
+
+One session state is shared by both peers. A request or notification whose method is not allowed in
+the current state is a `StateViolation` error; `related` names the entry of the last transition. A
+method whose required capability no result advertised is a `CapabilityNotAdvertised` error. A rejected
+message causes no transition, and its reply moves the session nowhere, but its call is still
+correlated. A cancellation names an active call of its own sender. If that call is not active, the
+cancellation is a `CancelInactiveCall` advisory, because a cancellation can race the reply. The reply
+of a cancelled call may use the declared code: the checker drops the `UnknownError` finding for that
+code on that call. In a request batch, the checker checks the elements in array order, and a reply
+batch settles each answered call. A cancellation does not excuse the code of a call inside a batch.
+
+`from_smithy` checks the traits: a state that the session does not declare, an unknown capability, a
+capability method that no peer accepts, an invalid pointer and an `idMember` that is not an input
+member are `InvalidContract`. The session holds only the state, the advertised capability names, the
+entry of the last transition and the cancelled calls, which are always active calls, so
+`active_calls` bounds them. With `correlation=false` the checker does no order checks.
+
+```mbt check
+///|
+test "check the order of a session" {
+  let loaded = @rpc.loader()
+    .add_idl(
+      "session.smithy",
+      (
+        #|$version: "2"
+        #|namespace demo
+        #|use smithy.rpc#jsonRpc
+        #|use smithy.rpc#jsonRpcLifecycle
+        #|use smithy.rpc#jsonRpcProtocol
+        #|use smithy.rpc#jsonRpcSession
+        #|use smithy.rpc#method
+        #|@jsonRpcProtocol(versions: ["2.0"], peers: [{name: "client"}, {name: "server", accepts: Api}])
+        #|@jsonRpcSession(states: ["closed", "open"])
+        #|structure Link {}
+        #|@jsonRpc(versions: ["2.0"])
+        #|service Api { version: "1", operations: [Open, Ping] }
+        #|@method(name: "open", params: "named", nullResult: true)
+        #|@jsonRpcLifecycle(allowedIn: ["closed"], onSuccess: "open")
+        #|operation Open {}
+        #|@method(name: "ping", params: "named", nullResult: true)
+        #|@jsonRpcLifecycle(allowedIn: ["open"])
+        #|operation Ping {}
+      ),
+    )
+    .assemble()
+  guard loaded.model is Some(model) else { fail("model did not load") }
+  let link = @rpc.ProtocolDescription::from_smithy(
+    model,
+    @smithy.ShapeId::parse("demo#Link").unwrap(),
+    @rpc.V2_0,
+  )
+  let client = @rpc.PeerName::parse("client").unwrap()
+  let server = @rpc.PeerName::parse("server").unwrap()
+  let checker = @rpc.TranscriptChecker::new(link)
+  let found = checker.feed_all(
+    [
+      (client, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}"),
+      (client, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"open\"}"),
+      (server, "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":null}"),
+      (client, "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"ping\"}"),
+    ].map(e => { sender: e.0, receiver: None, message: e.1, location: None, }),
+  )
+  assert_eq(found.map(f => f.code.to_string()), ["StateViolation"])
+  assert_eq(found[0].entry, Some(0))
+  assert_eq(
+    found[0].message,
+    "I expected method ping only in state open; entry 0 from client sent it in state closed.",
+  )
+}
+```
+
+## JSON transcript documents
+
+`read_json_transcript` reads a JSON document into a `TranscriptDocument`: an object with `entries`
+(each `{"from": peer, "message": value}`) and optional `version` (`"1.0"` or `"2.0"`), `complete`
+(boolean) and `expect`, or a bare array of entries. Each `message` is the exact source text of its
+value, so numbers and IDs stay as written, and each entry's location is the line and column of that
+value. The reader never raises: a problem is an `InvalidTranscript` finding with a location, and an
+entry with a problem is dropped. An object without `entries`, or with a second `entries`, is an error;
+an unknown top-level key is an advisory, so it never fails a valid document. It does not know the protocol, so a peer name that the protocol
+lacks is reported by the checker as `UnknownPeer`.
+
+`expect` lists `{code, entry?, related?}` items. `match_expected` pairs each item with one distinct
+finding of the same code name (`to_string`), entry and related entry. `ExpectationResult::is_match`
+holds when no item is missing and every unlisted finding is an advisory.
+
+## Markdown transcript documents
+
+`read_markdown_transcript` reads the same `TranscriptDocument` from Markdown. A fenced block (three or
+more backticks or tildes; the closing fence uses the same character and is at least as long) whose
+info string is `jsonrpc A -> B` or `jsonrpc A` is an entry sent by `A`; `B`, when given, is kept as the
+entry's `receiver` and must be the other peer, or the checker reports `UnknownPeer` and skips the entry.
+The reader itself rejects a `B` equal to `A` or not a peer name. A `jsonrpc` fence with no direction is an `InvalidTranscript` finding. A `jsonrpc-expect`
+fence holds a JSON array of `{code, entry?, related?}` items. Other fences and all prose are ignored.
+Front matter between `---` lines on the first lines may give `version` and `complete`; other keys are
+ignored. The block body is the message exactly as written, located at the first body line, column 1.
+An unterminated `jsonrpc` fence is reported at its opening line.
+
+`run_transcript` checks a document that a reader produced: it runs the `TranscriptChecker` over the
+entries, puts the reader findings first, and returns the findings, the summary and, for an `expect`
+list, the `ExpectationResult`. A completeness argument overrides the document; the default is `Partial`.
+
+## JSONL logs
+
+`LogReader` reads entries from a log as it arrives: `push_text` takes chunks of any size and
+returns the entries and findings of the lines that the chunk finishes, and `end` reads a final
+line with no newline. A line split between chunks, also inside a surrogate pair or a CRLF, is held
+until it is complete. A leading BOM is removed once, and CRLF counts as LF. A `LogMapping` says how a
+line becomes an entry:
+
+- `LogPrefix` removes leading text: `NoPrefix`, `ToFirstBrace`, or `Fields(n, delimiter)`, which
+  skips `n` fields that each end with the delimiter.
+- `LogSelector` keeps protocol records: `AnyJsonRpc` (a record, or an element of a record array,
+  with `jsonrpc`, `method`, `result` or `error`), `HasField(pointer)` or
+  `FieldEquals(pointer, string)`.
+- `MessageSource` finds the message: `WholeRecord`, `Field(pointer)` (the exact source text of the
+  value) or `EscapedField(pointer)` (the decoded value of a string that holds the JSON text).
+- `SenderSource` names the sender: `Fixed(peer)`, or `Field(pointer, values)`, which maps the
+  string value of a field to a peer.
+
+Paths are JSON Pointers. `LogMapping::new` raises `ConfigurationError` for an invalid pointer, a
+negative field count or an empty sender map. `LogMapping::raw(sender)` is the `raw` preset, and
+`LogMapping::dir_message(directions)` is the `dir-message` preset for `{"dir": ..., "message": ...}`
+records. `LogMapping::from_json(text, peers)` reads the same mapping from JSON, for example
+`examples/json-rpc/transcripts/mcp-like.mapping.json`:
+
+```json
+{
+  "prefix": {"fields": 2, "delimiter": " "},
+  "selector": {"field": "/event", "equals": "message"},
+  "message": {"escapedField": "/text"},
+  "sender": {"field": "/from", "values": {"client": "client", "server": "server"}}
+}
+```
+
+`prefix` is `"none"`, `"first-brace"` or `{"fields", "delimiter"}`; `selector` is `"jsonrpc"`,
+`{"hasField"}` or `{"field", "equals"}`; `message` is `"record"`, `{"field"}` or
+`{"escapedField"}`; `sender` is a peer name or `{"field", "values"}`. Only `sender` is required, every
+peer name must be one of `peers`, and an unknown key raises.
+
+Lines that are blank or not JSON after the prefix, such as plain text and copied `Content-Length`
+headers, and records that the selector rejects are only counted in `counts()`. A record nested
+deeper than 128 levels, the depth limit of the message validator, counts as not JSON. A line longer than
+`line_bytes` (1 MiB of UTF-8 by default), a sender value that the map lacks and a missing message
+field are `InvalidTranscript` findings at the line and column, and the line is dropped. An entry's
+location is its line and the column where its message starts. The reader leaves `receiver` as
+`None`. `single_sender()` is true for a `Fixed` sender: such a log has one direction, so check it
+with `correlation=false`.
+
+```mbt check
+///|
+test "read entries from a log" {
+  let client = @rpc.PeerName::parse("client").unwrap()
+  let server = @rpc.PeerName::parse("server").unwrap()
+  let reader = @rpc.LogReader::new(
+    @rpc.LogMapping::dir_message({ "in": client, "out": server }),
+  )
+  let (first, _) = reader.push_text(
+    "starting\n{\"dir\": \"in\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"ping\"}}\n{\"dir\": \"out\", \"mess",
+  )
+  let (rest, findings) = reader.push_text(
+    "age\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"result\": null}}",
+  )
+  let (last, _) = reader.end()
+  assert_eq(first.map(e => e.message), [
+    "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"ping\"}",
+  ])
+  assert_eq(first[0].location, Some({ line: 2, column: 26, }))
+  assert_eq(rest, [])
+  assert_eq(findings, [])
+  assert_eq(last.map(e => e.sender), [server])
+  let counts = reader.counts()
+  assert_eq(counts.lines, 3)
+  assert_eq(counts.not_json, 1)
+  assert_eq(counts.skipped, 0)
+  assert_eq(counts.entries, 2)
+  assert_false(reader.single_sender())
+}
+```
 
 ## CLI
 
@@ -197,6 +543,37 @@ Message, response, original request and model inputs may use stdin `-` only once
  Text findings go to stderr, including advisory severity.
 Invalid messages, malformed JSON, I/O errors, invalid models and incomplete checks exit 1.
 Invalid usage, service contracts and unsupported constraint configurations exit 2.
+
+`smithy validate rpc transcript` checks a JSON or Markdown transcript document with
+`read_json_transcript` or `read_markdown_transcript` and `run_transcript`:
+
+```sh
+smithy validate rpc transcript --protocol example.peers#EchoChat \
+  examples/json-rpc/peers.smithy examples/json-rpc/transcripts/chat.json
+smithy validate rpc transcript --protocol example.peers#EchoChat \
+  examples/json-rpc/peers.smithy examples/json-rpc/transcripts/chat.md
+smithy validate rpc transcript --protocol example.peers#Editor --diagnostics json \
+  examples/json-rpc/peers.smithy examples/json-rpc/transcripts/editor-negative.json
+smithy validate rpc transcript --protocol example.lifecycle#Lifecycle \
+  examples/json-rpc/lifecycle.smithy examples/json-rpc/transcripts/lifecycle-violation.json
+```
+
+The positionals are the model files, then the transcript file or `-`. `--protocol` is required.
+`--version` is required when the document gives no version, and must agree with it otherwise.
+`--complete` or `--partial` overrides `complete` in the document; partial is the default.
+`--input-format json|markdown|jsonl` defaults from the extension, and to `jsonl` for stdin. A JSONL
+log needs `--version`, and `--log-preset raw --sender <peer>`, `--log-preset dir-message` (the default,
+with repeatable `--direction value=peer`) or `--log-mapping <file.json>` (the `LogMapping::from_json`
+form). The command feeds each chunk through `LogReader` and `TranscriptChecker` and writes each finding
+when it is known; with `--diagnostics json` the output is JSON Lines, one finding per line and then a
+`{"summary": {...}}` line with the reader counts. A raw log turns correlation off. The js and wasm-gc
+binaries read all of stdin first. Text findings go to stderr as
+`<file>:<line>:<column>: entry <n> <sender>: <severity> <code>: <message>`. JSON diagnostics are one
+report with `valid`, `complete`, `entries`, `outstanding`, `correlation`, `findings` and, for an
+`expect` list, `expectations` (`matched`, `missing`, `unexpected`). The command exits 0 when no
+finding is an error, or when the findings match the `expect` list, and 1 otherwise. A malformed
+transcript is an `InvalidTranscript` finding (exit 1). Invalid usage, a missing or conflicting version
+and an invalid protocol exit 2.
 
 ## Version and parameter policies
 
@@ -241,8 +618,8 @@ See the [value profile](../README.mbt.md) for default limits and unsupported con
 including runtime contract conditions and regex features.
 
 `validate_request` rejects response objects. Both entry points reject top-level arrays with
-`UnsupportedMessage`. Explicit batch entry points handle arrays; transcript correlation and
-transport behavior belong to later slices.
+`UnsupportedMessage`. Explicit batch entry points handle arrays, and `TranscriptChecker` links
+them in transcripts; transport behavior belongs to later slices.
 The package introduces no Ion, WIT, WAC, wasm-devkit or JSON Schema conversion dependencies.
 `mise run test:validation-consumer` builds separate packaged JSON and RPC consumers, audits
 their resolved dependency manifests and runs both examples on all four targets.

@@ -134,8 +134,11 @@ permitted with an advisory. Advisories do not invalidate an otherwise valid mess
 ResponseContext explicitly provides an operation or original request. Operation-only context can
 validate payload shapes but cannot prove ID correlation. A bare response identifies no method;
 envelope-only checks must state that limited scope. Original-request context permits exact ID checks.
-ExchangeContext holds explicit direction, calls, notifications and supplied associations. Transcript
-completeness must be declared before reporting missing responses. Duplicate IDs may leave otherwise
+For exchanges, `ProtocolDescription` names the two peers of a `@jsonRpcProtocol` structure and the
+service each one accepts, so each transcript entry has an explicit direction. `TranscriptChecker`
+correlates calls, notifications and replies per sender (see the
+[RPC guide](rpc/README.mbt.md#transcripts)). Transcript completeness must be declared before reporting
+missing responses. Duplicate IDs may leave otherwise
 well-formed calls ambiguous for correlation; distinguish that finding from an invented envelope MUST.
 
 Unknown envelope extension fields are ignored by the base profile unless an explicit extension
@@ -160,7 +163,119 @@ matching and notification omissions. `--batch --no-response --request` checks ab
 from an invalid empty response array. Duplicate call IDs remain request advisories but fail
 ambiguous correlation. Identical invalid-element errors form a multiset. See the RPC guide for
 typed batch contexts, indexed results, single invalid-whole-batch errors and resource policies.
-Transcript mode with explicit directions remains planned.
+`smithy validate rpc transcript --protocol example.peers#Editor peers.smithy editor.json` checks a
+JSON transcript between the two peers of a protocol, with explicit senders. `--version` is needed only
+when the document gives none, and must agree with it. `--complete` or `--partial` overrides the
+document; partial is the default. Text findings name the file, line, column, entry and sender; JSON
+diagnostics are one report with the summary, the findings and the expectation result. The exit
+status is 0 for no error findings, or for an `expect` list that matches, 1 otherwise, and 2 for usage
+and contract errors. Markdown transcripts (`examples/json-rpc/transcripts/*.md`) are read with the same command. JSONL logs (`--input-format jsonl`, `.jsonl`, `.ndjson` or stdin) need `--version`, and take
+`--log-preset raw|dir-message`, `--sender`, repeatable `--direction value=peer` or `--log-mapping`. The
+command decodes stdin chunks at the CLI boundary, carrying an incomplete UTF-8 sequence to the next
+chunk and replacing invalid bytes with U+FFFD, and passes each chunk through `LogReader` and
+`TranscriptChecker`. It writes reader and checker findings in line order as they are known, then a
+summary with the `LogCounts`; JSON diagnostics are JSON Lines. When `single_sender()` is true the
+checker runs with correlation off. Native and WASI read stdin live; js and wasm-gc read all of stdin
+first and give the same findings.
+
+## Two-peer protocols
+
+`smithy.rpc#jsonRpcProtocol` marks a structure as a protocol between exactly two named peers. Each peer
+may `accept` one JSON-RPC service, which is the service that peer receives calls and notifications for.
+`ProtocolDescription::from_smithy(model, protocol, version)` rejects a missing shape or trait, an
+undeclared version, equal peer names and an accepted service that does not declare the version. It
+prepares one `PreparedService` per accepting peer; `service_for` gives `None` for a peer that accepts
+nothing. Transcript checking builds on this description.
+
+## Transcript correlation
+
+`TranscriptChecker` takes a `ProtocolDescription` and checks entries, each a sender and the original
+message text, one at a time or in groups. Findings are `TranscriptFinding` values with a
+`TranscriptCode`: `Message(FindingCode)` wraps a message-level finding, and the other codes are
+correlation and limit findings. `DuplicateReply`, `MissingReply` and `AmbiguousReplyId` render as the
+stable codes `DuplicateResponse`, `MissingResponse` and `AmbiguousId`, and their names differ from the
+`FindingCode` constructors so that unqualified uses stay unambiguous. `FindingSeverity` stays `Error | Advisory`; the outstanding calls of a
+partial transcript are advisories. Each sender has its own ID space, and a reply matches a call by
+caller, responder and exact ID, with the batch ID normalization for scalars and structural equality for
+structured 1.0 IDs. A matched reply is validated with `OriginalRequest` context. A null-ID reply answers
+the earliest unreadable entry of the other peer, then an explicit-null 2.0 call, with an `AmbiguousReplyId`
+advisory when both exist. Other replies are duplicate, wrong-responder, reply-to-notification or
+unsolicited findings. Completeness is declared: `finish` reports missing replies only for a `Complete`
+transcript. Tables are bounded by `TranscriptLimits`, so memory does not grow with the length of a
+stream. A 2.0 request batch is one unit that waits for one reply batch. A reply batch answers the
+earliest pending batch of the other peer whose IDs include every reply ID, and is checked with
+`OriginalBatch` context; one that fits no batch is unsolicited. A single reply to a call inside a
+pending batch is `WrongReplyForm`. An empty batch waits for one null-ID `-32600` error object, and an
+all-notification batch needs no reply. At `finish`, each pending batch counts as one unanswered unit.
+A 1.0 array entry stays `UnsupportedMessage`.
+
+
+### JSON transcript documents
+
+`read_json_transcript` reads `{version?, complete?, entries, expect?}` or a bare entry array. A
+small scanner finds each `message` value's exact source text; nothing is re-serialized. Problems
+are `InvalidTranscript` findings with a line and column; a bad entry is dropped. `ExpectedFinding`
+names a code by its rendered `to_string` (for example `DuplicateResponse`), and `match_expected`
+matches items to distinct findings (maximum bipartite matching, so order does not matter). A match
+needs no missing item and no unlisted error.
+
+### Markdown transcript documents
+
+`read_markdown_transcript` reads fenced `jsonrpc A -> B` (or `jsonrpc A`) blocks as entries, `jsonrpc-expect`
+blocks as the expect list, and optional front matter keys `version` and `complete`. It ignores other
+fences and prose. A message is the block body as written, located at its first line. A `jsonrpc` fence with
+no direction, a receiver equal to the sender, and an unterminated fence are `InvalidTranscript` findings.
+The receiver of `A -> B` is stored in `TranscriptEntry.receiver` (the JSON reader leaves it `None`); when it is not `other(A)`, `TranscriptChecker::feed` reports `UnknownPeer` and skips the entry.
+`run_transcript` is the shared read-check-match pipeline of the CLI and the BDD world.
+
+### JSONL logs
+
+`LogReader` turns log text into entries as it arrives. `push_text` takes UTF-16 chunks of any size
+and holds a split line, including a split surrogate pair or CRLF, until its newline; `end` reads a
+final line with no newline. The reader removes one leading BOM and treats CRLF as LF. Memory is
+bounded by `line_bytes` (1 MiB of UTF-8): a longer line is one `InvalidTranscript` finding and is
+skipped to its newline. Decoding bytes, and carrying an incomplete UTF-8 sequence to the next chunk,
+is the caller's job. A `LogMapping` is a fixed rule, not a pattern language: a `LogPrefix` (none, to
+the first brace, or N delimited fields), a `LogSelector` (any JSON-RPC record, a field that exists, or
+a string field with a value), a `MessageSource` (the whole record, the exact source text of a field
+through the JSON transcript scanner, or a decoded string field) and a `SenderSource` (a fixed peer,
+or a field mapped to peers). Paths are JSON Pointers. `LogMapping::new` and `from_json` raise
+`ConfigurationError` for a bad configuration; the reader itself never raises. Lines that are not JSON
+and records the selector rejects are counted, not reported. A sender value that the map lacks and a
+missing message field are `InvalidTranscript` findings, and the line is dropped. The `raw` preset has
+a fixed sender, so `single_sender()` tells the caller to turn correlation off; `dir-message` reads
+`{"dir", "message"}` records. A quickcheck law checks that random chunk boundaries, CRLF, a BOM and a
+missing final newline give the same entries, findings and counts, and a table test checks that
+`editor.json`, `editor.md` and `editor-dir.ndjson` give the same findings apart from locations.
+
+### Session order
+
+The order layer is opt-in. `@smithy.rpc#jsonRpcSession` on a protocol structure declares the session
+states (the first is the initial state) and the capability sources: a name, the method whose
+successful result advertises it, and a JSON Pointer into that result. A value that is absent, `null`
+or `false` does not advertise. `@jsonRpcLifecycle` on an operation gives `allowedIn` (absent means
+every state), the transitions `onCall`, `onSuccess` and `onError`, and the `requires` capabilities.
+`@jsonRpcCancels(idMember, code)` names the input member with the ID of the cancelled call and the
+error code that the call may then answer with. The rules are declarative, with no expression
+language, so that they express the initialize-first and shutdown-then-exit order of MEP, LSP and MCP.
+
+`from_smithy` prepares the rules only for a protocol with `jsonRpcSession`, so a protocol without it
+gives the findings it gave before, even when its operations carry the lifecycle traits. A state that
+the session does not declare, an unknown capability, a capability method that no peer accepts, an
+invalid pointer and an `idMember` that is not an input member are `InvalidContract`. The checker
+keeps one session state for both peers. When a request or notification arrives, its method must be
+allowed in the state (`StateViolation`, with the entry of the last transition in `related`) and its
+required capabilities must be advertised (`CapabilityNotAdvertised`). A rejected message causes no
+transition, and its reply moves the session nowhere, but correlation still tracks its call. An
+accepted message takes its `onCall` transition. A reply to an accepted call takes `onSuccess` or
+`onError` and adds the capabilities that its result advertises. Request batch elements are checked
+in array order, and a reply batch settles each answered call. A cancellation names an active call of
+its own sender; otherwise it is a `CancelInactiveCall` advisory, because a cancellation can race the
+reply. The reply of a cancelled single call may use the declared code: the `UnknownError` finding for
+that code on that call is dropped. The session holds only the state, the advertised capability names,
+the entry of the last transition and the cancelled calls. A cancelled call is always an active call,
+so `active_calls` bounds that table, and the call leaves it when it is answered. The layer needs
+correlation; with `correlation=false` it does nothing.
 
 ## Rule and original-example coverage
 
@@ -186,19 +301,19 @@ S = responses/errors, B = batches, E = exchanges, T = transport-only, C = explic
 | 2.0 §7 invalid request | R/S | Wrong method/params types and contextual -32600. |
 | 2.0 §7 invalid batch JSON/empty batch | B/S | Single protocol error object. |
 | 2.0 §7 [1] and [1,2,3] | B/S | Error for each invalid element, with null IDs. |
-| 2.0 §7 mixed batch | B/E | Calls, notification omissions, invalid elements, unknown method and unordered responses. |
+| 2.0 §7 mixed batch | B/E | Calls, notification omissions, invalid elements, unknown method and unordered responses. In a transcript, a reply batch answers the pending request batch of the other peer (`transcripts/batches.json`, `batch#Link`). |
 | 2.0 §7 all-notification batch | B/E | No response. |
 | 2.0 §8 extensions | C | Only supported explicit extensions, without inferred negotiation. |
 | 1.0 overview/§1.1 | R | Object, method string, required positional params and arbitrary required JSON ID. This profile rejects a jsonrpc marker. |
 | 1.0 §1.2 | S/E | result/error/id required; error null on success, result null on error, matching arbitrary ID. Null success allowed. Legacy error mapping is explicit, not a required 2.0 error envelope. |
 | 1.0 §1.3 | R/E | Present-null notification; absent ID invalid; no supplied response. |
-| 1.0 §2.1 bidirectional calls | E | Explicit peer directions and outstanding calls; unsolicited/duplicate replies fail exchange checks. |
+| 1.0 §2.1 bidirectional calls | E | Explicit peer directions and per-sender ID spaces; partial transcripts list outstanding calls (advisory) and complete ones report missing replies; unsolicited, duplicate and wrong-responder replies and replies to notifications fail exchange checks (`TranscriptChecker`, `smithy validate rpc transcript`). |
 | 1.0 §2.1 stream lifecycle | T | Framing, close behavior and pending-call exceptions need a transport implementation. |
 | 1.0 §2.2 HTTP | T/C | POST framing, polling and unspecified sessions remain transport concerns. Multiple serialized objects are not standardized 2.0-style batch arrays. |
 | 1.0 §3 class hints | C | __jsonclass__ is ordinary modeled data; never execute constructors. |
 | 1.0 §4 echo | R/S/E | String argument/result and matching numeric ID. |
-| 1.0 §4 chat transcript | R/S/E | postMessage calls 99/101, reverse handleMessage/userLeft null-ID notifications and matching results. |
-| Adversarial fixtures | R/S/B/E | Exact large/fractional IDs, wrong case, absent/null, arbitrary scalar/array/null results, malformed errors, ambiguous IDs, duplicate/unsolicited replies, partial transcripts and limits. |
+| 1.0 §4 chat transcript | R/S/E | postMessage calls 99/101, reverse handleMessage/userLeft null-ID notifications and matching results. The echo and chat exchanges are checked as transcripts (`transcripts/echo.json`, `transcripts/chat.json`). |
+| Adversarial fixtures | R/S/B/E | Exact large/fractional IDs, wrong case, absent/null, arbitrary scalar/array/null results, malformed errors, ambiguous IDs, duplicate/unsolicited/wrong-responder replies, partial and complete transcripts, expected findings (`transcripts/editor-negative.json`) and transcript limits. |
 
 ## OpenRPC mapping
 

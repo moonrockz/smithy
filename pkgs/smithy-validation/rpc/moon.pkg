@@ -2,6 +2,7 @@ import {
   "moonrockz/smithy",
   "moonrockz/smithy-validation" @validation,
   "moonbitlang/core/json",
+  "moonbitlang/core/deque",
 }
 
 import {
@@ -9,4 +10,5 @@ import {
   "moonrockz/smithy-validation" @validation,
   "moonrockz/smithy",
   "moonbitlang/core/json",
+  "moonbitlang/core/quickcheck",
 } for "test"

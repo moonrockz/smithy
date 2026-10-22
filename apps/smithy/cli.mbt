@@ -14,6 +14,8 @@ fn input_command(
   about : String,
   options~ : Array[@argparse.OptionArg] = [],
   flags~ : Array[@argparse.FlagArg] = [],
+  subcommands~ : Array[@argparse.Command] = [],
+  files_about~ : String = "Input files; use '-' once to read stdin with --from. Use '--' before paths beginning with '-'.",
 ) -> @argparse.Command {
   @argparse.Command(
     name,
@@ -29,10 +31,15 @@ fn input_command(
     positionals=[
       @argparse.PositionArg(
         "file",
-        about="Input files; use '-' once to read stdin with --from. Use '--' before paths beginning with '-'.",
-        num_args=@argparse.ValueRange(lower=1),
+        about=files_about,
+        // A nested command does not satisfy its parent's inputs, so a parent
+        // with subcommands checks its own inputs after parsing.
+        num_args=@argparse.ValueRange(
+          lower=if subcommands.is_empty() { 1 } else { 0 },
+        ),
       ),
     ],
+    subcommands~,
   )
 }
 
@@ -110,16 +117,17 @@ fn command_line() -> @argparse.Command {
           input_command(
             "rpc",
             "Validate JSON-RPC requests, notifications, responses or explicit 2.0 batches.",
+            subcommands=[transcript_command()],
             options=[
+              // argparse checks a parent's required options even when a
+              // subcommand is named, so options() checks these two instead.
               @argparse.OptionArg(
                 "version",
-                required=true,
-                about="Explicit JSON-RPC version: 1.0 or 2.0.",
+                about="Explicit JSON-RPC version: 1.0 or 2.0. Required.",
               ),
               @argparse.OptionArg(
                 "service",
-                required=true,
-                about="Absolute Smithy service ID.",
+                about="Absolute Smithy service ID. Required.",
               ),
               @argparse.OptionArg(
                 "message",
@@ -290,6 +298,7 @@ struct Options {
   rpc_version : @rpc.ProtocolVersion?
   protocol_tests : Bool
   rpc_options : RpcOptions?
+  transcript : TranscriptOptions?
   offline : Bool
   cache_dir : String?
   config : String?
@@ -312,7 +321,9 @@ fn options(args : Array[String]) -> Options raise CliError {
   } else {
     None
   }
-  let rpc_mode = validation_command is Some(("rpc", _))
+  let transcript_mode = validation_command
+    is Some(("rpc", { subcommand: Some(("transcript", _)), .. }))
+  let rpc_mode = validation_command is Some(("rpc", _)) && !transcript_mode
   let value_mode = validation_command is Some(("value", _))
   // Model inputs belong to the selected validation command's argparse scope.
   if validation_command is Some((name, _)) &&
@@ -327,13 +338,46 @@ fn options(args : Array[String]) -> Options raise CliError {
     Some((_, nested)) => nested
     None => matches
   }
+  let matches = match matches.subcommand {
+    Some(("transcript", nested)) if transcript_mode => {
+      if !matches.values.is_empty() || matches.flags.values().any(set => set) {
+        raise CliError(
+          "place model inputs and options after validate rpc transcript", 2,
+        )
+      }
+      nested
+    }
+    _ => matches
+  }
   fn value(name : String) -> String? {
     match matches.values.get(name) {
       Some([value, ..]) => Some(value)
       _ => None
     }
   }
-  let files = matches.values.get("file").unwrap_or([])
+  let (files, transcript) = if transcript_mode {
+    let inputs = matches.values.get("file").unwrap_or([])
+    guard inputs.length() >= 2 else {
+      raise CliError(
+        "validate rpc transcript requires model inputs and then a transcript file or '-'",
+        2,
+      )
+    }
+    let file = inputs[inputs.length() - 1]
+    (
+      inputs[:inputs.length() - 1].to_owned(),
+      Some(
+        transcript_options(
+          file,
+          value,
+          matches.flags,
+          directions=matches.values.get("direction").unwrap_or([]),
+        ),
+      ),
+    )
+  } else {
+    (matches.values.get("file").unwrap_or([]), None)
+  }
   if command == "validate" && files.is_empty() {
     raise CliError("validate requires model inputs; use validate --help", 2)
   }
@@ -346,6 +390,13 @@ fn options(args : Array[String]) -> Options raise CliError {
   let diff_format = DiffFormat::parse(value("format").unwrap_or("text"))
   let check = matches.flags.get("check") == Some(true)
   let write = matches.flags.get("write") == Some(true)
+  if rpc_mode {
+    for name in ["version", "service"] {
+      if value(name) is None {
+        raise CliError("validate rpc requires --" + name, 2)
+      }
+    }
+  }
   let rpc_version = if rpc_mode {
     guard @rpc.ProtocolVersion::parse(value("version").unwrap())
       is Some(version) else {
@@ -434,10 +485,17 @@ fn options(args : Array[String]) -> Options raise CliError {
   } else {
     None
   }
-  let value_validation = if value_mode || rpc_mode {
-    let selector = if rpc_mode { "service" } else { "shape" }
+  let value_validation = if value_mode || rpc_mode || transcript_mode {
+    let selector = if rpc_mode {
+      "service"
+    } else if transcript_mode {
+      "protocol"
+    } else {
+      "shape"
+    }
     let raw_shape = value(selector).unwrap()
-    guard @smithy.ShapeId::parse(raw_shape) is Some(target) else {
+    guard @smithy.ShapeId::parse(raw_shape) is Some(target) &&
+      (!transcript_mode || target.member_name() is None) else {
       raise CliError(
         "expected an absolute Smithy shape ID after --" + selector,
         2,
@@ -448,6 +506,8 @@ fn options(args : Array[String]) -> Options raise CliError {
         Some(file) => file
         None => value("message").unwrap_or("<no response>")
       }
+    } else if transcript is Some(transcript) {
+      transcript.file
     } else {
       value("value").unwrap()
     }
@@ -472,7 +532,13 @@ fn options(args : Array[String]) -> Options raise CliError {
         "stdin '-' may only be read once across model and value inputs", 2,
       )
     }
-    let input_format = match value("input-format").unwrap_or("json") {
+    // The transcript command reads --input-format in transcript_options.
+    let value_format = if transcript_mode {
+      None
+    } else {
+      value("input-format")
+    }
+    let input_format = match value_format.unwrap_or("json") {
       "json" => JsonInput
       "ion-text" => IonTextInput
       "ion-binary" => IonBinaryInput
@@ -540,6 +606,7 @@ fn options(args : Array[String]) -> Options raise CliError {
     rpc_version,
     protocol_tests: matches.flags.get("protocol-tests") == Some(true),
     rpc_options,
+    transcript,
     command,
     files,
     from,
@@ -644,7 +711,7 @@ fn run(args : Array[String]) -> Int32 raise {
       error => raise error
     }
   }
-  let loader = if opts.rpc_version is Some(_) {
+  let loader = if opts.rpc_version is Some(_) || opts.transcript is Some(_) {
     @rpc.loader()
   } else {
     @smithy.Loader::new(protocol_tests=opts.protocol_tests)
@@ -713,6 +780,9 @@ fn run(args : Array[String]) -> Int32 raise {
   }
   let result = loader.assemble()
   if opts.value_validation is Some(value_opts) {
+    if opts.transcript is Some(transcript) {
+      return run_transcript_validation(value_opts, transcript, result)
+    }
     if opts.rpc_version is Some(version) {
       return run_rpc_validation(
         value_opts,
@@ -784,4 +854,65 @@ fn run(args : Array[String]) -> Int32 raise {
 ///|
 fn read_stdin() -> String raise {
   @utf8.decode(stdin_bytes())
+}
+
+///|
+/// Decodes UTF-8 that arrives in chunks. An incomplete sequence at the end of a
+/// chunk waits for the next chunk, so a character split between two reads
+/// decodes once. Invalid bytes become U+FFFD; nothing panics.
+priv struct Utf8Chunks {
+  /// The start of a sequence that the last chunk did not finish: 0 to 3 bytes.
+  mut held : Bytes
+}
+
+///|
+fn Utf8Chunks::new() -> Utf8Chunks {
+  { held: b"", }
+}
+
+///|
+/// Gives the text of every sequence that is complete after `chunk`.
+fn Utf8Chunks::push(self : Utf8Chunks, chunk : Bytes) -> String {
+  let bytes = if self.held.length() == 0 { chunk } else { self.held + chunk }
+  let keep = incomplete_utf8_tail(bytes)
+  let end = bytes.length() - keep
+  self.held = bytes[end:].to_owned()
+  @utf8.decode_lossy(bytes[:end])
+}
+
+///|
+/// Gives the held bytes at end of input, as U+FFFD.
+fn Utf8Chunks::end(self : Utf8Chunks) -> String {
+  let held = self.held
+  self.held = b""
+  @utf8.decode_lossy(held)
+}
+
+///|
+/// The number of bytes at the end of `bytes` that start a UTF-8 sequence but do
+/// not finish it. Earlier bytes end on a sequence boundary, so they decode the
+/// same alone as with the bytes that follow.
+fn incomplete_utf8_tail(bytes : Bytes) -> Int32 {
+  let n = bytes.length()
+  for back in 1..<=3 {
+    if back > n {
+      return 0
+    }
+    let lead = bytes[n - back].to_int()
+    if (lead & 0xC0) == 0x80 {
+      // A continuation byte: look further back for its lead byte.
+      continue
+    }
+    let length = if lead >= 0xC2 && lead <= 0xDF {
+      2
+    } else if lead >= 0xE0 && lead <= 0xEF {
+      3
+    } else if lead >= 0xF0 && lead <= 0xF4 {
+      4
+    } else {
+      1
+    }
+    return if back < length { back } else { 0 }
+  }
+  0
 }

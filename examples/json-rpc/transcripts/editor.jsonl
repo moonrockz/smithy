@@ -1,0 +1,19 @@
+editor bridge 1.4 starting on stdio ✓
+Content-Length: 80
+
+{"dir": "in", "message": {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"processId": 42}}}
+{"level": "info", "msg": "initialize took 3 ms ⏱"}
+{"dir": "out", "message": {"jsonrpc": "2.0", "id": 1, "result": "full"}}
+[server] sending a configuration request 📨
+{"dir": "out", "message": {"jsonrpc": "2.0", "id": 1, "method": "workspace/configuration", "params": {"section": "editor"}}}
+{"dir": "in", "message": {"jsonrpc": "2.0", "id": 1, "result": ["tabs"]}}
+Content-Length: 122
+
+{"dir": "in", "message": {"jsonrpc": "2.0", "id": 2, "method": "textDocument/hover", "params": {"uri": "file:///a.txt", "line": 1, "character": 2}}}
+{"dir": "out", "message": {"jsonrpc": "2.0", "id": 2, "result": "docs"}}
+not json {
+{"dir": "in", "message": {"jsonrpc": "2.0", "id": 3, "method": "shutdown"}}
+{"dir": "out", "message": {"jsonrpc": "2.0", "id": 3, "result": null}}
+42
+{"dir": "in", "message": {"jsonrpc": "2.0", "method": "exit"}}
+bye 👋

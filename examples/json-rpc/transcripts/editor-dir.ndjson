@@ -1,0 +1,9 @@
+{"dir": "request", "message": {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"processId": 42}}}
+{"dir": "response", "message": {"jsonrpc": "2.0", "id": 1, "result": "full"}}
+{"dir": "response", "message": {"jsonrpc": "2.0", "id": 1, "method": "workspace/configuration", "params": {"section": "editor"}}}
+{"dir": "request", "message": {"jsonrpc": "2.0", "id": 1, "result": ["tabs"]}}
+{"dir": "request", "message": {"jsonrpc": "2.0", "id": 2, "method": "textDocument/hover", "params": {"uri": "file:///a.txt", "line": 1, "character": 2}}}
+{"dir": "response", "message": {"jsonrpc": "2.0", "id": 2, "result": "docs"}}
+{"dir": "request", "message": {"jsonrpc": "2.0", "id": 3, "method": "shutdown"}}
+{"dir": "response", "message": {"jsonrpc": "2.0", "id": 3, "result": null}}
+{"dir": "request", "message": {"jsonrpc": "2.0", "method": "exit"}}

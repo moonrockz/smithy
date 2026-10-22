@@ -1,0 +1,10 @@
+{
+  "version": "1.0",
+  "complete": true,
+  "entries": [
+    { "from": "client", "message": {"method": "postMessage", "params": ["Hello all!"], "id": 99} },
+    { "from": "server", "message": {"method": "handleMessage", "params": ["user1", "I'm in!"], "id": null} },
+    { "from": "server", "message": {"result": 1, "error": null, "id": 99} },
+    { "from": "server", "message": {"method": "userLeft", "params": ["user3"], "id": null} }
+  ]
+}
