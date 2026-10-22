@@ -166,11 +166,12 @@ pub fn ExpectationResult::is_match(self : ExpectationResult) -> Bool {
 }
 
 ///|
-fn ExpectedFinding::accepts(
+/// True when `finding`, whose code has this item's name, fits the entry and
+/// related entry of this item.
+fn ExpectedFinding::fits(
   self : ExpectedFinding,
   finding : TranscriptFinding,
 ) -> Bool {
-  finding.code.to_string() == self.code &&
   (self.entry is None || self.entry == finding.entry) &&
   (
     self.related is None ||
@@ -179,25 +180,101 @@ fn ExpectedFinding::accepts(
 }
 
 ///|
-/// Tries to give `item` a finding, moving an earlier item to another finding
-/// when that frees one.
-fn assign(
-  expected : Array[ExpectedFinding],
-  actual : Array[TranscriptFinding],
-  owner : Array[Int32?],
+/// The state of one match: the findings of each code name in order, the item
+/// that owns each finding, and the first position of each code name that can
+/// still be free. A finding never becomes free again, so that position only
+/// moves forward.
+priv struct Matching {
+  expected : Array[ExpectedFinding]
+  actual : Array[TranscriptFinding]
+  by_code : Map[String, Array[Int32]]
+  owner : Array[Int32?]
+  first_free : Map[String, Int32]
+}
+
+///|
+fn Matching::bucket(self : Matching, item : Int32) -> Array[Int32] {
+  self.by_code.get(self.expected[item].code).unwrap_or([])
+}
+
+///|
+/// A free finding that `item` accepts, if any.
+fn Matching::free_for(self : Matching, item : Int32) -> Int32? {
+  let code = self.expected[item].code
+  let bucket = self.bucket(item)
+  let mut start = self.first_free.get(code).unwrap_or(0)
+  while start < bucket.length() && self.owner[bucket[start]] is Some(_) {
+    start += 1
+  }
+  self.first_free[code] = start
+  for position in start..<bucket.length() {
+    let i = bucket[position]
+    if self.owner[i] is None && self.expected[item].fits(self.actual[i]) {
+      return Some(i)
+    }
+  }
+  None
+}
+
+///|
+/// Searches for an augmenting path from the unmatched `root` with an explicit
+/// stack, so the search depth does not use the call stack. On success each
+/// item on the path moves to the next finding and `root` gets one. `seen`
+/// marks findings that the search entered; a failed search changes no owner,
+/// so its marks stay valid for the next search, and `touched` lists them for
+/// a reset after a success.
+fn Matching::augment(
+  self : Matching,
+  root : Int32,
   seen : Array[Bool],
-  item : Int32,
+  touched : Array[Int32],
 ) -> Bool {
-  for i in 0..<actual.length() {
-    if !seen[i] && expected[item].accepts(actual[i]) {
-      seen[i] = true
-      let free = match owner[i] {
-        None => true
-        Some(other) => assign(expected, actual, owner, seen, other)
+  let items = [root]
+  // The next bucket position of each frame; -1 before its free look-ahead.
+  let positions = [-1]
+  // via[k] is the finding through which frame k + 1 was entered.
+  let via : Array[Int32] = []
+  while items.length() > 0 {
+    let top = items.length() - 1
+    let item = items[top]
+    let mut taken : Int32? = None
+    let mut entered = false
+    if positions[top] < 0 {
+      positions[top] = 0
+      taken = self.free_for(item)
+    }
+    let bucket = self.bucket(item)
+    while taken is None && positions[top] < bucket.length() {
+      let i = bucket[positions[top]]
+      positions[top] += 1
+      if seen[i] || !self.expected[item].fits(self.actual[i]) {
+        continue
       }
-      if free {
-        owner[i] = Some(item)
-        return true
+      seen[i] = true
+      touched.push(i)
+      match self.owner[i] {
+        None => taken = Some(i)
+        Some(other) => {
+          via.push(i)
+          items.push(other)
+          positions.push(-1)
+          entered = true
+          break
+        }
+      }
+    }
+    if taken is Some(last) {
+      for k in 0..<=top {
+        let finding = if k == top { last } else { via[k] }
+        self.owner[finding] = Some(items[k])
+      }
+      return true
+    }
+    if !entered {
+      ignore(items.pop())
+      ignore(positions.pop())
+      if top > 0 {
+        ignore(via.pop())
       }
     }
   }
@@ -208,15 +285,47 @@ fn assign(
 /// Each expected item takes one distinct actual finding, so the largest
 /// possible set of items is matched. Order does not matter. An item with no
 /// finding is missing. A finding that no item took is unexpected.
+///
+/// A greedy pass first gives each item a free finding that it accepts. Only
+/// the items left then search for an augmenting path, with an explicit stack.
 pub fn match_expected(
   expected : Array[ExpectedFinding],
   actual : Array[TranscriptFinding],
 ) -> ExpectationResult {
-  let owner : Array[Int32?] = Array::make(actual.length(), None)
-  let matched = Array::make(expected.length(), false)
+  let by_code : Map[String, Array[Int32]] = Map([])
+  for i, finding in actual {
+    let code = finding.code.to_string()
+    match by_code.get(code) {
+      Some(bucket) => bucket.push(i)
+      None => by_code[code] = [i]
+    }
+  }
+  let matching : Matching = {
+    expected,
+    actual,
+    by_code,
+    owner: Array::make(actual.length(), None),
+    first_free: Map([]),
+  }
+  let left = []
   for item in 0..<expected.length() {
-    let seen = Array::make(actual.length(), false)
-    matched[item] = assign(expected, actual, owner, seen, item)
+    match matching.free_for(item) {
+      Some(i) => matching.owner[i] = Some(item)
+      None => left.push(item)
+    }
+  }
+  let matched = Array::make(expected.length(), true)
+  let seen = Array::make(actual.length(), false)
+  let touched = []
+  for item in left {
+    if matching.augment(item, seen, touched) {
+      for i in touched {
+        seen[i] = false
+      }
+      touched.clear()
+    } else {
+      matched[item] = false
+    }
   }
   let missing = []
   for item in 0..<expected.length() {
@@ -226,7 +335,7 @@ pub fn match_expected(
   }
   let unexpected = []
   for i in 0..<actual.length() {
-    if owner[i] is None {
+    if matching.owner[i] is None {
       unexpected.push(actual[i])
     }
   }
