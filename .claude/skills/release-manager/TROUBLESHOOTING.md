@@ -140,11 +140,19 @@ If `macos-15-intel` is not available, change the `darwin-x64` leg to run on `mac
 Cause: `plan` (Release) or `smoke-plan` (CI) wrote no `version` output.
 Fix: read that job. Run `gh workflow run release.yml --ref main`.
 
-**An issue "Smoke failed on main" is open**
-Cause: CI after a push to main, or the nightly Release run, smoked binaries that failed on one OS. A release
-of the same inputs will fail its `smoke` job too.
-Fix: read the run in the issue, and fix the cause as for a failed leg above. To smoke again, run
-`gh workflow run release.yml --ref main -f dry_run=true`. Close the issue when it passes.
+**A `smoke-breach` issue is open ("Smoke failed on main: <platforms>")**
+Cause: a trusted run on main or on a release tag (CI after a push, the nightly run, a release, a dry run)
+smoked binaries that failed on these platforms. A release of the same inputs will fail its `smoke` job too.
+Fix: read the run and the messages in the issue, and fix the cause as for a failed leg above. To smoke again,
+run `gh workflow run release.yml --ref main -f dry_run=true`. Do not close the issue by hand: a passing smoke in
+a trusted run closes it. The same breach in a later run does not add a comment; a changed breach (other
+platforms, results or inputs) edits the issue and comments.
+
+**`Report the smoke breach` fails with `HTTP 403`**
+Cause: the calling job lacks a permission. The report reads the jobs (`actions: read`) and the annotations
+(`checks: read`) of the run, and writes issues (`issues: write`).
+Fix: give the job that calls `smoke.yml` in `ci.yml` or `release.yml` these permissions, then re-run the failed
+jobs.
 
 **A pull request or the nightly run skipped build and smoke**
 Cause: a trusted run already smoked the same inputs. `plan` (or CI `smoke-plan`) found the cache key
