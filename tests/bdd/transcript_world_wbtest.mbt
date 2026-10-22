@@ -7,6 +7,9 @@ struct TranscriptWorld {
   mut findings : Array[@rpc.TranscriptFinding]
   mut summary : @rpc.TranscriptSummary?
   mut expectations : @rpc.ExpectationResult?
+  /// The sender of each `dir` value of a dir-message log.
+  directions : Map[String, @rpc.PeerName]
+  mut counts : @rpc.LogCounts?
 }
 
 ///|
@@ -19,6 +22,8 @@ fn TranscriptWorld::new() -> TranscriptWorld {
     findings: [],
     summary: None,
     expectations: None,
+    directions: Map([]),
+    counts: None,
   }
 }
 
@@ -47,6 +52,43 @@ fn TranscriptWorld::check(
   self.findings = run.findings
   self.summary = Some(run.summary)
   self.expectations = run.expectations
+}
+
+///|
+/// Reads a dir-message log with a LogReader and feeds each entry to the
+/// checker, as `smithy validate rpc transcript` does for JSONL input. A log
+/// has no header, so the version is given.
+fn TranscriptWorld::check_log(
+  self : TranscriptWorld,
+  version : String,
+  text : String,
+) -> Unit raise {
+  let version : @rpc.ProtocolVersion = match version {
+    "1.0" => V1_0
+    "2.0" => V2_0
+    _ => fail("I expected version 1.0 or 2.0, and I found \{version}.")
+  }
+  let protocol = @rpc.ProtocolDescription::from_smithy(
+    self.model.unwrap(),
+    self.protocol.unwrap(),
+    version,
+  )
+  let reader = @rpc.LogReader::new(
+    @rpc.LogMapping::dir_message(self.directions),
+  )
+  let checker = @rpc.TranscriptChecker::new(protocol)
+  let findings = []
+  for read in [reader.push_text(text), reader.end()] {
+    let (entries, problems) = read
+    findings.append(problems)
+    findings.append(checker.feed_all(entries))
+  }
+  let summary = checker.finish()
+  findings.append(summary.findings)
+  self.findings = findings
+  self.summary = Some(summary)
+  self.expectations = None
+  self.counts = Some(reader.counts())
 }
 
 ///|
@@ -88,6 +130,30 @@ impl @moonspec.World for TranscriptWorld with fn configure(self, setup) {
   ) raise {
     self.check(doc.content, markdown=true)
   })
+  setup.given2("the log direction {string} is sent by {string}", fn(
+    dir : String,
+    peer : String,
+  ) raise {
+    guard @rpc.PeerName::parse(peer) is Some(name) else {
+      fail("I expected a peer name, and I found \{peer}.")
+    }
+    self.directions[dir] = name
+  })
+  setup.when2("I check the version {string} log file {string}", fn(
+    version : String,
+    file : String,
+  ) raise {
+    self.check_log(
+      version,
+      @xfs.read_file_to_string("../examples/json-rpc/transcripts/" + file),
+    )
+  })
+  setup.when2("I check the version {string} log:", fn(
+    version : String,
+    doc : @moonspec.DocString,
+  ) raise {
+    self.check_log(version, doc.content)
+  })
   setup.when0("I check the same transcript as complete", fn() raise {
     self.check(self.text, markdown=self.markdown, completeness=Some(Complete))
   })
@@ -126,6 +192,17 @@ impl @moonspec.World for TranscriptWorld with fn configure(self, setup) {
     entry : Int32,
   ) raise {
     assert_false(self.findings.any(f => f.entry == Some(entry)))
+  })
+  setup.then3("the log has {int} lines, {int} not JSON and {int} skipped", fn(
+    lines : Int32,
+    not_json : Int32,
+    skipped : Int32,
+  ) raise {
+    let counts = self.counts.unwrap()
+    assert_eq(
+      (counts.lines, counts.not_json, counts.skipped),
+      (lines, not_json, skipped),
+    )
   })
   setup.then1("{int} call is outstanding", fn(count : Int32) raise {
     assert_eq(self.summary.unwrap().outstanding, count)

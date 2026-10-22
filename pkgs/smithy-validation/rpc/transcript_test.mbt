@@ -461,3 +461,48 @@ test "version 1 replies to unreadable entries and invalid calls check the envelo
     }),
   )
 }
+
+///|
+test "version 1 structured ids correlate by structure" {
+  fn call(id : String) -> String {
+    "{\"method\": \"echo\", \"params\": [\"a\"], \"id\": " + id + "}"
+  }
+
+  fn reply(id : String) -> String {
+    "{\"result\": \"a\", \"error\": null, \"id\": " + id + "}"
+  }
+
+  let checker = @rpc.TranscriptChecker::new(chat(), completeness=Complete)
+  let found = checker.feed_all([
+    entry("client", call("[1,{\"b\":2}]")),
+    entry("client", call("{\"k\":[1,2]}")),
+    // Whitespace and member order do not change a structured id.
+    entry("server", reply("{ \"k\" : [1, 2] }")),
+    entry("server", reply("[1, {\"b\": 2}]")),
+  ])
+  assert_eq(found.filter(f => f.severity == @validation.Error), [])
+  assert_eq(checker.finish().findings, [])
+  // A second reply to a structured id is a duplicate of the first.
+  let twice = @rpc.TranscriptChecker::new(chat(), completeness=Complete)
+  let found = twice.feed_all([
+    entry("client", call("{\"k\":[1,2]}")),
+    entry("server", reply("{\"k\":[1,2]}")),
+    entry("server", reply("{\"k\":[1,2]}")),
+    // A different structure matches no call.
+    entry("server", reply("{\"k\":[2,1]}")),
+  ])
+  let errors = found.filter(f => f.severity == @validation.Error)
+  assert_eq(codes(errors), ["DuplicateResponse", "UnsolicitedResponse"])
+  assert_eq(errors[0].entry, Some(2))
+  assert_eq(errors[0].related, [1])
+  assert_eq(errors[1].entry, Some(3))
+  // Two calls whose structured ids are equal reuse an active id.
+  let reused = @rpc.TranscriptChecker::new(chat())
+  let found = reused.feed_all([
+    entry("client", call("[1,{\"b\":2}]")),
+    entry("client", call("[1, {\"b\" : 2}]")),
+  ])
+  assert_eq(codes(found.filter(f => f.severity == @validation.Error)), [
+    "ActiveIdReused",
+  ])
+}

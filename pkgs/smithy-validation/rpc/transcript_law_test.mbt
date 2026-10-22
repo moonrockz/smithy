@@ -298,3 +298,62 @@ test "formats agree apart from locations" {
   // findings, not only empty lists.
   assert_true(found > 0)
 }
+
+///|
+test "the log reader never panics on arbitrary text" {
+  let mappings = [
+    @rpc.LogMapping::raw(peer("client")),
+    in_out(),
+    mcp_like_mapping(),
+  ]
+  // Pieces that make lines look like records, mixed with arbitrary text.
+  let pieces = [
+    "\n",
+    "\r\n",
+    "\r",
+    "\u{FEFF}",
+    "{\"dir\": \"in\", \"message\": ",
+    "{\"dir\": \"out\", \"message\": ",
+    "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"exit\"}",
+    "}",
+    "{",
+    "\"",
+    "\\",
+    "\\u00",
+    "2024-01-01 12:00 ",
+    "{\"event\": \"message\", \"from\": \"client\", \"text\": \"",
+    "😀",
+    "😀".unsafe_substring(start=0, end=1),
+  ]
+  @quickcheck.check(
+    (input : (Array[(Int32, String)], Int32, Int32, Array[Int32])) => {
+      let (parts, choice, size, raw_cuts) = input
+      let text = StringBuilder()
+      for part in parts {
+        let (which, arbitrary) = part
+        let k = pick(which, pieces.length() + 1)
+        text.write_string(
+          if k == pieces.length() {
+            arbitrary
+          } else {
+            pieces[k]
+          },
+        )
+      }
+      let text = text.to_string()
+      let mapping = mappings[pick(choice, mappings.length())]
+      let line_bytes = pick(size, 64) + 1
+      let cuts = raw_cuts.map(c => pick(c, text.length() + 1))
+      cuts.sort()
+      let (entries, findings, counts) = read_cut(
+        mapping, text, cuts, line_bytes,
+      )
+      counts.lines >= counts.not_json + counts.skipped + counts.entries &&
+      counts.entries == entries.length() &&
+      findings.iter().all(f => f.code == InvalidTranscript)
+    },
+    count=500,
+    max_size=40,
+    seed=3411,
+  )
+}

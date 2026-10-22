@@ -128,3 +128,21 @@ Feature: JSON-RPC transcripts
     Then the transcript is invalid
     And the transcript has the error "UnsolicitedResponse" at entry 0
     And the transcript matches its expected findings
+
+  Scenario: A JSONL log is read line by line
+    Given the "example.peers#Editor" protocol in "peers.smithy"
+    And the log direction "in" is sent by "client"
+    And the log direction "out" is sent by "server"
+    When I check the version "2.0" log file "editor.jsonl"
+    Then the transcript is valid
+    And the transcript has no findings
+    And the log has 19 lines, 8 not JSON and 2 skipped
+    When I check the version "2.0" log:
+      """
+      starting
+      {"dir": "out", "message": {"jsonrpc": "2.0", "id": 9, "result": "full"}}
+      {"dir": "sideways", "message": {"jsonrpc": "2.0", "method": "exit"}}
+      """
+    Then the transcript is invalid
+    And the transcript has the error "UnsolicitedResponse" at entry 0
+    And the log has 3 lines, 1 not JSON and 0 skipped
