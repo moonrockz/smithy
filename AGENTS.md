@@ -111,7 +111,8 @@ Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every 
   version in another pull request.
 - The merge changes `moon.mod` on main, so the Release workflow (`.github/workflows/release.yml`) runs. The jobs are:
   - `plan` (`mise run release:plan`) releases when `vX.Y.Z` has no GitHub release and `CHANGELOG.md` has the
-    section with its highlights. It fails when the section is missing or has the placeholder.
+    section with its highlights. It fails when the section is missing or has the placeholder. It also writes
+    `validate`, `build` and `record`, which select the jobs of the run (see below).
   - `validate` runs `mise run check`, `mise run test:scripts` and the version check.
   - `build-windows` builds `smithy.exe` natively on a Windows runner (`mise run build:windows` does the same on
     Windows). A cross-built Windows binary reads its arguments wrongly, because moon resolves the `platform`
@@ -119,14 +120,31 @@ Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every 
   - `build` (`mise run build:release`) cross-builds four native binaries with zig on one Ubuntu runner, builds
     `smithy.wasm` and `smithy-gc.wasm`, adds the Windows executable from `windows-x64-exe`, and packs `dist/`
     (`mise run release:assets`). It needs `build-windows`.
-  - `smoke` runs `smithy version` from each archive on a runner of its own OS.
+  - `smoke` (`.github/workflows/smoke.yml`, shared with CI) runs `smithy version` from each archive on a runner
+    of its own OS. A release always smokes the bytes that it publishes.
   - `publish` (`release:credentials`, `release:publish`) publishes the modules in `scripts/publish.mbtx`:
     `pkgs/artifact-resources`, `pkgs/jmespath`, `pkgs/smithy-syntax`, `pkgs/smithy`, `pkgs/smithy-validation`, `pkgs/smithy-ion-validation`, `pkgs/smithy-build`, `pkgs/smithy-diff`, `pkgs/smithy-jsonschema`, `pkgs/smithy-openapi`, `pkgs/smithy-openrpc`
     and `apps/smithy`. It needs the `MOONCAKES_USER_TOKEN` org secret. It runs after
     `smoke`, because a mooncakes.io version is permanent.
   - `release` (`release:notes`, `release:github`) creates the tag and the GitHub release with the 8 assets.
-- A pull request that changes a release file, and a manual run with `dry_run`, run `plan`, `validate`, `build-windows`,
-  `build` and `smoke` only. They never publish and never create a release.
+- Runs that do not release never publish and never create a release:
+  - A pull request that changes a release file (the `pull_request` paths in `release.yml`) runs `plan`, and
+    `build-windows`, `build` and `smoke` only when no smoke evidence exists for its inputs. CI owns `validate`.
+    A feature pull request does not start the Release workflow.
+  - The nightly schedule does the same on main, and records the evidence. A failed smoke opens or updates the
+    issue "Smoke failed on main".
+  - A manual run with `dry_run` is a full rehearsal: `validate`, `build-windows`, `build` and `smoke`. Use it to
+    smoke again on demand.
+- **Smoke evidence.** `mise run smoke:fingerprint` hashes the `git ls-tree` entries of the smoke inputs at HEAD:
+  `apps/smithy` and `pkgs` without test files and Markdown, `moon.mod`, `moon.work`, the toolchain pins, the
+  build, dist, zig-cross and smoke scripts, the CI, Release and Smoke workflows and the setup action
+  (`mise run smoke:inputs` lists them). After all smoke platforms pass, a trusted run (a push to main, the
+  schedule, a release or a manual run) saves `evidence.json` in the GitHub Actions cache under
+  `smoke-evidence-<fingerprint>`. A pull request run is not trusted and records nothing. CI smokes after each
+  push to main, on the `dist` artifact of `cross-build`, only when the fingerprint has no evidence. A change
+  outside the inputs, such as docs or tests, carries the evidence forward. The evidence never replaces the smoke
+  of a release: the builds are not proven reproducible. GitHub removes a cache entry after 7 days without
+  access; the next run then smokes again.
 - **Re-run failed jobs.** After a transient failure, use "Re-run failed jobs" on the run (or
   `gh run rerun <run-id> --failed`). GitHub runs the failed job again, and the jobs after it. The jobs that passed
   keep their outputs and the `dist` artifact (30 days), so the retry ships the bytes that `smoke` checked.

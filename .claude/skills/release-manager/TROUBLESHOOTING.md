@@ -136,9 +136,26 @@ A runner that did not start is a transient problem. Use "Re-run failed jobs".
 If `macos-15-intel` is not available, change the `darwin-x64` leg to run on `macos-latest` with
 `arch -x86_64`.
 
-**`smoke`: `the plan gave no version`**
-Cause: `plan` wrote no `version` output.
-Fix: read the `plan` job. Run `gh workflow run release.yml --ref main`.
+**`smoke`: `the caller gave no version`**
+Cause: `plan` (Release) or `smoke-plan` (CI) wrote no `version` output.
+Fix: read that job. Run `gh workflow run release.yml --ref main`.
+
+**An issue "Smoke failed on main" is open**
+Cause: CI after a push to main, or the nightly Release run, smoked binaries that failed on one OS. A release
+of the same inputs will fail its `smoke` job too.
+Fix: read the run in the issue, and fix the cause as for a failed leg above. To smoke again, run
+`gh workflow run release.yml --ref main -f dry_run=true`. Close the issue when it passes.
+
+**A pull request or the nightly run skipped build and smoke**
+Cause: a trusted run already smoked the same inputs. `plan` (or CI `smoke-plan`) found the cache key
+`smoke-evidence-<fingerprint>`. This is expected.
+Fix: none. To see the evidence, run `gh cache list --key smoke-evidence-` and open the run in the step summary of
+`Record smoke evidence`. To smoke on demand, run the Release workflow with `dry_run`. To list the inputs, run
+`mise run smoke:inputs`.
+
+**`Record smoke evidence`: `HEAD has fingerprint ..., not ...`**
+Cause: the record job checked out other inputs than the job that looked up the evidence.
+Fix: re-run the whole run, so that both jobs use the same commit. Do not save the evidence by hand.
 
 ## After a partial release
 

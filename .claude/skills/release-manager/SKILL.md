@@ -48,7 +48,8 @@ Copy this checklist and tick it off:
 5. **Merge.** Get the user's approval. The merge publishes to mooncakes.io, and a published version is
    permanent. Make sure no other pull request merged after `prepare`. Then `gh pr merge <n> --squash`.
 6. **Watch.** `gh run list --workflow release.yml --limit 1`, then `gh run watch <run-id> --exit-status`. The
-   jobs are plan, validate, build, smoke (5 legs), publish and release.
+   jobs are plan, validate, build, smoke (5 legs), publish and release. A release always runs validate,
+   build and smoke, whatever the smoke evidence says.
 7. **Verify.** `mise run release:status` must say `vX.Y.Z is released`. Open the GitHub release and check the
    8 assets. On a Mac, run `mise use -g github:moonrockz/smithy@X.Y.Z` and `smithy version`.
 8. **Retrospective.** Do "Improve the process" below. Close the bd issue with
