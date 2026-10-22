@@ -18,4 +18,5 @@ import {
   "moonrockz/smithy@0.5.0",
   "moonrockz/smithy-validation@0.5.0",
   "moonrockz/smithy-jsonschema@0.5.0",
+  "moonrockz/openrpc@0.2.0",
 }

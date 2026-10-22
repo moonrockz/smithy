@@ -92,21 +92,27 @@ fn validate_example_result(
 }
 
 ///|
-fn add_examples(
+/// Standard example pairings and the `x-smithy-error-examples` entries.
+priv struct MethodExamples {
+  successes : Array[@rpcdoc.ExamplePairing]
+  errors : Array[Json]
+}
+
+///|
+fn method_examples(
   model : @smithy.Model,
   config : Config,
   prepared : @rpc.PreparedService,
   contract : @rpc.MethodContract,
-  method_ : Map[String, Json],
   warnings : Array[ConversionWarning],
-) -> Unit raise OpenRpcError {
+) -> MethodExamples raise OpenRpcError {
+  let successes : Array[@rpcdoc.ExamplePairing] = []
+  let errors : Array[Json] = []
   let operation = model.shapes[contract.operation]
   guard operation.trait_value("smithy.api#examples")
     is Some(@smithy.Array(examples)) else {
-    return
+    return { successes, errors, }
   }
-  let successes : Array[Json] = []
-  let errors : Array[Json] = []
   let titles : Set[String] = Set([])
   for example in examples {
     guard example is @smithy.Object(fields) &&
@@ -131,23 +137,8 @@ fn add_examples(
     guard wire is @smithy.Object(values) else {
       example_error(contract.operation, title, "I expected a structure input.")
     }
-    let ids = if contract.mode == @rpc.Named {
-      match model.shapes[contract.input].body {
-        Structure(ids) => {
-          let sorted = ids.copy()
-          sorted.sort_by((a, b) => {
-            member_name(model.shapes[a], config).lexical_compare(
-              member_name(model.shapes[b], config),
-            )
-          })
-          sorted
-        }
-        _ => []
-      }
-    } else {
-      contract.positional
-    }
-    let params : Array[Json] = []
+    let ids = parameter_members(model, contract, config)
+    let params : Array[@rpcdoc.InlineOrReference[@rpcdoc.Example]] = []
     let positional : Array[@smithy.NodeValue] = []
     let mut hole = false
     let mut interior = false
@@ -160,10 +151,7 @@ fn add_examples(
           }
           positional.push(value)
           params.push(
-            Json::object({
-              "name": Json::string(name),
-              "value": value.to_json(),
-            }),
+            literal_example(name, value.to_json(), contract.operation),
           )
         }
         None => hole = true
@@ -193,16 +181,16 @@ fn add_examples(
         checked.findings.map(f => f.message).join(" "),
       )
     }
-    let pairing : Map[String, Json] = {
-      "name": Json::string(title),
-      "params": Json::array(params),
+    let description = match fields.get("documentation") {
+      Some(@smithy.String(text)) => Some(text)
+      _ => None
     }
-    if fields.get("documentation") is Some(@smithy.String(text)) {
-      pairing["description"] = Json::string(text)
-    }
+    let pairing_extensions : Array[(String, Json)] = []
     if interior && contract.mode == @rpc.Either {
       if config.extensions == Preserve {
-        pairing["x-smithy-param-structure"] = Json::string("by-name")
+        pairing_extensions.push(
+          ("x-smithy-param-structure", Json::string("by-name")),
+        )
       } else {
         if config.extensions == Fail {
           raise UnsupportedMapping(
@@ -271,9 +259,34 @@ fn add_examples(
         { "error": @smithy.Object(error_value) },
         title,
       )
-      pairing["error"] = @smithy.Object(error_value).to_json()
       match config.extensions {
-        Preserve => errors.push(Json::object(pairing))
+        Preserve => {
+          let pairing = built(
+            @rpcdoc.ExamplePairing::new(
+              title,
+              params,
+              description~,
+              extensions=extensions(pairing_extensions, contract.operation),
+              additional_fields=[
+                (
+                  "error",
+                  exact(
+                    @smithy.Object(error_value).to_json(),
+                    contract.operation,
+                  ),
+                ),
+              ],
+              limits=limits(),
+            ),
+            contract.operation,
+          )
+          errors.push(
+            built(
+              @exact.to_core_json(pairing.to_json(), limits=limits()),
+              contract.operation,
+            ),
+          )
+        }
         Omit =>
           warnings.push({
             code: OmittedExample,
@@ -289,6 +302,7 @@ fn add_examples(
           )
       }
     } else {
+      let mut result = None
       if fields.get("output") is Some(output) {
         let value = match contract.result {
           @rpc.NullResult => @smithy.Null
@@ -307,18 +321,24 @@ fn add_examples(
           }
         }
         validate_example_result(prepared, contract, { "result": value }, title)
-        pairing["result"] = Json::object({
-          "name": Json::string("result"),
-          "value": value.to_json(),
-        })
+        result = Some(
+          literal_example("result", value.to_json(), contract.operation),
+        )
       }
-      successes.push(Json::object(pairing))
+      successes.push(
+        built(
+          @rpcdoc.ExamplePairing::new(
+            title,
+            params,
+            description~,
+            result~,
+            extensions=extensions(pairing_extensions, contract.operation),
+            limits=limits(),
+          ),
+          contract.operation,
+        ),
+      )
     }
   }
-  if !successes.is_empty() {
-    method_["examples"] = Json::array(successes)
-  }
-  if !errors.is_empty() {
-    method_["x-smithy-error-examples"] = Json::array(errors)
-  }
+  { successes, errors, }
 }

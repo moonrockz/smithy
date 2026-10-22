@@ -3,6 +3,9 @@ import {
   "moonrockz/smithy-validation" @validation,
   "moonrockz/smithy-validation/rpc",
   "moonrockz/smithy-jsonschema" @jsonschema,
+  "moonrockz/openrpc" @rpcdoc,
+  "moonrockz/openrpc/json" @exact,
+  "moonrockz/openrpc/schema" @draft07,
 }
 
 import {

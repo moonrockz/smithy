@@ -49,85 +49,72 @@ pub fn convert_result(
     error => raise SchemaConversion(id, error.to_string())
   }
   let warnings : Array[ConversionWarning] = []
-  let methods : Array[Json] = []
+  let methods : Array[@rpcdoc.InlineOrReference[@rpcdoc.Method]] = []
+  let operations : Array[@smithy.ShapeId] = []
+  // Schemas the document uses, in method order, for component selection.
+  let roots : Array[Json] = []
   for contract in prepared.contracts() {
     let operation = model.shapes[contract.operation]
-    let members = if contract.mode == @rpc.Named {
-      match model.shapes[contract.input].body {
-        Structure(ids) => {
-          let sorted = ids.copy()
-          sorted.sort_by((a, b) => {
-            member_name(model.shapes[a], config).lexical_compare(
-              member_name(model.shapes[b], config),
-            )
-          })
-          sorted
-        }
-        _ => []
-      }
-    } else {
-      contract.positional
-    }
-    let params : Array[Json] = []
-    for member_id in members {
+    let params : Array[@rpcdoc.InlineOrReference[@rpcdoc.ContentDescriptor]] = []
+    for member_id in parameter_members(model, contract, config) {
       let member_ = model.shapes[member_id]
       params.push(
-        descriptor(
-          model,
-          index,
-          member_id,
-          member_name(member_, config),
-          member_.trait_value("smithy.api#required") is Some(_),
-          config,
-          warnings,
+        @rpcdoc.Inline(
+          descriptor(
+            model,
+            index,
+            member_id,
+            member_name(member_, config),
+            member_.trait_value("smithy.api#required") is Some(_),
+            config,
+            warnings,
+            roots,
+          ),
         ),
       )
     }
     let result = match contract.result {
       @rpc.OutputMember(target) =>
-        descriptor(model, index, target, "result", true, config, warnings)
+        descriptor(
+          model, index, target, "result", true, config, warnings, roots,
+        )
       @rpc.OutputStructure(target) =>
-        descriptor(model, index, target, "result", true, config, warnings)
-      @rpc.NullResult =>
-        Json::object({
-          "name": Json::string("result"),
-          "required": Json::boolean(true),
-          "schema": Json::object({ "type": Json::string("null") }),
-        })
+        descriptor(
+          model, index, target, "result", true, config, warnings, roots,
+        )
+      @rpc.NullResult => {
+        let schema = Json::object({ "type": Json::string("null") })
+        roots.push(schema)
+        built(
+          @rpcdoc.ContentDescriptor::new(
+            "result",
+            draft07_schema(schema, contract.operation),
+            required=Some(true),
+            limits=limits(),
+          ),
+          contract.operation,
+        )
+      }
     }
-    let method_ : Map[String, Json] = {
-      "name": Json::string(contract.name.to_string()),
-      "paramStructure": Json::string(
-        match contract.mode {
-          @rpc.Named => "by-name"
-          @rpc.Positional => "by-position"
-          @rpc.Either => "either"
-        },
-      ),
-      "params": Json::array(params),
-      "result": result,
-    }
-    if trait_text(operation, "smithy.api#documentation") is Some(text) {
-      method_["description"] = Json::string(text)
-    }
-    if trait_text(operation, "smithy.api#title") is Some(text) {
-      method_["summary"] = Json::string(text)
-    }
-    if operation.trait_value("smithy.api#deprecated") is Some(_) {
-      method_["deprecated"] = Json::boolean(true)
-    }
-    let errors : Array[Json] = []
+    let errors : Array[@rpcdoc.InlineOrReference[@rpcdoc.ErrorObject]] = []
     let error_data : Array[Json] = []
     for error in contract.errors {
       errors.push(
-        Json::object({
-          "code": error.code.number().to_json(),
-          "message": Json::string(
-            trait_text(model.shapes[error.shape], "smithy.api#title").unwrap_or(
-              error.shape.name(),
+        @rpcdoc.Inline(
+          built(
+            @rpcdoc.ErrorObject::new(
+              built(
+                @rpcdoc.ErrorCode::parse(error.code.to_string()),
+                error.shape,
+              ),
+              trait_text(model.shapes[error.shape], "smithy.api#title").unwrap_or(
+                error.shape.name(),
+              ),
+              limits=limits(),
             ),
+            error.shape,
           ),
-        }),
+        ),
       )
       let mapping : Map[String, Json] = {
         "code": error.code.number().to_json(),
@@ -140,12 +127,17 @@ pub fn convert_result(
       }
       error_data.push(Json::object(mapping))
     }
-    if !errors.is_empty() {
-      method_["errors"] = Json::array(errors)
-    }
+    let method_extensions : Array[(String, Json)] = []
     if !error_data.is_empty() {
       match config.extensions {
-        Preserve => method_["x-smithy-error-data"] = Json::array(error_data)
+        Preserve => {
+          for mapping in error_data {
+            roots.push(fields(mapping)["schema"])
+          }
+          method_extensions.push(
+            ("x-smithy-error-data", Json::array(error_data)),
+          )
+        }
         Omit =>
           warnings.push({
             code: OmittedErrorData,
@@ -159,53 +151,98 @@ pub fn convert_result(
           )
       }
     }
-    add_examples(model, config, prepared, contract, method_, warnings)
-    methods.push(Json::object(method_))
+    let examples = method_examples(model, config, prepared, contract, warnings)
+    if !examples.errors.is_empty() {
+      method_extensions.push(
+        ("x-smithy-error-examples", Json::array(examples.errors)),
+      )
+    }
+    methods.push(
+      @rpcdoc.Inline(
+        built(
+          @rpcdoc.Method::new(
+            built(
+              @rpcdoc.MethodName::parse(contract.name.to_string()),
+              contract.operation,
+            ),
+            params,
+            result=Some(@rpcdoc.Inline(result)),
+            summary=trait_text(operation, "smithy.api#title"),
+            description=trait_text(operation, "smithy.api#documentation"),
+            deprecated=if operation.trait_value("smithy.api#deprecated")
+              is Some(_) {
+              Some(true)
+            } else {
+              None
+            },
+            errors=if errors.is_empty() { None } else { Some(errors) },
+            param_structure=Some(
+              match contract.mode {
+                @rpc.Named => @rpcdoc.ByName
+                @rpc.Positional => @rpcdoc.ByPosition
+                @rpc.Either => @rpcdoc.Either
+              },
+            ),
+            examples=if examples.successes.is_empty() {
+              None
+            } else {
+              Some(examples.successes.map(pairing => @rpcdoc.Inline(pairing)))
+            },
+            extensions=extensions(method_extensions, contract.operation),
+            limits=limits(),
+          ),
+          contract.operation,
+        ),
+      ),
+    )
+    operations.push(contract.operation)
   }
   let version = match root.body {
     Service(version~, ..) => version
     _ => ""
   }
-  let info : Map[String, Json] = {
-    "title": Json::string(
+  let info = built(
+    @rpcdoc.Info::new(
       config.title.unwrap_or(
         trait_text(root, "smithy.api#title").unwrap_or(id.name()),
       ),
+      config.api_version.unwrap_or(version),
+      description=trait_text(root, "smithy.api#documentation"),
+      limits=limits(),
     ),
-    "version": Json::string(config.api_version.unwrap_or(version)),
-  }
-  if trait_text(root, "smithy.api#documentation") is Some(text) {
-    info["description"] = Json::string(text)
-  }
-  let document : Map[String, Json] = {
-    "openrpc": Json::string(config.version.to_string()),
-    "info": Json::object(info),
-    "methods": Json::array(methods),
-  }
-  let schemas = used_schemas(index, methods, id)
-  for name, schema in schemas {
-    schema_policy(
-      schema,
-      index.definition(name).unwrap_or(id),
-      config,
-      warnings,
+    id,
+  )
+  let components : Array[(@rpcdoc.ComponentKey, @draft07.Schema)] = []
+  for name, schema in used_schemas(index, roots, id) {
+    let subject = index.definition(name).unwrap_or(id)
+    schema_policy(schema, subject, config, warnings)
+    components.push(
+      (
+        built(@rpcdoc.ComponentKey::parse(name), subject),
+        draft07_schema(schema, subject),
+      ),
     )
   }
-  if !schemas.is_empty() {
-    document["components"] = Json::object({ "schemas": Json::object(schemas) })
-  }
+  let document_extensions : Array[(String, Json)] = []
   match config.extensions {
     Preserve =>
-      document["x-smithy-protocol"] = Json::object({
-        "version": Json::string("2.0"),
-        "schemaDialect": Json::string("http://json-schema.org/draft-07/schema#"),
-        "notifications": Json::string(
-          "An absent id is a notification; a null result does not mean notification-only.",
+      document_extensions.push(
+        (
+          "x-smithy-protocol",
+          Json::object({
+            "version": Json::string("2.0"),
+            "schemaDialect": Json::string(
+              "http://json-schema.org/draft-07/schema#",
+            ),
+            "notifications": Json::string(
+              "An absent id is a notification; a null result does not mean notification-only.",
+            ),
+            "batches": Json::string(
+              "JSON-RPC 2.0 batch and exchange rules apply outside method value schemas.",
+            ),
+          }),
         ),
-        "batches": Json::string(
-          "JSON-RPC 2.0 batch and exchange rules apply outside method value schemas.",
-        ),
-      })
+      )
     Omit =>
       warnings.push({
         code: OmittedProtocolSemantics,
@@ -217,7 +254,56 @@ pub fn convert_result(
         id, "I need x-smithy-protocol to retain notification, batch and exchange boundaries; use extensions=preserve.",
       )
   }
-  { document: Json::object(document), warnings, }
+  let document = match
+    @rpcdoc.Document::new(
+      built(@rpcdoc.DocumentVersion::parse(config.version.to_string()), id),
+      info,
+      methods,
+      components=if components.is_empty() {
+        None
+      } else {
+        Some(
+          built(
+            @rpcdoc.Components::new(schemas=Some(components), limits=limits()),
+            id,
+          ),
+        )
+      },
+      extensions=extensions(document_extensions, id),
+      limits=limits(),
+    ) {
+    Ok(document) => document
+    Err(diagnostics) =>
+      raise UnsupportedMapping(
+        id,
+        "I could not build the OpenRPC document: " +
+        diagnostics.map(d => d.message()).join("; "),
+      )
+  }
+  { document: validated_json(document, id, operations), warnings, }
+}
+
+///|
+/// Named-only descriptors sort by wire member name; positional and either
+/// descriptors follow the explicit positional list.
+fn parameter_members(
+  model : @smithy.Model,
+  contract : @rpc.MethodContract,
+  config : Config,
+) -> Array[@smithy.ShapeId] {
+  guard contract.mode == @rpc.Named else { return contract.positional }
+  match model.shapes[contract.input].body {
+    Structure(ids) => {
+      let sorted = ids.copy()
+      sorted.sort_by((a, b) => {
+        member_name(model.shapes[a], config).lexical_compare(
+          member_name(model.shapes[b], config),
+        )
+      })
+      sorted
+    }
+    _ => []
+  }
 }
 
 ///|
