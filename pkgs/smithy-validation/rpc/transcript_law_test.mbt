@@ -174,3 +174,120 @@ test "the checker never panics on arbitrary text" {
     seed=3409,
   )
 }
+
+///|
+/// Gives `text` to a new reader, cut at `cuts` (UTF-16 offsets, which can
+/// split a surrogate pair or a CRLF).
+fn read_cut(
+  mapping : @rpc.LogMapping,
+  text : String,
+  cuts : Array[Int32],
+  line_bytes : Int32,
+) -> (
+  Array[@rpc.TranscriptEntry],
+  Array[@rpc.TranscriptFinding],
+  @rpc.LogCounts,
+) {
+  let reader = @rpc.LogReader::new(mapping, line_bytes~)
+  let entries = []
+  let findings = []
+  let mut start = 0
+  for cut in cuts + [text.length()] {
+    let (e, f) = reader.push_text(text.unsafe_substring(start~, end=cut))
+    entries.append(e)
+    findings.append(f)
+    start = cut
+  }
+  let (e, f) = reader.end()
+  (entries + e, findings + f, reader.counts())
+}
+
+///|
+test "text chunking does not change log entries" {
+  let problems = editor_dir_ndjson() +
+    "{\"dir\": \"sideways\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"exit\"}}\n" +
+    "{\"dir\": \"request\"}\n" +
+    "plain 🐢 text\n" +
+    "{\"dir\": \"request\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"exit\", \"params\": {\"note\": \"" +
+    "😀".repeat(40) +
+    "\"}}}\n"
+  let fixtures = [
+    (in_out(), editor_jsonl(), 1048576),
+    (request_response(), editor_dir_ndjson(), 1048576),
+    (mcp_like_mapping(), mcp_like_jsonl(), 1048576),
+    (request_response(), problems, 120),
+  ]
+  @quickcheck.check(
+    (input : (Int32, Array[Int32], Int32)) => {
+      let (choice, raw_cuts, variant) = input
+      let (mapping, base, line_bytes) = fixtures[pick(choice, fixtures.length())]
+      let reader = @rpc.LogReader::new(mapping, line_bytes~)
+      let (one_entries, one_findings) = reader.push_text(base)
+      let (rest, tail) = reader.end()
+      let expected = (one_entries + rest, one_findings + tail, reader.counts())
+      // The same log with CRLF, a leading BOM or no final newline.
+      let mut text = base
+      if pick(variant, 2) == 1 {
+        text = text.replace_all(old="\n", new="\r\n")
+      }
+      if pick(variant / 2, 2) == 1 {
+        text = "\u{FEFF}" + text
+      }
+      if pick(variant / 4, 2) == 1 {
+        text = text.trim_end(chars="\r\n").to_owned()
+      }
+      let cuts = raw_cuts.map(c => pick(c, text.length() + 1))
+      cuts.sort()
+      read_cut(mapping, text, cuts, line_bytes) == expected
+    },
+    count=400,
+    max_size=24,
+    seed=3410,
+  )
+}
+
+///|
+test "formats agree apart from locations" {
+  let (json, json_read) = @rpc.read_json_transcript(editor_json())
+  let (markdown, markdown_read) = @rpc.read_markdown_transcript(
+    editor_markdown(),
+  )
+  let (entries, log_read, _) = read_log(request_response(), editor_dir_ndjson())
+  assert_eq(json_read, [])
+  assert_eq(markdown_read, [])
+  assert_eq(log_read, [])
+  let log : @rpc.TranscriptDocument = {
+    version: None,
+    completeness: None,
+    entries,
+    expect: None,
+  }
+  let documents = [json, markdown, log]
+  let senders = documents.map(d => d.entries.map(e => (e.sender, e.message)))
+  assert_eq(senders[1], senders[0])
+  assert_eq(senders[2], senders[0])
+  fn unlocated(
+    findings : Array[@rpc.TranscriptFinding],
+  ) -> Array[@rpc.TranscriptFinding] {
+    findings.map(f => { ..f, location: None, })
+  }
+
+  let mut found = 0
+  for protocol in [editor(), chat()] {
+    for completeness in [@rpc.Complete, @rpc.Partial] {
+      let runs = documents.map(d => {
+        let run = @rpc.run_transcript(protocol, d, [], completeness~)
+        (
+          unlocated(run.findings),
+          { ..run.summary, findings: unlocated(run.summary.findings), },
+        )
+      })
+      assert_eq(runs[1], runs[0])
+      assert_eq(runs[2], runs[0])
+      found += runs[0].0.length()
+    }
+  }
+  // The 1.0 chat protocol rejects the 2.0 messages, so the law compares real
+  // findings, not only empty lists.
+  assert_true(found > 0)
+}

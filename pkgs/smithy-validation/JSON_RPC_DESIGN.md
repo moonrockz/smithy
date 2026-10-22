@@ -166,7 +166,7 @@ when the document gives none, and must agree with it. `--complete` or `--partial
 document; partial is the default. Text findings name the file, line, column, entry and sender; JSON
 diagnostics are one report with the summary, the findings and the expectation result. The exit
 status is 0 for no error findings, or for an `expect` list that matches, 1 otherwise, and 2 for usage
-and contract errors. Markdown transcripts (`examples/json-rpc/transcripts/*.md`) are read with the same command; JSONL transcripts and stdin streaming remain planned.
+and contract errors. Markdown transcripts (`examples/json-rpc/transcripts/*.md`) are read with the same command. The library reads JSONL logs with `LogReader`; the command does not read them yet, and stdin streaming remains planned.
 
 ## Two-peer protocols
 
@@ -217,6 +217,26 @@ fences and prose. A message is the block body as written, located at its first l
 no direction, a receiver equal to the sender, and an unterminated fence are `InvalidTranscript` findings.
 The receiver of `A -> B` is stored in `TranscriptEntry.receiver` (the JSON reader leaves it `None`); when it is not `other(A)`, `TranscriptChecker::feed` reports `UnknownPeer` and skips the entry.
 `run_transcript` is the shared read-check-match pipeline of the CLI and the BDD world.
+
+### JSONL logs
+
+`LogReader` turns log text into entries as it arrives. `push_text` takes UTF-16 chunks of any size
+and holds a split line, including a split surrogate pair or CRLF, until its newline; `end` reads a
+final line with no newline. The reader removes one leading BOM and treats CRLF as LF. Memory is
+bounded by `line_bytes` (1 MiB of UTF-8): a longer line is one `InvalidTranscript` finding and is
+skipped to its newline. Decoding bytes, and carrying an incomplete UTF-8 sequence to the next chunk,
+is the caller's job. A `LogMapping` is a fixed rule, not a pattern language: a `LogPrefix` (none, to
+the first brace, or N delimited fields), a `LogSelector` (any JSON-RPC record, a field that exists, or
+a string field with a value), a `MessageSource` (the whole record, the exact source text of a field
+through the JSON transcript scanner, or a decoded string field) and a `SenderSource` (a fixed peer,
+or a field mapped to peers). Paths are JSON Pointers. `LogMapping::new` and `from_json` raise
+`ConfigurationError` for a bad configuration; the reader itself never raises. Lines that are not JSON
+and records the selector rejects are counted, not reported. A sender value that the map lacks and a
+missing message field are `InvalidTranscript` findings, and the line is dropped. The `raw` preset has
+a fixed sender, so `single_sender()` tells the caller to turn correlation off; `dir-message` reads
+`{"dir", "message"}` records. A quickcheck law checks that random chunk boundaries, CRLF, a BOM and a
+missing final newline give the same entries, findings and counts, and a table test checks that
+`editor.json`, `editor.md` and `editor-dir.ndjson` give the same findings apart from locations.
 
 ## Rule and original-example coverage
 

@@ -1,0 +1,10 @@
+2026-10-22T09:00:00.000Z INFO editor server 1.4 listening on stdio
+2026-10-22T09:00:00.120Z DEBUG {"event": "message", "from": "client", "text": "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"initialize\", \"params\": {\"processId\": 42}}"}
+2026-10-22T09:00:00.130Z DEBUG {"event": "message", "from": "server", "text": "{\"jsonrpc\": \"2.0\", \"id\": 1, \"result\": \"full\"}"}
+2026-10-22T09:00:00.131Z DEBUG {"event": "timing", "ms": 11}
+2026-10-22T09:00:01.000Z DEBUG {"event": "message", "from": "client", "text": "{\"jsonrpc\": \"2.0\", \"id\": 2, \"method\": \"textDocument/hover\", \"params\": {\"uri\": \"file:///café.txt\", \"line\": 1, \"character\": 2}}"}
+2026-10-22T09:00:01.050Z DEBUG {"event": "message", "from": "server", "text": "{\"jsonrpc\": \"2.0\", \"id\": 2, \"result\": \"docs 📄\"}"}
+2026-10-22T09:00:02.000Z WARN slow client 🐢
+2026-10-22T09:00:02.100Z DEBUG {"event": "message", "from": "client", "text": "{\"jsonrpc\": \"2.0\", \"id\": 3, \"method\": \"shutdown\"}"}
+2026-10-22T09:00:02.110Z DEBUG {"event": "message", "from": "server", "text": "{\"jsonrpc\": \"2.0\", \"id\": 3, \"result\": null}"}
+2026-10-22T09:00:02.200Z DEBUG {"event": "message", "from": "client", "text": "{\"jsonrpc\": \"2.0\", \"method\": \"exit\"}"}

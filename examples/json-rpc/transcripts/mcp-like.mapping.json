@@ -1,0 +1,6 @@
+{
+  "prefix": {"fields": 2, "delimiter": " "},
+  "selector": {"field": "/event", "equals": "message"},
+  "message": {"escapedField": "/text"},
+  "sender": {"field": "/from", "values": {"client": "client", "server": "server"}}
+}

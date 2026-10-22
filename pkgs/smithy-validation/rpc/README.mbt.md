@@ -336,6 +336,79 @@ An unterminated `jsonrpc` fence is reported at its opening line.
 entries, puts the reader findings first, and returns the findings, the summary and, for an `expect`
 list, the `ExpectationResult`. A completeness argument overrides the document; the default is `Partial`.
 
+## JSONL logs
+
+`LogReader` reads entries from a log as it arrives: `push_text` takes chunks of any size and
+returns the entries and findings of the lines that the chunk finishes, and `end` reads a final
+line with no newline. A line split between chunks, also inside a surrogate pair or a CRLF, is held
+until it is complete. A leading BOM is removed once, and CRLF counts as LF. A `LogMapping` says how a
+line becomes an entry:
+
+- `LogPrefix` removes leading text: `NoPrefix`, `ToFirstBrace`, or `Fields(n, delimiter)`, which
+  skips `n` fields that each end with the delimiter.
+- `LogSelector` keeps protocol records: `AnyJsonRpc` (a record, or an element of a record array,
+  with `jsonrpc`, `method`, `result` or `error`), `HasField(pointer)` or
+  `FieldEquals(pointer, string)`.
+- `MessageSource` finds the message: `WholeRecord`, `Field(pointer)` (the exact source text of the
+  value) or `EscapedField(pointer)` (the decoded value of a string that holds the JSON text).
+- `SenderSource` names the sender: `Fixed(peer)`, or `Field(pointer, values)`, which maps the
+  string value of a field to a peer.
+
+Paths are JSON Pointers. `LogMapping::new` raises `ConfigurationError` for an invalid pointer, a
+negative field count or an empty sender map. `LogMapping::raw(sender)` is the `raw` preset, and
+`LogMapping::dir_message(directions)` is the `dir-message` preset for `{"dir": ..., "message": ...}`
+records. `LogMapping::from_json(text, peers)` reads the same mapping from JSON, for example
+`examples/json-rpc/transcripts/mcp-like.mapping.json`:
+
+```json
+{
+  "prefix": {"fields": 2, "delimiter": " "},
+  "selector": {"field": "/event", "equals": "message"},
+  "message": {"escapedField": "/text"},
+  "sender": {"field": "/from", "values": {"client": "client", "server": "server"}}
+}
+```
+
+`prefix` is `"none"`, `"first-brace"` or `{"fields", "delimiter"}`; `selector` is `"jsonrpc"`,
+`{"hasField"}` or `{"field", "equals"}`; `message` is `"record"`, `{"field"}` or
+`{"escapedField"}`; `sender` is a peer name or `{"field", "values"}`. Only `sender` is required, every
+peer name must be one of `peers`, and an unknown key raises.
+
+Lines that are blank or not JSON after the prefix, such as plain text and copied `Content-Length`
+headers, and records that the selector rejects are only counted in `counts()`. A line longer than
+`line_bytes` (1 MiB of UTF-8 by default), a sender value that the map lacks and a missing message
+field are `InvalidTranscript` findings at the line and column, and the line is dropped. An entry's
+location is its line and the column where its message starts. The reader leaves `receiver` as
+`None`. `single_sender()` is true for a `Fixed` sender: such a log has one direction, so check it
+with `correlation=false`.
+
+```mbt check
+///|
+test "read entries from a log" {
+  let client = @rpc.PeerName::parse("client").unwrap()
+  let server = @rpc.PeerName::parse("server").unwrap()
+  let reader = @rpc.LogReader::new(
+    @rpc.LogMapping::dir_message({ "in": client, "out": server }),
+  )
+  let (first, _) = reader.push_text(
+    "starting\n{\"dir\": \"in\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"ping\"}}\n{\"dir\": \"out\", \"mess",
+  )
+  let (rest, findings) = reader.push_text(
+    "age\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"result\": null}}",
+  )
+  let (last, _) = reader.end()
+  assert_eq(first.map(e => e.message), [
+    "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"ping\"}",
+  ])
+  assert_eq(first[0].location, Some({ line: 2, column: 26, }))
+  assert_eq(rest, [])
+  assert_eq(findings, [])
+  assert_eq(last.map(e => e.sender), [server])
+  assert_eq(reader.counts(), { lines: 3, not_json: 1, skipped: 0, entries: 2, })
+  assert_false(reader.single_sender())
+}
+```
+
 ## CLI
 
 From the repository root:
@@ -391,7 +464,7 @@ The positionals are the model files, then the transcript file or `-`. `--protoco
 `--version` is required when the document gives no version, and must agree with it otherwise.
 `--complete` or `--partial` overrides `complete` in the document; partial is the default.
 `--input-format json|markdown|jsonl` defaults from the extension, and to `jsonl` for stdin; only
-`json` and `markdown` are supported now. Text findings go to stderr as
+`json` and `markdown` are supported now (the library reads JSONL with `LogReader`). Text findings go to stderr as
 `<file>:<line>:<column>: entry <n> <sender>: <severity> <code>: <message>`. JSON diagnostics are one
 report with `valid`, `complete`, `entries`, `outstanding`, `correlation`, `findings` and, for an
 `expect` list, `expectations` (`matched`, `missing`, `unexpected`). The command exits 0 when no

@@ -78,7 +78,8 @@ fn closes_fence(content : String, open : Fence) -> Bool {
 }
 
 ///|
-fn markdown_problem(
+/// An InvalidTranscript reader finding at a one-based line and column.
+fn located_problem(
   line : Int32,
   column : Int32,
   message : String,
@@ -157,7 +158,7 @@ fn read_front_matter(
           "2.0" => version = Some(V2_0)
           _ =>
             findings.push(
-              markdown_problem(
+              located_problem(
                 line.number,
                 1,
                 "I expected \"1.0\" or \"2.0\" for \"version\" in the front matter, and I found \{value}.",
@@ -170,7 +171,7 @@ fn read_front_matter(
           "false" => completeness = Some(Partial)
           _ =>
             findings.push(
-              markdown_problem(
+              located_problem(
                 line.number,
                 1,
                 "I expected true or false for \"complete\" in the front matter, and I found \{value}.",
@@ -256,7 +257,7 @@ pub fn read_markdown_transcript(
     }
     if !closed {
       findings.push(
-        markdown_problem(
+        located_problem(
           line.number,
           1,
           "I expected a closing fence for this \{word} block, and I found the end of the text.",
@@ -278,18 +279,14 @@ pub fn read_markdown_transcript(
             message: body,
             location: Some({ line: body_number, column: 1, }),
           })
-        Err(message) => findings.push(markdown_problem(line.number, 1, message))
+        Err(message) => findings.push(located_problem(line.number, 1, message))
       }
     } else {
       let items = read_expected(body, { start: 0, end: body.length(), }) catch {
         Problem((message, at)) => {
           let place = source_location(body, at)
           findings.push(
-            markdown_problem(
-              body_number + place.line - 1,
-              place.column,
-              message,
-            ),
+            located_problem(body_number + place.line - 1, place.column, message),
           )
           continue
         }
