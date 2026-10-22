@@ -243,10 +243,16 @@ pub fn LogMapping::raw(sender : PeerName) -> LogMapping {
 
 ///|
 /// The `dir-message` preset: `{"dir": ..., "message": ...}` records, with
-/// `directions` mapping each `dir` value to its sender.
+/// `directions` mapping each `dir` value to its sender. Raises when
+/// `directions` is empty.
 pub fn LogMapping::dir_message(
   directions : Map[String, PeerName],
-) -> LogMapping {
+) -> LogMapping raise @validation.ConfigurationError {
+  if directions.is_empty() {
+    raise @validation.ConfigurationError(
+      "I expected at least one dir value in the dir-message map; directions was empty.",
+    )
+  }
   let dir = JsonPointer::name("dir")
   {
     prefix: NoPrefix,
@@ -419,18 +425,19 @@ pub struct LogReader {
 
 ///|
 /// `line_bytes` is the most UTF-8 bytes a line may have, without its line
-/// ending; a value below 1 counts as 1.
+/// ending. Raises when it is below 1.
 pub fn LogReader::new(
   mapping : LogMapping,
   line_bytes~ : Int32 = DEFAULT_LINE_BYTES,
-) -> LogReader {
+) -> LogReader raise @validation.ConfigurationError {
+  if line_bytes < 1 {
+    raise @validation.ConfigurationError(
+      "I expected a positive log line limit; line_bytes was \{line_bytes}.",
+    )
+  }
   {
     mapping,
-    line_bytes: if line_bytes < 1 {
-      1
-    } else {
-      line_bytes
-    },
+    line_bytes,
     pending: StringBuilder(),
     pending_bytes: 0,
     pending_cr: false,

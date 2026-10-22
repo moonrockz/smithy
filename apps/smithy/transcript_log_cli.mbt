@@ -85,7 +85,7 @@ fn log_choice(
 
 ///|
 /// Builds the log mapping of `choice`. Every peer it names must be a peer of
-/// the protocol.
+/// the protocol. A mapping that the library rejects is a usage error.
 fn log_mapping(
   choice : LogChoice,
   protocol : @rpc.ProtocolDescription,
@@ -101,18 +101,27 @@ fn log_mapping(
     }
   }
 
+  fn dir_message(
+    directions : Map[String, @rpc.PeerName],
+  ) -> @rpc.LogMapping raise CliError {
+    @rpc.LogMapping::dir_message(directions) catch {
+      @validation.ConfigurationError(message) =>
+        raise CliError("--direction: \{message}", 2)
+    }
+  }
+
   match choice {
     RawLog(sender) => {
       known(sender, "--sender")
       @rpc.LogMapping::raw(sender)
     }
     DirMessageLog(None) =>
-      @rpc.LogMapping::dir_message({ "request": peers[0], "response": peers[1] })
+      dir_message({ "request": peers[0], "response": peers[1] })
     DirMessageLog(Some(directions)) => {
       for value, peer in directions {
         known(peer, "--direction \{value}=")
       }
-      @rpc.LogMapping::dir_message(directions)
+      dir_message(directions)
     }
     MappingFile(file) => {
       let text = @fs.read_file_to_string(file) catch {
@@ -137,7 +146,10 @@ fn run_log_transcript(
   choice : LogChoice,
   expected : Array[@rpc.ExpectedFinding]?,
 ) -> Int32 raise {
-  let reader = @rpc.LogReader::new(log_mapping(choice, protocol))
+  let mapping = log_mapping(choice, protocol)
+  let reader = @rpc.LogReader::new(mapping) catch {
+    @validation.ConfigurationError(message) => raise CliError(message, 2)
+  }
   // A log with one sender has no replies to correlate.
   let checker = @rpc.TranscriptChecker::new(
     protocol,

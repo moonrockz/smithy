@@ -244,8 +244,9 @@ is the caller's job. A `LogMapping` is a fixed rule, not a pattern language: a `
 the first brace, or N delimited fields), a `LogSelector` (any JSON-RPC record, a field that exists, or
 a string field with a value), a `MessageSource` (the whole record, the exact source text of a field
 through the JSON transcript scanner, or a decoded string field) and a `SenderSource` (a fixed peer,
-or a field mapped to peers). Paths are JSON Pointers. `LogMapping::new` and `from_json` raise
-`ConfigurationError` for a bad configuration; the reader itself never raises. Lines that are not JSON
+or a field mapped to peers). Paths are JSON Pointers. `LogMapping::new`, `dir_message`, `from_json`
+and `LogReader::new` raise `ConfigurationError` for a bad configuration, such as an empty direction map
+or a `line_bytes` below 1; the reader never raises on its input. Lines that are not JSON
 and records the selector rejects are counted, not reported. A sender value that the map lacks and a
 missing message field are `InvalidTranscript` findings, and the line is dropped. The `raw` preset has
 a fixed sender, so `single_sender()` tells the caller to turn correlation off; `dir-message` reads

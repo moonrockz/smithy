@@ -830,6 +830,19 @@ fn stream_lines(
 }
 
 ///|
+test "a log mapping that the library rejects exits 2" {
+  let protocol = link_protocol()
+  let status = try log_mapping(DirMessageLog(Some({})), protocol) catch {
+    CliError(message, code) => "raised \{code}: \{message}"
+  } noraise {
+    _ => "accepted"
+  }
+  assert_eq(
+    status, "raised 2: --direction: I expected at least one dir value in the dir-message map; directions was empty.",
+  )
+}
+
+///|
 test "a read error part-way through a log still writes the summary" {
   let unsolicited = b"{\"dir\":\"response\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":null}}\n{\"dir\":\"req"
   let input = FakeInput::{

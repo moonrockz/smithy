@@ -249,7 +249,7 @@ fn read_cut(
   Array[@rpc.TranscriptEntry],
   Array[@rpc.TranscriptFinding],
   @rpc.LogCounts,
-) {
+) raise {
   let reader = @rpc.LogReader::new(mapping, line_bytes~)
   let entries = []
   let findings = []

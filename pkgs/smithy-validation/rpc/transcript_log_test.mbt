@@ -159,12 +159,12 @@ fn editor_peers() -> Map[String, @rpc.PeerName] {
 }
 
 ///|
-fn in_out() -> @rpc.LogMapping {
+fn in_out() -> @rpc.LogMapping raise {
   @rpc.LogMapping::dir_message({ "in": peer("client"), "out": peer("server") })
 }
 
 ///|
-fn request_response() -> @rpc.LogMapping {
+fn request_response() -> @rpc.LogMapping raise {
   @rpc.LogMapping::dir_message({
     "request": peer("client"),
     "response": peer("server"),
@@ -191,7 +191,7 @@ fn read_log(
   Array[@rpc.TranscriptEntry],
   Array[@rpc.TranscriptFinding],
   @rpc.LogCounts,
-) {
+) raise {
   let reader = match line_bytes {
     Some(line_bytes) => @rpc.LogReader::new(mapping, line_bytes~)
     None => @rpc.LogReader::new(mapping)
@@ -359,7 +359,7 @@ fn read_in_units(
   Array[@rpc.TranscriptEntry],
   Array[@rpc.TranscriptFinding],
   @rpc.LogCounts,
-) {
+) raise {
   let reader = @rpc.LogReader::new(mapping)
   let entries = []
   let findings = []
@@ -630,4 +630,34 @@ test "log records nest at most 128 levels" {
   assert_eq(findings, [])
   assert_eq(entries.length(), 1)
   assert_eq(tally(counts), (2, 1, 0, 1))
+}
+
+///|
+test "log reader and dir-message configuration errors raise" {
+  fn rejected(make : () -> Unit raise) -> String {
+    try make() catch {
+      @validation.ConfigurationError(message) => message
+      error => "unexpected error: \{error}"
+    } noraise {
+      _ => "accepted"
+    }
+  }
+
+  let raw = @rpc.LogMapping::raw(peer("client"))
+  assert_eq(
+    rejected(() => ignore(@rpc.LogReader::new(raw, line_bytes=0))),
+    "I expected a positive log line limit; line_bytes was 0.",
+  )
+  assert_eq(
+    rejected(() => ignore(@rpc.LogReader::new(raw, line_bytes=-5))),
+    "I expected a positive log line limit; line_bytes was -5.",
+  )
+  assert_eq(
+    rejected(() => ignore(@rpc.LogReader::new(raw, line_bytes=1))),
+    "accepted",
+  )
+  assert_eq(
+    rejected(() => ignore(@rpc.LogMapping::dir_message({}))),
+    "I expected at least one dir value in the dir-message map; directions was empty.",
+  )
 }

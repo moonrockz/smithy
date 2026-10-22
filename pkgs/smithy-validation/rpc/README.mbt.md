@@ -451,7 +451,7 @@ line becomes an entry:
 Paths are JSON Pointers. `LogMapping::new` raises `ConfigurationError` for an invalid pointer, a
 negative field count or an empty sender map. `LogMapping::raw(sender)` is the `raw` preset, and
 `LogMapping::dir_message(directions)` is the `dir-message` preset for `{"dir": ..., "message": ...}`
-records. `LogMapping::from_json(text, peers)` reads the same mapping from JSON, for example
+records; it raises `ConfigurationError` for an empty map. `LogMapping::from_json(text, peers)` reads the same mapping from JSON, for example
 `examples/json-rpc/transcripts/mcp-like.mapping.json`:
 
 ```json
@@ -471,7 +471,7 @@ peer name must be one of `peers`, and an unknown key raises.
 Lines that are blank or not JSON after the prefix, such as plain text and copied `Content-Length`
 headers, and records that the selector rejects are only counted in `counts()`. A record nested
 deeper than 128 levels, the depth limit of the message validator, counts as not JSON. A line longer than
-`line_bytes` (1 MiB of UTF-8 by default), a sender value that the map lacks and a missing message
+`line_bytes` (1 MiB of UTF-8 by default; `LogReader::new` raises `ConfigurationError` below 1), a sender value that the map lacks and a missing message
 field are `InvalidTranscript` findings at the line and column, and the line is dropped. An entry's
 location is its line and the column where its message starts. The reader leaves `receiver` as
 `None`. `single_sender()` is true for a `Fixed` sender: such a log has one direction, so check it
