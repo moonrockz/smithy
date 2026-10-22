@@ -21,6 +21,20 @@ fn input_name(path : String) -> String {
 }
 
 ///|
+/// How `read_chunks` ended.
+priv enum ChunksEnd {
+  /// The input ended, and the source closed.
+  Ended
+  /// The first read failed before any byte arrived, so the input was never
+  /// readable. The caller reports it like an input that did not open. The
+  /// source is closed.
+  Unreadable(Error)
+  /// A read failed after some bytes arrived, or the close failed. The
+  /// source is closed.
+  Failed(Error)
+}
+
+///|
 /// Gives each chunk of `source` to `consume` until end of input, then closes
 /// the source. A read or close error is given back, not raised, so that the
 /// caller can finish the work on the chunks before it. An error that
@@ -28,8 +42,9 @@ fn input_name(path : String) -> String {
 fn read_chunks(
   source : InputSource,
   consume : (Bytes) -> Unit raise,
-) -> Error? raise {
+) -> ChunksEnd raise {
   let mut open = true
+  let mut started = false
   errdefer (if open { (source.close)() catch { _ => () } })
   while true {
     let chunk = (source.read)(INPUT_CHUNK_BYTES) catch {
@@ -38,19 +53,20 @@ fn read_chunks(
         (source.close)() catch {
           _ => ()
         }
-        return Some(error)
+        return if started { Failed(error) } else { Unreadable(error) }
       }
     }
     if chunk.is_empty() {
       break
     }
+    started = true
     consume(chunk)
   }
   open = false
   (source.close)() catch {
-    error => return Some(error)
+    error => return Failed(error)
   }
-  None
+  Ended
 }
 
 ///|
@@ -62,7 +78,7 @@ fn read_input_bytes(path : String) -> Bytes raise {
       bytes.push(byte)
     }
   })
-  if failure is Some(error) {
+  if failure is (Unreadable(error) | Failed(error)) {
     raise error
   }
   Bytes::from_array(bytes)

@@ -1148,6 +1148,20 @@ async fn exercise_rpc_log_files(runner : Runner, root : String) -> Unit {
   for (key, count) in [("lines", 20001.0), ("entries", 20001.0), ("outstanding", 0.0), ("not_json", 0.0)] {
     assert_eq(summary.get(key), Some(Json::number(count)), msg="\{key}: \{out}")
   }
+  if runner.target == "native" {
+    // A path that opens but cannot be read, such as a directory on POSIX,
+    // gives the same InputRead report and exit status as a missing file:
+    // no summary, and no "could not read" error after it.
+    @fs.mkdir(runner.dir + "/folder.jsonl", allow_exist=true)
+    for diagnostics in ["text", "json"] {
+      let options = ["--diagnostics", diagnostics]
+      let (missing_out, missing_err) = runner.command(editor + ["absent.jsonl"] + options, 1)
+      let (folder_out, folder_err) = runner.command(editor + ["folder.jsonl"] + options, 1)
+      assert_true((missing_out + missing_err).contains("InputRead"), msg=missing_out + missing_err)
+      assert_eq(folder_out, missing_out.replace_all(old="absent.jsonl", new="folder.jsonl"))
+      assert_eq(folder_err, missing_err.replace_all(old="absent.jsonl", new="folder.jsonl"))
+    }
+  }
   if runner.target != "native" || @env.get_env_var("OS") == Some("Windows_NT") {
     return
   }

@@ -585,7 +585,9 @@ form). The command feeds each chunk through `LogReader` and `TranscriptChecker` 
 when it is known; with `--diagnostics json` the output is JSON Lines, one finding per line and then a
 `{"summary": {...}}` line with the reader counts. A raw log turns correlation off. The native and WASI
 binaries read a log file or stdin in 64 KiB chunks as it arrives; the js and wasm-gc binaries read all
-of the input first. `--expect <file.json>` reads expected findings with `read_expected_findings` for
+of the input first. A log whose first read fails before any byte, such as a directory path, gives the
+`InputRead` report of a missing file (exit 1); a read error after some bytes still writes the summary,
+then the error (exit 1). `--expect <file.json>` reads expected findings with `read_expected_findings` for
 any input format; it conflicts with an `expect` list in the document (exit 2). For a log, the match runs
 at the end and the summary line gets `expectations`. `--legacy-errors opaque|code-message-data`
 passes the 1.0 error mapping to `run_transcript` or `TranscriptChecker::new`, and requires version

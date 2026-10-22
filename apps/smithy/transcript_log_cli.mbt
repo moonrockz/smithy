@@ -157,37 +157,51 @@ fn run_log_transcript(
     correlation=!reader.single_sender(),
     legacy_errors=transcript.legacy_errors.unwrap_or(@rpc.Opaque),
   )
-  let source = chunk_source(transcript.file) catch {
-    _ =>
-      return value_problem(
-        opts, "InputRead", "I could not read the JSON-RPC transcript input.", 1,
-      )
-  }
-  stream_log(
-    source,
+  let outcome = stream_log(
+    () => chunk_source(transcript.file),
     reader,
     checker,
     FindingStream::new(opts, finding_sink(opts), expected),
   )
+  match outcome {
+    Checked(status) => status
+    Unreadable => transcript_input_problem(opts)
+  }
 }
 
 ///|
-/// Feeds each chunk of `source` through the reader and the checker, and
-/// writes the findings as they are known. A read error part-way through
-/// still ends the log and writes the summary, which is then not valid; the
-/// error is raised after it.
+/// How a streamed log ended.
+priv enum LogOutcome {
+  /// The log was read and checked, with this exit status.
+  Checked(Int32)
+  /// The input did not open, or its first read failed before any byte
+  /// arrived. Nothing was written.
+  Unreadable
+}
+
+///|
+/// Opens the log with `open`, feeds each chunk through the reader and the
+/// checker, and writes the findings as they are known. An input that does
+/// not open, or that fails on its first read, is `Unreadable`. A read error
+/// part-way through still ends the log and writes the summary, which is then
+/// not valid; the error is raised after it.
 fn stream_log(
-  source : InputSource,
+  open : () -> InputSource raise,
   reader : @rpc.LogReader,
   checker : @rpc.TranscriptChecker,
   output : FindingStream,
-) -> Int32 raise {
+) -> LogOutcome raise {
+  let source = open() catch { _ => return Unreadable }
   let chunks = Utf8Chunks::new()
   fn check(text : String) -> Unit raise {
     output.write_all(check_lines(reader.push_text(text), checker))
   }
 
-  let failure = read_chunks(source, bytes => check(chunks.push(bytes)))
+  let failure = match read_chunks(source, bytes => check(chunks.push(bytes))) {
+    Ended => None
+    Unreadable(_) => return Unreadable
+    Failed(error) => Some(error)
+  }
   check(chunks.end())
   output.write_all(check_lines(reader.end(), checker))
   let summary = checker.finish()
@@ -200,7 +214,7 @@ fn stream_log(
   if failure is Some(error) {
     raise error
   }
-  status
+  Checked(status)
 }
 
 ///|

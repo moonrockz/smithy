@@ -708,7 +708,7 @@ test "read_chunks gives each chunk, closes once and returns a read error" {
     closes: 0,
   }
   let seen = []
-  assert_true(read_chunks(input.source(), chunk => seen.push(chunk)) is None)
+  assert_true(read_chunks(input.source(), chunk => seen.push(chunk)) is Ended)
   assert_eq(seen, [b"ab", b"c"])
   assert_eq(input.reads, 3)
   assert_eq(input.closes, 1)
@@ -721,8 +721,19 @@ test "read_chunks gives each chunk, closes once and returns a read error" {
   }
   let seen = []
   let failure = read_chunks(input.source(), chunk => seen.push(chunk))
-  assert_true(failure is Some(CliError("could not read stdin", 1)))
+  assert_true(failure is Failed(CliError("could not read stdin", 1)))
   assert_eq(seen, [b"ab"])
+  assert_eq(input.closes, 1)
+  // A read error before any byte arrived means the input was never readable.
+  let input = FakeInput::{
+    chunks: [],
+    error: Some(CliError("could not read 'dir.jsonl'", 1)),
+    reads: 0,
+    closes: 0,
+  }
+  let failure = read_chunks(input.source(), _ => fail("expected no chunk"))
+  assert_true(failure is Unreadable(CliError("could not read 'dir.jsonl'", 1)))
+  assert_eq(input.reads, 1)
   assert_eq(input.closes, 1)
   // An error of the consumer closes the source and propagates.
   let input = FakeInput::{
@@ -781,6 +792,16 @@ fn stream_lines(
   input : FakeInput,
   expected : Array[@rpc.ExpectedFinding]?,
 ) -> (String, Array[Json]) raise {
+  stream_opened(() => input.source(), expected)
+}
+
+///|
+/// Streams the input that `open` gives, like `stream_lines`. The status is
+/// "unreadable" when `stream_log` found no readable input.
+fn stream_opened(
+  open : () -> InputSource raise,
+  expected : Array[@rpc.ExpectedFinding]?,
+) -> (String, Array[Json]) raise {
   let protocol = link_protocol()
   let peers = protocol.peers()
   let reader = @rpc.LogReader::new(
@@ -807,17 +828,13 @@ fn stream_lines(
     ion_index: None,
   }
   let status = try
-    stream_log(
-      input.source(),
-      reader,
-      checker,
-      FindingStream::new(opts, sink, expected),
-    )
+    stream_log(open, reader, checker, FindingStream::new(opts, sink, expected))
   catch {
     CliError(message, code) => "raised \{code}: \{message}"
     _ => "raised another error"
   } noraise {
-    status => "status \{status}"
+    Checked(status) => "status \{status}"
+    Unreadable => "unreadable"
   }
   let text = @utf8.decode(Bytes::from_array(written))
   let lines = []
@@ -872,6 +889,28 @@ test "a read error part-way through a log still writes the summary" {
       "expected the findings and then the summary: \{Json::array(lines).stringify()}",
     )
   }
+}
+
+///|
+test "a log that fails on its first read is unreadable like a missing file" {
+  // A path that opens but gives a read error at once, such as a directory
+  // on POSIX, writes no findings and no summary.
+  let input = FakeInput::{
+    chunks: [],
+    error: Some(CliError("could not read 'dir.jsonl'", 1)),
+    reads: 0,
+    closes: 0,
+  }
+  let unreadable = stream_lines(input, None)
+  assert_eq(unreadable, ("unreadable", []))
+  assert_eq(input.reads, 1)
+  assert_eq(input.closes, 1)
+  // A path that does not open gives the same outcome.
+  let missing = stream_opened(
+    () => raise CliError("could not open 'missing.jsonl'", 1),
+    None,
+  )
+  assert_eq(missing, unreadable)
 }
 
 ///|

@@ -179,7 +179,8 @@ chunk and replacing invalid bytes with U+FFFD, and passes each chunk through `Lo
 summary with the `LogCounts`; JSON diagnostics are JSON Lines. When `single_sender()` is true the
 checker runs with correlation off. Native and WASI read files and stdin live, so a FIFO streams;
 js and wasm-gc read all of the input first and give the same findings. A read error part-way through
-still gives the summary, then the error (exit 1). With `--expect`, the match runs at the end of the
+still gives the summary, then the error (exit 1). A read error before the first byte, such as a
+directory path on POSIX, gives the `InputRead` report of a missing file instead (exit 1). With `--expect`, the match runs at the end of the
 log and the summary has the expectation result.
 
 ## Two-peer protocols
