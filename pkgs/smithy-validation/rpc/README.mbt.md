@@ -341,7 +341,9 @@ each answered call.
 A cancellation names a call of its own sender: an active call, or a call in an earlier pending
 request batch. If that call is not active, the cancellation is a `CancelInactiveCall` advisory,
 because a cancellation can race the reply. A cancellation that names a call in its own request batch
-gives no finding and excuses nothing, because the receiver may process the elements in any order. The
+gives no finding and excuses nothing, because the receiver may process the elements in any order. A
+null ID never names a batch call, because in a batch it also answers each invalid element, so a
+null-id cancellation names only an active null-id single call; otherwise it is the advisory. The
 reply of a cancelled call may use the declared code: the checker drops the `UnknownError` finding for
 that code on that reply. In a reply batch, only the element that answers the cancelled call is
 excused.

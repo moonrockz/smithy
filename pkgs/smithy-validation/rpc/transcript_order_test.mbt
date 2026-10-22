@@ -803,3 +803,28 @@ test "a cancellation of a call in the same batch gives no advisory" {
   assert_eq(summary_of(found), ["UnknownError@4[3]", "UnknownError@6[5]"])
   assert_eq(checker.finish().findings, [])
 }
+
+///|
+test "a null-id cancellation excuses no batch element" {
+  let compile = id => call(id, "compile", params="{\"source\": \"x\"}")
+  // A structured id is invalid in 2.0, so this element is answered with a
+  // null id.
+  let invalid = "{\"jsonrpc\": \"2.0\", \"method\": \"compile\", \"params\": {\"source\": \"x\"}, \"id\": {\"a\": 1}}"
+  let null_error = "{\"jsonrpc\": \"2.0\", \"id\": null, \"error\": {\"code\": -32800, \"message\": \"failed\"}}"
+  let checker = @rpc.TranscriptChecker::new(lifecycle(), completeness=Complete)
+  let found = checker.feed_all(
+    ready("{\"cancellation\": true}") +
+    [
+      entry("host", "[" + compile(2) + ", " + invalid + "]"),
+      entry("host", cancel("null")),
+      entry("extension", "[" + success(2, "\"ok\"") + ", " + null_error + "]"),
+    ],
+  )
+  // The null key of a batch answers an invalid element, not one call, so the
+  // cancellation names no active call and the reply keeps its finding.
+  assert_eq(summary_of(found), [
+    "InvalidId@3[]", "CancelInactiveCall@4[]", "UnknownError@5[3]", "InvalidContext@5[3]",
+  ])
+  assert_eq(found[2].finding.map(f => f.path.pointer()), Some("/1/error/code"))
+  assert_eq(checker.finish().findings, [])
+}

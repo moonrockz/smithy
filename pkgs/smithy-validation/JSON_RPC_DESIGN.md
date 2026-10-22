@@ -286,15 +286,17 @@ A cancellation names a call of its own sender: an active single call, or a call 
 pending request batch. Otherwise it is a `CancelInactiveCall` advisory, because a cancellation can
 race the reply. A cancellation that names a call in its own request batch gives no finding and
 excuses nothing: the receiver may process the elements of a batch in any order, so it proves
-nothing. The reply of a cancelled call may use the declared code: the `UnknownError` finding for
-that code on that reply is dropped. In a reply batch, only the first element that answers the
-cancelled call is excused, never another element and never a call with the same ID outside the
-batch. The session holds only the state, the advertised capability names, the entry of the last
-call of each capability source, the entry of the last transition and the cancelled calls. A
-cancelled single call is always an active call, so `active_calls` bounds that table, and the call
-leaves it when it is answered. A cancelled batch call is kept in its pending batch, so the keys of
-that batch bound it, and it leaves with the batch reply. The layer needs
-correlation; with `correlation=false` it does nothing.
+nothing. A null ID never names a batch call: in a batch the null ID also answers each invalid
+element, so it does not name one call. A null-id cancellation names only an active null-id single
+call, and otherwise it is the `CancelInactiveCall` advisory. The reply of a cancelled call may use
+the declared code: the `UnknownError` finding for that code on that reply is dropped. In a reply
+batch, only the first element that answers the cancelled call is excused, never another element and
+never a call with the same ID outside the batch. The session holds only the state, the advertised
+capability names, the entry of the last call of each capability source, the entry of the last
+transition and the cancelled calls. A cancelled single call is always an active call, so
+`active_calls` bounds that table, and the call leaves it when it is answered. A cancelled batch call
+is kept in its pending batch, so the keys of that batch bound it, and it leaves with the batch reply.
+The layer needs correlation; with `correlation=false` it does nothing.
 
 ## Rule and original-example coverage
 

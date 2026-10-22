@@ -129,7 +129,7 @@ fn TranscriptChecker::apply_rule(
 /// Marks the call that a cancellation names. The canceller cancels its own
 /// call: an active call, or a call in an earlier pending request batch. A
 /// call that is not active gives an advisory, because a cancellation may race
-/// the reply. `batch` holds the reply keys of the request batch that the
+/// the reply. A null id names an active null-id call only, never a batch call. `batch` holds the reply keys of the request batch that the
 /// cancellation is an element of.
 fn TranscriptChecker::cancel(
   self : TranscriptChecker,
@@ -149,9 +149,12 @@ fn TranscriptChecker::cancel(
   guard named is Some(raw) else { return }
   let id = Present(@smithy.NodeValue::from_json(raw)) catch { _ => return }
   guard call_key(id) is Some(key) else { return }
+  // In a batch, the null key also answers each invalid element, so it does
+  // not name one call. A null-id cancellation never names a batch call.
+  let in_batch = key != Scalar(NullId)
   // The receiver may process the elements of a batch in any order, so a
   // cancellation of a call in the same batch proves nothing.
-  if batch is Some(keys) && keys.contains(key) {
+  if in_batch && batch is Some(keys) && keys.contains(key) {
     return
   }
   let sender = step.entry.sender
@@ -164,7 +167,7 @@ fn TranscriptChecker::cancel(
     }
     return
   }
-  if state.batch_with(key) is Some(pending) {
+  if in_batch && state.batch_with(key) is Some(pending) {
     if rule.code is Some(code) {
       // A batch holds the cancellations of its own calls only, so its keys
       // bound them.
