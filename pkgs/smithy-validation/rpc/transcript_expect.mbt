@@ -32,6 +32,7 @@ fn next_rpc_code(code : FindingCode) -> FindingCode? {
     UnknownError => Some(AmbiguousId)
     AmbiguousId => Some(DuplicateResponse)
     DuplicateResponse => Some(MissingResponse)
+    // An appended variant must be linked from this arm, and the snapshot test updated.
     MissingResponse => None
     Value(_) => None
   }
@@ -55,6 +56,7 @@ fn next_value_code(code : @validation.FindingCode) -> @validation.FindingCode? {
     InvalidEncoding => Some(InvalidTimestamp)
     InvalidTimestamp => Some(UnsupportedValue)
     UnsupportedValue => Some(LimitExceeded)
+    // An appended variant must be linked from this arm, and the snapshot test updated.
     LimitExceeded => None
   }
 }
@@ -76,6 +78,7 @@ fn next_transcript_code(code : TranscriptCode) -> TranscriptCode? {
     ActiveIdReused => Some(AmbiguousReplyId)
     AmbiguousReplyId => Some(WrongReplyForm)
     WrongReplyForm => Some(InvalidTranscript)
+    // An appended variant must be linked from this arm, and the snapshot test updated.
     InvalidTranscript => None
     Message(_) => None
   }
@@ -85,7 +88,8 @@ fn next_transcript_code(code : TranscriptCode) -> TranscriptCode? {
 fn[T] walk_codes(first : T, next : (T) -> T?) -> Array[T] {
   let all = [first]
   let mut current = next(first)
-  while current is Some(code) {
+  // A cycle from a wrong link stops at the cap and fails the snapshot test.
+  while current is Some(code) && all.length() < 256 {
     all.push(code)
     current = next(code)
   }
