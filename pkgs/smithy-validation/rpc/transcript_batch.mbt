@@ -8,6 +8,9 @@ priv struct PendingBatch {
   keys : Set[CallKey]
   /// The methods of the accepted calls when the protocol has a session.
   methods : Map[CallKey, MethodName]
+  /// The calls that a later cancellation named, with the error code they may
+  /// answer with.
+  cancelled : Map[CallKey, ErrorCode]
 }
 
 ///|
@@ -147,33 +150,27 @@ fn TranscriptChecker::request_batch(
   if !self.correlation {
     return
   }
-  // The session checks the elements in array order.
-  let methods : Map[CallKey, MethodName] = Map([])
-  for element in values {
-    if self.order_request(step, receiver, element) is Some(method_) &&
-      classify_unchecked(version, element) is Call(key, _) {
-      methods[key] = method_
-    }
-  }
   match keys {
     // An empty batch is answered by one null-ID error object.
     None => self.track_unreadable(step, form=InvalidWholeBatch)
-    // An all-notification batch needs no reply.
-    Some(keys) if keys.is_empty() => ()
-    Some(keys) => self.track_batch(step, keys, methods)
+    Some(keys) => self.track_batch(step, receiver, values, keys)
   }
 }
 
 ///|
+/// Tracks a request batch whose replies carry `keys`, and checks its elements
+/// against the session in array order. A batch that the checker refuses
+/// applies no order rule. An all-notification batch needs no reply.
 fn TranscriptChecker::track_batch(
   self : TranscriptChecker,
   step : Step,
+  receiver : PeerName,
+  values : Array[Json],
   keys : Set[CallKey],
-  methods : Map[CallKey, MethodName],
 ) -> Unit {
   let sender = step.entry.sender
   let state = self.state(sender)
-  if state.batches.length() >= self.limits.active_calls {
+  if !keys.is_empty() && state.batches.length() >= self.limits.active_calls {
     self.complete = false
     self.report(
       step,
@@ -183,12 +180,25 @@ fn TranscriptChecker::track_batch(
     )
     return
   }
+  let version = self.protocol.version()
+  let methods : Map[CallKey, MethodName] = Map([])
+  for element in values {
+    if self.order_request(step, receiver, element, batch=Some(keys))
+      is Some(method_) &&
+      classify_unchecked(version, element) is Call(key, _) {
+      methods[key] = method_
+    }
+  }
+  if keys.is_empty() {
+    return
+  }
   state.batches.push({
     entry: step.index,
     text: step.entry.message,
     location: step.entry.location,
     keys,
     methods,
+    cancelled: Map([]),
   })
 }
 
@@ -275,9 +285,18 @@ fn TranscriptChecker::reply_batch(
         Some(step.entry.message),
         context=Some(OriginalBatch(batch.text)),
       )
-      self.report_messages(step, result.findings, [batch.entry])
+      self.report_messages(
+        step,
+        excuse_cancelled_batch(result.findings, values, batch.cancelled),
+        [batch.entry],
+      )
     }
-    _ => self.report_messages(step, errors, [batch.entry])
+    _ =>
+      self.report_messages(
+        step,
+        excuse_cancelled_batch(errors, values, batch.cancelled),
+        [batch.entry],
+      )
   }
   if batch.methods.is_empty() {
     return

@@ -269,18 +269,31 @@ language, so that they express the initialize-first and shutdown-then-exit order
 gives the findings it gave before, even when its operations carry the lifecycle traits. A state that
 the session does not declare, an unknown capability, a capability method that no peer accepts, an
 invalid pointer and an `idMember` that is not an input member are `InvalidContract`. The checker
-keeps one session state for both peers. When a request or notification arrives, its method must be
-allowed in the state (`StateViolation`, with the entry of the last transition in `related`) and its
-required capabilities must be advertised (`CapabilityNotAdvertised`). A rejected message causes no
-transition, and its reply moves the session nowhere, but correlation still tracks its call. An
-accepted message takes its `onCall` transition. A reply to an accepted call takes `onSuccess` or
-`onError` and adds the capabilities that its result advertises. Request batch elements are checked
-in array order, and a reply batch settles each answered call. A cancellation names an active call of
-its own sender; otherwise it is a `CancelInactiveCall` advisory, because a cancellation can race the
-reply. The reply of a cancelled single call may use the declared code: the `UnknownError` finding for
-that code on that call is dropped. The session holds only the state, the advertised capability names,
-the entry of the last transition and the cancelled calls. A cancelled call is always an active call,
-so `active_calls` bounds that table, and the call leaves it when it is answered. The layer needs
+keeps one session state for both peers. The rules apply only to a method that the receiving peer
+models. A request that the receiver does not model is an `UnknownMethod` finding already, so it
+applies no rule, takes no transition and advertises nothing. When a request or notification arrives,
+its method must be allowed in the state (`StateViolation`, with the entry of the last transition in
+`related`) and its required capabilities must be advertised (`CapabilityNotAdvertised`, with the
+last accepted call of the capability source in `related` when there is one). A rejected message
+causes no transition, and its reply moves the session nowhere, but correlation still tracks its
+call. A call that correlation refuses (`ActiveIdReused` or `ActiveCallLimit`) is not checked against
+the session, so it takes no transition and cancels nothing; the same holds for every element of a
+refused request batch. An accepted message takes its `onCall` transition. A reply to an accepted
+call takes `onSuccess` or `onError` and adds the capabilities that its result advertises. Request
+batch elements are checked in array order, and a reply batch settles each answered call.
+
+A cancellation names a call of its own sender: an active single call, or a call in an earlier
+pending request batch. Otherwise it is a `CancelInactiveCall` advisory, because a cancellation can
+race the reply. A cancellation that names a call in its own request batch gives no finding and
+excuses nothing: the receiver may process the elements of a batch in any order, so it proves
+nothing. The reply of a cancelled call may use the declared code: the `UnknownError` finding for
+that code on that reply is dropped. In a reply batch, only the first element that answers the
+cancelled call is excused, never another element and never a call with the same ID outside the
+batch. The session holds only the state, the advertised capability names, the entry of the last
+call of each capability source, the entry of the last transition and the cancelled calls. A
+cancelled single call is always an active call, so `active_calls` bounds that table, and the call
+leaves it when it is answered. A cancelled batch call is kept in its pending batch, so the keys of
+that batch bound it, and it leaves with the batch reply. The layer needs
 correlation; with `correlation=false` it does nothing.
 
 ## Rule and original-example coverage

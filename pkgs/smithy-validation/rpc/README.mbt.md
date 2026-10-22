@@ -326,21 +326,33 @@ order: initialize first, then shutdown, then exit.
 - `@jsonRpcCancels(idMember, code)` on an operation names the input member that holds the ID of the
   call to cancel, and the error code that the cancelled call may answer with.
 
-One session state is shared by both peers. A request or notification whose method is not allowed in
-the current state is a `StateViolation` error; `related` names the entry of the last transition. A
-method whose required capability no result advertised is a `CapabilityNotAdvertised` error. A rejected
-message causes no transition, and its reply moves the session nowhere, but its call is still
-correlated. A cancellation names an active call of its own sender. If that call is not active, the
-cancellation is a `CancelInactiveCall` advisory, because a cancellation can race the reply. The reply
-of a cancelled call may use the declared code: the checker drops the `UnknownError` finding for that
-code on that call. In a request batch, the checker checks the elements in array order, and a reply
-batch settles each answered call. A cancellation does not excuse the code of a call inside a batch.
+One session state is shared by both peers. The rules apply only to a method that the receiving peer
+models; a request that the receiver does not model is an `UnknownMethod` finding, and it takes no
+transition and advertises nothing. A request or notification whose method is not allowed in the
+current state is a `StateViolation` error; `related` names the entry of the last transition. A method
+whose required capability no result advertised is a `CapabilityNotAdvertised` error; `related` names
+the last accepted call of the capability source, when there is one. A rejected message causes no
+transition, and its reply moves the session nowhere, but its call is still correlated. A call that
+correlation refuses with `ActiveIdReused` or `ActiveCallLimit` is not checked against the session:
+it takes no transition and cancels nothing. The same holds for each element of a refused request
+batch. In a request batch, the checker checks the elements in array order, and a reply batch settles
+each answered call.
+
+A cancellation names a call of its own sender: an active call, or a call in an earlier pending
+request batch. If that call is not active, the cancellation is a `CancelInactiveCall` advisory,
+because a cancellation can race the reply. A cancellation that names a call in its own request batch
+gives no finding and excuses nothing, because the receiver may process the elements in any order. The
+reply of a cancelled call may use the declared code: the checker drops the `UnknownError` finding for
+that code on that reply. In a reply batch, only the element that answers the cancelled call is
+excused.
 
 `from_smithy` checks the traits: a state that the session does not declare, an unknown capability, a
 capability method that no peer accepts, an invalid pointer and an `idMember` that is not an input
 member are `InvalidContract`. The session holds only the state, the advertised capability names, the
-entry of the last transition and the cancelled calls, which are always active calls, so
-`active_calls` bounds them. With `correlation=false` the checker does no order checks.
+entry of the last call of each capability source, the entry of the last transition and the cancelled
+calls. A cancelled single call is always an active call, so `active_calls` bounds them; a cancelled
+batch call stays in its pending batch, whose keys bound it. With `correlation=false` the checker does
+no order checks.
 
 ```mbt check
 ///|

@@ -228,3 +228,64 @@ test "cancelled calls stay within the active call limit" {
   }
   assert_eq(largest, 4)
 }
+
+///|
+test "batch cancellations stay within their batches" {
+  let limits = TranscriptLimits::new(active_calls=4)
+  let checker = TranscriptChecker::new(cancelling_protocol(), limits~)
+  let client = PeerName::parse("client").unwrap()
+  let server = PeerName::parse("server").unwrap()
+  let ping = id => "{\"jsonrpc\": \"2.0\", \"id\": \{id}, \"method\": \"ping\"}"
+  let cancel = id => {
+    "{\"jsonrpc\": \"2.0\", \"method\": \"cancel\", \"params\": {\"id\": \{id}}}"
+  }
+  let failure = id => {
+    "{\"jsonrpc\": \"2.0\", \"id\": \{id}, \"error\": {\"code\": -32800, \"message\": \"cancelled\"}}"
+  }
+  let mut largest = 0
+  // The cycles whose batch the checker tracks and no reply answered.
+  let tracked : Array[Int32] = []
+  for i in 0..<1000 {
+    let (a, b) = (2 * i, 2 * i + 1)
+    // Batches pile up beyond the limit, and every call in them is cancelled,
+    // alone and from another batch.
+    let batch = checker.feed({
+      sender: client,
+      message: "[" + ping(a) + ", " + ping(b) + "]",
+      receiver: None,
+      location: None,
+    })
+    if batch.is_empty() {
+      tracked.push(i)
+    }
+    for message in [cancel(a), "[" + cancel(b) + "]"] {
+      checker.feed({ sender: client, message, receiver: None, location: None, })
+      |> ignore
+    }
+    // Every fifth cycle answers the oldest tracked batch.
+    if i % 5 == 0 && !tracked.is_empty() {
+      let j = tracked.remove(0)
+      let found = checker.feed({
+        sender: server,
+        message: "[" + failure(2 * j) + ", " + failure(2 * j + 1) + "]",
+        receiver: None,
+        location: None,
+      })
+      assert_eq(found, [], msg="excused batch reply at cycle \{i}")
+    }
+    let (active, _, _, _, batches, cancelled) = checker.table_sizes()
+    assert_true(cancelled <= active, msg="cancelled calls at cycle \{i}")
+    assert_true(batches <= 4, msg="pending batches at cycle \{i}")
+    for state in checker.peers {
+      for batch in state.batches {
+        assert_true(
+          batch.cancelled.length() <= batch.keys.length() &&
+          batch.cancelled.keys().all(key => batch.keys.contains(key)),
+          msg="batch cancellations at cycle \{i}",
+        )
+        largest = larger(largest, batch.cancelled.length())
+      }
+    }
+  }
+  assert_eq(largest, 2)
+}

@@ -435,7 +435,10 @@ fn TranscriptChecker::request(
   if !self.correlation {
     return
   }
-  let method_ = self.order_request(step, receiver, value)
+  // A call applies the order rules only when the checker tracks it.
+  if !(class is Call(_, _)) {
+    self.order_request(step, receiver, value) |> ignore
+  }
   match class {
     Silent => ()
     LegacyNotification => {
@@ -446,7 +449,7 @@ fn TranscriptChecker::request(
       }
     }
     Unreadable => self.track_unreadable(step)
-    Call(key, id) => self.track_call(step, key, id, form, method_)
+    Call(key, id) => self.track_call(step, receiver, value, key, id, form)
   }
 }
 
@@ -499,13 +502,17 @@ fn classify_unchecked(version : ProtocolVersion, value : Json) -> RequestClass {
 }
 
 ///|
+/// Tracks a call from the step's sender to `receiver`. Only a tracked call is
+/// checked against the session, so a refused call causes no transition and no
+/// cancellation.
 fn TranscriptChecker::track_call(
   self : TranscriptChecker,
   step : Step,
+  receiver : PeerName,
+  value : Json,
   key : CallKey,
   id : RequestId,
   form : PendingForm,
-  method_ : MethodName?,
 ) -> Unit {
   let sender = step.entry.sender
   let state = self.state(sender)
@@ -527,6 +534,7 @@ fn TranscriptChecker::track_call(
           "I expected at most \{self.limits.active_calls} active calls from \{sender.to_string()}; I do not track the call at entry \{step.index} with \{render_id(id)}.",
         )
       } else {
+        let method_ = self.order_request(step, receiver, value)
         state.active[key] = {
           entry: step.index,
           text: step.entry.message,

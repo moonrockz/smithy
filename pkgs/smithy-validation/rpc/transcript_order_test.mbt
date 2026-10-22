@@ -400,7 +400,8 @@ test "progress needs the advertised capability" {
     let found = checker
       .feed_all(ready(missing) + [progress])
       .filter(f => !(f.code is Message(_)))
-    assert_eq(summary_of(found), ["CapabilityNotAdvertised@3[]"])
+    // The related entry is the initialize call that did not advertise it.
+    assert_eq(summary_of(found), ["CapabilityNotAdvertised@3[0]"])
     assert_eq(found[0].severity, @validation.Error)
     assert_eq(
       found[0].message,
@@ -416,7 +417,12 @@ test "progress needs the advertised capability" {
     progress,
   ])
   assert_eq(summary_of(found), [
-    "CapabilityNotAdvertised@1[]", "CapabilityNotAdvertised@3[]",
+    "CapabilityNotAdvertised@1[0]", "CapabilityNotAdvertised@3[0]",
+  ])
+  // Before any initialize call, no entry is related.
+  let checker = @rpc.TranscriptChecker::new(lifecycle())
+  assert_eq(summary_of(checker.feed_all([progress])), [
+    "CapabilityNotAdvertised@0[]",
   ])
 }
 
@@ -460,7 +466,7 @@ test "cancelled calls may answer with the declared code" {
     ],
   )
   assert_eq(summary_of(found), [
-    "CapabilityNotAdvertised@4[]", "UnknownError@5[3]",
+    "CapabilityNotAdvertised@4[0]", "UnknownError@5[3]",
   ])
   // An application code that the operation does not model is excused too.
   let model = load(
@@ -674,5 +680,126 @@ test "batches follow the session order" {
   ])
   assert_eq(summary_of(found), ["StateViolation@0[]"])
   assert_true(found[0].message.contains("method compile"))
+  assert_eq(checker.finish().findings, [])
+}
+
+///|
+test "initialize sent the wrong way advertises nothing" {
+  // The host does not model initialize, so the call applies no rule.
+  let checker = @rpc.TranscriptChecker::new(lifecycle())
+  let found = checker
+    .feed_all([
+      entry("extension", call(1, "initialize", params="{\"host\": \"h\"}")),
+      entry("host", success(1, "{\"capabilities\": {\"progress\": true}}")),
+      entry("extension", notify("progress", params="{\"message\": \"m\"}")),
+      entry("host", notify("initialized")),
+    ])
+    .filter(f => !(f.code is Message(_)))
+  assert_eq(summary_of(found), [
+    "CapabilityNotAdvertised@2[]", "StateViolation@3[]",
+  ])
+  // The same call in a batch also applies no rule.
+  let checker = @rpc.TranscriptChecker::new(lifecycle())
+  let found = checker
+    .feed_all([
+      entry(
+        "extension",
+        "[" + call(1, "initialize", params="{\"host\": \"h\"}") + "]",
+      ),
+      entry(
+        "host",
+        "[" + success(1, "{\"capabilities\": {\"progress\": true}}") + "]",
+      ),
+      entry("extension", notify("progress", params="{\"message\": \"m\"}")),
+    ])
+    .filter(f => !(f.code is Message(_)))
+  assert_eq(summary_of(found), ["CapabilityNotAdvertised@2[]"])
+}
+
+///|
+test "a refused call does not transition or cancel" {
+  let compile = id => call(id, "compile", params="{\"source\": \"x\"}")
+  let checker = @rpc.TranscriptChecker::new(lifecycle())
+  let found = checker.feed_all(
+    ready("{\"cancellation\": true}") +
+    [
+      entry("host", compile(2)),
+      // Both calls reuse the active id 2, so the checker does not track them.
+      entry("host", call(2, "exit")),
+      entry("host", call(2, "$/cancelRequest", params="{\"id\": 2}")),
+      entry("extension", failure(2, -32800)),
+      entry("host", call(3, "ping")),
+    ],
+  )
+  assert_eq(summary_of(found), [
+    "ActiveIdReused@4[3]", "ActiveIdReused@5[3]", "UnknownError@6[3]",
+  ])
+  let limits = @rpc.TranscriptLimits::new(active_calls=1)
+  let checker = @rpc.TranscriptChecker::new(lifecycle(), limits~)
+  let found = checker.feed_all(
+    ready("{}") +
+    [
+      entry("host", compile(2)),
+      entry("host", call(3, "exit")),
+      entry("host", "[" + compile(4) + "]"),
+      entry("host", "[" + call(5, "exit") + "]"),
+      entry("extension", success(2, "\"ok\"")),
+      entry("host", call(6, "ping")),
+    ],
+  )
+  assert_eq(summary_of(found), ["ActiveCallLimit@4[]", "ActiveCallLimit@6[]"])
+}
+
+///|
+test "a cancellation of an earlier batch call is excused in the batch reply" {
+  let compile = id => call(id, "compile", params="{\"source\": \"x\"}")
+  let checker = @rpc.TranscriptChecker::new(lifecycle(), completeness=Complete)
+  let found = checker.feed_all(
+    ready("{\"cancellation\": true}") +
+    [
+      entry("host", "[" + compile(2) + ", " + compile(3) + "]"),
+      entry("host", cancel("2")),
+      entry("host", "[" + cancel("3") + "]"),
+      entry(
+        "extension",
+        "[" + failure(2, -32800) + ", " + failure(3, -32800) + "]",
+      ),
+      // Only the cancelled element is excused.
+      entry("host", "[" + compile(4) + ", " + compile(5) + "]"),
+      entry("host", cancel("4")),
+      entry(
+        "extension",
+        "[" + failure(5, -32800) + ", " + failure(4, -32800) + "]",
+      ),
+      // A cancellation of a single call does not excuse a batch call with
+      // the same id.
+      entry("host", compile(6)),
+      entry("host", "[" + compile(6) + "]"),
+      entry("host", cancel("6")),
+      entry("extension", "[" + failure(6, -32800) + "]"),
+      entry("extension", failure(6, -32800)),
+    ],
+  )
+  assert_eq(summary_of(found), ["UnknownError@9[7]", "UnknownError@13[11]"])
+  assert_eq(found[0].finding.map(f => f.path.pointer()), Some("/0/error/code"))
+  assert_eq(checker.finish().findings, [])
+}
+
+///|
+test "a cancellation of a call in the same batch gives no advisory" {
+  let compile = id => call(id, "compile", params="{\"source\": \"x\"}")
+  let checker = @rpc.TranscriptChecker::new(lifecycle(), completeness=Complete)
+  let found = checker.feed_all(
+    ready("{\"cancellation\": true}") +
+    [
+      entry("host", "[" + compile(2) + ", " + cancel("2") + "]"),
+      entry("extension", "[" + failure(2, -32800) + "]"),
+      entry("host", "[" + cancel("3") + ", " + compile(3) + "]"),
+      entry("extension", "[" + failure(3, -32800) + "]"),
+    ],
+  )
+  // The elements may be processed in any order, so the cancellation proves
+  // nothing and excuses nothing.
+  assert_eq(summary_of(found), ["UnknownError@4[3]", "UnknownError@6[5]"])
   assert_eq(checker.finish().findings, [])
 }
