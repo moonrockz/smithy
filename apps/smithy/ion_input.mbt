@@ -1,14 +1,5 @@
 ///|
-struct IonInputSource {
-  read : (Int32) -> Bytes raise
-  close : () -> Unit raise
-}
-
-///|
-fn collect_ion_bytes(
-  source : IonInputSource,
-  max_bytes~ : Int32,
-) -> Bytes raise {
+fn collect_ion_bytes(source : InputSource, max_bytes~ : Int32) -> Bytes raise {
   let mut close_needed = true
   errdefer (if close_needed { (source.close)() catch { _ => () } })
   guard max_bytes >= 0 else { raise CliError("invalid Ion input limit", 1) }
@@ -45,5 +36,5 @@ fn read_ion_bytes(
   file : String,
   max_bytes~ : Int32 = 16 * 1024 * 1024,
 ) -> Bytes raise {
-  collect_ion_bytes(ion_input_source(file), max_bytes~)
+  collect_ion_bytes(input_source(file), max_bytes~)
 }

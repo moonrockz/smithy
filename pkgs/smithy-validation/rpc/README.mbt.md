@@ -407,7 +407,9 @@ entry with a problem is dropped. An object without `entries`, or with a second `
 an unknown top-level key is an advisory, so it never fails a valid document. It does not know the protocol, so a peer name that the protocol
 lacks is reported by the checker as `UnknownPeer`.
 
-`expect` lists `{code, entry?, related?}` items. `match_expected` pairs each item with one distinct
+`expect` lists `{code, entry?, related?}` items. `read_expected_findings` reads the same items from a
+standalone JSON array, such as the CLI's `--expect` file, with the same rules; a problem gives no items
+and one located `InvalidTranscript` finding. `match_expected` pairs each item with one distinct
 finding of the same code name (`to_string`), entry and related entry. `ExpectationResult::is_match`
 holds when no item is missing and every unlisted finding is an advisory.
 
@@ -566,12 +568,15 @@ log needs `--version`, and `--log-preset raw --sender <peer>`, `--log-preset dir
 with repeatable `--direction value=peer`) or `--log-mapping <file.json>` (the `LogMapping::from_json`
 form). The command feeds each chunk through `LogReader` and `TranscriptChecker` and writes each finding
 when it is known; with `--diagnostics json` the output is JSON Lines, one finding per line and then a
-`{"summary": {...}}` line with the reader counts. A raw log turns correlation off. The js and wasm-gc
-binaries read all of stdin first. Text findings go to stderr as
+`{"summary": {...}}` line with the reader counts. A raw log turns correlation off. The native and WASI
+binaries read a log file or stdin in 64 KiB chunks as it arrives; the js and wasm-gc binaries read all
+of the input first. `--expect <file.json>` reads expected findings with `read_expected_findings` for
+any input format; it conflicts with an `expect` list in the document (exit 2). For a log, the match runs
+at the end and the summary line gets `expectations`. Text findings go to stderr as
 `<file>:<line>:<column>: entry <n> <sender>: <severity> <code>: <message>`. JSON diagnostics are one
 report with `valid`, `complete`, `entries`, `outstanding`, `correlation`, `findings` and, for an
 `expect` list, `expectations` (`matched`, `missing`, `unexpected`). The command exits 0 when no
-finding is an error, or when the findings match the `expect` list, and 1 otherwise. A malformed
+finding is an error, or when the findings match the `expect` list or `--expect`, and 1 otherwise. A malformed
 transcript is an `InvalidTranscript` finding (exit 1). Invalid usage, a missing or conflicting version
 and an invalid protocol exit 2.
 

@@ -34,15 +34,13 @@ import {
 
 options(
   link: { "wasm-gc": { "export-memory-name": "memory" } },
-  "native-stub": [ "stdin_native.c", "output_native.c", "ion_input_native.c" ],
+  "native-stub": [ "output_native.c", "input_native.c" ],
   targets: {
-    "stdin_native.mbt": [ "native" ],
     "stdin_js.mbt": [ "js" ],
-    "stdin_wasm.mbt": [ "wasm" ],
     "stdin_wasm_gc.mbt": [ "wasm-gc" ],
-    "ion_input_native.mbt": [ "native" ],
-    "ion_input_js.mbt": [ "js" ],
-    "ion_input_wasm.mbt": [ "wasm", "wasm-gc" ],
+    "input_native.mbt": [ "native" ],
+    "input_js.mbt": [ "js" ],
+    "input_wasm.mbt": [ "wasm", "wasm-gc" ],
     "output_native.mbt": [ "native" ],
     "output_js.mbt": [ "js" ],
     "output_wasm.mbt": [ "wasm", "wasm-gc" ],

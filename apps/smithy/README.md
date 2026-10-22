@@ -496,6 +496,9 @@ state or capability is an invalid protocol (exit 2). See `examples/json-rpc/life
   report to stdout: `valid`, `complete`, `entries`, `outstanding`, `correlation`, `findings` and, when the
   document has an `expect` list, `expectations` with `matched`, `missing` and `unexpected` (the unlisted
   error findings).
+- `--expect <file.json>` gives the expected findings for any input format: a JSON array of
+  `{"code", "entry"?, "related"?}` items, the form of a document's `expect` list. A document that also
+  has an `expect` list, and an expect file that I cannot read or that is malformed, exit 2.
 
 ### JSONL logs
 
@@ -523,11 +526,19 @@ runs. Text mode writes the finding lines and then a summary line to stderr, for 
 JSON mode writes JSON Lines to stdout: one finding object per line, then
 `{"summary": {"valid", "complete", "entries", "outstanding", "correlation", "lines", "not_json", "skipped"}}`.
 `lines` counts every line, `not_json` the lines that are not JSON, and `skipped` the JSON records that
-are not messages. The native and WASI (`wasm`) binaries read stdin as it arrives. The `js` and
-`wasm-gc` binaries read all of stdin first; they give the same findings, but only at the end of input.
+are not messages. The native and WASI (`wasm`) binaries read a log file or stdin in 64 KiB chunks as
+it arrives, so a FIFO or a file that grows while it is read gives findings before end of input, and
+memory does not grow with the size of the log. The `js` and `wasm-gc` binaries read all of the input
+first; they give the same findings, but only at the end of input. When a read fails part-way through,
+the command still writes the summary, with `valid:false`, then the error, and exits 1.
+
+With `--expect`, the findings still stream, and the expectations are matched at the end of the log.
+The JSON summary then also has `"expectations": {"matched", "missing", "unexpected"}`. Text mode writes
+a line for each missing or unexpected finding and adds `matched:true` or `matched:false` to the
+summary line.
 
 The exit status is 0 when no finding is an error, and 1 otherwise. When the document has an `expect`
-list, the status is 0 when the findings match it and 1 when they do not. A malformed transcript gives
+list, or `--expect` gives one, the status is 0 when the findings match it and 1 when they do not. A malformed transcript gives
 `InvalidTranscript` findings and exits 1. An invalid model exits 1. Invalid options, a missing or
 conflicting version, and an invalid protocol exit 2.
 

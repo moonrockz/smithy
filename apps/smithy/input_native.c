@@ -11,7 +11,7 @@
 #include <unistd.h>
 #endif
 
-MOONBIT_FFI_EXPORT int smithy_ion_input_open(const unsigned char *path) {
+MOONBIT_FFI_EXPORT int smithy_input_open(const unsigned char *path) {
 #ifdef _WIN32
   int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, (const char *)path, -1, NULL, 0);
   if (!size) return -1;
@@ -29,14 +29,17 @@ MOONBIT_FFI_EXPORT int smithy_ion_input_open(const unsigned char *path) {
 #endif
 }
 
-MOONBIT_FFI_EXPORT int smithy_ion_input_stdin(void) {
+MOONBIT_FFI_EXPORT int smithy_input_stdin(void) {
 #ifdef _WIN32
   if (_setmode(0, _O_BINARY) == -1) return -1;
 #endif
   return 0;
 }
 
-MOONBIT_FFI_EXPORT int smithy_ion_input_read(int fd, unsigned char *buffer, int size) {
+/* Reads what the descriptor has now, up to size bytes. Unlike fread, read(2)
+   returns as soon as a pipe or FIFO has data, so a live writer is not held
+   until end of input. */
+MOONBIT_FFI_EXPORT int smithy_input_read(int fd, unsigned char *buffer, int size) {
   for (;;) {
 #ifdef _WIN32
     int count = _read(fd, buffer, (unsigned int)size);
@@ -57,7 +60,7 @@ MOONBIT_FFI_EXPORT int smithy_ion_input_read(int fd, unsigned char *buffer, int 
   }
 }
 
-MOONBIT_FFI_EXPORT int smithy_ion_input_close(int fd) {
+MOONBIT_FFI_EXPORT int smithy_input_close(int fd) {
 #ifdef _WIN32
   return _close(fd) == 0;
 #else

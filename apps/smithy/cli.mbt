@@ -853,7 +853,7 @@ fn run(args : Array[String]) -> Int32 raise {
 
 ///|
 fn read_stdin() -> String raise {
-  @utf8.decode(stdin_bytes())
+  @utf8.decode(read_input_bytes("-"))
 }
 
 ///|

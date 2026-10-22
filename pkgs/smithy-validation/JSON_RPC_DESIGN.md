@@ -169,14 +169,17 @@ when the document gives none, and must agree with it. `--complete` or `--partial
 document; partial is the default. Text findings name the file, line, column, entry and sender; JSON
 diagnostics are one report with the summary, the findings and the expectation result. The exit
 status is 0 for no error findings, or for an `expect` list that matches, 1 otherwise, and 2 for usage
-and contract errors. Markdown transcripts (`examples/json-rpc/transcripts/*.md`) are read with the same command. JSONL logs (`--input-format jsonl`, `.jsonl`, `.ndjson` or stdin) need `--version`, and take
+and contract errors. `--expect <file.json>` gives the expect list for any input format
+(`read_expected_findings`); it conflicts with an `expect` list in the document. Markdown transcripts (`examples/json-rpc/transcripts/*.md`) are read with the same command. JSONL logs (`--input-format jsonl`, `.jsonl`, `.ndjson` or stdin) need `--version`, and take
 `--log-preset raw|dir-message`, `--sender`, repeatable `--direction value=peer` or `--log-mapping`. The
-command decodes stdin chunks at the CLI boundary, carrying an incomplete UTF-8 sequence to the next
+command reads a log file or stdin in 64 KiB chunks, decodes them at the CLI boundary, carrying an incomplete UTF-8 sequence to the next
 chunk and replacing invalid bytes with U+FFFD, and passes each chunk through `LogReader` and
 `TranscriptChecker`. It writes reader and checker findings in line order as they are known, then a
 summary with the `LogCounts`; JSON diagnostics are JSON Lines. When `single_sender()` is true the
-checker runs with correlation off. Native and WASI read stdin live; js and wasm-gc read all of stdin
-first and give the same findings.
+checker runs with correlation off. Native and WASI read files and stdin live, so a FIFO streams;
+js and wasm-gc read all of the input first and give the same findings. A read error part-way through
+still gives the summary, then the error (exit 1). With `--expect`, the match runs at the end of the
+log and the summary has the expectation result.
 
 ## Two-peer protocols
 
@@ -217,7 +220,8 @@ small scanner finds each `message` value's exact source text; nothing is re-seri
 are `InvalidTranscript` findings with a line and column; a bad entry is dropped. `ExpectedFinding`
 names a code by its rendered `to_string` (for example `DuplicateResponse`), and `match_expected`
 matches items to distinct findings (maximum bipartite matching, so order does not matter). A match
-needs no missing item and no unlisted error.
+needs no missing item and no unlisted error. `read_expected_findings` reads a standalone array of
+the same items with the same item parser.
 
 ### Markdown transcript documents
 
