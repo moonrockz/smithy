@@ -193,6 +193,16 @@ pending batch is `WrongReplyForm`. An empty batch waits for one null-ID `-32600`
 all-notification batch needs no reply. At `finish`, each pending batch counts as one unanswered unit.
 A 1.0 array entry stays `UnsupportedMessage`.
 
+
+### JSON transcript documents
+
+`read_json_transcript` reads `{version?, complete?, entries, expect?}` or a bare entry array. A
+small scanner finds each `message` value's exact source text; nothing is re-serialized. Problems
+are `InvalidTranscript` findings with a line and column; a bad entry is dropped. `ExpectedFinding`
+names a code by its rendered `to_string` (for example `DuplicateResponse`), and `match_expected`
+matches items to distinct findings (maximum bipartite matching, so order does not matter). A match
+needs no missing item and no unlisted error.
+
 ## Rule and original-example coverage
 
 The table separates request and single-response coverage from follow-on batch/exchange work. R = requests/notifications,

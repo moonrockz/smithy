@@ -302,6 +302,20 @@ oversized entry gives `EntryLimit`; both entries are skipped. A call beyond `act
 reported as unsolicited and the message says so. The last finding within the budget is
 `FindingLimit`. The two limit findings set `complete` to false in the summary.
 
+## JSON transcript documents
+
+`read_json_transcript` reads a JSON document into a `TranscriptDocument`: an object with `entries`
+(each `{"from": peer, "message": value}`) and optional `version` (`"1.0"` or `"2.0"`), `complete`
+(boolean) and `expect`, or a bare array of entries. Each `message` is the exact source text of its
+value, so numbers and IDs stay as written, and each entry's location is the line and column of that
+value. The reader never raises: a problem is an `InvalidTranscript` finding with a location, and an
+entry with a problem is dropped. It does not know the protocol, so a peer name that the protocol
+lacks is reported by the checker as `UnknownPeer`.
+
+`expect` lists `{code, entry?, related?}` items. `match_expected` pairs each item with one distinct
+finding of the same code name (`to_string`), entry and related entry. `ExpectationResult::is_match`
+holds when no item is missing and every unlisted finding is an advisory.
+
 ## CLI
 
 From the repository root:

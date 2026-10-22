@@ -1,0 +1,8 @@
+{
+  "version": "1.0",
+  "complete": true,
+  "entries": [
+    { "from": "client", "message": {"method": "echo", "params": ["Hello JSON-RPC"], "id": 1} },
+    { "from": "server", "message": {"result": "Hello JSON-RPC", "error": null, "id": 1} }
+  ]
+}
