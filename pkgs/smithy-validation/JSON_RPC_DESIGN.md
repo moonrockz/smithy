@@ -160,7 +160,13 @@ matching and notification omissions. `--batch --no-response --request` checks ab
 from an invalid empty response array. Duplicate call IDs remain request advisories but fail
 ambiguous correlation. Identical invalid-element errors form a multiset. See the RPC guide for
 typed batch contexts, indexed results, single invalid-whole-batch errors and resource policies.
-Transcript mode with explicit directions remains planned.
+`smithy validate rpc transcript --protocol example.peers#Editor peers.smithy editor.json` checks a
+JSON transcript between the two peers of a protocol, with explicit senders. `--version` is needed only
+when the document gives none, and must agree with it. `--complete` or `--partial` overrides the
+document; partial is the default. Text findings name the file, line, column, entry and sender; JSON
+diagnostics are one report with the summary, the findings and the expectation result. The exit
+status is 0 for no error findings, or for an `expect` list that matches, 1 otherwise, and 2 for usage
+and contract errors. Markdown and JSONL transcripts and stdin streaming remain planned.
 
 ## Two-peer protocols
 
@@ -227,19 +233,19 @@ S = responses/errors, B = batches, E = exchanges, T = transport-only, C = explic
 | 2.0 §7 invalid request | R/S | Wrong method/params types and contextual -32600. |
 | 2.0 §7 invalid batch JSON/empty batch | B/S | Single protocol error object. |
 | 2.0 §7 [1] and [1,2,3] | B/S | Error for each invalid element, with null IDs. |
-| 2.0 §7 mixed batch | B/E | Calls, notification omissions, invalid elements, unknown method and unordered responses. |
+| 2.0 §7 mixed batch | B/E | Calls, notification omissions, invalid elements, unknown method and unordered responses. In a transcript, a reply batch answers the pending request batch of the other peer (`transcripts/batches.json`, `batch#Link`). |
 | 2.0 §7 all-notification batch | B/E | No response. |
 | 2.0 §8 extensions | C | Only supported explicit extensions, without inferred negotiation. |
 | 1.0 overview/§1.1 | R | Object, method string, required positional params and arbitrary required JSON ID. This profile rejects a jsonrpc marker. |
 | 1.0 §1.2 | S/E | result/error/id required; error null on success, result null on error, matching arbitrary ID. Null success allowed. Legacy error mapping is explicit, not a required 2.0 error envelope. |
 | 1.0 §1.3 | R/E | Present-null notification; absent ID invalid; no supplied response. |
-| 1.0 §2.1 bidirectional calls | E | Explicit peer directions and outstanding calls; unsolicited/duplicate replies fail exchange checks. |
+| 1.0 §2.1 bidirectional calls | E | Explicit peer directions and per-sender ID spaces; partial transcripts list outstanding calls (advisory) and complete ones report missing replies; unsolicited, duplicate and wrong-responder replies and replies to notifications fail exchange checks (`TranscriptChecker`, `smithy validate rpc transcript`). |
 | 1.0 §2.1 stream lifecycle | T | Framing, close behavior and pending-call exceptions need a transport implementation. |
 | 1.0 §2.2 HTTP | T/C | POST framing, polling and unspecified sessions remain transport concerns. Multiple serialized objects are not standardized 2.0-style batch arrays. |
 | 1.0 §3 class hints | C | __jsonclass__ is ordinary modeled data; never execute constructors. |
 | 1.0 §4 echo | R/S/E | String argument/result and matching numeric ID. |
-| 1.0 §4 chat transcript | R/S/E | postMessage calls 99/101, reverse handleMessage/userLeft null-ID notifications and matching results. |
-| Adversarial fixtures | R/S/B/E | Exact large/fractional IDs, wrong case, absent/null, arbitrary scalar/array/null results, malformed errors, ambiguous IDs, duplicate/unsolicited replies, partial transcripts and limits. |
+| 1.0 §4 chat transcript | R/S/E | postMessage calls 99/101, reverse handleMessage/userLeft null-ID notifications and matching results. The echo and chat exchanges are checked as transcripts (`transcripts/echo.json`, `transcripts/chat.json`). |
+| Adversarial fixtures | R/S/B/E | Exact large/fractional IDs, wrong case, absent/null, arbitrary scalar/array/null results, malformed errors, ambiguous IDs, duplicate/unsolicited/wrong-responder replies, partial and complete transcripts, expected findings (`transcripts/editor-negative.json`) and transcript limits. |
 
 ## OpenRPC mapping
 

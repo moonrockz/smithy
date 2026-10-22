@@ -825,6 +825,91 @@ async fn exercise_ion(runner : Runner, skip_stdin : Bool) -> Unit {
 }
 
 ///|
+/// Check whole transcripts through the built CLI: exit codes, the JSON report
+/// and expectation matching.
+async fn exercise_rpc_transcripts(runner : Runner, root : String, skip_stdin : Bool) -> Unit {
+  for model in ["peers.smithy", "batches.smithy"] {
+    @fs.write_file(runner.dir + "/" + model, @fs.read_file(root + "/examples/json-rpc/" + model).text())
+  }
+  for (protocol, model, transcript, status, valid, code) in [
+    ("example.peers#EchoChat", "peers.smithy", "echo.json", 0, true, ""),
+    ("example.peers#EchoChat", "peers.smithy", "chat.json", 0, true, ""),
+    ("example.peers#Editor", "peers.smithy", "editor.json", 0, true, ""),
+    ("example.peers#Editor", "peers.smithy", "editor-negative.json", 0, false, "UnsolicitedResponse"),
+    ("batch#Link", "batches.smithy", "batches.json", 0, true, ""),
+  ] {
+    @fs.write_file(runner.dir + "/" + transcript, @fs.read_file(root + "/examples/json-rpc/transcripts/" + transcript).text())
+    let args = ["validate", "rpc", "transcript", "--protocol", protocol, model, transcript]
+    let (out, _) = runner.command(args + ["--diagnostics", "json"], status)
+    guard @json.parse(out) is Object(report) else { fail("Expected one complete transcript report") }
+    assert_eq(report.get("valid"), Some(Json::boolean(valid)), msg=out)
+    assert_eq(report.get("complete"), Some(Json::boolean(true)), msg=out)
+    guard report.get("findings") is Some(Array(findings)) else { fail("Missing transcript findings") }
+    if code == "" {
+      assert_eq(findings.length(), 0, msg=out)
+      assert_eq(report.get("expectations"), None, msg=out)
+    } else {
+      guard findings is [Object(first), ..] else { fail("Expected a transcript finding") }
+      assert_eq(first.get("code"), Some(Json::string(code)), msg=out)
+      guard report.get("expectations") is Some(Object(expectations)) else { fail("Expected the expectation result") }
+      assert_eq(expectations.get("matched"), Some(Json::boolean(true)), msg=out)
+      assert_eq(expectations.get("missing"), Some(Json::array([])), msg=out)
+      assert_eq(expectations.get("unexpected"), Some(Json::array([])), msg=out)
+    }
+    runner.command(args, status) |> ignore
+  }
+  let editor = ["validate", "rpc", "transcript", "--protocol", "example.peers#Editor", "peers.smithy"]
+  // A transcript without an expect list exits 1 on an error finding.
+  @fs.write_file(runner.dir + "/unsolicited.json", "{\"version\":\"2.0\",\"entries\":[{\"from\":\"server\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":\"full\"}}]}")
+  let (out, _) = runner.command(editor + ["unsolicited.json", "--diagnostics", "json"], 1)
+  guard @json.parse(out) is Object(report) else { fail("Expected the unsolicited report") }
+  assert_eq(report.get("valid"), Some(Json::boolean(false)))
+  assert_eq(report.get("entries"), Some(Json::number(1.0)))
+  guard report.get("findings") is Some(Array([Object(first), ..])) else { fail("Expected the unsolicited finding") }
+  assert_eq(first.get("code"), Some(Json::string("UnsolicitedResponse")))
+  assert_eq(first.get("entry"), Some(Json::number(0.0)))
+  let (out, stderr) = runner.command(editor + ["unsolicited.json"], 1)
+  // moonrun's wasm-gc print host routes eprintln through stdout.
+  let err = if runner.target == "wasm-gc" { out + stderr } else { stderr }
+  assert_true(err.contains("unsolicited.json:1:56: entry 0 server: error UnsolicitedResponse: "), msg=err)
+  // A partial transcript reports outstanding calls as advisories and exits 0;
+  // --complete turns them into missing replies.
+  @fs.write_file(runner.dir + "/partial.json", "{\"version\":\"2.0\",\"entries\":[{\"from\":\"client\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"shutdown\"}}]}")
+  let (out, _) = runner.command(editor + ["partial.json", "--diagnostics", "json"], 0)
+  assert_true(out.contains("\"outstanding\":1") && out.contains("OutstandingCall"), msg=out)
+  let (out, _) = runner.command(editor + ["partial.json", "--complete", "--diagnostics", "json"], 1)
+  assert_true(out.contains("MissingResponse"), msg=out)
+  // An expect list that does not match exits 1 and names the missing finding.
+  @fs.write_file(runner.dir + "/mismatch.json", "{\"version\":\"2.0\",\"expect\":[{\"code\":\"WrongResponder\",\"entry\":0}],\"entries\":[{\"from\":\"server\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":\"full\"}}]}")
+  let (out, _) = runner.command(editor + ["mismatch.json", "--diagnostics", "json"], 1)
+  guard @json.parse(out) is { "expectations": { "matched": False, "missing": [{ "code": String(missing), .. }], "unexpected": [{ "code": String(unexpected), .. }], .. }, .. } else { fail("Expected a failed expectation: \{out}") }
+  assert_eq(missing, "WrongResponder")
+  assert_eq(unexpected, "UnsolicitedResponse")
+  // A malformed transcript is an error finding, not a usage error.
+  @fs.write_file(runner.dir + "/broken.json", "{\"version\":\"2.0\",\"entries\":[{\"from\":\"client\"}]}")
+  let (out, _) = runner.command(editor + ["broken.json", "--diagnostics", "json"], 1)
+  assert_true(out.contains("InvalidTranscript"), msg=out)
+  @fs.write_file(runner.dir + "/unversioned.json", "[{\"from\":\"client\",\"message\":{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}}]")
+  runner.command(editor + ["unversioned.json"], 2) |> ignore
+  runner.command(editor + ["unversioned.json", "--version", "2.0"], 0) |> ignore
+  runner.command(editor + ["unsolicited.json", "--version", "1.0"], 2) |> ignore
+  runner.command(editor + ["unsolicited.json", "--complete", "--partial"], 2) |> ignore
+  runner.command(["validate", "rpc", "transcript", "--protocol", "example.peers#Missing", "peers.smithy", "unsolicited.json"], 2) |> ignore
+  runner.command(editor + ["missing-transcript.json"], 1) |> ignore
+  @fs.write_file(runner.dir + "/notes.md", "# notes")
+  runner.command(editor + ["notes.md"], 2) |> ignore
+  for args in [["validate", "rpc", "transcript", "--help"], ["help", "validate", "rpc", "transcript"]] {
+    let (help, _) = runner.command(args, 0)
+    assert_true(help.contains("Usage: smithy validate rpc transcript") && help.contains("--protocol"), msg=help)
+  }
+  if !skip_stdin && (runner.target != "wasm-gc" || @env.get_env_var("OS") != Some("Windows_NT")) {
+    let text = @fs.read_file(root + "/examples/json-rpc/transcripts/editor.json").text()
+    runner.command(editor + ["--input-format", "json", "-"], 0, input=text) |> ignore
+    runner.command(editor + ["-"], 2, input=text) |> ignore
+  }
+}
+
+///|
 async fn exercise(
   root : String,
   target : String,
@@ -863,6 +948,7 @@ async fn exercise(
   exercise_rpc(runner, root, skip_stdin)
   exercise_rpc_responses(runner, root, skip_stdin)
   exercise_rpc_batches(runner, root, skip_stdin)
+  exercise_rpc_transcripts(runner, root, skip_stdin)
   exercise_ion(runner, skip_stdin)
   @fs.write_file(
     "\{dir}/broken.smithy",

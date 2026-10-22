@@ -2,7 +2,12 @@ $version: "2"
 namespace batch
 
 use smithy.rpc#jsonRpc
+use smithy.rpc#jsonRpcProtocol
 use smithy.rpc#method
+
+/// The JSON-RPC 2.0 section 7 batch examples as a transcript: the client calls and the server replies.
+@jsonRpcProtocol(versions: ["2.0"], peers: [{name: "client"}, {name: "server", accepts: Api}])
+structure Link {}
 
 @jsonRpc(versions: ["1.0", "2.0"])
 service Api { version: "1", operations: [Sum, Subtract, NotifyHello, NotifySum, GetData, Ping] }

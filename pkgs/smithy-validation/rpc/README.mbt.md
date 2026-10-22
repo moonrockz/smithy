@@ -355,6 +355,28 @@ Message, response, original request and model inputs may use stdin `-` only once
 Invalid messages, malformed JSON, I/O errors, invalid models and incomplete checks exit 1.
 Invalid usage, service contracts and unsupported constraint configurations exit 2.
 
+`smithy validate rpc transcript` checks a JSON transcript document with `read_json_transcript`,
+`TranscriptChecker` and, when the document has `expect`, `match_expected`:
+
+```sh
+smithy validate rpc transcript --protocol example.peers#EchoChat \
+  examples/json-rpc/peers.smithy examples/json-rpc/transcripts/chat.json
+smithy validate rpc transcript --protocol example.peers#Editor --diagnostics json \
+  examples/json-rpc/peers.smithy examples/json-rpc/transcripts/editor-negative.json
+```
+
+The positionals are the model files, then the transcript file or `-`. `--protocol` is required.
+`--version` is required when the document gives no version, and must agree with it otherwise.
+`--complete` or `--partial` overrides `complete` in the document; partial is the default.
+`--input-format json|markdown|jsonl` defaults from the extension, and to `jsonl` for stdin; only
+`json` is supported now. Text findings go to stderr as
+`<file>:<line>:<column>: entry <n> <sender>: <severity> <code>: <message>`. JSON diagnostics are one
+report with `valid`, `complete`, `entries`, `outstanding`, `correlation`, `findings` and, for an
+`expect` list, `expectations` (`matched`, `missing`, `unexpected`). The command exits 0 when no
+finding is an error, or when the findings match the `expect` list, and 1 otherwise. A malformed
+transcript is an `InvalidTranscript` finding (exit 1). Invalid usage, a missing or conflicting version
+and an invalid protocol exit 2.
+
 ## Version and parameter policies
 
 | Concern | 1.0 | 2.0 |
