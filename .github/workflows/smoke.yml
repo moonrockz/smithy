@@ -144,8 +144,11 @@ jobs:
           path: .smoke-evidence
           key: smoke-evidence-${{ inputs.fingerprint }}
 
+      # Closing the issue is housekeeping: a GitHub failure here must not fail smoke, because publish
+      # needs smoke. The next passing smoke closes the issue.
       - name: Close the open smoke breach
         if: inputs.breach-issues
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mise run smoke:resolve

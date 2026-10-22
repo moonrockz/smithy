@@ -16,7 +16,9 @@
 ///   smoke-breach.mbtx resolve   close the open issues after a passing smoke
 ///
 /// Both need GH_TOKEN (issues: write, actions: read, checks: read), GITHUB_REPOSITORY and the GitHub
-/// run variables. `report` also needs FINGERPRINT and VERSION. The script exits with a non-zero code on
+/// run variables. `report` also needs FINGERPRINT and VERSION. A transient GitHub failure is tried again
+/// after 5, 20 and 60 seconds. A retry of `report` reads the issues again and decides again, so a write
+/// that worked before its answer was lost is not done twice. The script exits with a non-zero code on
 /// failure.
 import {
   "moonbitlang/async@0.22.5",
@@ -340,20 +342,54 @@ fn run_url() -> String {
 }
 
 ///|
-/// Run `gh` and return its stdout; stop the script when it fails.
-async fn gh(args : Array[String]) -> String {
+/// The waits between attempts, in milliseconds, after a transient failure.
+let waits : Array[Int] = [5000, 20000, 60000]
+
+///|
+/// A failure that a retry can fix: a timeout, a reset or refused connection, a 502, 503 or 504, or a
+/// rate limit. A 401, 403 or 409 is never transient.
+fn is_transient(exit_code : Int, output : String) -> Bool {
+  if exit_code == 0 {
+    return false
+  }
+  let text = output.to_lower()
+  if ["401", "403", "409"].any(code => text.contains(code)) {
+    return false
+  }
+  [
+    "timed out", "timeout", "connection reset", "connection refused", "temporary failure",
+    "eof", "502", "503", "504", "rate limit",
+  ].any(word => text.contains(word))
+}
+
+///|
+/// Run `gh` once: the exit code, and stdout on success or stdout and stderr on failure.
+async fn gh_once(args : Array[String]) -> (Int, String) {
   let (code, out, err) = @process.collect_output("gh", args) catch {
-    e => {
-      fail_with("cannot start gh: \{e}")
-      return ""
-    }
+    e => return (1, "cannot start gh: \{e}")
   }
   if code != 0 {
-    fail_with(
-      "`gh \{args[:2].to_owned().join(" ")}` failed: \{(out.text() + err.text()).trim()}",
-    )
+    return (code, "`gh \{args[:2].to_owned().join(" ")}` failed: \{(out.text() + err.text()).trim()}")
   }
-  out.text()
+  (0, out.text())
+}
+
+///|
+/// Run `gh`, again after a transient failure; stop the script when it still fails.
+async fn gh(args : Array[String]) -> String {
+  let mut result = gh_once(args)
+  for i, wait in waits {
+    if !is_transient(result.0, result.1) {
+      break
+    }
+    eprintln("↻ gh \{args[:2].to_owned().join(" ")}: attempt \{i + 2}/4")
+    @async.sleep(wait)
+    result = gh_once(args)
+  }
+  if result.0 != 0 {
+    fail_with(result.1)
+  }
+  result.1
 }
 
 ///|
@@ -375,6 +411,67 @@ async fn list_issues(repo : String) -> Array[BreachIssue] {
       "200", "--json", "number,state,body",
     ]),
   )
+}
+
+///|
+/// Run the writes in order. Stop at the first failure and return it; when all worked, the output of
+/// the last write.
+async fn writes(steps : Array[Array[String]]) -> (Int, String) {
+  let mut last = (0, "")
+  for args in steps {
+    last = gh_once(args)
+    if last.0 != 0 {
+      return last
+    }
+  }
+  last
+}
+
+///|
+/// Read the issues, decide, and do the writes once. The result is the exit code and a message.
+/// A changed breach gets its comment before the edit: when the edit fails, a retry sees the old
+/// signature and does the update again, so the comment is never lost.
+async fn report_once(repo : String, breach : Breach) -> (Int, String) {
+  let title = breach.title()
+  let body = breach.body()
+  match decide(list_issues(repo), breach.signature()) {
+    Nothing(n) => (0, "#\{n} already reports this breach.")
+    Update(n) => {
+      let r = writes([
+        [
+          "issue", "comment", "\{n}", "--repo", repo, "--body", breach.comment(false),
+        ],
+        [
+          "issue", "edit", "\{n}", "--repo", repo, "--title", title, "--body", body,
+        ],
+      ])
+      if r.0 == 0 { (0, "Updated #\{n}.") } else { r }
+    }
+    Reopen(n) => {
+      let r = writes([
+        [
+          "issue", "edit", "\{n}", "--repo", repo, "--title", title, "--body", body,
+        ],
+        [
+          "issue", "reopen", "\{n}", "--repo", repo, "--comment", breach.comment(true),
+        ],
+      ])
+      if r.0 == 0 { (0, "Reopened #\{n}.") } else { r }
+    }
+    Create => {
+      let r = writes([
+        [
+          "label", "create", label, "--repo", repo, "--color", "B60205", "--description",
+          "A release binary failed its smoke test on main", "--force",
+        ],
+        [
+          "issue", "create", "--repo", repo, "--title", title, "--body", body, "--label",
+          label,
+        ],
+      ])
+      if r.0 == 0 { (0, "Created \{r.1.trim()}.") } else { r }
+    }
+  }
 }
 
 ///|
@@ -405,42 +502,19 @@ async fn run_report() -> Unit {
     event: env_or("GITHUB_EVENT_NAME", ""),
     git_ref: env_or("GITHUB_REF", ""),
   }
-  let title = breach.title()
-  let body = breach.body()
-  match decide(list_issues(repo), breach.signature()) {
-    Nothing(n) => println("#\{n} already reports this breach.")
-    Update(n) => {
-      gh([
-        "issue", "edit", "\{n}", "--repo", repo, "--title", title, "--body", body,
-      ]) |> ignore
-      gh([
-        "issue", "comment", "\{n}", "--repo", repo, "--body", breach.comment(false),
-      ]) |> ignore
-      println("Updated #\{n}.")
+  let mut result = report_once(repo, breach)
+  for i, wait in waits {
+    if !is_transient(result.0, result.1) {
+      break
     }
-    Reopen(n) => {
-      gh([
-        "issue", "edit", "\{n}", "--repo", repo, "--title", title, "--body", body,
-      ]) |> ignore
-      gh([
-        "issue", "reopen", "\{n}", "--repo", repo, "--comment", breach.comment(true),
-      ]) |> ignore
-      println("Reopened #\{n}.")
-    }
-    Create => {
-      gh([
-        "label", "create", label, "--repo", repo, "--color", "B60205", "--description",
-        "A release binary failed its smoke test on main", "--force",
-      ])
-      |> ignore
-      println(
-        gh([
-          "issue", "create", "--repo", repo, "--title", title, "--body", body, "--label",
-          label,
-        ]).trim(),
-      )
-    }
+    eprintln("↻ report: attempt \{i + 2}/4")
+    @async.sleep(wait)
+    result = report_once(repo, breach)
   }
+  if result.0 != 0 {
+    fail_with(result.1)
+  }
+  println(result.1)
 }
 
 ///|
@@ -617,6 +691,13 @@ impl @moonspec.World for BreachWorld with fn configure(self, setup) {
     @expect.expect(to_close(self.issues).map(n => "\{n}").join("|")).to_equal(
       expected,
     )
+  })
+  setup.then3("a gh call that exits with {int} and prints {string} is transient: {string}", fn(
+    code : Int,
+    output : String,
+    answer : String,
+  ) raise {
+    @expect.expect(is_transient(code, output)).to_equal(answer == "yes")
   })
   setup.then1("the title is {string}", fn(expected : String) raise {
     @expect.expect(self.breach.title()).to_equal(expected)

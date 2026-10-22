@@ -79,6 +79,20 @@ Feature: One GitHub issue per smoke breach
     Given the issues "4 closed s1,9 open s2,12 open s1"
     Then a passing smoke closes "9|12"
 
+  Scenario Outline: Which gh failures are tried again
+    Then a gh call that exits with <code> and prints "<output>" is transient: "<transient>"
+
+    Examples:
+      | code | output                                 | transient |
+      | 0    | ok                                     | no        |
+      | 1    | HTTP 502: Bad Gateway                  | yes       |
+      | 1    | Get api.github.com: i/o timeout        | yes       |
+      | 1    | connection reset by peer               | yes       |
+      | 1    | API rate limit exceeded                | yes       |
+      | 1    | HTTP 403: Resource not accessible      | no        |
+      | 1    | HTTP 401: Bad credentials              | no        |
+      | 1    | HTTP 422: Validation Failed            | no        |
+
   Scenario: The issue title names the failed platforms
     Given a breach of fingerprint "f1" with "darwin-x64 failure,linux-arm64 timed_out" in run "https://x/runs/1"
     Then the title is "Smoke failed on main: darwin-x64, linux-arm64"

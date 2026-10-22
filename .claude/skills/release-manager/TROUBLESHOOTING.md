@@ -148,6 +148,12 @@ run `gh workflow run release.yml --ref main -f dry_run=true`. Do not close the i
 a trusted run closes it. The same breach in a later run does not add a comment; a changed breach (other
 platforms, results or inputs) edits the issue and comments.
 
+**A `smoke-breach` issue stays open after a passing smoke**
+Cause: the step `Close the open smoke breach` of `Record smoke evidence` failed after its retries. The step
+cannot fail smoke (`continue-on-error`), because publish needs smoke, so the run shows only a warning.
+Fix: read the step log. The next passing smoke in a trusted run closes the issue. If the breach is fixed and
+no smoke will run soon, close the issue with a comment that links the passing run.
+
 **`Report the smoke breach` fails with `HTTP 403`**
 Cause: the calling job lacks a permission. The report reads the jobs (`actions: read`) and the annotations
 (`checks: read`) of the run, and writes issues (`issues: write`).
