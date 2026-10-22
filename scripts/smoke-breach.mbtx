@@ -1,0 +1,658 @@
+///|
+/// Smoke breach issues. A breach is a failed smoke in a trusted run on main or on a release tag. The
+/// report keeps one GitHub issue per breach, with the label `smoke-breach`. A hidden marker in the body
+/// holds the signature of the breach: the fingerprint of the smoke inputs and the result of each failed
+/// platform. The run is not part of the signature, so the same breach in a later run changes nothing.
+///
+///   no labelled issue, or none that matches     create an issue
+///   the newest open issue has the signature     do nothing
+///   the newest open issue has another one       edit its title and body, and comment what changed
+///   a closed issue has the signature            reopen it with the new run, and comment
+///
+/// A passing smoke in a trusted run closes every open labelled issue.
+///
+/// Usage:
+///   smoke-breach.mbtx report    file or update the issue for the failed smoke of this run
+///   smoke-breach.mbtx resolve   close the open issues after a passing smoke
+///
+/// Both need GH_TOKEN (issues: write, actions: read, checks: read), GITHUB_REPOSITORY and the GitHub
+/// run variables. `report` also needs FINGERPRINT and VERSION. The script exits with a non-zero code on
+/// failure.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/encoding/hex",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/sys",
+  "moonrockz/moonspec@0.11.0",
+  "moonrockz/expect@0.6.1",
+}
+
+///|
+let usage : String = "Usage: smoke-breach.mbtx report | resolve"
+
+///|
+let label : String = "smoke-breach"
+
+///|
+let marker_prefix : String = "<!-- smoke-breach v1 signature="
+
+///|
+let marker_suffix : String = " -->"
+
+///|
+let api_prefix : String = "https://api.github.com/"
+
+///|
+fn fail_with(message : String) -> Unit {
+  eprintln("❌ \{message}")
+  @sys.exit(1)
+}
+
+///|
+/// One smoke leg that did not pass: its platform, the job conclusion, the job page and the check run
+/// path in the REST API (for the annotations).
+struct Leg {
+  platform : String
+  conclusion : String
+  job_url : String
+  check_run : String
+  mut messages : Array[String]
+} derive(Debug)
+
+///|
+/// A failed smoke of one run.
+struct Breach {
+  fingerprint : String
+  mut legs : Array[Leg]
+  run : String
+  commit : String
+  version : String
+  event : String
+  git_ref : String
+}
+
+///|
+/// One labelled issue: its number, whether it is open, and the signature in its body.
+struct BreachIssue {
+  number : Int
+  open : Bool
+  signature : String?
+}
+
+///|
+enum Action {
+  Create
+  Nothing(Int)
+  Update(Int)
+  Reopen(Int)
+} derive(Eq, Debug)
+
+///|
+fn compare_lexical(a : String, b : String) -> Int {
+  let n = if a.length() < b.length() { a.length() } else { b.length() }
+  for i in 0..<n {
+    let c = a.code_unit_at(i).compare(b.code_unit_at(i))
+    if c != 0 {
+      return c
+    }
+  }
+  a.length().compare(b.length())
+}
+
+///|
+/// The legs sorted by platform.
+fn sorted_legs(legs : Array[Leg]) -> Array[Leg] {
+  let sorted = legs.copy()
+  sorted.sort_by((a, b) => compare_lexical(a.platform, b.platform))
+  sorted
+}
+
+///|
+/// The platform of a smoke job name, such as `Smoke / Smoke (linux-x64)`, or `None` for another job.
+fn platform_of(name : String) -> String? {
+  guard name.find("Smoke (") is Some(start) else { return None }
+  let rest = name.view(start_offset=start + 7)
+  guard rest.find(")") is Some(end) else { return None }
+  Some(rest.view(end_offset=end).to_owned())
+}
+
+///|
+fn text_field(fields : Map[String, Json], key : String) -> String? {
+  match fields.get(key) {
+    Some(String(value)) => Some(value)
+    _ => None
+  }
+}
+
+///|
+/// The smoke legs that did not pass, from the response of the jobs API of a run attempt. A leg without
+/// a conclusion counts as `unknown`: the report runs after every leg, so that leg did not finish.
+fn failed_legs(jobs : Json) -> Array[Leg] {
+  guard jobs is { "jobs": Array(list), .. } else { return [] }
+  let legs = []
+  for job in list {
+    guard job is Object(fields) else { continue }
+    guard text_field(fields, "name").bind(platform_of) is Some(platform) else {
+      continue
+    }
+    let conclusion = text_field(fields, "conclusion").unwrap_or("unknown")
+    if conclusion == "success" {
+      continue
+    }
+    let check_run = text_field(fields, "check_run_url").unwrap_or("")
+    legs.push({
+      platform,
+      conclusion,
+      job_url: text_field(fields, "html_url").unwrap_or(""),
+      check_run: if check_run.has_prefix(api_prefix) {
+        check_run.view(start_offset=api_prefix.length()).to_owned()
+      } else {
+        check_run
+      },
+      messages: [],
+    })
+  }
+  legs
+}
+
+///|
+/// The failure messages of a check run, from the response of its annotations API.
+fn failure_messages(annotations : Json) -> Array[String] {
+  guard annotations is Array(list) else { return [] }
+  let messages = []
+  for a in list {
+    guard a is Object(fields) else { continue }
+    guard text_field(fields, "annotation_level") == Some("failure") else {
+      continue
+    }
+    if text_field(fields, "message") is Some(message) {
+      messages.push(message)
+    }
+  }
+  messages
+}
+
+///|
+/// The signature of a breach: a SHA-256 of the fingerprint and the platform and result of each failed
+/// leg, sorted by platform. The run, the commit and the messages are not part of it.
+fn Breach::signature(self : Breach) -> String {
+  let buf = StringBuilder()
+  buf.write_string("smoke-breach v1\n\{self.fingerprint}\n")
+  for leg in sorted_legs(self.legs) {
+    buf.write_string("\{leg.platform} \{leg.conclusion}\n")
+  }
+  @hex.encode(
+    Bytes::from_array(@crypto.sha256(@utf8.encode(buf.to_string()))),
+  )
+}
+
+///|
+fn Breach::title(self : Breach) -> String {
+  let names = sorted_legs(self.legs).map(leg => leg.platform).join(", ")
+  "Smoke failed on main: \{names}"
+}
+
+///|
+/// A table cell: one line, without a column separator.
+fn cell(text : String) -> String {
+  text.replace_all(old="\n", new=" ").replace_all(old="|", new="\\|")
+}
+
+///|
+fn marker(signature : String) -> String {
+  marker_prefix + signature + marker_suffix
+}
+
+///|
+fn Breach::body(self : Breach) -> String {
+  let buf = StringBuilder()
+  buf.write_string(
+    "A release binary failed its smoke test in a trusted run. A release of these inputs will fail its smoke job.\n\n",
+  )
+  buf.write_string("| Platform | Result | Job | Messages |\n| --- | --- | --- | --- |\n")
+  for leg in sorted_legs(self.legs) {
+    let messages = if leg.messages.is_empty() {
+      "-"
+    } else {
+      cell(leg.messages.join("; "))
+    }
+    buf.write_string(
+      "| \{leg.platform} | \{leg.conclusion} | [job](\{leg.job_url}) | \{messages} |\n",
+    )
+  }
+  buf.write_string("\n- Run: \{self.run} (\{self.event}, \{self.git_ref})\n")
+  buf.write_string("- Commit: \{self.commit}\n")
+  buf.write_string("- Version: \{self.version}\n")
+  buf.write_string("- Fingerprint of the smoke inputs: `\{self.fingerprint}`\n\n")
+  buf.write_string(
+    "Fix the cause. A passing smoke in a trusted run closes this issue. To smoke again, run the Release workflow with `dry_run` on main.\n\n",
+  )
+  buf.write_string(marker(self.signature()) + "\n")
+  buf.to_string()
+}
+
+///|
+/// The comment for an issue that this breach updates or reopens.
+fn Breach::comment(self : Breach, reopened : Bool) -> String {
+  let what = if reopened {
+    "The same breach came back"
+  } else {
+    "The breach changed"
+  }
+  let legs = sorted_legs(self.legs)
+    .map(leg => "\{leg.platform} \{leg.conclusion}")
+    .join(", ")
+  "\{what} in \{self.run} (commit \{self.commit}, fingerprint `\{self.fingerprint}`): \{legs}. The description has the details."
+}
+
+///|
+/// The signature in the marker of an issue body.
+fn signature_in(body : String) -> String? {
+  guard body.find(marker_prefix) is Some(start) else { return None }
+  let rest = body.view(start_offset=start + marker_prefix.length())
+  guard rest.find(marker_suffix) is Some(end) else { return None }
+  Some(rest.view(end_offset=end).trim().to_owned())
+}
+
+///|
+fn newest(issues : Array[BreachIssue]) -> BreachIssue? {
+  let mut best : BreachIssue? = None
+  for issue in issues {
+    match best {
+      Some(b) if b.number >= issue.number => ()
+      _ => best = Some(issue)
+    }
+  }
+  best
+}
+
+///|
+/// What the report does with the labelled issues for a breach with `signature`.
+fn decide(issues : Array[BreachIssue], signature : String) -> Action {
+  if newest(issues.filter(i => i.open)) is Some(open) {
+    return if open.signature == Some(signature) {
+      Nothing(open.number)
+    } else {
+      Update(open.number)
+    }
+  }
+  match newest(issues.filter(i => i.signature == Some(signature))) {
+    Some(closed) => Reopen(closed.number)
+    None => Create
+  }
+}
+
+///|
+/// The issues that a passing smoke closes: every open labelled issue, oldest first.
+fn to_close(issues : Array[BreachIssue]) -> Array[Int] {
+  let numbers = issues.filter(i => i.open).map(i => i.number)
+  numbers.sort()
+  numbers
+}
+
+///|
+/// The labelled issues from `gh issue list --json number,state,body`.
+fn breach_issues(list : Json) -> Array[BreachIssue] {
+  guard list is Array(items) else { return [] }
+  let issues = []
+  for item in items {
+    guard item is { "number": Number(n, ..), "state": String(state), .. } else {
+      continue
+    }
+    let body = match item {
+      { "body": String(b), .. } => b
+      _ => ""
+    }
+    issues.push({
+      number: n.to_int(),
+      open: state.to_upper() == "OPEN",
+      signature: signature_in(body),
+    })
+  }
+  issues
+}
+
+///|
+fn env_or(name : String, default : String) -> String {
+  match @env.get_env_var(name) {
+    Some(value) if value != "" => value
+    _ => default
+  }
+}
+
+///|
+fn required(name : String) -> String {
+  let value = env_or(name, "")
+  if value == "" {
+    fail_with("\{name} is not set")
+  }
+  value
+}
+
+///|
+fn run_url() -> String {
+  let server = env_or("GITHUB_SERVER_URL", "https://github.com")
+  "\{server}/\{required("GITHUB_REPOSITORY")}/actions/runs/\{required("GITHUB_RUN_ID")}"
+}
+
+///|
+/// Run `gh` and return its stdout; stop the script when it fails.
+async fn gh(args : Array[String]) -> String {
+  let (code, out, err) = @process.collect_output("gh", args) catch {
+    e => {
+      fail_with("cannot start gh: \{e}")
+      return ""
+    }
+  }
+  if code != 0 {
+    fail_with(
+      "`gh \{args[:2].to_owned().join(" ")}` failed: \{(out.text() + err.text()).trim()}",
+    )
+  }
+  out.text()
+}
+
+///|
+async fn gh_json(args : Array[String]) -> Json {
+  let text = gh(args)
+  @json.parse(text) catch {
+    _ => {
+      fail_with("`gh \{args[:2].to_owned().join(" ")}` did not give JSON")
+      Json::null()
+    }
+  }
+}
+
+///|
+async fn list_issues(repo : String) -> Array[BreachIssue] {
+  breach_issues(
+    gh_json([
+      "issue", "list", "--repo", repo, "--label", label, "--state", "all", "--limit",
+      "200", "--json", "number,state,body",
+    ]),
+  )
+}
+
+///|
+async fn run_report() -> Unit {
+  let repo = required("GITHUB_REPOSITORY")
+  let attempt = env_or("GITHUB_RUN_ATTEMPT", "1")
+  let jobs = gh_json([
+    "api", "repos/\{repo}/actions/runs/\{required("GITHUB_RUN_ID")}/attempts/\{attempt}/jobs?per_page=100",
+  ])
+  let legs = failed_legs(jobs)
+  if legs.is_empty() {
+    println("Every smoke leg passed: there is no breach to report.")
+    return
+  }
+  for leg in legs {
+    if leg.check_run != "" {
+      leg.messages = failure_messages(
+        gh_json(["api", "\{leg.check_run}/annotations"]),
+      )
+    }
+  }
+  let breach : Breach = {
+    fingerprint: required("FINGERPRINT"),
+    legs,
+    run: run_url(),
+    commit: env_or("GITHUB_SHA", ""),
+    version: env_or("VERSION", ""),
+    event: env_or("GITHUB_EVENT_NAME", ""),
+    git_ref: env_or("GITHUB_REF", ""),
+  }
+  let title = breach.title()
+  let body = breach.body()
+  match decide(list_issues(repo), breach.signature()) {
+    Nothing(n) => println("#\{n} already reports this breach.")
+    Update(n) => {
+      gh([
+        "issue", "edit", "\{n}", "--repo", repo, "--title", title, "--body", body,
+      ]) |> ignore
+      gh([
+        "issue", "comment", "\{n}", "--repo", repo, "--body", breach.comment(false),
+      ]) |> ignore
+      println("Updated #\{n}.")
+    }
+    Reopen(n) => {
+      gh([
+        "issue", "edit", "\{n}", "--repo", repo, "--title", title, "--body", body,
+      ]) |> ignore
+      gh([
+        "issue", "reopen", "\{n}", "--repo", repo, "--comment", breach.comment(true),
+      ]) |> ignore
+      println("Reopened #\{n}.")
+    }
+    Create => {
+      gh([
+        "label", "create", label, "--repo", repo, "--color", "B60205", "--description",
+        "A release binary failed its smoke test on main", "--force",
+      ])
+      |> ignore
+      println(
+        gh([
+          "issue", "create", "--repo", repo, "--title", title, "--body", body, "--label",
+          label,
+        ]).trim(),
+      )
+    }
+  }
+}
+
+///|
+async fn run_resolve() -> Unit {
+  let repo = required("GITHUB_REPOSITORY")
+  let numbers = to_close(list_issues(repo))
+  if numbers.is_empty() {
+    println("No open smoke breach.")
+    return
+  }
+  let comment = "Smoke passed on every platform in \{run_url()} (commit \{env_or("GITHUB_SHA", "")}). Closing."
+  for n in numbers {
+    gh(["issue", "close", "\{n}", "--repo", repo, "--comment", comment]) |> ignore
+    println("Closed #\{n}.")
+  }
+}
+
+///|
+async fn main {
+  match @env.args()[1:].to_owned() {
+    ["report"] => run_report()
+    ["resolve"] => run_resolve()
+    _ => {
+      eprintln(usage)
+      @sys.exit(2)
+    }
+  }
+}
+
+///|
+struct BreachWorld {
+  mut legs : Array[Leg]
+  mut messages : Array[String]
+  mut breach : Breach
+  mut taken : String
+  mut issues : Array[BreachIssue]
+}
+
+///|
+fn legs_of(text : String) -> Array[Leg] {
+  text
+  .split(",")
+  .map(item => {
+    let parts = item.trim().split(" ").collect()
+    {
+      platform: parts[0].to_owned(),
+      conclusion: parts[1].to_owned(),
+      job_url: "",
+      check_run: "",
+      messages: [],
+    }
+  })
+  .collect()
+}
+
+///|
+fn BreachWorld::new() -> BreachWorld {
+  {
+    legs: [],
+    messages: [],
+    breach: {
+      fingerprint: "",
+      legs: [],
+      run: "",
+      commit: "abc",
+      version: "0.5.0",
+      event: "push",
+      git_ref: "refs/heads/main",
+    },
+    taken: "",
+    issues: [],
+  }
+}
+
+///|
+fn issues_of(text : String) -> Array[BreachIssue] {
+  if text == "" {
+    return []
+  }
+  text
+  .split(",")
+  .map(item => {
+    let parts = item.trim().split(" ").map(p => p.to_owned()).collect()
+    {
+      number: parts[0].fold(init=0, (n, c) => n * 10 + (c.to_int() - '0'.to_int())),
+      open: parts[1] == "open",
+      signature: if parts.length() > 2 { Some(parts[2]) } else { None },
+    }
+  })
+  .collect()
+}
+
+///|
+fn action_name(a : Action) -> String {
+  match a {
+    Create => "create"
+    Nothing(n) => "nothing \{n}"
+    Update(n) => "update \{n}"
+    Reopen(n) => "reopen \{n}"
+  }
+}
+
+///|
+impl @moonspec.World for BreachWorld with fn configure(self, setup) {
+  setup.when1("I read the jobs of the run:", fn(doc : @moonspec.DocString) raise {
+    self.legs = failed_legs(@json.parse(doc.content))
+  })
+  setup.then1("the failed legs are {string}", fn(expected : String) raise {
+    @expect.expect(
+      self.legs
+      .map(leg => "\{leg.platform} \{leg.conclusion} \{leg.check_run}")
+      .join("|"),
+    ).to_equal(expected)
+  })
+  setup.when1("I read the annotations of a leg:", fn(
+    doc : @moonspec.DocString,
+  ) raise {
+    self.messages = failure_messages(@json.parse(doc.content))
+  })
+  setup.then1("the messages are {string}", fn(expected : String) raise {
+    @expect.expect(self.messages.join("|")).to_equal(expected)
+  })
+  setup.given3("a breach of fingerprint {string} with {string} in run {string}", fn(
+    fingerprint : String,
+    legs : String,
+    run : String,
+  ) {
+    self.breach = { ..self.breach, fingerprint, legs: legs_of(legs), run }
+  })
+  setup.when0("I take the signature", fn() {
+    self.taken = self.breach.signature()
+  })
+  setup.given2("the breach is in run {string} of commit {string}", fn(
+    run : String,
+    commit : String,
+  ) {
+    self.breach = { ..self.breach, run, commit }
+  })
+  setup.given1("the breach has the legs {string}", fn(legs : String) {
+    self.breach.legs = legs_of(legs)
+  })
+  setup.given2("the breach is of fingerprint {string} with {string}", fn(
+    fingerprint : String,
+    legs : String,
+  ) {
+    self.breach = { ..self.breach, fingerprint, legs: legs_of(legs) }
+  })
+  setup.then0("the signature is the same", fn() raise {
+    @expect.expect(self.breach.signature()).to_equal(self.taken)
+  })
+  setup.then0("the signature is not the same", fn() raise {
+    @expect.expect(self.breach.signature() != self.taken).to_equal(true)
+  })
+  setup.then2("the signature in the body {string} is {string}", fn(
+    body : String,
+    expected : String,
+  ) raise {
+    @expect.expect(
+      signature_in(body.replace_all(old="\\n", new="\n")).unwrap_or(""),
+    ).to_equal(expected)
+  })
+  setup.given1("the issues {string}", fn(text : String) {
+    self.issues = issues_of(text)
+  })
+  setup.then2("the report for signature {string} is {string}", fn(
+    signature : String,
+    expected : String,
+  ) raise {
+    @expect.expect(action_name(decide(self.issues, signature))).to_equal(
+      expected,
+    )
+  })
+  setup.then1("a passing smoke closes {string}", fn(expected : String) raise {
+    @expect.expect(to_close(self.issues).map(n => "\{n}").join("|")).to_equal(
+      expected,
+    )
+  })
+  setup.then1("the title is {string}", fn(expected : String) raise {
+    @expect.expect(self.breach.title()).to_equal(expected)
+  })
+  setup.given3("the leg {string} has the job {string} and the messages {string}", fn(
+    platform : String,
+    job : String,
+    messages : String,
+  ) {
+    self.breach.legs = self.breach.legs.map(leg => if leg.platform == platform {
+      { ..leg, job_url: job, messages: messages.split("|").map(m => m.to_owned()).collect() }
+    } else {
+      leg
+    })
+  })
+  setup.then1("the body starts with:", fn(doc : @moonspec.DocString) raise {
+    @expect.expect(self.breach.body().has_prefix(doc.content + "\n")).to_equal(
+      true,
+    )
+  })
+  setup.then0("the body ends with the marker of its signature", fn() raise {
+    let body = self.breach.body()
+    @expect.expect(body.has_suffix(marker(self.breach.signature()) + "\n")).to_equal(
+      true,
+    )
+    @expect.expect(signature_in(body)).to_equal(Some(self.breach.signature()))
+  })
+}
+
+///|
+async test "smoke breach feature" {
+  @moonspec.run_or_fail(
+    BreachWorld::new,
+    @moonspec.RunOptions::new([
+      @moonspec.FeatureSource::File("features/smoke_breach.feature"),
+    ]),
+  )
+  |> ignore
+}

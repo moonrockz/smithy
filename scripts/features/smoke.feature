@@ -113,11 +113,3 @@ Feature: Smoke evidence
         }
       }
       """
-
-  Scenario: The failure report
-    Then the report for run "https://github.com/o/r/actions/runs/7" of commit "abc" on "refs/heads/main" by "schedule" is:
-      """
-      Smoke failed in https://github.com/o/r/actions/runs/7 (schedule, refs/heads/main, commit abc).
-
-      A release binary did not run, or printed the wrong version, on one of its platforms. A release of these inputs will fail its smoke job. Fix the cause, then close this issue. Run the Release workflow with `dry_run` to smoke again.
-      """

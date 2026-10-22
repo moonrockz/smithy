@@ -20,8 +20,9 @@
 #   pull request (release files)     build and smoke only when no trusted run smoked the same inputs.
 #                                    CI owns validate. It records nothing: a pull request is not trusted.
 #   schedule (nightly)               build, smoke and record only when no trusted run smoked the same
-#                                    inputs. A failed smoke opens or updates the issue
-#                                    "Smoke failed on main".
+#                                    inputs.
+# A failed smoke in a trusted run on main or on a release tag files one `smoke-breach` issue per
+# breach, and a passing smoke closes it (smoke.yml, scripts/smoke-breach.mbtx).
 # Feature pull requests do not start this workflow. CI smokes after the merge to main instead.
 #
 # Re-run failed jobs: after a transient failure, use "Re-run failed jobs" on the run. GitHub runs
@@ -229,13 +230,18 @@ jobs:
     needs: [plan, build]
     uses: ./.github/workflows/smoke.yml
     permissions:
+      actions: read
+      checks: read
       contents: read
       issues: write
     with:
       version: ${{ needs.plan.outputs.version }}
       fingerprint: ${{ needs.plan.outputs.fingerprint }}
       record: ${{ needs.plan.outputs.record == 'true' }}
-      report-failure: ${{ github.event_name == 'schedule' }}
+      # Trusted runs only: never a pull request, and only on main or a release tag.
+      breach-issues: >-
+        ${{ github.event_name != 'pull_request'
+        && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
 
   publish:
     name: Publish to mooncakes.io

@@ -9,8 +9,11 @@
 # that are not pull request runs set `record`. A cache entry that a pull request run writes stays in
 # the scope of that pull request, so main never reads it.
 #
-# Report: when `report-failure` is true and smoke failed, `report` opens the issue
-# "Smoke failed on main", or comments on the open one.
+# Breach issues: when `breach-issues` is true (a trusted run on main or on a release tag), a failed
+# smoke files one issue with the label `smoke-breach` (scripts/smoke-breach.mbtx). Its signature is the
+# fingerprint and the result of each failed platform. The same breach again changes nothing; a changed
+# breach edits the open issue and comments; a breach that comes back reopens its closed issue. A
+# passing smoke closes the open issue (in `record`).
 
 name: Smoke
 
@@ -29,8 +32,8 @@ on:
         description: Save the evidence when every platform passed
         type: boolean
         default: false
-      report-failure:
-        description: Open or update the "Smoke failed on main" issue when smoke failed
+      breach-issues:
+        description: File, update and close the smoke-breach issue (trusted runs on main or a tag only)
         type: boolean
         default: false
 
@@ -110,6 +113,9 @@ jobs:
     needs: [smoke]
     if: inputs.record && inputs.fingerprint != ''
     timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -138,13 +144,22 @@ jobs:
           path: .smoke-evidence
           key: smoke-evidence-${{ inputs.fingerprint }}
 
+      - name: Close the open smoke breach
+        if: inputs.breach-issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mise run smoke:resolve
+
+  # It reads the jobs and the annotations of this run, so it needs actions and checks.
   report:
-    name: Report the smoke failure
+    name: Report the smoke breach
     runs-on: ubuntu-latest
     needs: [smoke]
-    if: failure() && inputs.report-failure
+    if: failure() && inputs.breach-issues
     timeout-minutes: 10
     permissions:
+      actions: read
+      checks: read
       contents: read
       issues: write
     steps:
@@ -156,7 +171,9 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Open or update the issue
+      - name: File or update the breach issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FINGERPRINT: ${{ inputs.fingerprint }}
+          VERSION: ${{ inputs.version }}
         run: mise run smoke:report
