@@ -828,3 +828,38 @@ test "a null-id cancellation excuses no batch element" {
   assert_eq(found[2].finding.map(f => f.path.pointer()), Some("/1/error/code"))
   assert_eq(checker.finish().findings, [])
 }
+
+///|
+test "a notification is not the source call of a capability" {
+  let progress = entry(
+    "extension",
+    notify("progress", params="{\"message\": \"m\"}"),
+  )
+  let init_params = "{\"host\": \"h\"}"
+  // A single notification, and a notification element of a batch.
+  for
+    sent in [
+      notify("initialize", params=init_params),
+      "[" +
+      notify("initialize", params=init_params) +
+      ", " +
+      call(9, "ping") +
+      "]",
+    ] {
+    let checker = @rpc.TranscriptChecker::new(lifecycle())
+    let found = checker
+      .feed_all([entry("host", sent), progress])
+      .filter(f => !(f.code is Message(_)))
+    assert_eq(summary_of(found), ["CapabilityNotAdvertised@1[]"])
+  }
+  // A real source call that came earlier stays the related entry.
+  let checker = @rpc.TranscriptChecker::new(lifecycle())
+  let found = checker
+    .feed_all([
+      entry("host", call(1, "initialize", params=init_params)),
+      entry("host", notify("initialize", params=init_params)),
+      progress,
+    ])
+    .filter(f => !(f.code is Message(_)))
+  assert_eq(summary_of(found), ["CapabilityNotAdvertised@2[0]"])
+}

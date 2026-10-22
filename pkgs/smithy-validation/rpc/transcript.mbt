@@ -534,7 +534,7 @@ fn TranscriptChecker::track_call(
           "I expected at most \{self.limits.active_calls} active calls from \{sender.to_string()}; I do not track the call at entry \{step.index} with \{render_id(id)}.",
         )
       } else {
-        let method_ = self.order_request(step, receiver, value)
+        let method_ = self.order_request(step, receiver, value, call=true)
         state.active[key] = {
           entry: step.index,
           text: step.entry.message,

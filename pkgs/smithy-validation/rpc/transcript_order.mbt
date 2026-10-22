@@ -48,13 +48,15 @@ fn request_method(value : Json) -> MethodName? {
 /// that its reply can settle the session, and None when it is rejected, when
 /// the receiver does not model the method, or when there is no session.
 /// `batch` holds the reply keys of the request batch that the message is an
-/// element of.
+/// element of. `call` is true when the checker tracks the message as a
+/// replyable call; only such a message can be the source call of a capability.
 fn TranscriptChecker::order_request(
   self : TranscriptChecker,
   step : Step,
   receiver : PeerName,
   value : Json,
   batch~ : Set[CallKey]? = None,
+  call~ : Bool = false,
 ) -> MethodName? {
   guard self.session is Some(session) && request_method(value) is Some(method_) else {
     return None
@@ -69,9 +71,11 @@ fn TranscriptChecker::order_request(
     !self.apply_rule(step, session, method_, rule, value, batch) {
     return None
   }
-  for source in session.rules.sources {
-    if source.method_ == method_ {
-      session.source_calls[source.name] = step.index
+  if call {
+    for source in session.rules.sources {
+      if source.method_ == method_ {
+        session.source_calls[source.name] = step.index
+      }
     }
   }
   Some(method_)

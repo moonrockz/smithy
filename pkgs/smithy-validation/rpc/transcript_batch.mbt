@@ -183,9 +183,16 @@ fn TranscriptChecker::track_batch(
   let version = self.protocol.version()
   let methods : Map[CallKey, MethodName] = Map([])
   for element in values {
-    if self.order_request(step, receiver, element, batch=Some(keys))
+    let class = classify_unchecked(version, element)
+    if self.order_request(
+        step,
+        receiver,
+        element,
+        batch=Some(keys),
+        call=class is Call(_, _),
+      )
       is Some(method_) &&
-      classify_unchecked(version, element) is Call(key, _) {
+      class is Call(key, _) {
       methods[key] = method_
     }
   }
