@@ -240,10 +240,7 @@ fn run_transcript_validation(
       @fs.read_file_to_string(transcript.file)
     }
   } catch {
-    _ =>
-      return value_problem(
-        opts, "InputRead", "I could not read the JSON-RPC transcript input.", 1,
-      )
+    _ => return transcript_input_problem(opts)
   }
   let (document, read_findings) = match transcript.format {
     MarkdownTranscript => @rpc.read_markdown_transcript(text)
@@ -300,6 +297,16 @@ fn run_transcript_validation(
     Some(run.summary),
     run.expectations,
     complete=run.summary.complete,
+  )
+}
+
+///|
+/// Reports a transcript input that I could not open or read, and gives the
+/// exit status. A missing file, a directory and an unreadable stream give the
+/// same report.
+fn transcript_input_problem(opts : ValueOptions) -> Int32 {
+  value_problem(
+    opts, "InputRead", "I could not read the JSON-RPC transcript input.", 1,
   )
 }
 

@@ -534,7 +534,9 @@ are not messages. The native and WASI (`wasm`) binaries read a log file or stdin
 it arrives, so a FIFO or a file that grows while it is read gives findings before end of input, and
 memory does not grow with the size of the log. The `js` and `wasm-gc` binaries read all of the input
 first; they give the same findings, but only at the end of input. When a read fails part-way through,
-the command still writes the summary, with `valid:false`, then the error, and exits 1.
+the command still writes the summary, with `valid:false`, then the error, and exits 1. When the first
+read fails before any byte arrives, for example because the path is a directory, the command gives the
+same `InputRead` report as for a missing file, with no summary, and exits 1.
 
 With `--expect`, the findings still stream, and the expectations are matched at the end of the log.
 The JSON summary then also has `"expectations": {"matched", "missing", "unexpected"}`. Text mode writes

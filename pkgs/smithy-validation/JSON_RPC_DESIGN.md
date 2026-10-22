@@ -179,7 +179,8 @@ chunk and replacing invalid bytes with U+FFFD, and passes each chunk through `Lo
 summary with the `LogCounts`; JSON diagnostics are JSON Lines. When `single_sender()` is true the
 checker runs with correlation off. Native and WASI read files and stdin live, so a FIFO streams;
 js and wasm-gc read all of the input first and give the same findings. A read error part-way through
-still gives the summary, then the error (exit 1). With `--expect`, the match runs at the end of the
+still gives the summary, then the error (exit 1). A read error before the first byte, such as a
+directory path on POSIX, gives the `InputRead` report of a missing file instead (exit 1). With `--expect`, the match runs at the end of the
 log and the summary has the expectation result.
 
 ## Two-peer protocols
@@ -278,7 +279,8 @@ last accepted call of the capability source in `related` when there is one). A r
 causes no transition, and its reply moves the session nowhere, but correlation still tracks its
 call. A call that correlation refuses (`ActiveIdReused` or `ActiveCallLimit`) is not checked against
 the session, so it takes no transition and cancels nothing; the same holds for every element of a
-refused request batch. An accepted message takes its `onCall` transition. A reply to an accepted
+refused request batch, and for an unreadable entry (a request without a usable ID) that
+`ActiveCallLimit` refuses. An accepted message takes its `onCall` transition. A reply to an accepted
 call takes `onSuccess` or `onError` and adds the capabilities that its result advertises. Request
 batch elements are checked in array order, and a reply batch settles each answered call.
 
