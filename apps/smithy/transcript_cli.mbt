@@ -33,6 +33,8 @@ priv struct TranscriptOptions {
   log : LogChoice?
   /// The --expect file: expected findings for any input format.
   expect : String?
+  /// The --legacy-errors mapping; `None` when the flag is absent.
+  legacy_errors : @rpc.LegacyErrorMode?
 }
 
 ///|
@@ -79,6 +81,10 @@ fn transcript_command() -> @argparse.Command {
       @argparse.OptionArg(
         "expect",
         about="JSON file with an array of expected findings, {\"code\", \"entry\"?, \"related\"?}. The exit status is then 0 when they match. Conflicts with an expect list in the transcript.",
+      ),
+      @argparse.OptionArg(
+        "legacy-errors",
+        about="1.0 response error mapping: opaque or code-message-data; default opaque.",
       ),
     ],
     flags=[
@@ -154,6 +160,17 @@ fn transcript_options(
   } else {
     None
   }
+  let legacy_errors = match value("legacy-errors") {
+    None => None
+    Some(text) => {
+      let mode = legacy_errors_mode(text)
+      // A version from the document is checked when the document is read.
+      if version is Some(given) {
+        require_legacy_version(given)
+      }
+      Some(mode)
+    }
+  }
   let format = transcript_format(file, value("input-format"))
   let preset = value("log-preset")
   let mapping = value("log-mapping")
@@ -182,7 +199,15 @@ fn transcript_options(
       Some(log_choice(preset, mapping, sender, directions))
     }
   }
-  { file, format, version, completeness, log, expect: value("expect"), }
+  {
+    file,
+    format,
+    version,
+    completeness,
+    log,
+    expect: value("expect"),
+    legacy_errors,
+  }
 }
 
 ///|
@@ -341,6 +366,9 @@ fn run_transcript_validation(
       2,
     )
   }
+  if transcript.legacy_errors is Some(_) {
+    require_legacy_version(version)
+  }
   guard transcript_protocol(opts, assembled, version) is Some(protocol) else {
     return 2
   }
@@ -349,6 +377,7 @@ fn run_transcript_validation(
     document,
     read_findings,
     completeness?=transcript.completeness,
+    legacy_errors=transcript.legacy_errors.unwrap_or(@rpc.Opaque),
   )
   print_transcript_report(
     opts,
@@ -483,6 +512,7 @@ fn run_log_transcript(
     protocol,
     completeness=transcript.completeness.unwrap_or(@rpc.Partial),
     correlation=!reader.single_sender(),
+    legacy_errors=transcript.legacy_errors.unwrap_or(@rpc.Opaque),
   )
   let source = chunk_source(transcript.file) catch {
     _ =>

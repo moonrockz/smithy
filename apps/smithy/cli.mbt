@@ -442,16 +442,11 @@ fn options(args : Array[String]) -> Options raise CliError {
         "response context and --legacy-errors require --response", 2,
       )
     }
-    let legacy_errors = match value("legacy-errors").unwrap_or("opaque") {
-      "opaque" => @rpc.Opaque
-      "code-message-data" => @rpc.CodeMessageData
-      _ =>
-        raise CliError(
-          "expected opaque or code-message-data after --legacy-errors", 2,
-        )
-    }
-    if value("legacy-errors") is Some(_) && rpc_version != Some(@rpc.V1_0) {
-      raise CliError("--legacy-errors requires version 1.0", 2)
+    let legacy_errors = legacy_errors_mode(
+      value("legacy-errors").unwrap_or("opaque"),
+    )
+    if value("legacy-errors") is Some(_) {
+      require_legacy_version(rpc_version.unwrap())
     }
     let context = if method_ is Some(name) {
       guard @rpc.MethodName::parse(name) is Some(name) else {
@@ -617,6 +612,30 @@ fn options(args : Array[String]) -> Options raise CliError {
     output_dir,
     check,
     write,
+  }
+}
+
+///|
+/// Reads the --legacy-errors value of validate rpc and of its transcript
+/// command.
+fn legacy_errors_mode(text : String) -> @rpc.LegacyErrorMode raise CliError {
+  match text {
+    "opaque" => @rpc.Opaque
+    "code-message-data" => @rpc.CodeMessageData
+    _ =>
+      raise CliError(
+        "expected opaque or code-message-data after --legacy-errors", 2,
+      )
+  }
+}
+
+///|
+/// --legacy-errors maps JSON-RPC 1.0 errors only.
+fn require_legacy_version(
+  version : @rpc.ProtocolVersion,
+) -> Unit raise CliError {
+  if version != @rpc.V1_0 {
+    raise CliError("--legacy-errors requires version 1.0", 2)
   }
 }
 

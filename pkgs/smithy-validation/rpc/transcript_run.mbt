@@ -11,19 +11,26 @@ pub struct TranscriptRun {
 ///|
 /// Checks the entries of a document that a reader produced and matches its
 /// expect list. `completeness` overrides the document's; without either, the
-/// transcript is Partial. It does no I/O and never raises.
+/// transcript is Partial. `legacy_errors` selects the 1.0 error mapping, as
+/// for `TranscriptChecker::new`. It does no I/O and never raises.
 pub fn run_transcript(
   protocol : ProtocolDescription,
   document : TranscriptDocument,
   read_findings : Array[TranscriptFinding],
   completeness? : Completeness,
   limits~ : TranscriptLimits = TranscriptLimits::default(),
+  legacy_errors~ : LegacyErrorMode = Opaque,
 ) -> TranscriptRun {
   let completeness = match completeness {
     Some(chosen) => chosen
     None => document.completeness.unwrap_or(Partial)
   }
-  let checker = TranscriptChecker::new(protocol, completeness~, limits~)
+  let checker = TranscriptChecker::new(
+    protocol,
+    completeness~,
+    limits~,
+    legacy_errors~,
+  )
   let findings = read_findings + checker.feed_all(document.entries)
   let summary = checker.finish()
   findings.append(summary.findings)

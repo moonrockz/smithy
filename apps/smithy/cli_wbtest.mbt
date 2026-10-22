@@ -624,7 +624,7 @@ test "UTF-8 split between stdin chunks decodes once" {
 }
 
 ///|
-test "transcript CLI reads --expect" {
+test "transcript CLI reads --expect and --legacy-errors" {
   let base = [
     "validate", "rpc", "transcript", "--protocol", "example.peers#EchoChat",
   ]
@@ -632,8 +632,42 @@ test "transcript CLI reads --expect" {
     base + ["--expect", "expected.json", "peers.smithy", "chat.json"],
   ).transcript.unwrap()
   assert_eq(transcript.expect, Some("expected.json"))
-  let transcript = options(base + ["peers.smithy", "chat.json"]).transcript.unwrap()
-  assert_eq(transcript.expect, None)
+  assert_true(transcript.legacy_errors is None)
+  // The document can give the version, so 1.0 is checked after it is read.
+  let transcript = options(
+    base + ["--legacy-errors", "code-message-data", "peers.smithy", "chat.json"],
+  ).transcript.unwrap()
+  assert_true(transcript.legacy_errors is Some(@rpc.CodeMessageData))
+  let transcript = options(
+    base +
+    [
+      "--legacy-errors", "opaque", "--version", "1.0", "peers.smithy", "chat.jsonl",
+    ],
+  ).transcript.unwrap()
+  assert_true(transcript.legacy_errors is Some(@rpc.Opaque))
+  for
+    args in [
+      ["--legacy-errors", "verbose", "peers.smithy", "chat.json"],
+      [
+        "--legacy-errors", "opaque", "--version", "2.0", "peers.smithy", "chat.json",
+      ],
+      [
+        "--legacy-errors", "code-message-data", "--version", "2.0", "peers.smithy",
+        "chat.jsonl",
+      ],
+    ] {
+    let message = try options(base + args) catch {
+      CliError(message, 2) => message
+      _ => "other error"
+    } noraise {
+      _ => "accepted"
+    }
+    assert_true(
+      message == "expected opaque or code-message-data after --legacy-errors" ||
+      message == "--legacy-errors requires version 1.0",
+      msg=args.join(" ") + ": " + message,
+    )
+  }
 }
 
 ///|

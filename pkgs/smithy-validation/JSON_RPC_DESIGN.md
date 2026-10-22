@@ -170,7 +170,8 @@ document; partial is the default. Text findings name the file, line, column, ent
 diagnostics are one report with the summary, the findings and the expectation result. The exit
 status is 0 for no error findings, or for an `expect` list that matches, 1 otherwise, and 2 for usage
 and contract errors. `--expect <file.json>` gives the expect list for any input format
-(`read_expected_findings`); it conflicts with an `expect` list in the document. Markdown transcripts (`examples/json-rpc/transcripts/*.md`) are read with the same command. JSONL logs (`--input-format jsonl`, `.jsonl`, `.ndjson` or stdin) need `--version`, and take
+(`read_expected_findings`); it conflicts with an `expect` list in the document. `--legacy-errors`
+passes the 1.0 error mapping to `run_transcript` and `TranscriptChecker::new`. Markdown transcripts (`examples/json-rpc/transcripts/*.md`) are read with the same command. JSONL logs (`--input-format jsonl`, `.jsonl`, `.ndjson` or stdin) need `--version`, and take
 `--log-preset raw|dir-message`, `--sender`, repeatable `--direction value=peer` or `--log-mapping`. The
 command reads a log file or stdin in 64 KiB chunks, decodes them at the CLI boundary, carrying an incomplete UTF-8 sequence to the next
 chunk and replacing invalid bytes with U+FFFD, and passes each chunk through `LogReader` and

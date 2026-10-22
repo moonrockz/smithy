@@ -499,6 +499,10 @@ state or capability is an invalid protocol (exit 2). See `examples/json-rpc/life
 - `--expect <file.json>` gives the expected findings for any input format: a JSON array of
   `{"code", "entry"?, "related"?}` items, the form of a document's `expect` list. A document that also
   has an `expect` list, and an expect file that I cannot read or that is malformed, exit 2.
+- `--legacy-errors opaque|code-message-data` selects the JSON-RPC 1.0 error mapping, as for
+  `validate rpc`. The default, `opaque`, accepts any error value with a `LimitedScope` advisory;
+  `code-message-data` checks each error against the operation's modeled errors. It requires version
+  1.0, from `--version` or from the document.
 
 ### JSONL logs
 

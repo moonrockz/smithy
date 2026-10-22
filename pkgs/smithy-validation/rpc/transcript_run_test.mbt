@@ -45,3 +45,24 @@ test "run_transcript puts reader findings first and matches the expect list" {
   ])
   assert_false(result.is_match())
 }
+
+///|
+test "run_transcript passes the legacy error mapping to the checker" {
+  let (document, read) = @rpc.read_json_transcript(
+    "{\"version\": \"1.0\", \"entries\": [{\"from\": \"client\", \"message\": {\"method\": \"echo\", \"params\": [\"hi\"], \"id\": 1}}, {\"from\": \"server\", \"message\": {\"result\": null, \"error\": {\"code\": 7, \"message\": \"failed\"}, \"id\": 1}}]}",
+  )
+  assert_eq(read, [])
+  // Opaque by default: the error is not checked, and an advisory says so.
+  let unmapped = @rpc.run_transcript(chat(), document, read)
+  assert_eq(unmapped.findings.map(f => f.code.to_string()), ["LimitedScope"])
+  assert_eq(unmapped.findings[0].severity, @validation.Advisory)
+  // code-message-data checks the error; Echo models no code 7.
+  let mapped = @rpc.run_transcript(
+    chat(),
+    document,
+    read,
+    legacy_errors=CodeMessageData,
+  )
+  assert_eq(mapped.findings.map(f => f.code.to_string()), ["UnknownError"])
+  assert_eq(mapped.findings[0].severity, @validation.Error)
+}

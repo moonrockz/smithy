@@ -428,6 +428,7 @@ An unterminated `jsonrpc` fence is reported at its opening line.
 `run_transcript` checks a document that a reader produced: it runs the `TranscriptChecker` over the
 entries, puts the reader findings first, and returns the findings, the summary and, for an `expect`
 list, the `ExpectationResult`. A completeness argument overrides the document; the default is `Partial`.
+`legacy_errors` selects the 1.0 error mapping, as for `TranscriptChecker::new`; the default is `Opaque`.
 
 ## JSONL logs
 
@@ -572,7 +573,9 @@ when it is known; with `--diagnostics json` the output is JSON Lines, one findin
 binaries read a log file or stdin in 64 KiB chunks as it arrives; the js and wasm-gc binaries read all
 of the input first. `--expect <file.json>` reads expected findings with `read_expected_findings` for
 any input format; it conflicts with an `expect` list in the document (exit 2). For a log, the match runs
-at the end and the summary line gets `expectations`. Text findings go to stderr as
+at the end and the summary line gets `expectations`. `--legacy-errors opaque|code-message-data`
+passes the 1.0 error mapping to `run_transcript` or `TranscriptChecker::new`, and requires version
+1.0. Text findings go to stderr as
 `<file>:<line>:<column>: entry <n> <sender>: <severity> <code>: <message>`. JSON diagnostics are one
 report with `valid`, `complete`, `entries`, `outstanding`, `correlation`, `findings` and, for an
 `expect` list, `expectations` (`matched`, `missing`, `unexpected`). The command exits 0 when no
