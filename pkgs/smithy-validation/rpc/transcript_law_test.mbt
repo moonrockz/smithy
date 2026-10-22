@@ -5,7 +5,8 @@ fn pick(n : Int32, size : Int32) -> Int32 {
 
 ///|
 /// One entry from a pool of calls, replies, notifications, batches, invalid and
-/// wrong-ID entries for the Editor protocol, in both directions.
+/// wrong-ID entries for the Editor protocol, in both directions. The order
+/// cases initialize, shut down and exit an ordered editor session.
 fn pooled_entry(choice : Int32, id : Int32) -> @rpc.TranscriptEntry {
   let id = pick(id, 4).to_string()
   let pool = [
@@ -41,6 +42,62 @@ fn pooled_entry(choice : Int32, id : Int32) -> @rpc.TranscriptEntry {
     (
       "server", "{\"jsonrpc\": \"2.0\", \"error\": {\"code\": -32600, \"message\": \"Invalid Request\"}, \"id\": null}",
     ),
+    (
+      "client",
+      "{\"jsonrpc\": \"2.0\", \"id\": " +
+      id +
+      ", \"method\": \"initialize\", \"params\": {}}",
+    ),
+    (
+      "server",
+      "{\"jsonrpc\": \"2.0\", \"id\": " + id + ", \"result\": \"full\"}",
+    ),
+    (
+      "client",
+      "{\"jsonrpc\": \"2.0\", \"id\": " + id + ", \"method\": \"shutdown\"}",
+    ),
+    ("server", "{\"jsonrpc\": \"2.0\", \"id\": " + id + ", \"result\": null}"),
+    (
+      "client",
+      "[{\"jsonrpc\": \"2.0\", \"id\": " +
+      id +
+      ", \"method\": \"initialize\", \"params\": {}}]",
+    ),
+    (
+      "server",
+      "[{\"jsonrpc\": \"2.0\", \"id\": " + id + ", \"result\": \"full\"}]",
+    ),
+  ]
+  let (sender, message) = pool[pick(choice, pool.length())]
+  { sender: peer(sender), message, receiver: None, location: None, }
+}
+
+///|
+/// One entry from a pool of lifecycle calls, notifications, cancellations and
+/// replies that move the session, advertise capabilities and answer cancelled
+/// calls.
+fn lifecycle_entry(choice : Int32, id : Int32) -> @rpc.TranscriptEntry {
+  let id = pick(id, 4)
+  let pool = [
+    ("host", call(id, "initialize", params="{\"host\": \"h\"}")),
+    (
+      "extension",
+      success(
+        id, "{\"capabilities\": {\"progress\": true, \"cancellation\": true}}",
+      ),
+    ),
+    ("extension", success(id, "{\"capabilities\": {}}")),
+    ("host", notify("initialized")),
+    ("host", call(id, "compile", params="{\"source\": \"x\"}")),
+    ("host", call(id, "ping")),
+    ("host", call(id, "shutdown")),
+    ("extension", success(id, "null")),
+    ("extension", failure(id, -32800)),
+    ("host", cancel(id.to_string())),
+    ("extension", notify("progress", params="{\"message\": \"m\"}")),
+    ("host", notify("exit")),
+    ("host", "[" + call(id, "ping") + "]"),
+    ("extension", "[" + success(id, "null") + "]"),
   ]
   let (sender, message) = pool[pick(choice, pool.length())]
   { sender: peer(sender), message, receiver: None, location: None, }
@@ -48,11 +105,16 @@ fn pooled_entry(choice : Int32, id : Int32) -> @rpc.TranscriptEntry {
 
 ///|
 test "chunking does not change findings" {
-  let protocol = editor()
+  let protocols = [
+    (editor(), pooled_entry),
+    (ordered_editor(), pooled_entry),
+    (lifecycle(), lifecycle_entry),
+  ]
   @quickcheck.check(
-    (input : (Array[(Int32, Int32)], Array[Int32], Bool)) => {
-      let (choices, groups, complete) = input
-      let entries = choices.map(c => pooled_entry(c.0, c.1))
+    (input : (Int32, Array[(Int32, Int32)], Array[Int32], Bool)) => {
+      let (which, choices, groups, complete) = input
+      let (protocol, pooled) = protocols[pick(which, protocols.length())]
+      let entries = choices.map(c => pooled(c.0, c.1))
       let completeness : @rpc.Completeness = if complete {
         Complete
       } else {
@@ -101,7 +163,7 @@ test "chunking does not change findings" {
       summary == grouped.finish() &&
       summary == whole.finish()
     },
-    count=200,
+    count=300,
     max_size=40,
     seed=3408,
   )

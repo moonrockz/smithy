@@ -61,6 +61,9 @@ priv struct Pending {
   location : SourceLocation?
   id : RequestId
   form : PendingForm
+  /// The method of an accepted call when the protocol has a session; its
+  /// reply settles the session.
+  method_ : MethodName?
 }
 
 ///|
@@ -85,6 +88,9 @@ priv struct PeerState {
   mut next_seq : Int32
   mut forgot : Bool
   notifications : @deque.Deque[Int32]
+  /// Active calls that a cancellation named, with the error code they may
+  /// answer with.
+  cancelled : Map[CallKey, ErrorCode]
 }
 
 ///|
@@ -113,6 +119,9 @@ pub struct TranscriptChecker {
   priv limits : TranscriptLimits
   priv legacy_errors : LegacyErrorMode
   priv peers : Array[PeerState]
+  /// The session state, when the protocol has `jsonRpcSession` and
+  /// correlation is on.
+  priv session : SessionState?
   priv mut entries : Int32
   priv mut emitted : Int32
   priv mut stopped : Bool
@@ -140,7 +149,13 @@ pub fn TranscriptChecker::new(
       next_seq: 0,
       forgot: false,
       notifications: @deque.Deque([]),
+      cancelled: Map([]),
     })
+  let session = if correlation {
+    protocol.session.map(SessionState::new)
+  } else {
+    None
+  }
   {
     protocol,
     completeness,
@@ -148,6 +163,7 @@ pub fn TranscriptChecker::new(
     limits,
     legacy_errors,
     peers,
+    session,
     entries: 0,
     emitted: 0,
     stopped: false,
@@ -437,6 +453,7 @@ fn TranscriptChecker::request(
   if !self.correlation {
     return
   }
+  let method_ = self.order_request(step, receiver, value)
   match class {
     Silent => ()
     LegacyNotification => {
@@ -447,7 +464,7 @@ fn TranscriptChecker::request(
       }
     }
     Unreadable => self.track_unreadable(step)
-    Call(key, id) => self.track_call(step, key, id, form)
+    Call(key, id) => self.track_call(step, key, id, form, method_)
   }
 }
 
@@ -506,6 +523,7 @@ fn TranscriptChecker::track_call(
   key : CallKey,
   id : RequestId,
   form : PendingForm,
+  method_ : MethodName?,
 ) -> Unit {
   let sender = step.entry.sender
   let state = self.state(sender)
@@ -533,6 +551,7 @@ fn TranscriptChecker::track_call(
           location: step.entry.location,
           id,
           form,
+          method_,
         }
       }
   }
@@ -571,6 +590,7 @@ fn TranscriptChecker::track_unreadable(
     location: step.entry.location,
     id: Absent,
     form,
+    method_: None,
   })
 }
 
@@ -673,12 +693,12 @@ fn TranscriptChecker::reply(
       }
     }
     if linked is Some(pending) {
-      self.answer(step, service, value, pending, errors)
+      self.link(step, service, value, caller, pending, errors)
       return
     }
   } else if key is Some(key) && caller.active.get(key) is Some(call) {
     caller.active.remove(key)
-    self.answer(step, service, value, call, errors)
+    self.link(step, service, value, caller, call, errors)
     self.remember_answer(caller, key, step.index)
     return
   }
@@ -745,8 +765,26 @@ fn TranscriptChecker::reply(
 }
 
 ///|
+/// Answers a call that the caller no longer holds as active: validates the
+/// reply, then settles the session.
+fn TranscriptChecker::link(
+  self : TranscriptChecker,
+  step : Step,
+  service : (PreparedService, Bool)?,
+  value : Json,
+  caller : PeerState,
+  call : Pending,
+  envelope_errors : Array[Finding],
+) -> Unit {
+  let excused = caller.release_cancel(call)
+  self.answer(step, service, value, call, envelope_errors, excused)
+  self.settle(step, step.entry.sender, call.method_, value)
+}
+
+///|
 /// Validates a linked reply against the call it answers. A borrowed service
-/// and an EnvelopeOnlyReply call give the envelope errors only.
+/// and an EnvelopeOnlyReply call give the envelope errors only. The finding
+/// about an `excused` error code of a cancelled call is dropped.
 fn TranscriptChecker::answer(
   self : TranscriptChecker,
   step : Step,
@@ -754,26 +792,26 @@ fn TranscriptChecker::answer(
   value : Json,
   call : Pending,
   envelope_errors : Array[Finding],
+  excused : ErrorCode?,
 ) -> Unit {
-  match (service, call.form) {
-    (Some((service, false)), SingleMessage) => {
-      let result = service.validate_response_json(
+  let findings = match (service, call.form) {
+    (Some((service, false)), SingleMessage) =>
+      service.validate_response_json(
         value,
         context=Some(OriginalRequest(call.text)),
         legacy_errors=self.legacy_errors,
-      )
-      self.report_messages(step, result.findings, [call.entry])
-    }
-    (Some((service, false)), InvalidWholeBatch) => {
-      let result = service.validate_response_checked(
+      ).findings
+    (Some((service, false)), InvalidWholeBatch) =>
+      service.validate_response_checked(
         value,
         InvalidBatch(error_code("-32600")),
         legacy_errors=self.legacy_errors,
-      )
-      self.report_messages(step, result.findings, [call.entry])
-    }
-    _ => self.report_messages(step, envelope_errors, [call.entry])
+      ).findings
+    _ => envelope_errors
   }
+  self.report_messages(step, excuse_cancelled(findings, value, excused), [
+    call.entry,
+  ])
 }
 
 ///|

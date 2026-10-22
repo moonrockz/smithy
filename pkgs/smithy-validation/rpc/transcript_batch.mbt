@@ -6,6 +6,8 @@ priv struct PendingBatch {
   text : String
   location : SourceLocation?
   keys : Set[CallKey]
+  /// The methods of the accepted calls when the protocol has a session.
+  methods : Map[CallKey, MethodName]
 }
 
 ///|
@@ -145,12 +147,20 @@ fn TranscriptChecker::request_batch(
   if !self.correlation {
     return
   }
+  // The session checks the elements in array order.
+  let methods : Map[CallKey, MethodName] = Map([])
+  for element in values {
+    if self.order_request(step, receiver, element) is Some(method_) &&
+      classify_unchecked(version, element) is Call(key, _) {
+      methods[key] = method_
+    }
+  }
   match keys {
     // An empty batch is answered by one null-ID error object.
     None => self.track_unreadable(step, form=InvalidWholeBatch)
     // An all-notification batch needs no reply.
     Some(keys) if keys.is_empty() => ()
-    Some(keys) => self.track_batch(step, keys)
+    Some(keys) => self.track_batch(step, keys, methods)
   }
 }
 
@@ -159,6 +169,7 @@ fn TranscriptChecker::track_batch(
   self : TranscriptChecker,
   step : Step,
   keys : Set[CallKey],
+  methods : Map[CallKey, MethodName],
 ) -> Unit {
   let sender = step.entry.sender
   let state = self.state(sender)
@@ -177,6 +188,7 @@ fn TranscriptChecker::track_batch(
     text: step.entry.message,
     location: step.entry.location,
     keys,
+    methods,
   })
 }
 
@@ -272,5 +284,14 @@ fn TranscriptChecker::reply_batch(
       self.report_messages(step, result.findings, [batch.entry])
     }
     _ => self.report_messages(step, errors, [batch.entry])
+  }
+  if batch.methods.is_empty() {
+    return
+  }
+  for element in values {
+    if batch_id(read_id(element)) is Some(key) &&
+      batch.methods.get(Scalar(key)) is Some(method_) {
+      self.settle(step, responder_name, Some(method_), element)
+    }
   }
 }

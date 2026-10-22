@@ -248,6 +248,35 @@ a fixed sender, so `single_sender()` tells the caller to turn correlation off; `
 missing final newline give the same entries, findings and counts, and a table test checks that
 `editor.json`, `editor.md` and `editor-dir.ndjson` give the same findings apart from locations.
 
+### Session order
+
+The order layer is opt-in. `@smithy.rpc#jsonRpcSession` on a protocol structure declares the session
+states (the first is the initial state) and the capability sources: a name, the method whose
+successful result advertises it, and a JSON Pointer into that result. A value that is absent, `null`
+or `false` does not advertise. `@jsonRpcLifecycle` on an operation gives `allowedIn` (absent means
+every state), the transitions `onCall`, `onSuccess` and `onError`, and the `requires` capabilities.
+`@jsonRpcCancels(idMember, code)` names the input member with the ID of the cancelled call and the
+error code that the call may then answer with. The rules are declarative, with no expression
+language, so that they express the initialize-first and shutdown-then-exit order of MEP, LSP and MCP.
+
+`from_smithy` prepares the rules only for a protocol with `jsonRpcSession`, so a protocol without it
+gives the findings it gave before, even when its operations carry the lifecycle traits. A state that
+the session does not declare, an unknown capability, a capability method that no peer accepts, an
+invalid pointer and an `idMember` that is not an input member are `InvalidContract`. The checker
+keeps one session state for both peers. When a request or notification arrives, its method must be
+allowed in the state (`StateViolation`, with the entry of the last transition in `related`) and its
+required capabilities must be advertised (`CapabilityNotAdvertised`). A rejected message causes no
+transition, and its reply moves the session nowhere, but correlation still tracks its call. An
+accepted message takes its `onCall` transition. A reply to an accepted call takes `onSuccess` or
+`onError` and adds the capabilities that its result advertises. Request batch elements are checked
+in array order, and a reply batch settles each answered call. A cancellation names an active call of
+its own sender; otherwise it is a `CancelInactiveCall` advisory, because a cancellation can race the
+reply. The reply of a cancelled single call may use the declared code: the `UnknownError` finding for
+that code on that call is dropped. The session holds only the state, the advertised capability names,
+the entry of the last transition and the cancelled calls. A cancelled call is always an active call,
+so `active_calls` bounds that table, and the call leaves it when it is answered. The layer needs
+correlation; with `correlation=false` it does nothing.
+
 ## Rule and original-example coverage
 
 The table separates request and single-response coverage from follow-on batch/exchange work. R = requests/notifications,

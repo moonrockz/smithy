@@ -78,8 +78,11 @@ fn next_transcript_code(code : TranscriptCode) -> TranscriptCode? {
     ActiveIdReused => Some(AmbiguousReplyId)
     AmbiguousReplyId => Some(WrongReplyForm)
     WrongReplyForm => Some(InvalidTranscript)
+    InvalidTranscript => Some(StateViolation)
+    StateViolation => Some(CapabilityNotAdvertised)
+    CapabilityNotAdvertised => Some(CancelInactiveCall)
     // An appended variant must be linked from this arm, and the snapshot test updated.
-    InvalidTranscript => None
+    CancelInactiveCall => None
     Message(_) => None
   }
 }

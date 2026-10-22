@@ -306,6 +306,96 @@ oversized entry gives `EntryLimit`; both entries are skipped. A call beyond `act
 reported as unsolicited and the message says so. The last finding within the budget is
 `FindingLimit`. The two limit findings set `complete` to false in the summary.
 
+## Session order
+
+A protocol can opt in to order and capability checks with `@jsonRpcSession` on its
+`@jsonRpcProtocol` structure. Without it, the checker does not read the order traits, so a protocol
+with no session gives the same findings as before, even when its operations carry them.
+`examples/json-rpc/lifecycle.smithy` is a MEP-like protocol between a host and an extension, and
+`example.peers#OrderedEditor` in `examples/json-rpc/peers.smithy` gives the Editor services the LSP
+order: initialize first, then shutdown, then exit.
+
+- `@jsonRpcSession(states: [...], capabilities: [...])` names the session states; the first one is the
+  initial state. Each capability source has a `name`, the `method` whose successful result advertises
+  it, and a JSON Pointer `pointer` into that result. The capability is advertised unless the value
+  there is absent, `null` or `false`.
+- `@jsonRpcLifecycle` on an operation gives `allowedIn` (absent means every state), the transitions
+  `onCall` (when the request or notification is accepted), `onSuccess` and `onError` (when its reply
+  arrives), and `requires`, the capabilities that must be advertised. A method without the trait is
+  allowed in every state.
+- `@jsonRpcCancels(idMember, code)` on an operation names the input member that holds the ID of the
+  call to cancel, and the error code that the cancelled call may answer with.
+
+One session state is shared by both peers. A request or notification whose method is not allowed in
+the current state is a `StateViolation` error; `related` names the entry of the last transition. A
+method whose required capability no result advertised is a `CapabilityNotAdvertised` error. A rejected
+message causes no transition, and its reply moves the session nowhere, but its call is still
+correlated. A cancellation names an active call of its own sender. If that call is not active, the
+cancellation is a `CancelInactiveCall` advisory, because a cancellation can race the reply. The reply
+of a cancelled call may use the declared code: the checker drops the `UnknownError` finding for that
+code on that call. In a request batch, the checker checks the elements in array order, and a reply
+batch settles each answered call. A cancellation does not excuse the code of a call inside a batch.
+
+`from_smithy` checks the traits: a state that the session does not declare, an unknown capability, a
+capability method that no peer accepts, an invalid pointer and an `idMember` that is not an input
+member are `InvalidContract`. The session holds only the state, the advertised capability names, the
+entry of the last transition and the cancelled calls, which are always active calls, so
+`active_calls` bounds them. With `correlation=false` the checker does no order checks.
+
+```mbt check
+///|
+test "check the order of a session" {
+  let loaded = @rpc.loader()
+    .add_idl(
+      "session.smithy",
+      (
+        #|$version: "2"
+        #|namespace demo
+        #|use smithy.rpc#jsonRpc
+        #|use smithy.rpc#jsonRpcLifecycle
+        #|use smithy.rpc#jsonRpcProtocol
+        #|use smithy.rpc#jsonRpcSession
+        #|use smithy.rpc#method
+        #|@jsonRpcProtocol(versions: ["2.0"], peers: [{name: "client"}, {name: "server", accepts: Api}])
+        #|@jsonRpcSession(states: ["closed", "open"])
+        #|structure Link {}
+        #|@jsonRpc(versions: ["2.0"])
+        #|service Api { version: "1", operations: [Open, Ping] }
+        #|@method(name: "open", params: "named", nullResult: true)
+        #|@jsonRpcLifecycle(allowedIn: ["closed"], onSuccess: "open")
+        #|operation Open {}
+        #|@method(name: "ping", params: "named", nullResult: true)
+        #|@jsonRpcLifecycle(allowedIn: ["open"])
+        #|operation Ping {}
+      ),
+    )
+    .assemble()
+  guard loaded.model is Some(model) else { fail("model did not load") }
+  let link = @rpc.ProtocolDescription::from_smithy(
+    model,
+    @smithy.ShapeId::parse("demo#Link").unwrap(),
+    @rpc.V2_0,
+  )
+  let client = @rpc.PeerName::parse("client").unwrap()
+  let server = @rpc.PeerName::parse("server").unwrap()
+  let checker = @rpc.TranscriptChecker::new(link)
+  let found = checker.feed_all(
+    [
+      (client, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}"),
+      (client, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"open\"}"),
+      (server, "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":null}"),
+      (client, "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"ping\"}"),
+    ].map(e => { sender: e.0, receiver: None, message: e.1, location: None, }),
+  )
+  assert_eq(found.map(f => f.code.to_string()), ["StateViolation"])
+  assert_eq(found[0].entry, Some(0))
+  assert_eq(
+    found[0].message,
+    "I expected method ping only in state open; entry 0 from client sent it in state closed.",
+  )
+}
+```
+
 ## JSON transcript documents
 
 `read_json_transcript` reads a JSON document into a `TranscriptDocument`: an object with `entries`
@@ -464,6 +554,8 @@ smithy validate rpc transcript --protocol example.peers#EchoChat \
   examples/json-rpc/peers.smithy examples/json-rpc/transcripts/chat.md
 smithy validate rpc transcript --protocol example.peers#Editor --diagnostics json \
   examples/json-rpc/peers.smithy examples/json-rpc/transcripts/editor-negative.json
+smithy validate rpc transcript --protocol example.lifecycle#Lifecycle \
+  examples/json-rpc/lifecycle.smithy examples/json-rpc/transcripts/lifecycle-violation.json
 ```
 
 The positionals are the model files, then the transcript file or `-`. `--protocol` is required.

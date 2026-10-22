@@ -463,6 +463,8 @@ smithy validate rpc transcript --protocol example.peers#Editor --complete --diag
   examples/json-rpc/peers.smithy examples/json-rpc/transcripts/editor-negative.json
 smithy validate rpc transcript --protocol batch#Link \
   examples/json-rpc/batches.smithy examples/json-rpc/transcripts/batches.json
+smithy validate rpc transcript --protocol example.lifecycle#Lifecycle \
+  examples/json-rpc/lifecycle.smithy examples/json-rpc/transcripts/lifecycle-violation.json
 smithy validate rpc transcript --protocol example.peers#Editor --version 2.0 \
   --direction in=client --direction out=server \
   examples/json-rpc/peers.smithy examples/json-rpc/transcripts/editor.jsonl
@@ -478,7 +480,10 @@ The transcript is a JSON document with `entries` (each `{"from": peer, "message"
 `version`, `complete` and `expect` fields, or a bare array of entries. A document without `entries`
 is an `InvalidTranscript` error; an unknown top-level key is an advisory. The checker correlates each reply
 with its call per sender, and reports unsolicited, duplicate and wrong-responder replies, replies to
-notifications and calls without a reply.
+notifications and calls without a reply. A protocol with `@jsonRpcSession` also checks the order of
+methods (`StateViolation`), the advertised capabilities (`CapabilityNotAdvertised`) and cancellations
+of calls that are not active (`CancelInactiveCall`, advisory). An order trait that names an undeclared
+state or capability is an invalid protocol (exit 2). See `examples/json-rpc/lifecycle.smithy`.
 
 - `--protocol` names the protocol structure. It is required.
 - `--version 1.0|2.0` is required when the document gives no version. When both give it, they must agree.

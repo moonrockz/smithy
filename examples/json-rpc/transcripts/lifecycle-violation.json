@@ -1,0 +1,24 @@
+{
+  "version": "2.0",
+  "complete": true,
+  "expect": [
+    { "code": "StateViolation", "entry": 0 },
+    { "code": "CapabilityNotAdvertised", "entry": 3 },
+    { "code": "CancelInactiveCall", "entry": 5 },
+    { "code": "StateViolation", "entry": 9, "related": 8 }
+  ],
+  "entries": [
+    { "from": "host", "message": {"jsonrpc": "2.0", "id": 1, "method": "compile", "params": {"source": "a"}} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": {"host": "studio"}} },
+    { "from": "extension", "message": {"jsonrpc": "2.0", "id": 2, "result": {"capabilities": {"cancellation": true}}} },
+    { "from": "extension", "message": {"jsonrpc": "2.0", "method": "progress", "params": {"message": "parsing"}} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "method": "initialized"} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "method": "$/cancelRequest", "params": {"id": 9}} },
+    { "from": "extension", "message": {"jsonrpc": "2.0", "id": 1, "result": "ok"} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "id": 3, "method": "shutdown"} },
+    { "from": "extension", "message": {"jsonrpc": "2.0", "id": 3, "result": null} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "id": 4, "method": "compile", "params": {"source": "b"}} },
+    { "from": "extension", "message": {"jsonrpc": "2.0", "id": 4, "error": {"code": -32603, "message": "Internal error"}} },
+    { "from": "host", "message": {"jsonrpc": "2.0", "method": "exit"} }
+  ]
+}

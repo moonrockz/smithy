@@ -828,7 +828,7 @@ async fn exercise_ion(runner : Runner, skip_stdin : Bool) -> Unit {
 /// Check whole transcripts through the built CLI: exit codes, the JSON report
 /// and expectation matching.
 async fn exercise_rpc_transcripts(runner : Runner, root : String, skip_stdin : Bool) -> Unit {
-  for model in ["peers.smithy", "batches.smithy"] {
+  for model in ["peers.smithy", "batches.smithy", "lifecycle.smithy"] {
     @fs.write_file(runner.dir + "/" + model, @fs.read_file(root + "/examples/json-rpc/" + model).text())
   }
   for (protocol, model, transcript, status, valid, code) in [
@@ -839,6 +839,9 @@ async fn exercise_rpc_transcripts(runner : Runner, root : String, skip_stdin : B
     ("example.peers#Editor", "peers.smithy", "editor.json", 0, true, ""),
     ("example.peers#Editor", "peers.smithy", "editor-negative.json", 0, false, "UnsolicitedResponse"),
     ("batch#Link", "batches.smithy", "batches.json", 0, true, ""),
+    ("example.peers#OrderedEditor", "peers.smithy", "editor.json", 0, true, ""),
+    ("example.lifecycle#Lifecycle", "lifecycle.smithy", "lifecycle-valid.json", 0, true, ""),
+    ("example.lifecycle#Lifecycle", "lifecycle.smithy", "lifecycle-violation.json", 0, false, "StateViolation"),
   ] {
     @fs.write_file(runner.dir + "/" + transcript, @fs.read_file(root + "/examples/json-rpc/transcripts/" + transcript).text())
     let args = ["validate", "rpc", "transcript", "--protocol", protocol, model, transcript]
@@ -906,6 +909,11 @@ async fn exercise_rpc_transcripts(runner : Runner, root : String, skip_stdin : B
   runner.command(editor + ["unsolicited.json", "--version", "1.0"], 2) |> ignore
   runner.command(editor + ["unsolicited.json", "--complete", "--partial"], 2) |> ignore
   runner.command(["validate", "rpc", "transcript", "--protocol", "example.peers#Missing", "peers.smithy", "unsolicited.json"], 2) |> ignore
+  // An order trait that names an undeclared state is a contract error.
+  @fs.write_file(runner.dir + "/bad-session.smithy", @fs.read_file(runner.dir + "/lifecycle.smithy").text().replace(old="allowedIn: [\"ready\"], onSuccess: \"stopping\"", new="allowedIn: [\"done\"], onSuccess: \"stopping\""))
+  let (out, stderr) = runner.command(["validate", "rpc", "transcript", "--protocol", "example.lifecycle#Lifecycle", "bad-session.smithy", "lifecycle-valid.json"], 2)
+  let err = if runner.target == "wasm-gc" { out + stderr } else { stderr }
+  assert_true(err.contains("allowedIn"), msg=err)
   runner.command(editor + ["missing-transcript.json"], 1) |> ignore
   @fs.write_file(runner.dir + "/notes.md", "# notes")
   // A Markdown file with no jsonrpc blocks and no version is a usage error.

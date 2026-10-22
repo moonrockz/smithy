@@ -47,6 +47,12 @@ pub(all) enum TranscriptCode {
   WrongReplyForm
   /// A problem in the transcript document rather than in a message.
   InvalidTranscript
+  /// A request or notification in a session state that does not allow it.
+  StateViolation
+  /// A method whose required capability no result advertised.
+  CapabilityNotAdvertised
+  /// A cancellation that names no active call (advisory).
+  CancelInactiveCall
 } derive(Eq, Debug)
 
 ///|
@@ -67,6 +73,9 @@ pub fn TranscriptCode::to_string(self : TranscriptCode) -> String {
     AmbiguousReplyId => "AmbiguousId"
     WrongReplyForm => "WrongReplyForm"
     InvalidTranscript => "InvalidTranscript"
+    StateViolation => "StateViolation"
+    CapabilityNotAdvertised => "CapabilityNotAdvertised"
+    CancelInactiveCall => "CancelInactiveCall"
   }
 }
 

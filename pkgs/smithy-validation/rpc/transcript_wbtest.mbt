@@ -1,9 +1,10 @@
 ///|
-/// The largest active, unreadable, answered, notification and pending batch
-/// table of any peer.
+/// The largest active, unreadable, answered, notification, pending batch and
+/// cancelled call table of any peer.
 fn TranscriptChecker::table_sizes(
   self : TranscriptChecker,
-) -> (Int32, Int32, Int32, Int32, Int32) {
+) -> (Int32, Int32, Int32, Int32, Int32, Int32) {
+  let mut cancelled = 0
   let mut active = 0
   let mut unreadable = 0
   let mut batches = 0
@@ -18,8 +19,9 @@ fn TranscriptChecker::table_sizes(
     )
     notifications = larger(notifications, state.notifications.length())
     batches = larger(batches, state.batches.length())
+    cancelled = larger(cancelled, state.cancelled.length())
   }
-  (active, unreadable, answered, notifications, batches)
+  (active, unreadable, answered, notifications, batches, cancelled)
 }
 
 ///|
@@ -127,7 +129,7 @@ test "tables stay within limits" {
     let mut largest = (0, 0, 0, 0, 0)
     for i in 0..<10000 {
       checker.feed(bounded_entry(version, i)) |> ignore
-      let (active, unreadable, answered, notifications, batches) = checker.table_sizes()
+      let (active, unreadable, answered, notifications, batches, _) = checker.table_sizes()
       assert_true(active <= 4, msg="active calls at entry \{i}")
       assert_true(unreadable <= 4, msg="unreadable entries at entry \{i}")
       assert_true(answered <= 4, msg="answered ids at entry \{i}")
@@ -154,4 +156,75 @@ test "tables stay within limits" {
     assert_eq(summary.entries, 10000)
     assert_false(summary.complete)
   }
+}
+
+///|
+/// A session protocol whose cancel notification names a ping call.
+fn cancelling_protocol() -> ProtocolDescription raise {
+  let loaded = loader()
+    .add_idl(
+      "cancelling.smithy",
+      (
+        #|$version: "2"
+        #|namespace cancelling
+        #|use smithy.rpc#jsonRpc
+        #|use smithy.rpc#jsonRpcCancels
+        #|use smithy.rpc#jsonRpcProtocol
+        #|use smithy.rpc#jsonRpcSession
+        #|use smithy.rpc#method
+        #|@jsonRpcProtocol(versions: ["2.0"], peers: [{name: "client"}, {name: "server", accepts: Api}])
+        #|@jsonRpcSession(states: ["open"])
+        #|structure Link {}
+        #|@jsonRpc(versions: ["2.0"])
+        #|service Api { version: "1", operations: [Ping, Cancel] }
+        #|@method(name: "ping", params: "named", nullResult: true)
+        #|operation Ping {}
+        #|@method(name: "cancel", params: "named", nullResult: true)
+        #|@jsonRpcCancels(idMember: "id", code: -32800)
+        #|operation Cancel { input: CancelInput }
+        #|structure CancelInput { id: Integer }
+      ),
+    )
+    .assemble()
+  guard loaded.model is Some(model) else {
+    fail(loaded.diagnostics.map(d => d.message).join("\n"))
+  }
+  ProtocolDescription::from_smithy(
+    model,
+    @smithy.ShapeId::parse("cancelling#Link").unwrap(),
+    V2_0,
+  )
+}
+
+///|
+test "cancelled calls stay within the active call limit" {
+  let limits = TranscriptLimits::new(active_calls=4)
+  let checker = TranscriptChecker::new(cancelling_protocol(), limits~)
+  let mut largest = 0
+  for i in 0..<3000 {
+    let message = match i % 3 {
+      // Calls pile up beyond the limit, and every one is cancelled.
+      0 => "{\"jsonrpc\": \"2.0\", \"id\": \{i}, \"method\": \"ping\"}"
+      1 =>
+        "{\"jsonrpc\": \"2.0\", \"method\": \"cancel\", \"params\": {\"id\": \{i - 1}}}"
+      // Every fifth cycle answers one of the cancelled calls.
+      _ if i / 3 % 5 == 0 =>
+        "{\"jsonrpc\": \"2.0\", \"id\": \{i - 2}, \"error\": {\"code\": -32800, \"message\": \"cancelled\"}}"
+      _ =>
+        "{\"jsonrpc\": \"2.0\", \"method\": \"cancel\", \"params\": {\"id\": 0}}"
+    }
+    let sender = if message.contains("error") { "server" } else { "client" }
+    checker.feed({
+      sender: PeerName::parse(sender).unwrap(),
+      message,
+      receiver: None,
+      location: None,
+    })
+    |> ignore
+    let (active, _, _, _, _, cancelled) = checker.table_sizes()
+    assert_true(cancelled <= 4, msg="cancelled calls at entry \{i}")
+    assert_true(cancelled <= active, msg="cancelled calls at entry \{i}")
+    largest = larger(largest, cancelled)
+  }
+  assert_eq(largest, 4)
 }

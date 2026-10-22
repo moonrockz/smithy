@@ -46,5 +46,34 @@ pub fn trait_definitions() -> String {
     #|string PeerName
     #|@idRef(failWhenMissing: true, selector: "service")
     #|string ServiceRef
+    #|@trait(selector: "structure [trait|smithy.rpc#jsonRpcProtocol]")
+    #|structure jsonRpcSession {
+    #|  @required states: StateNames
+    #|  capabilities: CapabilitySources
+    #|}
+    #|@length(min: 1)
+    #|list StateNames { member: StateName }
+    #|@pattern("^[A-Za-z][A-Za-z0-9_-]{0,63}$")
+    #|string StateName
+    #|list CapabilitySources { member: CapabilitySource }
+    #|structure CapabilitySource {
+    #|  @required name: String
+    #|  @required method: MethodName
+    #|  @required pointer: String
+    #|}
+    #|@trait(selector: "operation")
+    #|structure jsonRpcLifecycle {
+    #|  allowedIn: StateNames
+    #|  onCall: StateName
+    #|  onSuccess: StateName
+    #|  onError: StateName
+    #|  requires: CapabilityNames
+    #|}
+    #|list CapabilityNames { member: String }
+    #|@trait(selector: "operation")
+    #|structure jsonRpcCancels {
+    #|  @required idMember: String
+    #|  code: Integer
+    #|}
   )
 }

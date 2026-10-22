@@ -15,6 +15,7 @@ test "known code names are pinned in order" {
     "UnknownPeer", "EntryLimit", "ActiveCallLimit", "FindingLimit", "UnsolicitedResponse",
     "DuplicateResponse", "MissingResponse", "OutstandingCall", "ResponseToNotification",
     "WrongResponder", "ActiveIdReused", "AmbiguousId", "WrongReplyForm", "InvalidTranscript",
+    "StateViolation", "CapabilityNotAdvertised", "CancelInactiveCall",
   ])
 }
 

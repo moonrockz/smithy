@@ -2,7 +2,9 @@ $version: "2"
 namespace example.peers
 
 use smithy.rpc#jsonRpc
+use smithy.rpc#jsonRpcLifecycle
 use smithy.rpc#jsonRpcProtocol
+use smithy.rpc#jsonRpcSession
 use smithy.rpc#method
 
 /// JSON-RPC 1.0 section 4 echo and chat examples.
@@ -68,6 +70,18 @@ structure UserLeftInput { @required name: String }
 )
 structure Editor {}
 
+/// The Editor services with the LSP order: initialize first, then shutdown, then exit.
+/// Editor has no session, so it ignores the lifecycle traits of the operations.
+@jsonRpcProtocol(
+    versions: ["2.0"]
+    peers: [
+        { name: "client", accepts: LanguageClient }
+        { name: "server", accepts: LanguageServer }
+    ]
+)
+@jsonRpcSession(states: ["starting", "running", "stopping", "stopped"])
+structure OrderedEditor {}
+
 @jsonRpc(versions: ["2.0"])
 service LanguageServer {
     version: "1"
@@ -81,6 +95,7 @@ service LanguageClient {
 }
 
 @method(name: "initialize", params: "named", resultMember: "capabilities")
+@jsonRpcLifecycle(allowedIn: ["starting"], onSuccess: "running")
 operation Initialize { input: InitializeInput, output: InitializeOutput }
 
 structure InitializeInput { processId: Integer }
@@ -88,9 +103,11 @@ structure InitializeInput { processId: Integer }
 structure InitializeOutput { capabilities: String }
 
 @method(name: "shutdown", params: "named", nullResult: true)
+@jsonRpcLifecycle(allowedIn: ["running"], onSuccess: "stopping")
 operation Shutdown {}
 
 @method(name: "textDocument/hover", params: "named", resultMember: "contents")
+@jsonRpcLifecycle(allowedIn: ["running"])
 operation Hover { input: HoverInput, output: HoverOutput }
 
 structure HoverInput {
@@ -102,9 +119,11 @@ structure HoverInput {
 structure HoverOutput { contents: String }
 
 @method(name: "exit", params: "named", nullResult: true)
+@jsonRpcLifecycle(onCall: "stopped")
 operation Exit {}
 
 @method(name: "workspace/configuration", params: "named", resultMember: "items")
+@jsonRpcLifecycle(allowedIn: ["running"])
 operation WorkspaceConfiguration { input: ConfigurationInput, output: ConfigurationOutput }
 
 structure ConfigurationInput { section: String }

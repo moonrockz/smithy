@@ -146,3 +146,57 @@ Feature: JSON-RPC transcripts
     Then the transcript is invalid
     And the transcript has the error "UnsolicitedResponse" at entry 0
     And the log has 3 lines, 1 not JSON and 0 skipped
+
+  Scenario: A session checks the order of methods and the advertised capabilities
+    Given the "example.lifecycle#Lifecycle" protocol in "lifecycle.smithy"
+    When I check the transcript file "lifecycle-valid.json"
+    Then the transcript is valid
+    And the transcript has no findings
+    When I check the transcript file "lifecycle-violation.json"
+    Then the transcript is invalid
+    And the transcript has the error "StateViolation" at entry 0
+    And the transcript has the error "CapabilityNotAdvertised" at entry 3
+    And the transcript has the advisory "CancelInactiveCall" at entry 5
+    And the transcript has the error "StateViolation" at entry 9
+    And the transcript matches its expected findings
+
+  Scenario: An LSP-like editor session starts with initialize and ends with shutdown and exit
+    Given the "example.peers#OrderedEditor" protocol in "peers.smithy"
+    When I check the transcript file "editor.json"
+    Then the transcript is valid
+    And the transcript has no findings
+    When I check the transcript:
+      """json
+      {
+        "version": "2.0",
+        "entries": [
+          { "from": "client", "message": {"jsonrpc": "2.0", "id": 1, "method": "textDocument/hover", "params": {"uri": "file:///a.txt"}} },
+          { "from": "client", "message": {"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": {"processId": 42}} },
+          { "from": "server", "message": {"jsonrpc": "2.0", "id": 2, "result": "full"} },
+          { "from": "client", "message": {"jsonrpc": "2.0", "id": 3, "method": "shutdown"} },
+          { "from": "server", "message": {"jsonrpc": "2.0", "id": 3, "result": null} },
+          { "from": "client", "message": {"jsonrpc": "2.0", "id": 4, "method": "textDocument/hover", "params": {"uri": "file:///a.txt"}} },
+          { "from": "client", "message": {"jsonrpc": "2.0", "method": "exit"} }
+        ]
+      }
+      """
+    Then the transcript is invalid
+    And the transcript has the error "StateViolation" at entry 0
+    And the transcript has the error "StateViolation" at entry 5
+    And the transcript has no finding at entry 6
+
+  Scenario: A protocol without a session ignores the lifecycle traits
+    Given the "example.peers#Editor" protocol in "peers.smithy"
+    When I check the transcript:
+      """json
+      {
+        "version": "2.0",
+        "complete": true,
+        "entries": [
+          { "from": "client", "message": {"jsonrpc": "2.0", "id": 1, "method": "textDocument/hover", "params": {"uri": "file:///a.txt"}} },
+          { "from": "server", "message": {"jsonrpc": "2.0", "id": 1, "result": "docs"} }
+        ]
+      }
+      """
+    Then the transcript is valid
+    And the transcript has no findings
