@@ -549,23 +549,70 @@ test "invalid session traits are contract errors" {
   )
   describe(valid, "t#P", @rpc.V2_0) |> ignore
   for
-    traits in [
-      "@jsonRpcLifecycle(allowedIn: [\"shut\"])", "@jsonRpcLifecycle(onCall: \"shut\")",
-      "@jsonRpcLifecycle(onSuccess: \"shut\")", "@jsonRpcLifecycle(onError: \"shut\")",
-      "@jsonRpcLifecycle(requires: [\"slow\"])", "@jsonRpcCancels(idMember: \"ref\")",
-      "@jsonRpcCancels(idMember: \"other\")",
+    case in [
+      ("@jsonRpcLifecycle(allowedIn: [\"shut\"])", "allowedIn"),
+      ("@jsonRpcLifecycle(onCall: \"shut\")", "onCall"),
+      ("@jsonRpcLifecycle(onSuccess: \"shut\")", "onSuccess"),
+      ("@jsonRpcLifecycle(onError: \"shut\")", "onError"),
+      ("@jsonRpcLifecycle(requires: [\"slow\"])", "requires"),
+      // The member is id; ref is its JSON name.
+      ("@jsonRpcCancels(idMember: \"ref\")", "idMember"),
+      ("@jsonRpcCancels(idMember: \"other\")", "other"),
     ] {
-    expect_invalid(session_model(session, traits), @rpc.V2_0)
+    let (traits, word) = case
+    expect_invalid(session_model(session, traits), @rpc.V2_0, mentions=word)
   }
   for
-    invalid in [
-      "states: [\"open\", \"open\"]", "states: [\"open\"], capabilities: [{name: \"fast\", method: \"stop\", pointer: \"/fast\"}]",
-      "states: [\"open\"], capabilities: [{name: \"fast\", method: \"go\", pointer: \"fast\"}]",
-      "states: [\"open\"], capabilities: [{name: \"fast\", method: \"go\", pointer: \"/a~2\"}]",
-      "states: [\"open\"], capabilities: [{name: \"fast\", method: \"go\", pointer: \"/a\"}, {name: \"fast\", method: \"go\", pointer: \"/b\"}]",
-      "states: [\"open\"], capabilities: [{name: \"\", method: \"go\", pointer: \"/a\"}]",
+    case in [
+      ("states: [\"open\", \"open\"]", "distinct state names"),
+      (
+        "states: [\"open\"], capabilities: [{name: \"fast\", method: \"stop\", pointer: \"/fast\"}]",
+        "method stop",
+      ),
+      (
+        "states: [\"open\"], capabilities: [{name: \"fast\", method: \"go\", pointer: \"fast\"}]",
+        "JSON Pointer",
+      ),
+      (
+        "states: [\"open\"], capabilities: [{name: \"fast\", method: \"go\", pointer: \"/a~2\"}]",
+        "/a~2",
+      ),
+      (
+        "states: [\"open\"], capabilities: [{name: \"fast\", method: \"go\", pointer: \"/a\"}, {name: \"fast\", method: \"go\", pointer: \"/b\"}]",
+        "distinct capability names",
+      ),
+      (
+        "states: [\"open\"], capabilities: [{name: \"\", method: \"go\", pointer: \"/a\"}]",
+        "nonempty capability name",
+      ),
     ] {
-    expect_invalid(session_model(invalid, ""), @rpc.V2_0)
+    let (invalid, word) = case
+    expect_invalid(session_model(invalid, ""), @rpc.V2_0, mentions=word)
+  }
+  // Model validation rejects a code that is not an integer, so the trait
+  // value is set after loading.
+  let model = load(session_model(session, "@jsonRpcCancels(idMember: \"id\")"))
+  let go = model.shapes[@smithy.ShapeId::parse("t#Go").unwrap()]
+  for
+    code in [
+      @smithy.Number(@smithy.NodeNumber::parse("1.5").unwrap()),
+      @smithy.String("-32800"),
+    ] {
+    go.traits[@smithy.ShapeId::parse("smithy.rpc#jsonRpcCancels").unwrap()] = @smithy.Object({
+        "idMember": @smithy.String("id"),
+        "code": code,
+      },
+    )
+    try describe(model, "t#P", @rpc.V2_0) catch {
+      @rpc.InvalidContract(_, message) =>
+        assert_eq(message, "I expected an integer jsonRpcCancels code.")
+      e => fail("unexpected error: \{e}")
+    } noraise {
+      _ =>
+        fail(
+          "I expected the code \{@json.to_json(code).stringify()} to be rejected.",
+        )
+    }
   }
 }
 

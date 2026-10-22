@@ -1,71 +1,4 @@
 ///|
-/// A session state named by `jsonRpcSession`. It follows the PeerName rule.
-priv struct StateName {
-  text : String
-} derive(Eq)
-
-///|
-fn StateName::parse(text : String) -> StateName? {
-  if is_protocol_name(text) {
-    Some({ text, })
-  } else {
-    None
-  }
-}
-
-///|
-/// A capability that the successful result of a named call advertises.
-priv struct CapabilitySource {
-  name : String
-  method_ : MethodName
-  /// Into the result. The capability is advertised unless the value is
-  /// absent, null or false.
-  pointer : JsonPointer
-}
-
-///|
-/// How a method cancels a call: where its params hold the call ID, and the
-/// error code that the cancelled call may answer with.
-priv struct CancelRule {
-  /// The wire name of the ID member in named params.
-  wire_name : String
-  /// The position of the ID member in positional params.
-  position : Int32?
-  code : ErrorCode?
-}
-
-///|
-/// The order rules of one method, from `jsonRpcLifecycle` and `jsonRpcCancels`.
-priv struct MethodRule {
-  /// None means every state.
-  allowed : Array[StateName]?
-  on_call : StateName?
-  on_success : StateName?
-  on_error : StateName?
-  requires : Array[String]
-  cancels : CancelRule?
-}
-
-///|
-/// The prepared `jsonRpcSession` of a protocol.
-priv struct SessionRules {
-  /// The first state is the initial state.
-  states : Array[StateName]
-  sources : Array[CapabilitySource]
-  /// The rules of the methods each peer accepts, by receiving peer.
-  methods : Map[PeerName, Map[MethodName, MethodRule]]
-}
-
-///|
-fn SessionRules::rule(
-  self : SessionRules,
-  receiver : PeerName,
-  method_ : MethodName,
-) -> MethodRule? {
-  self.methods.get(receiver).bind(rules => rules.get(method_))
-}
-
-///|
 /// The session state of one transcript, shared by both peers. The cancelled
 /// calls are kept per sender, beside its active calls.
 priv struct SessionState {
@@ -128,19 +61,14 @@ fn TranscriptChecker::order_request(
       "I expected method \{method_.to_string()} only in \{render_states(allowed)}; entry \{step.index} from \{sender} sent it in state \{session.state.text}.",
     )
   }
-  for capability in rule.requires {
-    if !session.advertised.contains(capability) {
+  for source in rule.requires {
+    if !session.advertised.contains(source.name) {
       accepted = false
-      let source = session.rules.sources
-        .iter()
-        .find_first(s => s.name == capability)
-        .map(s => s.method_.to_string())
-        .unwrap_or("")
       self.report(
         step,
         CapabilityNotAdvertised,
         [],
-        "I expected capability \{capability} to be advertised before method \{method_.to_string()}; entry \{step.index} from \{sender} sent it, and no \{source} result advertised it.",
+        "I expected capability \{source.name} to be advertised before method \{method_.to_string()}; entry \{step.index} from \{sender} sent it, and no \{source.method_.to_string()} result advertised it.",
       )
     }
   }
