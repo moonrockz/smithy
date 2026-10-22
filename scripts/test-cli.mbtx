@@ -60,6 +60,18 @@ async fn Runner::command(
 }
 
 ///|
+/// Runs a POSIX shell command line in the scratch directory.
+async fn Runner::command_in_shell(
+  self : Runner,
+  line : String,
+  expected : Int32,
+) -> (String, String) {
+  let (code, out, err) = @process.collect_output("sh", ["-c", line], cwd=self.dir)
+  assert_eq(code, expected, msg="\{self.target}: \{line}\n\{err.text()}")
+  (out.text().replace_all(old="\r\n", new="\n"), err.text())
+}
+
+///|
 fn jsonl_records(text : String) -> Array[Json] raise {
   if text.is_empty() {
     return []
@@ -1148,18 +1160,29 @@ async fn exercise_rpc_log_files(runner : Runner, root : String) -> Unit {
   for (key, count) in [("lines", 20001.0), ("entries", 20001.0), ("outstanding", 0.0), ("not_json", 0.0)] {
     assert_eq(summary.get(key), Some(Json::number(count)), msg="\{key}: \{out}")
   }
-  if runner.target == "native" {
-    // A path that opens but cannot be read, such as a directory on POSIX,
-    // gives the same InputRead report and exit status as a missing file:
-    // no summary, and no "could not read" error after it.
-    @fs.mkdir(runner.dir + "/folder.jsonl", allow_exist=true)
-    for diagnostics in ["text", "json"] {
-      let options = ["--diagnostics", diagnostics]
-      let (missing_out, missing_err) = runner.command(editor + ["absent.jsonl"] + options, 1)
-      let (folder_out, folder_err) = runner.command(editor + ["folder.jsonl"] + options, 1)
-      assert_true((missing_out + missing_err).contains("InputRead"), msg=missing_out + missing_err)
-      assert_eq(folder_out, missing_out.replace_all(old="absent.jsonl", new="folder.jsonl"))
-      assert_eq(folder_err, missing_err.replace_all(old="absent.jsonl", new="folder.jsonl"))
+  // A path that opens but cannot be read, such as a directory on POSIX,
+  // gives the same InputRead report and exit status as a missing file:
+  // no summary, and no "could not read" error after it.
+  @fs.mkdir(runner.dir + "/folder.jsonl", allow_exist=true)
+  for diagnostics in ["text", "json"] {
+    let options = ["--diagnostics", diagnostics]
+    let (missing_out, missing_err) = runner.command(editor + ["absent.jsonl"] + options, 1)
+    let (folder_out, folder_err) = runner.command(editor + ["folder.jsonl"] + options, 1)
+    assert_true((missing_out + missing_err).contains("InputRead"), msg=missing_out + missing_err)
+    assert_eq(folder_out, missing_out.replace_all(old="absent.jsonl", new="folder.jsonl"))
+    assert_eq(folder_err, missing_err.replace_all(old="absent.jsonl", new="folder.jsonl"))
+    if @env.get_env_var("OS") != Some("Windows_NT") {
+      // An unreadable stdin, here a directory opened as descriptor 0, gives
+      // the same report as the unreadable file, not a crash.
+      let words = [runner.executable]
+      words.append(runner.prefix)
+      words.append(editor + ["-"] + options)
+      let quoted = words.map(word => "'" + word.replace_all(old="'", new="'\\''") + "'")
+      let (stdin_out, stdin_err) = runner.command_in_shell(
+        quoted.join(" ") + " < folder.jsonl", 1,
+      )
+      assert_true((stdin_out + stdin_err).contains("InputRead"), msg=stdin_out + stdin_err)
+      assert_false(stdin_out.contains("\"summary\""), msg=stdin_out)
     }
   }
   if runner.target != "native" || @env.get_env_var("OS") == Some("Windows_NT") {
