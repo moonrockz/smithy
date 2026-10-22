@@ -168,8 +168,12 @@ test "batch responses reject duplicates missing calls and wrong payload paths" {
   let reply = "{\"jsonrpc\":\"2.0\",\"result\":-1,\"id\":1}"
   for
     (response, code, pointer) in [
-      (Some("[" + reply + "," + reply + "]"), @rpc.DuplicateResponse, "/1/id"),
-      (None, @rpc.MissingResponse, ""),
+      (
+        Some("[" + reply + "," + reply + "]"),
+        @rpc.FindingCode::DuplicateResponse,
+        "/1/id",
+      ),
+      (None, @rpc.FindingCode::MissingResponse, ""),
       (
         Some("[{\"jsonrpc\":\"2.0\",\"result\":\"bad\",\"id\":1}]"),
         @rpc.Value(@validation.TypeMismatch),

@@ -198,6 +198,100 @@ test "describe a two-peer protocol" {
 }
 ```
 
+## Transcripts
+
+`TranscriptChecker` checks a conversation between the two peers of a `ProtocolDescription`.
+Each `TranscriptEntry` names its sender and holds the original message text. The receiver is
+the other peer. `feed` returns the findings for one entry at once, and `feed_all` accepts a
+group of any size; both give the same findings in the same order. `finish` returns the
+end-of-input findings and a summary. It is idempotent, and a feed after it is ignored. The
+checker does no I/O and never raises: problems are `TranscriptFinding` values.
+
+```mbt check
+///|
+test "check a two-peer transcript" {
+  let loaded = @rpc.loader()
+    .add_idl(
+      "peers.smithy",
+      (
+        #|$version: "2"
+        #|namespace demo
+        #|use smithy.rpc#jsonRpc
+        #|use smithy.rpc#jsonRpcProtocol
+        #|use smithy.rpc#method
+        #|@jsonRpcProtocol(versions: ["2.0"], peers: [{name: "client"}, {name: "server", accepts: Api}])
+        #|structure Link {}
+        #|@jsonRpc(versions: ["2.0"])
+        #|service Api { version: "1", operations: [Ping] }
+        #|@method(name: "ping", params: "named", nullResult: true)
+        #|operation Ping {}
+      ),
+    )
+    .assemble()
+  guard loaded.model is Some(model) else { fail("model did not load") }
+  let link = @rpc.ProtocolDescription::from_smithy(
+    model,
+    @smithy.ShapeId::parse("demo#Link").unwrap(),
+    @rpc.V2_0,
+  )
+  let client = @rpc.PeerName::parse("client").unwrap()
+  let server = @rpc.PeerName::parse("server").unwrap()
+  let checker = @rpc.TranscriptChecker::new(link, completeness=Complete)
+  let found = checker.feed_all([
+    {
+      sender: client,
+      message: "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}",
+      location: None,
+    },
+    {
+      sender: server,
+      message: "{\"jsonrpc\":\"2.0\",\"id\":1.0,\"result\":null}",
+      location: None,
+    },
+    {
+      sender: server,
+      message: "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":null}",
+      location: None,
+    },
+  ])
+  assert_eq(found.map(f => f.code.to_string()), ["UnsolicitedResponse"])
+  assert_eq(found[0].entry, Some(2))
+  assert_eq(checker.finish().outstanding, 0)
+}
+```
+
+Correlation follows these rules:
+
+- Each sender has its own ID space. A reply matches a call by caller, responder and exact ID.
+  `1`, `1.0` and `10e-1` are the same ID; the string `"1"` is not. Structured 1.0 IDs compare
+  structurally.
+- A matched reply is validated with `OriginalRequest` context from its call, and its findings
+  name the call in `related`. The call is then answered.
+- A null-ID reply answers the earliest unreadable entry (invalid JSON, or an invalid envelope with
+  no usable ID) of the other peer, else an active explicit-null 2.0 call. When both exist, it
+  answers the earlier one and adds an `AmbiguousId` advisory.
+- Otherwise a reply is a `DuplicateResponse` (with the first reply in `related`), a
+  `WrongResponder` (the ID is active for the sender itself), a `ResponseToNotification` (a 1.0
+  null-ID reply after a 1.0 notification), or an `UnsolicitedResponse`. These replies are still
+  checked as envelopes, and only their error findings are kept.
+- A call that reuses an ID still active for its sender is `ActiveIdReused`.
+- `finish` reports each active call and each 2.0 unreadable entry as `MissingResponse` (error)
+  when the transcript is `Complete`, and as `OutstandingCall` (advisory) when it is `Partial`, the
+  default. Notifications never need a reply.
+- A peer that accepts nothing receives no methods: a request to it is `UnknownMethod` on the
+  protocol shape.
+- With `correlation=false` the checker validates each message only; replies keep the
+  `LimitedScope` advisory and no call is tracked.
+- Batch entries (JSON arrays) are not linked yet; they give `UnsupportedMessage`.
+
+`TranscriptLimits::new` bounds memory and output: `active_calls` (1024, per sender, also for
+unreadable entries), `answered_ids` (4096, per sender, also for remembered 1.0 notifications),
+`entry_bytes` (1 MiB) and `findings` (10,000). An unknown sender gives `UnknownPeer` and an
+oversized entry gives `EntryLimit`; both entries are skipped. A call beyond `active_calls` gives
+`ActiveCallLimit` and is not tracked. When the answered memory forgets an ID, a late duplicate is
+reported as unsolicited and the message says so. The last finding within the budget is
+`FindingLimit`. The two limit findings set `complete` to false in the summary.
+
 ## CLI
 
 From the repository root:
