@@ -7,20 +7,6 @@ priv enum TranscriptFormat {
 }
 
 ///|
-/// How the lines of a JSONL log become transcript entries. The peer names are
-/// checked against the protocol after the model is loaded.
-priv enum LogChoice {
-  /// `--log-preset raw --sender <peer>`: each JSON-RPC line comes from one peer.
-  RawLog(@rpc.PeerName)
-  /// `--log-preset dir-message`, the default: `{"dir", "message"}` records.
-  /// The `--direction` map, or `None` for request = the first peer and
-  /// response = the second.
-  DirMessageLog(Map[String, @rpc.PeerName]?)
-  /// `--log-mapping <file>`: a mapping in the `LogMapping::from_json` form.
-  MappingFile(String)
-}
-
-///|
 priv struct TranscriptOptions {
   /// The transcript file, or "-" for stdin.
   file : String
@@ -31,13 +17,17 @@ priv struct TranscriptOptions {
   completeness : @rpc.Completeness?
   /// The log mapping for JSONL input; `None` for JSON and Markdown.
   log : LogChoice?
+  /// The --expect file: expected findings for any input format.
+  expect : String?
+  /// The --legacy-errors mapping; `None` when the flag is absent.
+  legacy_errors : @rpc.LegacyErrorMode?
 }
 
 ///|
 fn transcript_command() -> @argparse.Command {
   input_command(
     "transcript",
-    "Validate a JSON-RPC transcript between the two peers of a protocol: a JSON or Markdown document, or a JSONL log. Findings of a log are written as each line is read. The native and WASI binaries read stdin as it arrives; the js and wasm-gc binaries read all of stdin first and give the same findings.",
+    "Validate a JSON-RPC transcript between the two peers of a protocol: a JSON or Markdown document, or a JSONL log. Findings of a log are written as each line is read. The native and WASI binaries read a log file or stdin in chunks as it arrives; the js and wasm-gc binaries read all of the input first and give the same findings.",
     files_about="Model files, then the transcript file or '-' for stdin. Use '--' before paths beginning with '-'.",
     options=[
       @argparse.OptionArg(
@@ -73,6 +63,14 @@ fn transcript_command() -> @argparse.Command {
       @argparse.OptionArg(
         "diagnostics",
         about="Findings format: text or json; default text. For JSONL, json writes one finding per line and then a summary line.",
+      ),
+      @argparse.OptionArg(
+        "expect",
+        about="JSON file with an array of expected findings, {\"code\", \"entry\"?, \"related\"?}. The exit status is then 0 when they match. Conflicts with an expect list in the transcript.",
+      ),
+      @argparse.OptionArg(
+        "legacy-errors",
+        about="1.0 response error mapping: opaque or code-message-data; default opaque.",
       ),
     ],
     flags=[
@@ -148,6 +146,17 @@ fn transcript_options(
   } else {
     None
   }
+  let legacy_errors = match value("legacy-errors") {
+    None => None
+    Some(text) => {
+      let mode = legacy_errors_mode(text)
+      // A version from the document is checked when the document is read.
+      if version is Some(given) {
+        require_legacy_version(given)
+      }
+      Some(mode)
+    }
+  }
   let format = transcript_format(file, value("input-format"))
   let preset = value("log-preset")
   let mapping = value("log-mapping")
@@ -176,77 +185,14 @@ fn transcript_options(
       Some(log_choice(preset, mapping, sender, directions))
     }
   }
-  { file, format, version, completeness, log, }
-}
-
-///|
-/// Reads --log-preset, --log-mapping, --sender and --direction. A mapping file
-/// names its own senders, raw takes only --sender, and dir-message takes only
-/// --direction.
-fn log_choice(
-  preset : String?,
-  mapping : String?,
-  sender : String?,
-  directions : Array[String],
-) -> LogChoice raise CliError {
-  fn peer(text : String, option : String) -> @rpc.PeerName raise CliError {
-    guard @rpc.PeerName::parse(text) is Some(peer) else {
-      raise CliError("expected a peer name after \{option}, found '\{text}'", 2)
-    }
-    peer
-  }
-
-  match (preset, mapping) {
-    (Some(_), Some(_)) =>
-      raise CliError("use only one of --log-preset and --log-mapping", 2)
-    (None, Some(file)) => {
-      if sender is Some(_) || !directions.is_empty() {
-        raise CliError(
-          "--log-mapping names the senders; do not use --sender or --direction with it",
-          2,
-        )
-      }
-      MappingFile(file)
-    }
-    (Some("raw"), None) => {
-      if !directions.is_empty() {
-        raise CliError("--direction requires --log-preset dir-message", 2)
-      }
-      guard sender is Some(name) else {
-        raise CliError("--log-preset raw requires --sender <peer>", 2)
-      }
-      RawLog(peer(name, "--sender"))
-    }
-    (Some("dir-message") | None, None) => {
-      if sender is Some(_) {
-        raise CliError("--sender requires --log-preset raw", 2)
-      }
-      if directions.is_empty() {
-        return DirMessageLog(None)
-      }
-      let map : Map[String, @rpc.PeerName] = Map([])
-      for direction in directions {
-        guard direction.rev_find("=") is Some(at) &&
-          at > 0 &&
-          at < direction.length() - 1 else {
-          raise CliError(
-            "expected value=peer after --direction, found '\{direction}'",
-            2,
-          )
-        }
-        let name = direction[:at].to_owned()
-        if map.contains(name) {
-          raise CliError("--direction gives the value '\{name}' twice", 2)
-        }
-        map[name] = peer(direction[at + 1:].to_owned(), "--direction \{name}=")
-      }
-      DirMessageLog(Some(map))
-    }
-    (Some(other), None) =>
-      raise CliError(
-        "expected raw or dir-message after --log-preset, found '\{other}'",
-        2,
-      )
+  {
+    file,
+    format,
+    version,
+    completeness,
+    log,
+    expect: value("expect"),
+    legacy_errors,
   }
 }
 
@@ -275,6 +221,7 @@ fn run_transcript_validation(
   transcript : TranscriptOptions,
   assembled : @smithy.LoadResult,
 ) -> Int32 raise {
+  let expected = transcript.expect.map(read_expect_file)
   if !validation_model_ok(opts, assembled) {
     return 1
   }
@@ -284,7 +231,7 @@ fn run_transcript_validation(
       is Some(protocol) else {
       return 2
     }
-    return run_log_transcript(opts, transcript, protocol, log)
+    return run_log_transcript(opts, transcript, protocol, log, expected)
   }
   let text = try {
     if transcript.file == "-" {
@@ -302,6 +249,15 @@ fn run_transcript_validation(
     MarkdownTranscript => @rpc.read_markdown_transcript(text)
     _ => @rpc.read_json_transcript(text)
   }
+  let document = match (document.expect, expected) {
+    (Some(_), Some(_)) =>
+      raise CliError(
+        "--expect \{transcript.expect.unwrap()} and the expect list in \{transcript.file} both give expected findings; use only one",
+        2,
+      )
+    (None, Some(_)) => { ..document, expect: expected, }
+    _ => document
+  }
   guard transcript_version(
       transcript.version,
       document.version,
@@ -316,7 +272,7 @@ fn run_transcript_validation(
         opts,
         read_findings,
         None,
-        None,
+        expected.map(e => @rpc.match_expected(e, read_findings)),
         complete=false,
       )
     }
@@ -324,6 +280,9 @@ fn run_transcript_validation(
       "\{transcript.file} gives no JSON-RPC version; use --version 1.0 or --version 2.0",
       2,
     )
+  }
+  if transcript.legacy_errors is Some(_) {
+    require_legacy_version(version)
   }
   guard transcript_protocol(opts, assembled, version) is Some(protocol) else {
     return 2
@@ -333,6 +292,7 @@ fn run_transcript_validation(
     document,
     read_findings,
     completeness?=transcript.completeness,
+    legacy_errors=transcript.legacy_errors.unwrap_or(@rpc.Opaque),
   )
   print_transcript_report(
     opts,
@@ -341,6 +301,25 @@ fn run_transcript_validation(
     run.expectations,
     complete=run.summary.complete,
   )
+}
+
+///|
+/// Reads the --expect file. A file that I cannot read or that is not a valid
+/// expect list is a usage error.
+fn read_expect_file(
+  file : String,
+) -> Array[@rpc.ExpectedFinding] raise CliError {
+  let text = @fs.read_file_to_string(file) catch {
+    _ => raise CliError("could not read the --expect file \{file}", 2)
+  }
+  let (expected, problems) = @rpc.read_expected_findings(text)
+  if problems is [problem, ..] {
+    raise CliError(
+      "\{transcript_finding_place(file, problem)}: \{problem.message}",
+      2,
+    )
+  }
+  expected
 }
 
 ///|
@@ -389,195 +368,6 @@ fn transcript_protocol(
 }
 
 ///|
-/// Builds the log mapping of `choice`. Every peer it names must be a peer of
-/// the protocol.
-fn log_mapping(
-  choice : LogChoice,
-  protocol : @rpc.ProtocolDescription,
-) -> @rpc.LogMapping raise CliError {
-  let peers = protocol.peers()
-  let names = peers.map(p => p.to_string()).join(", ")
-  fn known(peer : @rpc.PeerName, option : String) -> Unit raise CliError {
-    if !peers.contains(peer) {
-      raise CliError(
-        "\{option} names \{peer.to_string()}, which is not a peer of \{protocol.protocol().to_string()} (\{names})",
-        2,
-      )
-    }
-  }
-
-  match choice {
-    RawLog(sender) => {
-      known(sender, "--sender")
-      @rpc.LogMapping::raw(sender)
-    }
-    DirMessageLog(None) =>
-      @rpc.LogMapping::dir_message({ "request": peers[0], "response": peers[1] })
-    DirMessageLog(Some(directions)) => {
-      for value, peer in directions {
-        known(peer, "--direction \{value}=")
-      }
-      @rpc.LogMapping::dir_message(directions)
-    }
-    MappingFile(file) => {
-      let text = @fs.read_file_to_string(file) catch {
-        _ => raise CliError("could not read the --log-mapping file \{file}", 2)
-      }
-      @rpc.LogMapping::from_json(text, peers) catch {
-        @validation.ConfigurationError(message) =>
-          raise CliError("\{file}: \{message}", 2)
-      }
-    }
-  }
-}
-
-///|
-/// Checks a JSONL log as it is read, and writes each finding when it is known:
-/// one line per finding, then a summary line. Stdin is read in chunks; a file
-/// is read whole.
-fn run_log_transcript(
-  opts : ValueOptions,
-  transcript : TranscriptOptions,
-  protocol : @rpc.ProtocolDescription,
-  choice : LogChoice,
-) -> Int32 raise {
-  let reader = @rpc.LogReader::new(log_mapping(choice, protocol))
-  // A log with one sender has no replies to correlate.
-  let checker = @rpc.TranscriptChecker::new(
-    protocol,
-    completeness=transcript.completeness.unwrap_or(@rpc.Partial),
-    correlation=!reader.single_sender(),
-  )
-  let output = FindingStream::new(opts)
-  let chunks = Utf8Chunks::new()
-  fn check(text : String) -> Unit raise {
-    output.write_all(check_lines(reader.push_text(text), checker))
-  }
-
-  if transcript.file == "-" {
-    read_stdin_chunks(bytes => check(chunks.push(bytes)))
-  } else {
-    let bytes = @fs.read_file_to_bytes(transcript.file) catch {
-      _ =>
-        return value_problem(
-          opts, "InputRead", "I could not read the JSON-RPC transcript input.", 1,
-        )
-    }
-    check(chunks.push(bytes))
-  }
-  check(chunks.end())
-  output.write_all(check_lines(reader.end(), checker))
-  let summary = checker.finish()
-  output.write_all(summary.findings)
-  output.finish(summary, reader.counts())
-}
-
-///|
-/// Feeds the entries that a reader gave for some lines to the checker, and
-/// gives the reader and checker findings in line order. A line has either an
-/// entry or a reader finding, so the order does not depend on chunk sizes.
-fn check_lines(
-  read : (Array[@rpc.TranscriptEntry], Array[@rpc.TranscriptFinding]),
-  checker : @rpc.TranscriptChecker,
-) -> Array[@rpc.TranscriptFinding] {
-  let (entries, problems) = read
-  fn line(location : @rpc.SourceLocation?) -> Int32 {
-    location.map(at => at.line).unwrap_or(0)
-  }
-
-  let out = []
-  let mut problem = 0
-  for entry in entries {
-    while problem < problems.length() &&
-          line(problems[problem].location) < line(entry.location) {
-      out.push(problems[problem])
-      problem += 1
-    }
-    out.append(checker.feed(entry))
-  }
-  out.append(problems[problem:].to_owned())
-  out
-}
-
-///|
-/// Writes streamed findings as they are known: text lines to stderr, or JSON
-/// Lines to stdout. Each line is flushed.
-priv struct FindingStream {
-  opts : ValueOptions
-  sink : OutputSink
-  mut errors : Bool
-}
-
-///|
-fn FindingStream::new(opts : ValueOptions) -> FindingStream raise {
-  let sink = if opts.diagnostics == JsonFindings {
-    output_sink(None)
-  } else {
-    stderr_sink()
-  }
-  { opts, sink, errors: false, }
-}
-
-///|
-fn FindingStream::line(self : FindingStream, text : String) -> Unit raise {
-  (self.sink.write)(@utf8.encode(text + "\n"))
-  (self.sink.flush)()
-}
-
-///|
-fn FindingStream::write_all(
-  self : FindingStream,
-  findings : Array[@rpc.TranscriptFinding],
-) -> Unit raise {
-  for finding in findings {
-    if finding.severity == @validation.Error {
-      self.errors = true
-    }
-    self.line(
-      if self.opts.diagnostics == JsonFindings {
-        @json.to_json(finding).stringify()
-      } else {
-        transcript_finding_text(self.opts.file, finding)
-      },
-    )
-  }
-}
-
-///|
-/// Writes the summary line with the reader counts, and gives the exit status:
-/// 0 when no finding is an error and no limit stopped a check.
-fn FindingStream::finish(
-  self : FindingStream,
-  summary : @rpc.TranscriptSummary,
-  counts : @rpc.LogCounts,
-) -> Int32 raise {
-  let valid = summary.complete && !self.errors
-  let fields : Array[(String, Json)] = [
-    ("valid", Json::boolean(valid)),
-    ("complete", Json::boolean(summary.complete)),
-    ("entries", Json::number(summary.entries.to_double())),
-    ("outstanding", Json::number(summary.outstanding.to_double())),
-    ("correlation", Json::boolean(summary.correlation)),
-    ("lines", Json::number(counts.lines.to_double())),
-    ("not_json", Json::number(counts.not_json.to_double())),
-    ("skipped", Json::number(counts.skipped.to_double())),
-  ]
-  if self.opts.diagnostics == JsonFindings {
-    self.line(
-      Json::object({ "summary": Json::object(Map::from_array(fields)) }).stringify(),
-    )
-  } else {
-    let text = fields.map(field => "\{field.0}:\{field.1.stringify()}")
-    self.line("\{self.opts.file}: summary: \{text.join(" ")}")
-  }
-  if valid {
-    0
-  } else {
-    1
-  }
-}
-
-///|
 /// Prints the findings and the expectation result, and gives the exit status:
 /// with an expect list, 0 when it matches; otherwise 0 when no finding is an
 /// error.
@@ -591,28 +381,12 @@ fn print_transcript_report(
   let valid = complete &&
     !findings.any(finding => finding.severity == @validation.Error)
   if opts.diagnostics == JsonFindings {
-    let report : Map[String, Json] = {
-      "valid": Json::boolean(valid),
-      "complete": Json::boolean(complete),
-      "entries": Json::number(
-        summary.map(s => s.entries).unwrap_or(0).to_double(),
-      ),
-      "outstanding": Json::number(
-        summary.map(s => s.outstanding).unwrap_or(0).to_double(),
-      ),
-      "correlation": Json::boolean(
-        summary.map(s => s.correlation).unwrap_or(true),
-      ),
-      "findings": Json::array(findings.map(finding => @json.to_json(finding))),
-    }
+    let report = Map::from_array(summary_fields(valid, complete, summary))
+    report["findings"] = Json::array(
+      findings.map(finding => @json.to_json(finding)),
+    )
     if expectations is Some(result) {
-      report["expectations"] = Json::object({
-        "matched": Json::boolean(result.is_match()),
-        "missing": Json::array(result.missing.map(expected_json)),
-        "unexpected": Json::array(
-          unexpected_errors(result).map(finding => @json.to_json(finding)),
-        ),
-      })
+      report["expectations"] = expectations_json(result)
     }
     println(Json::object(report).stringify())
   } else {
@@ -620,15 +394,8 @@ fn print_transcript_report(
       eprintln(transcript_finding_text(opts.file, finding))
     }
     if expectations is Some(result) {
-      for expected in result.missing {
-        eprintln(
-          "\{opts.file}: expect: I expected \{expected_text(expected)}; no finding matches it.",
-        )
-      }
-      for finding in unexpected_errors(result) {
-        eprintln(
-          "\{transcript_finding_place(opts.file, finding)}: expect: I did not expect error \{finding.code.to_string()}.",
-        )
+      for line in expectation_lines(opts.file, result) {
+        eprintln(line)
       }
     }
   }
@@ -641,6 +408,69 @@ fn print_transcript_report(
   } else {
     1
   }
+}
+
+///|
+/// The summary members of a transcript report, in report order. With no
+/// checker summary, because the document could not be read, the counts are 0
+/// and correlation is on. A JSONL log adds its reader `counts`.
+fn summary_fields(
+  valid : Bool,
+  complete : Bool,
+  summary : @rpc.TranscriptSummary?,
+  counts? : @rpc.LogCounts,
+) -> Array[(String, Json)] {
+  fn number(n : Int32) -> Json {
+    Json::number(n.to_double())
+  }
+
+  let fields = [
+    ("valid", Json::boolean(valid)),
+    ("complete", Json::boolean(complete)),
+    ("entries", number(summary.map(s => s.entries).unwrap_or(0))),
+    ("outstanding", number(summary.map(s => s.outstanding).unwrap_or(0))),
+    (
+      "correlation",
+      Json::boolean(summary.map(s => s.correlation).unwrap_or(true)),
+    ),
+  ]
+  if counts is Some(counts) {
+    fields.push(("lines", number(counts.lines)))
+    fields.push(("not_json", number(counts.not_json)))
+    fields.push(("skipped", number(counts.skipped)))
+  }
+  fields
+}
+
+///|
+/// The expectation match as JSON: whether it matched, the missing expected
+/// findings and the unexpected error findings.
+fn expectations_json(result : @rpc.ExpectationResult) -> Json {
+  Json::object({
+    "matched": Json::boolean(result.is_match()),
+    "missing": Json::array(result.missing.map(expected_json)),
+    "unexpected": Json::array(
+      unexpected_errors(result).map(finding => @json.to_json(finding)),
+    ),
+  })
+}
+
+///|
+/// The text lines of an expectation mismatch: one per missing expected
+/// finding and one per unexpected error finding.
+fn expectation_lines(
+  file : String,
+  result : @rpc.ExpectationResult,
+) -> Array[String] {
+  let lines = result.missing.map(expected => {
+    "\{file}: expect: I expected \{expected_text(expected)}; no finding matches it."
+  })
+  for finding in unexpected_errors(result) {
+    lines.push(
+      "\{transcript_finding_place(file, finding)}: expect: I did not expect error \{finding.code.to_string()}.",
+    )
+  }
+  lines
 }
 
 ///|

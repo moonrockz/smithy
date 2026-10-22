@@ -75,7 +75,7 @@ fn pooled_entry(choice : Int32, id : Int32) -> @rpc.TranscriptEntry {
 ///|
 /// One entry from a pool of lifecycle calls, notifications, cancellations and
 /// replies that move the session, advertise capabilities and answer cancelled
-/// calls.
+/// calls, alone and in batches.
 fn lifecycle_entry(choice : Int32, id : Int32) -> @rpc.TranscriptEntry {
   let id = pick(id, 4)
   let pool = [
@@ -98,6 +98,17 @@ fn lifecycle_entry(choice : Int32, id : Int32) -> @rpc.TranscriptEntry {
     ("host", notify("exit")),
     ("host", "[" + call(id, "ping") + "]"),
     ("extension", "[" + success(id, "null") + "]"),
+    ("host", "[" + call(id, "compile", params="{\"source\": \"x\"}") + "]"),
+    (
+      "host",
+      "[" +
+      call(id, "compile", params="{\"source\": \"x\"}") +
+      ", " +
+      cancel(id.to_string()) +
+      "]",
+    ),
+    ("host", "[" + cancel(id.to_string()) + "]"),
+    ("extension", "[" + failure(id, -32800) + "]"),
   ]
   let (sender, message) = pool[pick(choice, pool.length())]
   { sender: peer(sender), message, receiver: None, location: None, }
@@ -249,7 +260,7 @@ fn read_cut(
   Array[@rpc.TranscriptEntry],
   Array[@rpc.TranscriptFinding],
   @rpc.LogCounts,
-) {
+) raise {
   let reader = @rpc.LogReader::new(mapping, line_bytes~)
   let entries = []
   let findings = []

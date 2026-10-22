@@ -28,6 +28,12 @@ fn WasiBuffer::new() -> WasiBuffer raise {
 }
 
 ///|
+/// The data bytes after the 16-byte header that one WASI call copies.
+fn WasiBuffer::capacity(_ : WasiBuffer) -> Int32 {
+  8192
+}
+
+///|
 fn WasiBuffer::address(self : WasiBuffer) -> Int32 {
   self.0
 }

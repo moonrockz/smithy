@@ -1,71 +1,4 @@
 ///|
-/// A session state named by `jsonRpcSession`. It follows the PeerName rule.
-priv struct StateName {
-  text : String
-} derive(Eq)
-
-///|
-fn StateName::parse(text : String) -> StateName? {
-  if is_protocol_name(text) {
-    Some({ text, })
-  } else {
-    None
-  }
-}
-
-///|
-/// A capability that the successful result of a named call advertises.
-priv struct CapabilitySource {
-  name : String
-  method_ : MethodName
-  /// Into the result. The capability is advertised unless the value is
-  /// absent, null or false.
-  pointer : JsonPointer
-}
-
-///|
-/// How a method cancels a call: where its params hold the call ID, and the
-/// error code that the cancelled call may answer with.
-priv struct CancelRule {
-  /// The wire name of the ID member in named params.
-  wire_name : String
-  /// The position of the ID member in positional params.
-  position : Int32?
-  code : ErrorCode?
-}
-
-///|
-/// The order rules of one method, from `jsonRpcLifecycle` and `jsonRpcCancels`.
-priv struct MethodRule {
-  /// None means every state.
-  allowed : Array[StateName]?
-  on_call : StateName?
-  on_success : StateName?
-  on_error : StateName?
-  requires : Array[String]
-  cancels : CancelRule?
-}
-
-///|
-/// The prepared `jsonRpcSession` of a protocol.
-priv struct SessionRules {
-  /// The first state is the initial state.
-  states : Array[StateName]
-  sources : Array[CapabilitySource]
-  /// The rules of the methods each peer accepts, by receiving peer.
-  methods : Map[PeerName, Map[MethodName, MethodRule]]
-}
-
-///|
-fn SessionRules::rule(
-  self : SessionRules,
-  receiver : PeerName,
-  method_ : MethodName,
-) -> MethodRule? {
-  self.methods.get(receiver).bind(rules => rules.get(method_))
-}
-
-///|
 /// The session state of one transcript, shared by both peers. The cancelled
 /// calls are kept per sender, beside its active calls.
 priv struct SessionState {
@@ -74,11 +7,20 @@ priv struct SessionState {
   /// The entry that caused the last transition.
   mut transition : Int32?
   advertised : Set[String]
+  /// The entry of the last accepted call of each capability source, by
+  /// capability name.
+  source_calls : Map[String, Int32]
 }
 
 ///|
 fn SessionState::new(rules : SessionRules) -> SessionState {
-  { rules, state: rules.states[0], transition: None, advertised: Set([]), }
+  {
+    rules,
+    state: rules.states[0],
+    transition: None,
+    advertised: Set([]),
+    source_calls: Map([]),
+  }
 }
 
 ///|
@@ -103,20 +45,55 @@ fn request_method(value : Json) -> MethodName? {
 ///|
 /// Checks a request or notification from the step's sender to `receiver`
 /// against the session. It gives the method when the message is accepted, so
-/// that its reply can settle the session, and None when it is rejected or
-/// there is no session.
+/// that its reply can settle the session, and None when it is rejected, when
+/// the receiver does not model the method, or when there is no session.
+/// `batch` holds the reply keys of the request batch that the message is an
+/// element of. `call` is true when the checker tracks the message as a
+/// replyable call; only such a message can be the source call of a capability.
 fn TranscriptChecker::order_request(
   self : TranscriptChecker,
   step : Step,
   receiver : PeerName,
   value : Json,
+  batch~ : Set[CallKey]? = None,
+  call~ : Bool = false,
 ) -> MethodName? {
   guard self.session is Some(session) && request_method(value) is Some(method_) else {
     return None
   }
-  guard session.rules.rule(receiver, method_) is Some(rule) else {
-    return Some(method_)
+  // A method that the receiver does not model is an UnknownMethod finding
+  // already, so it applies no rule, no transition and no capability.
+  guard self.protocol.service_for(receiver) is Some(service) &&
+    service.methods.contains(method_) else {
+    return None
   }
+  if session.rules.rule(receiver, method_) is Some(rule) &&
+    !self.apply_rule(step, session, method_, rule, value, batch) {
+    return None
+  }
+  if call {
+    for source in session.rules.sources {
+      if source.method_ == method_ {
+        session.source_calls[source.name] = step.index
+      }
+    }
+  }
+  Some(method_)
+}
+
+///|
+/// Checks a message against the rule of its method, and applies the
+/// transition and the cancellation of an accepted message. It gives false
+/// when the message is rejected.
+fn TranscriptChecker::apply_rule(
+  self : TranscriptChecker,
+  step : Step,
+  session : SessionState,
+  method_ : MethodName,
+  rule : MethodRule,
+  value : Json,
+  batch : Set[CallKey]?,
+) -> Bool {
   let sender = step.entry.sender.to_string()
   let mut accepted = true
   if rule.allowed is Some(allowed) && !allowed.contains(session.state) {
@@ -128,45 +105,44 @@ fn TranscriptChecker::order_request(
       "I expected method \{method_.to_string()} only in \{render_states(allowed)}; entry \{step.index} from \{sender} sent it in state \{session.state.text}.",
     )
   }
-  for capability in rule.requires {
-    if !session.advertised.contains(capability) {
+  for source in rule.requires {
+    if !session.advertised.contains(source.name) {
       accepted = false
-      let source = session.rules.sources
-        .iter()
-        .find_first(s => s.name == capability)
-        .map(s => s.method_.to_string())
-        .unwrap_or("")
       self.report(
         step,
         CapabilityNotAdvertised,
-        [],
-        "I expected capability \{capability} to be advertised before method \{method_.to_string()}; entry \{step.index} from \{sender} sent it, and no \{source} result advertised it.",
+        session.source_calls.get(source.name).map(e => [e]).unwrap_or([]),
+        "I expected capability \{source.name} to be advertised before method \{method_.to_string()}; entry \{step.index} from \{sender} sent it, and no \{source.method_.to_string()} result advertised it.",
       )
     }
   }
   if !accepted {
-    return None
+    return false
   }
   if rule.on_call is Some(next) {
     session.state = next
     session.transition = Some(step.index)
   }
   if rule.cancels is Some(cancels) {
-    self.cancel(step, method_, cancels, value)
+    self.cancel(step, method_, cancels, value, batch)
   }
-  Some(method_)
+  true
 }
 
 ///|
 /// Marks the call that a cancellation names. The canceller cancels its own
-/// call; a call that is not active gives an advisory, because a cancellation
-/// may race the reply.
+/// call: an active call, or a call in an earlier pending request batch. A
+/// call that is not active gives an advisory, because a cancellation may race
+/// the reply. A null id names an active null-id call only, never a batch
+/// call. `batch` holds the reply keys of the request batch that the
+/// cancellation is an element of.
 fn TranscriptChecker::cancel(
   self : TranscriptChecker,
   step : Step,
   method_ : MethodName,
   rule : CancelRule,
   value : Json,
+  batch : Set[CallKey]?,
 ) -> Unit {
   guard value is Object(fields) else { return }
   let named = match fields.get("params") {
@@ -178,6 +154,14 @@ fn TranscriptChecker::cancel(
   guard named is Some(raw) else { return }
   let id = Present(@smithy.NodeValue::from_json(raw)) catch { _ => return }
   guard call_key(id) is Some(key) else { return }
+  // In a batch, the null key also answers each invalid element, so it does
+  // not name one call. A null-id cancellation never names a batch call.
+  let in_batch = key != Scalar(NullId)
+  // The receiver may process the elements of a batch in any order, so a
+  // cancellation of a call in the same batch proves nothing.
+  if in_batch && batch is Some(keys) && keys.contains(key) {
+    return
+  }
   let sender = step.entry.sender
   let state = self.state(sender)
   if state.active.contains(key) {
@@ -188,9 +172,12 @@ fn TranscriptChecker::cancel(
     }
     return
   }
-  // A call inside a pending batch is active, but its batch reply is checked
-  // as usual.
-  if state.batch_with(key) is Some(_) {
+  if in_batch && state.batch_with(key) is Some(pending) {
+    if rule.code is Some(code) {
+      // A batch holds the cancellations of its own calls only, so its keys
+      // bound them.
+      pending.cancelled[key] = code
+    }
     return
   }
   let (related, answered) = match state.answered.get(key) {
@@ -220,11 +207,13 @@ fn PeerState::release_cancel(self : PeerState, pending : Pending) -> ErrorCode? 
 
 ///|
 /// Drops the UnknownError finding about the error code of a reply when that
-/// code is the declared code of a cancelled call.
+/// code is the declared code of a cancelled call. `at` is the pointer of the
+/// reply inside a reply batch.
 fn excuse_cancelled(
   findings : Array[Finding],
   value : Json,
   excused : ErrorCode?,
+  at~ : String = "",
 ) -> Array[Finding] {
   guard excused is Some(code) &&
     value is Object(fields) &&
@@ -238,8 +227,34 @@ fn excuse_cancelled(
     return findings
   }
   findings.filter(f => {
-    !(f.code == UnknownError && f.path.pointer() == "/error/code")
+    !(f.code == UnknownError && f.path.pointer() == at + "/error/code")
   })
+}
+
+///|
+/// Drops the UnknownError findings about the error codes of the elements of a
+/// reply batch that answer cancelled calls of the batch. A cancellation
+/// excuses the first element that answers its call, and no other element.
+fn excuse_cancelled_batch(
+  findings : Array[Finding],
+  values : Array[Json],
+  cancelled : Map[CallKey, ErrorCode],
+) -> Array[Finding] {
+  if cancelled.is_empty() {
+    return findings
+  }
+  let used : Set[CallKey] = Set([])
+  let mut kept = findings
+  for index, element in values {
+    guard batch_id(read_id(element)) is Some(id) &&
+      !used.contains(Scalar(id)) &&
+      cancelled.get(Scalar(id)) is Some(code) else {
+      continue
+    }
+    used.add(Scalar(id))
+    kept = excuse_cancelled(kept, element, Some(code), at="/\{index}")
+  }
+  kept
 }
 
 ///|

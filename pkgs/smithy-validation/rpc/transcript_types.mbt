@@ -94,6 +94,24 @@ pub(all) struct TranscriptFinding {
 } derive(Eq, Debug)
 
 ///|
+/// An InvalidTranscript reader finding at a place in the transcript text.
+fn located_problem(
+  location : SourceLocation,
+  message : String,
+) -> TranscriptFinding {
+  {
+    code: InvalidTranscript,
+    severity: @validation.Error,
+    entry: None,
+    location: Some(location),
+    sender: None,
+    related: [],
+    finding: None,
+    message,
+  }
+}
+
+///|
 pub impl @json.ToJson for TranscriptFinding with fn to_json(self) {
   fn number(n : Int32) -> Json {
     Json::number(n.to_double())

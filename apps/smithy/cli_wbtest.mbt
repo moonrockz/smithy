@@ -622,3 +622,316 @@ test "UTF-8 split between stdin chunks decodes once" {
   assert_true(expected.contains("\u{FFFD}"))
   assert_true(expected.has_prefix("aé€😀\n"))
 }
+
+///|
+test "transcript CLI reads --expect and --legacy-errors" {
+  let base = [
+    "validate", "rpc", "transcript", "--protocol", "example.peers#EchoChat",
+  ]
+  let transcript = options(
+    base + ["--expect", "expected.json", "peers.smithy", "chat.json"],
+  ).transcript.unwrap()
+  assert_eq(transcript.expect, Some("expected.json"))
+  assert_true(transcript.legacy_errors is None)
+  // The document can give the version, so 1.0 is checked after it is read.
+  let transcript = options(
+    base + ["--legacy-errors", "code-message-data", "peers.smithy", "chat.json"],
+  ).transcript.unwrap()
+  assert_true(transcript.legacy_errors is Some(@rpc.CodeMessageData))
+  let transcript = options(
+    base +
+    [
+      "--legacy-errors", "opaque", "--version", "1.0", "peers.smithy", "chat.jsonl",
+    ],
+  ).transcript.unwrap()
+  assert_true(transcript.legacy_errors is Some(@rpc.Opaque))
+  for
+    args in [
+      ["--legacy-errors", "verbose", "peers.smithy", "chat.json"],
+      [
+        "--legacy-errors", "opaque", "--version", "2.0", "peers.smithy", "chat.json",
+      ],
+      [
+        "--legacy-errors", "code-message-data", "--version", "2.0", "peers.smithy",
+        "chat.jsonl",
+      ],
+    ] {
+    let message = try options(base + args) catch {
+      CliError(message, 2) => message
+      _ => "other error"
+    } noraise {
+      _ => "accepted"
+    }
+    assert_true(
+      message == "expected opaque or code-message-data after --legacy-errors" ||
+      message == "--legacy-errors requires version 1.0",
+      msg=args.join(" ") + ": " + message,
+    )
+  }
+}
+
+///|
+/// An input source over `chunks`, then end of input or `error`. It counts
+/// the reads and the closes.
+priv struct FakeInput {
+  chunks : Array[Bytes]
+  error : Error?
+  mut reads : Int32
+  mut closes : Int32
+}
+
+///|
+fn FakeInput::source(self : FakeInput) -> InputSource {
+  {
+    read: requested => {
+      assert_eq(requested, INPUT_CHUNK_BYTES)
+      let index = self.reads
+      self.reads += 1
+      if index < self.chunks.length() {
+        self.chunks[index]
+      } else if self.error is Some(error) {
+        raise error
+      } else {
+        b""
+      }
+    },
+    close: () => self.closes += 1,
+  }
+}
+
+///|
+test "read_chunks gives each chunk, closes once and returns a read error" {
+  let input = FakeInput::{
+    chunks: [b"ab", b"c"],
+    error: None,
+    reads: 0,
+    closes: 0,
+  }
+  let seen = []
+  assert_true(read_chunks(input.source(), chunk => seen.push(chunk)) is None)
+  assert_eq(seen, [b"ab", b"c"])
+  assert_eq(input.reads, 3)
+  assert_eq(input.closes, 1)
+  // A read error is given back after the chunks before it.
+  let input = FakeInput::{
+    chunks: [b"ab"],
+    error: Some(CliError("could not read stdin", 1)),
+    reads: 0,
+    closes: 0,
+  }
+  let seen = []
+  let failure = read_chunks(input.source(), chunk => seen.push(chunk))
+  assert_true(failure is Some(CliError("could not read stdin", 1)))
+  assert_eq(seen, [b"ab"])
+  assert_eq(input.closes, 1)
+  // An error of the consumer closes the source and propagates.
+  let input = FakeInput::{
+    chunks: [b"ab", b"c"],
+    error: None,
+    reads: 0,
+    closes: 0,
+  }
+  let raised = try
+    read_chunks(input.source(), _ => raise CliError("could not write", 1))
+  catch {
+    CliError("could not write", 1) => true
+    _ => false
+  } noraise {
+    _ => false
+  }
+  assert_true(raised)
+  assert_eq(input.reads, 1)
+  assert_eq(input.closes, 1)
+}
+
+///|
+fn link_protocol() -> @rpc.ProtocolDescription raise {
+  let source =
+    #|$version: "2"
+    #|namespace example
+    #|use smithy.rpc#jsonRpc
+    #|use smithy.rpc#jsonRpcProtocol
+    #|use smithy.rpc#method
+    #|@jsonRpcProtocol(versions: ["2.0"], peers: [
+    #|    { name: "client", accepts: Client }
+    #|    { name: "server", accepts: Server }
+    #|])
+    #|structure Link {}
+    #|@jsonRpc(versions: ["2.0"])
+    #|service Server { version: "1", operations: [Ping] }
+    #|@jsonRpc(versions: ["2.0"])
+    #|service Client { version: "1" }
+    #|@method(name: "ping", params: "named", nullResult: true)
+    #|operation Ping {}
+  let loaded = @rpc.loader().add_idl("link.smithy", source).assemble()
+  guard loaded.model is Some(model) else {
+    fail(loaded.diagnostics.map(d => d.message).join("\n"))
+  }
+  @rpc.ProtocolDescription::from_smithy(
+    model,
+    @smithy.ShapeId::parse("example#Link").unwrap(),
+    @rpc.V2_0,
+  )
+}
+
+///|
+/// Streams `input` as a dir-message log through a sink in memory, and gives
+/// the status, or the CliError raised, and the JSON Lines written.
+fn stream_lines(
+  input : FakeInput,
+  expected : Array[@rpc.ExpectedFinding]?,
+) -> (String, Array[Json]) raise {
+  let protocol = link_protocol()
+  let peers = protocol.peers()
+  let reader = @rpc.LogReader::new(
+    @rpc.LogMapping::dir_message({ "request": peers[0], "response": peers[1] }),
+  )
+  let checker = @rpc.TranscriptChecker::new(protocol)
+  let written : Array[Byte] = []
+  let sink : OutputSink = {
+    write: bytes => {
+      for byte in bytes {
+        written.push(byte)
+      }
+    },
+    flush: () => (),
+    close: () => (),
+    flush_records: true,
+  }
+  let opts : ValueOptions = {
+    target: protocol.protocol(),
+    file: "log.jsonl",
+    diagnostics: JsonFindings,
+    config: @validation.Config::new(),
+    input_format: JsonInput,
+    ion_index: None,
+  }
+  let status = try
+    stream_log(
+      input.source(),
+      reader,
+      checker,
+      FindingStream::new(opts, sink, expected),
+    )
+  catch {
+    CliError(message, code) => "raised \{code}: \{message}"
+    _ => "raised another error"
+  } noraise {
+    status => "status \{status}"
+  }
+  let text = @utf8.decode(Bytes::from_array(written))
+  let lines = []
+  for line in text.split("\n") {
+    if !line.is_empty() {
+      lines.push(@json.parse(line))
+    }
+  }
+  (status, lines)
+}
+
+///|
+test "a log mapping that the library rejects exits 2" {
+  let protocol = link_protocol()
+  let status = try log_mapping(DirMessageLog(Some({})), protocol) catch {
+    CliError(message, code) => "raised \{code}: \{message}"
+  } noraise {
+    _ => "accepted"
+  }
+  assert_eq(
+    status, "raised 2: --direction: I expected at least one dir value in the dir-message map; directions was empty.",
+  )
+}
+
+///|
+test "a read error part-way through a log still writes the summary" {
+  let unsolicited = b"{\"dir\":\"response\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":null}}\n{\"dir\":\"req"
+  let input = FakeInput::{
+    chunks: [unsolicited],
+    error: Some(CliError("could not read stdin", 1)),
+    reads: 0,
+    closes: 0,
+  }
+  let (status, lines) = stream_lines(input, None)
+  assert_eq(status, "raised 1: could not read stdin")
+  assert_eq(input.closes, 1)
+  guard lines
+    is [
+      { "code": "UnsolicitedResponse", "line": Number(1.0, ..), .. },
+      // The cut line that was read is not JSON.
+      {
+        "summary": {
+          "valid": False,
+          "lines": Number(2.0, ..),
+          "not_json": Number(1.0, ..),
+          ..
+        },
+        ..
+      },
+    ] else {
+    fail(
+      "expected the findings and then the summary: \{Json::array(lines).stringify()}",
+    )
+  }
+}
+
+///|
+test "a log matches --expect at the end and the status follows the match" {
+  let log = b"{\"dir\":\"response\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":null}}\n"
+  fn input() -> FakeInput {
+    { chunks: [log], error: None, reads: 0, closes: 0, }
+  }
+
+  let unsolicited = @rpc.ExpectedFinding::new(
+    "UnsolicitedResponse",
+    entry=Some(0),
+  ).unwrap()
+  let (status, lines) = stream_lines(input(), Some([unsolicited]))
+  assert_eq(status, "status 0")
+  guard lines
+    is [
+      { "code": "UnsolicitedResponse", .. },
+      {
+        "summary": {
+          "valid": False,
+          "expectations": {
+            "matched": True,
+            "missing": [],
+            "unexpected": [],
+            ..
+          },
+          ..
+        },
+        ..
+      },
+    ] else {
+    fail("expected a matched expectation: \{Json::array(lines).stringify()}")
+  }
+  let duplicate = @rpc.ExpectedFinding::new("DuplicateResponse").unwrap()
+  let (status, lines) = stream_lines(input(), Some([duplicate]))
+  assert_eq(status, "status 1")
+  guard lines
+    is [
+      _,
+      {
+        "summary": {
+          "expectations": {
+            "matched": False,
+            "missing": [{ "code": "DuplicateResponse", .. }],
+            "unexpected": [{ "code": "UnsolicitedResponse", .. }],
+            ..
+          },
+          ..
+        },
+        ..
+      },
+    ] else {
+    fail("expected a failed expectation: \{Json::array(lines).stringify()}")
+  }
+  // Without an expect list, the summary has no expectations.
+  let (status, lines) = stream_lines(input(), None)
+  assert_eq(status, "status 1")
+  guard lines is [_, { "summary": summary, .. }] && summary is Object(fields) else {
+    fail("expected a summary: \{Json::array(lines).stringify()}")
+  }
+  assert_false(fields.contains("expectations"))
+}

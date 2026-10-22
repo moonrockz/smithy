@@ -1,9 +1,17 @@
 ///|
+/// A 16-byte header for WASI call arguments, then 64 KiB of data, so one
+/// fd_read can fill a whole input chunk.
 struct WasiBuffer(Bytes)
 
 ///|
 fn WasiBuffer::new() -> WasiBuffer {
-  WasiBuffer(Bytes::make(8208, 0))
+  WasiBuffer(Bytes::make(16 + 65536, 0))
+}
+
+///|
+/// The data bytes after the header.
+fn WasiBuffer::capacity(_ : WasiBuffer) -> Int32 {
+  65536
 }
 
 ///|

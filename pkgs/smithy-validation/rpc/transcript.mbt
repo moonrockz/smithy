@@ -310,7 +310,7 @@ pub fn TranscriptChecker::feed(
     )
     return step.out
   }
-  let bytes = utf8_length(entry.message)
+  let bytes = @validation.utf8_length(entry.message)
   if bytes > self.limits.entry_bytes {
     self.report(
       step,
@@ -388,24 +388,6 @@ pub fn TranscriptChecker::feed_all(
 }
 
 ///|
-fn utf8_length(text : String) -> Int32 {
-  let mut bytes = 0
-  for c in text.iter() {
-    let n = c.to_int()
-    bytes += if n < 0x80 {
-      1
-    } else if n < 0x800 {
-      2
-    } else if n < 0x10000 {
-      3
-    } else {
-      4
-    }
-  }
-  bytes
-}
-
-///|
 /// A request or notification from the step's sender to `receiver`.
 fn TranscriptChecker::request(
   self : TranscriptChecker,
@@ -453,7 +435,10 @@ fn TranscriptChecker::request(
   if !self.correlation {
     return
   }
-  let method_ = self.order_request(step, receiver, value)
+  // A call applies the order rules only when the checker tracks it.
+  if !(class is Call(_, _)) {
+    self.order_request(step, receiver, value) |> ignore
+  }
   match class {
     Silent => ()
     LegacyNotification => {
@@ -464,7 +449,7 @@ fn TranscriptChecker::request(
       }
     }
     Unreadable => self.track_unreadable(step)
-    Call(key, id) => self.track_call(step, key, id, form, method_)
+    Call(key, id) => self.track_call(step, receiver, value, key, id, form)
   }
 }
 
@@ -517,13 +502,17 @@ fn classify_unchecked(version : ProtocolVersion, value : Json) -> RequestClass {
 }
 
 ///|
+/// Tracks a call from the step's sender to `receiver`. Only a tracked call is
+/// checked against the session, so a refused call causes no transition and no
+/// cancellation.
 fn TranscriptChecker::track_call(
   self : TranscriptChecker,
   step : Step,
+  receiver : PeerName,
+  value : Json,
   key : CallKey,
   id : RequestId,
   form : PendingForm,
-  method_ : MethodName?,
 ) -> Unit {
   let sender = step.entry.sender
   let state = self.state(sender)
@@ -545,6 +534,7 @@ fn TranscriptChecker::track_call(
           "I expected at most \{self.limits.active_calls} active calls from \{sender.to_string()}; I do not track the call at entry \{step.index} with \{render_id(id)}.",
         )
       } else {
+        let method_ = self.order_request(step, receiver, value, call=true)
         state.active[key] = {
           entry: step.index,
           text: step.entry.message,
@@ -614,6 +604,21 @@ fn TranscriptChecker::reply_service(
 }
 
 ///|
+/// The envelope findings of a reply, checked by `reply_service`. A borrowed
+/// service is not the responder's, so its findings name the protocol shape.
+fn TranscriptChecker::envelope_findings(
+  self : TranscriptChecker,
+  findings : Array[Finding],
+  borrowed : Bool,
+) -> Array[Finding] {
+  if borrowed {
+    findings.map(f => { ..f, shape: self.protocol.protocol(), operation: None, })
+  } else {
+    findings
+  }
+}
+
+///|
 fn read_id(value : Json) -> RequestId {
   guard value is Object(fields) && fields.get("id") is Some(raw) else {
     return Absent
@@ -640,16 +645,7 @@ fn TranscriptChecker::reply(
         context=Some(EnvelopeOnly),
         legacy_errors=self.legacy_errors,
       )
-      let findings = if borrowed {
-        result.findings.map(f => {
-          ..f,
-          shape: self.protocol.protocol(),
-          operation: None,
-        })
-      } else {
-        result.findings
-      }
-      (findings, result.id)
+      (self.envelope_findings(result.findings, borrowed), result.id)
     }
     None => ([], read_id(value))
   }

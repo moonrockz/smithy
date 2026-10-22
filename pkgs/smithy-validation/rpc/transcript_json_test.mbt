@@ -110,6 +110,49 @@ test "malformed documents give located findings" {
 }
 
 ///|
+test "an expect file is a located array of expected findings" {
+  let (items, problems) = @rpc.read_expected_findings(
+    "\u{FEFF}\n[{\"code\": \"MissingResponse\", \"entry\": 0}, {\"code\": \"InvalidId\", \"related\": 1, \"entry\": null}]\n",
+  )
+  assert_eq(problems, [])
+  assert_eq(items, [
+    expected("MissingResponse", entry=Some(0)),
+    expected("InvalidId", related=Some(1)),
+  ])
+  let (empty, problems) = @rpc.read_expected_findings("[]")
+  assert_eq(empty, [])
+  assert_eq(problems, [])
+  // The item rules are those of the document reader's expect member.
+  for
+    (text, line, column) in [
+      ("", 1, 1),
+      ("  \n", 2, 1),
+      ("{\"code\": \"MissingResponse\"}", 1, 1),
+      ("[{\"code\": \"Nope\"}]", 1, 2),
+      ("[\n {\"code\": \"InvalidId\", \"entry\": -1}]", 2, 2),
+      ("[{\"entry\": 1}]", 1, 2),
+      ("[7]", 1, 2),
+      ("[] []", 1, 4),
+      ("[{\"code\": \"InvalidId\"}", 1, 1),
+    ] {
+    let (items, problems) = @rpc.read_expected_findings(text)
+    assert_eq(items, [], msg=text)
+    guard problems is [problem] else { fail("expected one problem: \{text}") }
+    assert_eq(problem.code, InvalidTranscript, msg=text)
+    assert_eq(problem.severity, @validation.Error, msg=text)
+    assert_eq(problem.location, Some({ line, column, }), msg=text)
+  }
+  let (_, problems) = @rpc.read_expected_findings("{}")
+  assert_eq(problems.map(p => p.message), [
+    "I expected an array of expected findings, and I found '{'.",
+  ])
+  let (_, problems) = @rpc.read_expected_findings("")
+  assert_eq(problems.map(p => p.message), [
+    "I expected an array of expected findings, and I found an empty document.",
+  ])
+}
+
+///|
 fn feed_document(
   text : String,
   protocol : @rpc.ProtocolDescription,

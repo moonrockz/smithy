@@ -7,15 +7,10 @@ pub(all) suberror ValueInputError {
 } derive(Debug)
 
 ///|
-priv struct JsonContainer {
-  object_ : Bool
-  keys : Set[String]
-  mut expect_key : Bool
-}
-
-///|
-/// Parse one bounded JSON value, rejecting duplicate decoded object names.
-pub fn parse_json_value(text : String) -> Json raise ValueInputError {
+/// The UTF-8 length of `text`. A surrogate pair counts 4 bytes, and a lone
+/// surrogate counts 3, the length of its replacement character.
+#internal(internal, "a helper of the smithy-validation packages")
+pub fn utf8_length(text : StringView) -> Int32 {
   let mut bytes = 0
   for c in text.iter() {
     let n = c.to_int()
@@ -28,9 +23,22 @@ pub fn parse_json_value(text : String) -> Json raise ValueInputError {
     } else {
       4
     }
-    if bytes > 16777216 {
-      raise JsonInputLimit(0, "I expected at most 16 MiB of UTF-8 JSON input.")
-    }
+  }
+  bytes
+}
+
+///|
+priv struct JsonContainer {
+  object_ : Bool
+  keys : Set[String]
+  mut expect_key : Bool
+}
+
+///|
+/// Parse one bounded JSON value, rejecting duplicate decoded object names.
+pub fn parse_json_value(text : String) -> Json raise ValueInputError {
+  if utf8_length(text) > 16777216 {
+    raise JsonInputLimit(0, "I expected at most 16 MiB of UTF-8 JSON input.")
   }
   let stack : Array[JsonContainer] = []
   let mut i = 0

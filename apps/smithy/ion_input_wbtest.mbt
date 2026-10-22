@@ -2,7 +2,7 @@
 test "Ion input stops after the first excess byte and closes the source" {
   let mut consumed = 0
   let mut closes = 0
-  let source : IonInputSource = {
+  let source : InputSource = {
     read: requested => {
       let count = Int32::min(requested, 100 - consumed)
       consumed += count
@@ -25,7 +25,7 @@ test "Ion input stops after the first excess byte and closes the source" {
 ///|
 test "Ion input preserves read errors and closes the source" {
   let mut closes = 0
-  let source : IonInputSource = {
+  let source : InputSource = {
     read: _ => raise CliError("read failed", 1),
     close: () => {
       closes += 1
@@ -47,7 +47,7 @@ test "Ion input preserves read errors and closes the source" {
 test "Ion input accepts an exact limit and closes after EOF" {
   let mut reads = 0
   let mut closes = 0
-  let source : IonInputSource = {
+  let source : InputSource = {
     read: requested => {
       reads += 1
       if reads == 1 {
@@ -69,7 +69,7 @@ test "Ion input accepts an exact limit and closes after EOF" {
 test "Ion input rejects the first byte at a zero limit" {
   let mut reads = 0
   let mut closes = 0
-  let source : IonInputSource = {
+  let source : InputSource = {
     read: requested => {
       assert_eq(requested, 1)
       reads += 1
@@ -92,7 +92,7 @@ test "Ion input rejects the first byte at a zero limit" {
 ///|
 test "Ion input reports close errors without closing twice" {
   let mut closes = 0
-  let source : IonInputSource = {
+  let source : InputSource = {
     read: _ => b"",
     close: () => {
       closes += 1

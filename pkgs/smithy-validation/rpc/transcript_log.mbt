@@ -243,10 +243,16 @@ pub fn LogMapping::raw(sender : PeerName) -> LogMapping {
 
 ///|
 /// The `dir-message` preset: `{"dir": ..., "message": ...}` records, with
-/// `directions` mapping each `dir` value to its sender.
+/// `directions` mapping each `dir` value to its sender. Raises when
+/// `directions` is empty.
 pub fn LogMapping::dir_message(
   directions : Map[String, PeerName],
-) -> LogMapping {
+) -> LogMapping raise @validation.ConfigurationError {
+  if directions.is_empty() {
+    raise @validation.ConfigurationError(
+      "I expected at least one dir value in the dir-message map; directions was empty.",
+    )
+  }
   let dir = JsonPointer::name("dir")
   {
     prefix: NoPrefix,
@@ -394,7 +400,7 @@ pub struct LogCounts {
 
 ///|
 /// Turns log text, given in chunks of any size, into transcript entries. It
-/// does no I/O and never raises: problems are InvalidTranscript findings with
+/// does no I/O and never raises on its input: problems are InvalidTranscript findings with
 /// a location, and the line with a problem is dropped. Memory is bounded by
 /// `line_bytes`.
 pub struct LogReader {
@@ -404,6 +410,8 @@ pub struct LogReader {
   priv pending : StringBuilder
   priv mut pending_bytes : Int32
   priv mut pending_cr : Bool
+  /// The line being assembled ends with the first half of a surrogate pair.
+  priv mut pending_lead : Bool
   priv mut has_pending : Bool
   /// The line being assembled is over the limit; it is skipped to its end.
   priv mut overlong : Bool
@@ -417,21 +425,23 @@ pub struct LogReader {
 
 ///|
 /// `line_bytes` is the most UTF-8 bytes a line may have, without its line
-/// ending; a value below 1 counts as 1.
+/// ending. Raises when it is below 1.
 pub fn LogReader::new(
   mapping : LogMapping,
   line_bytes~ : Int32 = DEFAULT_LINE_BYTES,
-) -> LogReader {
+) -> LogReader raise @validation.ConfigurationError {
+  if line_bytes < 1 {
+    raise @validation.ConfigurationError(
+      "I expected a positive log line limit; line_bytes was \{line_bytes}.",
+    )
+  }
   {
     mapping,
-    line_bytes: if line_bytes < 1 {
-      1
-    } else {
-      line_bytes
-    },
+    line_bytes,
     pending: StringBuilder(),
     pending_bytes: 0,
     pending_cr: false,
+    pending_lead: false,
     has_pending: false,
     overlong: false,
     started: false,
@@ -458,21 +468,6 @@ pub fn LogReader::counts(self : LogReader) -> LogCounts {
     not_json: self.not_json,
     skipped: self.skipped,
     entries: self.entries,
-  }
-}
-
-///|
-/// UTF-8 bytes for one UTF-16 code unit; a surrogate pair counts 4.
-fn utf8_unit_bytes(unit : UInt16) -> Int32 {
-  let n = unit.to_int()
-  if n < 0x80 {
-    1
-  } else if n < 0x800 {
-    2
-  } else if n >= 0xD800 && n <= 0xDFFF {
-    2
-  } else {
-    3
   }
 }
 
@@ -548,9 +543,13 @@ fn LogReader::take(
   if self.overlong {
     return
   }
-  for i in start..<end {
-    self.pending_bytes += utf8_unit_bytes(chunk[i])
+  self.pending_bytes += @validation.utf8_length(chunk[start:end])
+  // A surrogate pair split between chunks counts 3 bytes for each half; the
+  // pair has 4.
+  if self.pending_lead && chunk[start].is_trailing_surrogate() {
+    self.pending_bytes -= 2
   }
+  self.pending_lead = chunk[end - 1].is_leading_surrogate()
   self.pending_cr = chunk[end - 1] == '\r'
   // A final carriage return can still be part of a CRLF line ending.
   let content = self.pending_bytes - (if self.pending_cr { 1 } else { 0 })
@@ -559,8 +558,7 @@ fn LogReader::take(
     self.pending.reset()
     findings.push(
       located_problem(
-        self.lines + 1,
-        1,
+        { line: self.lines + 1, column: 1, },
         "I expected a log line of at most \{self.line_bytes} bytes, and I found more on line \{self.lines + 1}; I skipped the line.",
       ),
     )
@@ -582,6 +580,7 @@ fn LogReader::finish_line(
   self.pending.reset()
   self.pending_bytes = 0
   self.pending_cr = false
+  self.pending_lead = false
   self.has_pending = false
   self.overlong = false
   if !overlong {
@@ -699,7 +698,9 @@ fn LogReader::read_line(
     return
   }
   fn problem(at : Int32, message : String) -> Unit {
-    findings.push(located_problem(line, at + 1, message + " on line \{line}."))
+    findings.push(
+      located_problem({ line, column: at + 1, }, message + " on line \{line}."),
+    )
   }
 
   fn source(span : Span) -> String {

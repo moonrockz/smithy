@@ -211,13 +211,19 @@ test "a peer may accept nothing" {
 }
 
 ///|
+/// Fails unless the protocol is rejected as an invalid contract, with a
+/// message that has `mentions` when it is given.
 fn expect_invalid(
   source : String,
   version : @rpc.ProtocolVersion,
+  mentions? : String,
 ) -> Unit raise {
   let model = load(source)
   try describe(model, "t#P", version) catch {
-    @rpc.InvalidContract(_, _) => ()
+    @rpc.InvalidContract(_, message) =>
+      if mentions is Some(word) && !message.contains(word) {
+        fail("I expected a message with \{word}; I found \{message}")
+      }
     e => fail("unexpected error: \{e}")
   } noraise {
     _ => fail("I expected the protocol to be rejected.")

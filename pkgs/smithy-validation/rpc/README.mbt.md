@@ -326,21 +326,35 @@ order: initialize first, then shutdown, then exit.
 - `@jsonRpcCancels(idMember, code)` on an operation names the input member that holds the ID of the
   call to cancel, and the error code that the cancelled call may answer with.
 
-One session state is shared by both peers. A request or notification whose method is not allowed in
-the current state is a `StateViolation` error; `related` names the entry of the last transition. A
-method whose required capability no result advertised is a `CapabilityNotAdvertised` error. A rejected
-message causes no transition, and its reply moves the session nowhere, but its call is still
-correlated. A cancellation names an active call of its own sender. If that call is not active, the
-cancellation is a `CancelInactiveCall` advisory, because a cancellation can race the reply. The reply
-of a cancelled call may use the declared code: the checker drops the `UnknownError` finding for that
-code on that call. In a request batch, the checker checks the elements in array order, and a reply
-batch settles each answered call. A cancellation does not excuse the code of a call inside a batch.
+One session state is shared by both peers. The rules apply only to a method that the receiving peer
+models; a request that the receiver does not model is an `UnknownMethod` finding, and it takes no
+transition and advertises nothing. A request or notification whose method is not allowed in the
+current state is a `StateViolation` error; `related` names the entry of the last transition. A method
+whose required capability no result advertised is a `CapabilityNotAdvertised` error; `related` names
+the last accepted call of the capability source, when there is one. A rejected message causes no
+transition, and its reply moves the session nowhere, but its call is still correlated. A call that
+correlation refuses with `ActiveIdReused` or `ActiveCallLimit` is not checked against the session:
+it takes no transition and cancels nothing. The same holds for each element of a refused request
+batch. In a request batch, the checker checks the elements in array order, and a reply batch settles
+each answered call.
+
+A cancellation names a call of its own sender: an active call, or a call in an earlier pending
+request batch. If that call is not active, the cancellation is a `CancelInactiveCall` advisory,
+because a cancellation can race the reply. A cancellation that names a call in its own request batch
+gives no finding and excuses nothing, because the receiver may process the elements in any order. A
+null ID never names a batch call, because in a batch it also answers each invalid element, so a
+null-id cancellation names only an active null-id single call; otherwise it is the advisory. The
+reply of a cancelled call may use the declared code: the checker drops the `UnknownError` finding for
+that code on that reply. In a reply batch, only the first element is
+excused.
 
 `from_smithy` checks the traits: a state that the session does not declare, an unknown capability, a
 capability method that no peer accepts, an invalid pointer and an `idMember` that is not an input
 member are `InvalidContract`. The session holds only the state, the advertised capability names, the
-entry of the last transition and the cancelled calls, which are always active calls, so
-`active_calls` bounds them. With `correlation=false` the checker does no order checks.
+entry of the last call of each capability source, the entry of the last transition and the cancelled
+calls. A cancelled single call is always an active call, so `active_calls` bounds them; a cancelled
+batch call stays in its pending batch, whose keys bound it. With `correlation=false` the checker does
+no order checks.
 
 ```mbt check
 ///|
@@ -407,7 +421,9 @@ entry with a problem is dropped. An object without `entries`, or with a second `
 an unknown top-level key is an advisory, so it never fails a valid document. It does not know the protocol, so a peer name that the protocol
 lacks is reported by the checker as `UnknownPeer`.
 
-`expect` lists `{code, entry?, related?}` items. `match_expected` pairs each item with one distinct
+`expect` lists `{code, entry?, related?}` items. `read_expected_findings` reads the same items from a
+standalone JSON array, such as the CLI's `--expect` file, with the same rules; a problem gives no items
+and one located `InvalidTranscript` finding. `match_expected` pairs each item with one distinct
 finding of the same code name (`to_string`), entry and related entry. `ExpectationResult::is_match`
 holds when no item is missing and every unlisted finding is an advisory.
 
@@ -426,6 +442,7 @@ An unterminated `jsonrpc` fence is reported at its opening line.
 `run_transcript` checks a document that a reader produced: it runs the `TranscriptChecker` over the
 entries, puts the reader findings first, and returns the findings, the summary and, for an `expect`
 list, the `ExpectationResult`. A completeness argument overrides the document; the default is `Partial`.
+`legacy_errors` selects the 1.0 error mapping, as for `TranscriptChecker::new`; the default is `Opaque`.
 
 ## JSONL logs
 
@@ -448,7 +465,7 @@ line becomes an entry:
 Paths are JSON Pointers. `LogMapping::new` raises `ConfigurationError` for an invalid pointer, a
 negative field count or an empty sender map. `LogMapping::raw(sender)` is the `raw` preset, and
 `LogMapping::dir_message(directions)` is the `dir-message` preset for `{"dir": ..., "message": ...}`
-records. `LogMapping::from_json(text, peers)` reads the same mapping from JSON, for example
+records; it raises `ConfigurationError` for an empty map. `LogMapping::from_json(text, peers)` reads the same mapping from JSON, for example
 `examples/json-rpc/transcripts/mcp-like.mapping.json`:
 
 ```json
@@ -468,7 +485,7 @@ peer name must be one of `peers`, and an unknown key raises.
 Lines that are blank or not JSON after the prefix, such as plain text and copied `Content-Length`
 headers, and records that the selector rejects are only counted in `counts()`. A record nested
 deeper than 128 levels, the depth limit of the message validator, counts as not JSON. A line longer than
-`line_bytes` (1 MiB of UTF-8 by default), a sender value that the map lacks and a missing message
+`line_bytes` (1 MiB of UTF-8 by default; `LogReader::new` raises `ConfigurationError` below 1), a sender value that the map lacks and a missing message
 field are `InvalidTranscript` findings at the line and column, and the line is dropped. An entry's
 location is its line and the column where its message starts. The reader leaves `receiver` as
 `None`. `single_sender()` is true for a `Fixed` sender: such a log has one direction, so check it
@@ -566,12 +583,17 @@ log needs `--version`, and `--log-preset raw --sender <peer>`, `--log-preset dir
 with repeatable `--direction value=peer`) or `--log-mapping <file.json>` (the `LogMapping::from_json`
 form). The command feeds each chunk through `LogReader` and `TranscriptChecker` and writes each finding
 when it is known; with `--diagnostics json` the output is JSON Lines, one finding per line and then a
-`{"summary": {...}}` line with the reader counts. A raw log turns correlation off. The js and wasm-gc
-binaries read all of stdin first. Text findings go to stderr as
+`{"summary": {...}}` line with the reader counts. A raw log turns correlation off. The native and WASI
+binaries read a log file or stdin in 64 KiB chunks as it arrives; the js and wasm-gc binaries read all
+of the input first. `--expect <file.json>` reads expected findings with `read_expected_findings` for
+any input format; it conflicts with an `expect` list in the document (exit 2). For a log, the match runs
+at the end and the summary line gets `expectations`. `--legacy-errors opaque|code-message-data`
+passes the 1.0 error mapping to `run_transcript` or `TranscriptChecker::new`, and requires version
+1.0. Text findings go to stderr as
 `<file>:<line>:<column>: entry <n> <sender>: <severity> <code>: <message>`. JSON diagnostics are one
 report with `valid`, `complete`, `entries`, `outstanding`, `correlation`, `findings` and, for an
 `expect` list, `expectations` (`matched`, `missing`, `unexpected`). The command exits 0 when no
-finding is an error, or when the findings match the `expect` list, and 1 otherwise. A malformed
+finding is an error, or when the findings match the `expect` list or `--expect`, and 1 otherwise. A malformed
 transcript is an `InvalidTranscript` finding (exit 1). Invalid usage, a missing or conflicting version
 and an invalid protocol exit 2.
 

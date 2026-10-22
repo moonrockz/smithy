@@ -294,24 +294,6 @@ fn source_location(text : String, at : Int32) -> SourceLocation {
 }
 
 ///|
-fn invalid_document(
-  locator : Locator,
-  at : Int32,
-  message : String,
-) -> TranscriptFinding {
-  {
-    code: InvalidTranscript,
-    severity: @validation.Error,
-    entry: None,
-    location: Some(locator.locate(at)),
-    sender: None,
-    related: [],
-    finding: None,
-    message,
-  }
-}
-
-///|
 fn parse_span(text : String, span : Span) -> Json raise JsonDocumentError {
   parse_bounded_json(text[span.start:span.end]) catch {
     _ =>
@@ -436,6 +418,43 @@ fn read_expected(
 }
 
 ///|
+/// The offset of the document's value: after a byte order mark and blanks.
+fn document_start(text : String) -> Int32 {
+  skip_blank(
+    text,
+    if text.length() > 0 && text[0] == '\u{FEFF}' {
+      1
+    } else {
+      0
+    },
+  )
+}
+
+///|
+/// The end of the one value that starts at `start` and fills the rest of the
+/// document. `what` names the value that an empty document lacks.
+fn document_end(
+  text : String,
+  start : Int32,
+  what : String,
+) -> Int32 raise JsonDocumentError {
+  if start >= text.length() {
+    raise Problem(("I expected \{what}, and I found an empty document.", start))
+  }
+  let end = skip_value(text, start)
+  let tail = skip_blank(text, end)
+  if tail < text.length() {
+    raise Problem(
+      (
+        "I expected the end of the document, and I found \{describe_unit(text, tail)}.",
+        tail,
+      ),
+    )
+  }
+  end
+}
+
+///|
 /// Reads a transcript document: an object with one `entries` member and
 /// optional `version`, `complete` and `expect`, or a bare array of entries. An
 /// unknown member of the object gives an advisory. Each
@@ -450,17 +469,10 @@ pub fn read_json_transcript(
   let locator = Locator::new(text)
   fn problem(error : JsonDocumentError) -> Unit {
     let Problem((message, at)) = error
-    findings.push(invalid_document(locator, at, message))
+    findings.push(located_problem(locator.locate(at), message))
   }
 
-  let start = skip_blank(
-    text,
-    if text.length() > 0 && text[0] == '\u{FEFF}' {
-      1
-    } else {
-      0
-    },
-  )
+  let start = document_start(text)
   let mut version : ProtocolVersion? = None
   let mut completeness : Completeness? = None
   let mut expect : Array[ExpectedFinding]? = None
@@ -480,21 +492,7 @@ pub fn read_json_transcript(
   }
 
   try {
-    if start >= text.length() {
-      raise Problem(
-        ("I expected a transcript, and I found an empty document.", start),
-      )
-    }
-    let end = skip_value(text, start)
-    let tail = skip_blank(text, end)
-    if tail < text.length() {
-      raise Problem(
-        (
-          "I expected the end of the document, and I found \{describe_unit(text, tail)}.",
-          tail,
-        ),
-      )
-    }
+    let end = document_end(text, start, "a transcript")
     if text[start] == '[' {
       read_entries({ start, end, })
     } else {
@@ -576,9 +574,8 @@ pub fn read_json_transcript(
             }
             _ =>
               findings.push({
-                ..invalid_document(
-                  locator,
-                  at,
+                ..located_problem(
+                  locator.locate(at),
                   "I do not know the transcript member \"\{key}\"; I ignored it.",
                 ),
                 severity: @validation.Advisory,
@@ -601,4 +598,32 @@ pub fn read_json_transcript(
     error => problem(error)
   }
   ({ version, completeness, entries, expect, }, findings)
+}
+
+///|
+/// Reads an expect list given apart from a transcript, such as the CLI's
+/// `--expect` file: a JSON array of `{"code", "entry"?, "related"?}` items,
+/// with the item rules of the `expect` member of `read_json_transcript`. It
+/// never raises. A problem gives no items and one located InvalidTranscript
+/// finding.
+pub fn read_expected_findings(
+  text : String,
+) -> (Array[ExpectedFinding], Array[TranscriptFinding]) {
+  let start = document_start(text)
+  let what = "an array of expected findings"
+  try {
+    let end = document_end(text, start, what)
+    if text[start] != '[' {
+      raise Problem(
+        (
+          "I expected \{what}, and I found \{describe_unit(text, start)}.",
+          start,
+        ),
+      )
+    }
+    (read_expected(text, { start, end, }), [])
+  } catch {
+    Problem((message, at)) =>
+      ([], [located_problem(source_location(text, at), message)])
+  }
 }

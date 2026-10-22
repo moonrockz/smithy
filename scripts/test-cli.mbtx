@@ -892,6 +892,12 @@ async fn exercise_rpc_transcripts(runner : Runner, root : String, skip_stdin : B
   // A document with an error finding and no version still exits 1.
   @fs.write_file(runner.dir + "/noversion-error.json", "{\"entries\":[{\"from\":\"client\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"shutdown\"}}],\"entries\":[]}")
   runner.command(editor + ["noversion-error.json"], 1) |> ignore
+  // A malformed document without a version follows --expect: a match exits 0, a mismatch exits 1.
+  @fs.write_file(runner.dir + "/broken.json", "{\"entries\":[")
+  @fs.write_file(runner.dir + "/broken-match.expect.json", "[{\"code\":\"InvalidTranscript\"}]")
+  @fs.write_file(runner.dir + "/broken-miss.expect.json", "[{\"code\":\"WrongResponder\"}]")
+  runner.command(editor + ["broken.json", "--expect", "broken-match.expect.json"], 0) |> ignore
+  runner.command(editor + ["broken.json", "--expect", "broken-miss.expect.json"], 1) |> ignore
   // Markdown without a version behaves the same way.
   @fs.write_file(runner.dir + "/noversion.md", "# Chat\n\n```jsonrpc client -> server\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"shutdown\"}\n```\n")
   let (out, stderr) = runner.command(editor + ["noversion.md"], 2)
@@ -903,6 +909,41 @@ async fn exercise_rpc_transcripts(runner : Runner, root : String, skip_stdin : B
   guard @json.parse(out) is { "expectations": { "matched": False, "missing": [{ "code": String(missing), .. }], "unexpected": [{ "code": String(unexpected), .. }], .. }, .. } else { fail("Expected a failed expectation: \{out}") }
   assert_eq(missing, "WrongResponder")
   assert_eq(unexpected, "UnsolicitedResponse")
+  // --expect gives the expected findings of a document without an expect list.
+  @fs.write_file(runner.dir + "/unsolicited.expect.json", "[{\"code\":\"UnsolicitedResponse\",\"entry\":0}]")
+  let (out, _) = runner.command(editor + ["unsolicited.json", "--expect", "unsolicited.expect.json", "--diagnostics", "json"], 0)
+  guard @json.parse(out) is { "valid": False, "expectations": { "matched": True, .. }, .. } else { fail("Expected a matched --expect: \{out}") }
+  @fs.write_file(runner.dir + "/wrong.expect.json", "[{\"code\":\"WrongResponder\"}]")
+  let (out, stderr) = runner.command(editor + ["unsolicited.json", "--expect", "wrong.expect.json"], 1)
+  let err = if runner.target == "wasm-gc" { out + stderr } else { stderr }
+  assert_true(err.contains("unsolicited.json: expect: I expected WrongResponder; no finding matches it."), msg=err)
+  // --expect and an expect list in the document conflict; a malformed or missing expect file is a usage error.
+  let (out, stderr) = runner.command(editor + ["mismatch.json", "--expect", "unsolicited.expect.json"], 2)
+  let err = if runner.target == "wasm-gc" { out + stderr } else { stderr }
+  assert_true(err.contains("--expect unsolicited.expect.json and the expect list in mismatch.json"), msg=err)
+  @fs.write_file(runner.dir + "/bad.expect.json", "[{\"code\":\"Nope\"}]")
+  let (out, stderr) = runner.command(editor + ["unsolicited.json", "--expect", "bad.expect.json"], 2)
+  let err = if runner.target == "wasm-gc" { out + stderr } else { stderr }
+  assert_true(err.contains("bad.expect.json:1:2: I do not know the finding code \"Nope\""), msg=err)
+  runner.command(editor + ["unsolicited.json", "--expect", "missing.expect.json"], 2) |> ignore
+  // --legacy-errors code-message-data checks 1.0 application errors, which are opaque by default.
+  let chat = ["validate", "rpc", "transcript", "--protocol", "example.peers#EchoChat", "peers.smithy", "legacy.json", "--diagnostics", "json"]
+  let mapped = chat + ["--legacy-errors", "code-message-data"]
+  for (error, status) in [("{\"code\":-32603,\"message\":\"Internal error\"}", 0), ("{\"code\":7,\"message\":\"failed\"}", 1)] {
+    @fs.write_file(runner.dir + "/legacy.json", "{\"version\":\"1.0\",\"entries\":[{\"from\":\"client\",\"message\":{\"method\":\"echo\",\"params\":[\"hi\"],\"id\":1}},{\"from\":\"server\",\"message\":{\"result\":null,\"error\":" + error + ",\"id\":1}}]}")
+    let (out, _) = runner.command(chat, 0)
+    guard @json.parse(out) is { "findings": [{ "code": "LimitedScope", "severity": "advisory", .. }], .. } else { fail("Expected an opaque legacy error: \{out}") }
+    let (out, _) = runner.command(mapped, status)
+    if status == 0 {
+      guard @json.parse(out) is { "findings": [], .. } else { fail("Expected a checked legacy error: \{out}") }
+    } else {
+      guard @json.parse(out) is { "findings": [{ "code": "UnknownError", .. }], .. } else { fail("Expected an unmodeled legacy error: \{out}") }
+    }
+  }
+  // --legacy-errors needs version 1.0, from the flag or from the document.
+  for args in [["unsolicited.json", "--legacy-errors", "opaque"], ["unsolicited.json", "--version", "2.0", "--legacy-errors", "opaque"], ["unsolicited.json", "--legacy-errors", "full"]] {
+    runner.command(editor + args, 2) |> ignore
+  }
   // A malformed transcript is an error finding, not a usage error.
   @fs.write_file(runner.dir + "/broken.json", "{\"version\":\"2.0\",\"entries\":[{\"from\":\"client\"}]}")
   let (out, _) = runner.command(editor + ["broken.json", "--diagnostics", "json"], 1)
@@ -1005,6 +1046,30 @@ async fn exercise_rpc_log_streams(runner : Runner, root : String, skip_stdin : B
   let (_, err) = runner.command(editor + ["unsolicited.jsonl"], 1)
   assert_true(err.contains("unsolicited.jsonl:1:29: entry 0 server: error UnsolicitedResponse: "), msg=err)
   assert_true(err.contains("unsolicited.jsonl: summary: valid:false"), msg=err)
+  // --expect matches a log at the end: findings still stream, and the summary has the match.
+  @fs.write_file(runner.dir + "/unsolicited.expect.json", "[{\"code\":\"UnsolicitedResponse\",\"entry\":0},{\"code\":\"InvalidTranscript\"}]")
+  let (out, _) = runner.command(editor + ["unsolicited.jsonl", "--expect", "unsolicited.expect.json", "--diagnostics", "json"], 0)
+  let (findings, summary) = transcript_stream(out)
+  assert_eq(findings.length(), 2, msg=out)
+  guard summary.get("expectations") is Some({ "matched": True, "missing": [], "unexpected": [], .. }) else { fail("Expected a matched log: \{out}") }
+  let (_, err) = runner.command(editor + ["unsolicited.jsonl", "--expect", "unsolicited.expect.json"], 0)
+  assert_true(err.contains("unsolicited.jsonl: summary: valid:false") && err.contains(" matched:true"), msg=err)
+  @fs.write_file(runner.dir + "/short.expect.json", "[{\"code\":\"UnsolicitedResponse\",\"entry\":0},{\"code\":\"MissingResponse\"}]")
+  let (out, _) = runner.command(editor + ["unsolicited.jsonl", "--expect", "short.expect.json", "--diagnostics", "json"], 1)
+  let (_, summary) = transcript_stream(out)
+  guard summary.get("expectations") is Some({ "matched": False, "missing": [{ "code": "MissingResponse", .. }], "unexpected": [{ "code": "InvalidTranscript", .. }], .. }) else {
+    fail("Expected a failed log expectation: \{out}")
+  }
+  @fs.write_file(runner.dir + "/broken.expect.json", "{\"code\":\"UnsolicitedResponse\"}")
+  runner.command(editor + ["unsolicited.jsonl", "--expect", "broken.expect.json"], 2) |> ignore
+  // --legacy-errors reaches the checker of a 1.0 log.
+  @fs.write_file(runner.dir + "/chat.jsonl", "{\"dir\":\"request\",\"message\":{\"method\":\"echo\",\"params\":[\"hi\"],\"id\":1}}\n{\"dir\":\"response\",\"message\":{\"result\":null,\"error\":{\"code\":7,\"message\":\"failed\"},\"id\":1}}\n")
+  let chat = ["validate", "rpc", "transcript", "--protocol", "example.peers#EchoChat", "--version", "1.0", "peers.smithy", "chat.jsonl", "--diagnostics", "json"]
+  let (out, _) = runner.command(chat, 0)
+  assert_true(out.contains("LimitedScope"), msg=out)
+  let (out, _) = runner.command(chat + ["--legacy-errors", "code-message-data"], 1)
+  assert_true(out.contains("UnknownError"), msg=out)
+  runner.command(editor + ["unsolicited.jsonl", "--legacy-errors", "code-message-data"], 2) |> ignore
   // Usage and contract errors exit 2.
   @fs.write_file(runner.dir + "/bad.mapping.json", "{\"sender\": \"nobody\"}")
   for args in [
@@ -1020,7 +1085,7 @@ async fn exercise_rpc_log_streams(runner : Runner, root : String, skip_stdin : B
   runner.command(["validate", "rpc", "transcript", "--protocol", "example.peers#Editor", "peers.smithy", "editor-dir.ndjson"], 2) |> ignore
   for args in [["validate", "rpc", "transcript", "--help"], ["help", "validate", "rpc", "transcript"]] {
     let (help, _) = runner.command(args, 0)
-    assert_true(help.contains("--log-preset") && help.contains("--direction") && help.contains("read all of stdin first"), msg=help)
+    assert_true(help.contains("--log-preset") && help.contains("--direction") && help.contains("--expect") && help.contains("read all of the input first"), msg=help)
   }
   if skip_stdin || (runner.target == "wasm-gc" && @env.get_env_var("OS") == Some("Windows_NT")) {
     return
@@ -1052,6 +1117,69 @@ async fn exercise_rpc_log_streams(runner : Runner, root : String, skip_stdin : B
       guard @json.parse(first) is { "entry": Number(0.0, ..), "severity": "error", .. } else {
         fail("Expected an error finding for entry 0: \{first}")
       }
+      writer.close()
+      let rest = reader.read_all().text()
+      assert_eq(status.wait(), 1, msg=rest)
+      assert_true(rest.contains("\"summary\""), msg=rest)
+    })
+  })
+}
+
+///|
+/// Check JSONL log files: a file of many read chunks, and on native a FIFO
+/// whose findings come out before its writer closes it.
+async fn exercise_rpc_log_files(runner : Runner, root : String) -> Unit {
+  @fs.write_file(runner.dir + "/peers.smithy", @fs.read_file(root + "/examples/json-rpc/peers.smithy").text())
+  let editor = ["validate", "rpc", "transcript", "--protocol", "example.peers#Editor", "--version", "2.0", "peers.smithy"]
+  // 20,000 valid lines with two-byte characters, so chunk boundaries fall
+  // inside lines and characters, then one error on the last line.
+  let log = StringBuilder()
+  for id in 1..=10000 {
+    log.write_string("{\"dir\":\"request\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":\{id},\"method\":\"textDocument/hover\",\"params\":{\"uri\":\"file:///\u{e9}\{id}\"}}}\n")
+    log.write_string("{\"dir\":\"response\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":\{id},\"result\":\"d\u{e9}j\u{e0} vu\"}}\n")
+  }
+  log.write_string("{\"dir\":\"request\",\"message\":{\"jsonrpc\":\"2.0\",\"method\":\"missing/method\"}}\n")
+  @fs.write_file(runner.dir + "/large.jsonl", log.to_string())
+  let (out, _) = runner.command(editor + ["large.jsonl", "--diagnostics", "json"], 1)
+  let (findings, summary) = transcript_stream(out)
+  guard findings is [{ "code": "UnknownMethod", "entry": Number(20000.0, ..), "line": Number(20001.0, ..), .. }] else {
+    fail("Expected one finding on the last line: \{out}")
+  }
+  for (key, count) in [("lines", 20001.0), ("entries", 20001.0), ("outstanding", 0.0), ("not_json", 0.0)] {
+    assert_eq(summary.get(key), Some(Json::number(count)), msg="\{key}: \{out}")
+  }
+  if runner.target != "native" || @env.get_env_var("OS") == Some("Windows_NT") {
+    return
+  }
+  // A FIFO streams like stdin: the first finding comes out while the writer
+  // still holds it open. Skip where mkfifo is not available.
+  let fifo = runner.dir + "/live.jsonl"
+  let made = try {
+    let (code, _, _) = @process.collect_output("mkfifo", [fifo])
+    code == 0
+  } catch {
+    _ => false
+  }
+  if !made {
+    println("skipped the FIFO case: mkfifo is not available")
+    return
+  }
+  @async.with_timeout(15000, () => {
+    @async.with_task_group(group => {
+      let (reader, stdout) = @process.read_from_process()
+      defer reader.close()
+      let status = group.spawn(() => {
+        @process.run(runner.executable, editor + ["--diagnostics", "json", "live.jsonl"], cwd=runner.dir, stdout~)
+      })
+      let writer = @fs.open(fifo, mode=WriteOnly)
+      let mut open = true
+      defer (if open { writer.close() })
+      writer.write("{\"dir\":\"request\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"missing/method\"}}\n")
+      guard reader.read_until("\n") is Some(first) else { fail("Expected a finding before the FIFO closes") }
+      guard @json.parse(first) is { "entry": Number(0.0, ..), "severity": "error", .. } else {
+        fail("Expected an error finding for entry 0: \{first}")
+      }
+      open = false
       writer.close()
       let rest = reader.read_all().text()
       assert_eq(status.wait(), 1, msg=rest)
@@ -1101,6 +1229,7 @@ async fn exercise(
   exercise_rpc_batches(runner, root, skip_stdin)
   exercise_rpc_transcripts(runner, root, skip_stdin)
   exercise_rpc_log_streams(runner, root, skip_stdin)
+  exercise_rpc_log_files(runner, root)
   exercise_ion(runner, skip_stdin)
   @fs.write_file(
     "\{dir}/broken.smithy",

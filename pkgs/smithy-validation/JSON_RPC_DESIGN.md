@@ -169,14 +169,18 @@ when the document gives none, and must agree with it. `--complete` or `--partial
 document; partial is the default. Text findings name the file, line, column, entry and sender; JSON
 diagnostics are one report with the summary, the findings and the expectation result. The exit
 status is 0 for no error findings, or for an `expect` list that matches, 1 otherwise, and 2 for usage
-and contract errors. Markdown transcripts (`examples/json-rpc/transcripts/*.md`) are read with the same command. JSONL logs (`--input-format jsonl`, `.jsonl`, `.ndjson` or stdin) need `--version`, and take
+and contract errors. `--expect <file.json>` gives the expect list for any input format
+(`read_expected_findings`); it conflicts with an `expect` list in the document. `--legacy-errors`
+passes the 1.0 error mapping to `run_transcript` and `TranscriptChecker::new`. Markdown transcripts (`examples/json-rpc/transcripts/*.md`) are read with the same command. JSONL logs (`--input-format jsonl`, `.jsonl`, `.ndjson` or stdin) need `--version`, and take
 `--log-preset raw|dir-message`, `--sender`, repeatable `--direction value=peer` or `--log-mapping`. The
-command decodes stdin chunks at the CLI boundary, carrying an incomplete UTF-8 sequence to the next
+command reads a log file or stdin in 64 KiB chunks, decodes them at the CLI boundary, carrying an incomplete UTF-8 sequence to the next
 chunk and replacing invalid bytes with U+FFFD, and passes each chunk through `LogReader` and
 `TranscriptChecker`. It writes reader and checker findings in line order as they are known, then a
 summary with the `LogCounts`; JSON diagnostics are JSON Lines. When `single_sender()` is true the
-checker runs with correlation off. Native and WASI read stdin live; js and wasm-gc read all of stdin
-first and give the same findings.
+checker runs with correlation off. Native and WASI read files and stdin live, so a FIFO streams;
+js and wasm-gc read all of the input first and give the same findings. A read error part-way through
+still gives the summary, then the error (exit 1). With `--expect`, the match runs at the end of the
+log and the summary has the expectation result.
 
 ## Two-peer protocols
 
@@ -217,7 +221,8 @@ small scanner finds each `message` value's exact source text; nothing is re-seri
 are `InvalidTranscript` findings with a line and column; a bad entry is dropped. `ExpectedFinding`
 names a code by its rendered `to_string` (for example `DuplicateResponse`), and `match_expected`
 matches items to distinct findings (maximum bipartite matching, so order does not matter). A match
-needs no missing item and no unlisted error.
+needs no missing item and no unlisted error. `read_expected_findings` reads a standalone array of
+the same items with the same item parser.
 
 ### Markdown transcript documents
 
@@ -239,8 +244,9 @@ is the caller's job. A `LogMapping` is a fixed rule, not a pattern language: a `
 the first brace, or N delimited fields), a `LogSelector` (any JSON-RPC record, a field that exists, or
 a string field with a value), a `MessageSource` (the whole record, the exact source text of a field
 through the JSON transcript scanner, or a decoded string field) and a `SenderSource` (a fixed peer,
-or a field mapped to peers). Paths are JSON Pointers. `LogMapping::new` and `from_json` raise
-`ConfigurationError` for a bad configuration; the reader itself never raises. Lines that are not JSON
+or a field mapped to peers). Paths are JSON Pointers. `LogMapping::new`, `dir_message`, `from_json`
+and `LogReader::new` raise `ConfigurationError` for a bad configuration, such as an empty direction map
+or a `line_bytes` below 1; the reader never raises on its input. Lines that are not JSON
 and records the selector rejects are counted, not reported. A sender value that the map lacks and a
 missing message field are `InvalidTranscript` findings, and the line is dropped. The `raw` preset has
 a fixed sender, so `single_sender()` tells the caller to turn correlation off; `dir-message` reads
@@ -263,19 +269,34 @@ language, so that they express the initialize-first and shutdown-then-exit order
 gives the findings it gave before, even when its operations carry the lifecycle traits. A state that
 the session does not declare, an unknown capability, a capability method that no peer accepts, an
 invalid pointer and an `idMember` that is not an input member are `InvalidContract`. The checker
-keeps one session state for both peers. When a request or notification arrives, its method must be
-allowed in the state (`StateViolation`, with the entry of the last transition in `related`) and its
-required capabilities must be advertised (`CapabilityNotAdvertised`). A rejected message causes no
-transition, and its reply moves the session nowhere, but correlation still tracks its call. An
-accepted message takes its `onCall` transition. A reply to an accepted call takes `onSuccess` or
-`onError` and adds the capabilities that its result advertises. Request batch elements are checked
-in array order, and a reply batch settles each answered call. A cancellation names an active call of
-its own sender; otherwise it is a `CancelInactiveCall` advisory, because a cancellation can race the
-reply. The reply of a cancelled single call may use the declared code: the `UnknownError` finding for
-that code on that call is dropped. The session holds only the state, the advertised capability names,
-the entry of the last transition and the cancelled calls. A cancelled call is always an active call,
-so `active_calls` bounds that table, and the call leaves it when it is answered. The layer needs
-correlation; with `correlation=false` it does nothing.
+keeps one session state for both peers. The rules apply only to a method that the receiving peer
+models. A request that the receiver does not model is an `UnknownMethod` finding already, so it
+applies no rule, takes no transition and advertises nothing. When a request or notification arrives,
+its method must be allowed in the state (`StateViolation`, with the entry of the last transition in
+`related`) and its required capabilities must be advertised (`CapabilityNotAdvertised`, with the
+last accepted call of the capability source in `related` when there is one). A rejected message
+causes no transition, and its reply moves the session nowhere, but correlation still tracks its
+call. A call that correlation refuses (`ActiveIdReused` or `ActiveCallLimit`) is not checked against
+the session, so it takes no transition and cancels nothing; the same holds for every element of a
+refused request batch. An accepted message takes its `onCall` transition. A reply to an accepted
+call takes `onSuccess` or `onError` and adds the capabilities that its result advertises. Request
+batch elements are checked in array order, and a reply batch settles each answered call.
+
+A cancellation names a call of its own sender: an active single call, or a call in an earlier
+pending request batch. Otherwise it is a `CancelInactiveCall` advisory, because a cancellation can
+race the reply. A cancellation that names a call in its own request batch gives no finding and
+excuses nothing: the receiver may process the elements of a batch in any order, so it proves
+nothing. A null ID never names a batch call: in a batch the null ID also answers each invalid
+element, so it does not name one call. A null-id cancellation names only an active null-id single
+call, and otherwise it is the `CancelInactiveCall` advisory. The reply of a cancelled call may use
+the declared code: the `UnknownError` finding for that code on that reply is dropped. In a reply
+batch, only the first element that answers the cancelled call is excused, never another element and
+never a call with the same ID outside the batch. The session holds only the state, the advertised
+capability names, the entry of the last call of each capability source, the entry of the last
+transition and the cancelled calls. A cancelled single call is always an active call, so
+`active_calls` bounds that table, and the call leaves it when it is answered. A cancelled batch call
+is kept in its pending batch, so the keys of that batch bound it, and it leaves with the batch reply.
+The layer needs correlation; with `correlation=false` it does nothing.
 
 ## Rule and original-example coverage
 

@@ -400,7 +400,8 @@ test "progress needs the advertised capability" {
     let found = checker
       .feed_all(ready(missing) + [progress])
       .filter(f => !(f.code is Message(_)))
-    assert_eq(summary_of(found), ["CapabilityNotAdvertised@3[]"])
+    // The related entry is the initialize call that did not advertise it.
+    assert_eq(summary_of(found), ["CapabilityNotAdvertised@3[0]"])
     assert_eq(found[0].severity, @validation.Error)
     assert_eq(
       found[0].message,
@@ -416,7 +417,12 @@ test "progress needs the advertised capability" {
     progress,
   ])
   assert_eq(summary_of(found), [
-    "CapabilityNotAdvertised@1[]", "CapabilityNotAdvertised@3[]",
+    "CapabilityNotAdvertised@1[0]", "CapabilityNotAdvertised@3[0]",
+  ])
+  // Before any initialize call, no entry is related.
+  let checker = @rpc.TranscriptChecker::new(lifecycle())
+  assert_eq(summary_of(checker.feed_all([progress])), [
+    "CapabilityNotAdvertised@0[]",
   ])
 }
 
@@ -460,7 +466,7 @@ test "cancelled calls may answer with the declared code" {
     ],
   )
   assert_eq(summary_of(found), [
-    "CapabilityNotAdvertised@4[]", "UnknownError@5[3]",
+    "CapabilityNotAdvertised@4[0]", "UnknownError@5[3]",
   ])
   // An application code that the operation does not model is excused too.
   let model = load(
@@ -549,23 +555,70 @@ test "invalid session traits are contract errors" {
   )
   describe(valid, "t#P", @rpc.V2_0) |> ignore
   for
-    traits in [
-      "@jsonRpcLifecycle(allowedIn: [\"shut\"])", "@jsonRpcLifecycle(onCall: \"shut\")",
-      "@jsonRpcLifecycle(onSuccess: \"shut\")", "@jsonRpcLifecycle(onError: \"shut\")",
-      "@jsonRpcLifecycle(requires: [\"slow\"])", "@jsonRpcCancels(idMember: \"ref\")",
-      "@jsonRpcCancels(idMember: \"other\")",
+    case in [
+      ("@jsonRpcLifecycle(allowedIn: [\"shut\"])", "allowedIn"),
+      ("@jsonRpcLifecycle(onCall: \"shut\")", "onCall"),
+      ("@jsonRpcLifecycle(onSuccess: \"shut\")", "onSuccess"),
+      ("@jsonRpcLifecycle(onError: \"shut\")", "onError"),
+      ("@jsonRpcLifecycle(requires: [\"slow\"])", "requires"),
+      // The member is id; ref is its JSON name.
+      ("@jsonRpcCancels(idMember: \"ref\")", "idMember"),
+      ("@jsonRpcCancels(idMember: \"other\")", "other"),
     ] {
-    expect_invalid(session_model(session, traits), @rpc.V2_0)
+    let (traits, word) = case
+    expect_invalid(session_model(session, traits), @rpc.V2_0, mentions=word)
   }
   for
-    invalid in [
-      "states: [\"open\", \"open\"]", "states: [\"open\"], capabilities: [{name: \"fast\", method: \"stop\", pointer: \"/fast\"}]",
-      "states: [\"open\"], capabilities: [{name: \"fast\", method: \"go\", pointer: \"fast\"}]",
-      "states: [\"open\"], capabilities: [{name: \"fast\", method: \"go\", pointer: \"/a~2\"}]",
-      "states: [\"open\"], capabilities: [{name: \"fast\", method: \"go\", pointer: \"/a\"}, {name: \"fast\", method: \"go\", pointer: \"/b\"}]",
-      "states: [\"open\"], capabilities: [{name: \"\", method: \"go\", pointer: \"/a\"}]",
+    case in [
+      ("states: [\"open\", \"open\"]", "distinct state names"),
+      (
+        "states: [\"open\"], capabilities: [{name: \"fast\", method: \"stop\", pointer: \"/fast\"}]",
+        "method stop",
+      ),
+      (
+        "states: [\"open\"], capabilities: [{name: \"fast\", method: \"go\", pointer: \"fast\"}]",
+        "JSON Pointer",
+      ),
+      (
+        "states: [\"open\"], capabilities: [{name: \"fast\", method: \"go\", pointer: \"/a~2\"}]",
+        "/a~2",
+      ),
+      (
+        "states: [\"open\"], capabilities: [{name: \"fast\", method: \"go\", pointer: \"/a\"}, {name: \"fast\", method: \"go\", pointer: \"/b\"}]",
+        "distinct capability names",
+      ),
+      (
+        "states: [\"open\"], capabilities: [{name: \"\", method: \"go\", pointer: \"/a\"}]",
+        "nonempty capability name",
+      ),
     ] {
-    expect_invalid(session_model(invalid, ""), @rpc.V2_0)
+    let (invalid, word) = case
+    expect_invalid(session_model(invalid, ""), @rpc.V2_0, mentions=word)
+  }
+  // Model validation rejects a code that is not an integer, so the trait
+  // value is set after loading.
+  let model = load(session_model(session, "@jsonRpcCancels(idMember: \"id\")"))
+  let go = model.shapes[@smithy.ShapeId::parse("t#Go").unwrap()]
+  for
+    code in [
+      @smithy.Number(@smithy.NodeNumber::parse("1.5").unwrap()),
+      @smithy.String("-32800"),
+    ] {
+    go.traits[@smithy.ShapeId::parse("smithy.rpc#jsonRpcCancels").unwrap()] = @smithy.Object({
+        "idMember": @smithy.String("id"),
+        "code": code,
+      },
+    )
+    try describe(model, "t#P", @rpc.V2_0) catch {
+      @rpc.InvalidContract(_, message) =>
+        assert_eq(message, "I expected an integer jsonRpcCancels code.")
+      e => fail("unexpected error: \{e}")
+    } noraise {
+      _ =>
+        fail(
+          "I expected the code \{@json.to_json(code).stringify()} to be rejected.",
+        )
+    }
   }
 }
 
@@ -628,4 +681,185 @@ test "batches follow the session order" {
   assert_eq(summary_of(found), ["StateViolation@0[]"])
   assert_true(found[0].message.contains("method compile"))
   assert_eq(checker.finish().findings, [])
+}
+
+///|
+test "initialize sent the wrong way advertises nothing" {
+  // The host does not model initialize, so the call applies no rule.
+  let checker = @rpc.TranscriptChecker::new(lifecycle())
+  let found = checker
+    .feed_all([
+      entry("extension", call(1, "initialize", params="{\"host\": \"h\"}")),
+      entry("host", success(1, "{\"capabilities\": {\"progress\": true}}")),
+      entry("extension", notify("progress", params="{\"message\": \"m\"}")),
+      entry("host", notify("initialized")),
+    ])
+    .filter(f => !(f.code is Message(_)))
+  assert_eq(summary_of(found), [
+    "CapabilityNotAdvertised@2[]", "StateViolation@3[]",
+  ])
+  // The same call in a batch also applies no rule.
+  let checker = @rpc.TranscriptChecker::new(lifecycle())
+  let found = checker
+    .feed_all([
+      entry(
+        "extension",
+        "[" + call(1, "initialize", params="{\"host\": \"h\"}") + "]",
+      ),
+      entry(
+        "host",
+        "[" + success(1, "{\"capabilities\": {\"progress\": true}}") + "]",
+      ),
+      entry("extension", notify("progress", params="{\"message\": \"m\"}")),
+    ])
+    .filter(f => !(f.code is Message(_)))
+  assert_eq(summary_of(found), ["CapabilityNotAdvertised@2[]"])
+}
+
+///|
+test "a refused call does not transition or cancel" {
+  let compile = id => call(id, "compile", params="{\"source\": \"x\"}")
+  let checker = @rpc.TranscriptChecker::new(lifecycle())
+  let found = checker.feed_all(
+    ready("{\"cancellation\": true}") +
+    [
+      entry("host", compile(2)),
+      // Both calls reuse the active id 2, so the checker does not track them.
+      entry("host", call(2, "exit")),
+      entry("host", call(2, "$/cancelRequest", params="{\"id\": 2}")),
+      entry("extension", failure(2, -32800)),
+      entry("host", call(3, "ping")),
+    ],
+  )
+  assert_eq(summary_of(found), [
+    "ActiveIdReused@4[3]", "ActiveIdReused@5[3]", "UnknownError@6[3]",
+  ])
+  let limits = @rpc.TranscriptLimits::new(active_calls=1)
+  let checker = @rpc.TranscriptChecker::new(lifecycle(), limits~)
+  let found = checker.feed_all(
+    ready("{}") +
+    [
+      entry("host", compile(2)),
+      entry("host", call(3, "exit")),
+      entry("host", "[" + compile(4) + "]"),
+      entry("host", "[" + call(5, "exit") + "]"),
+      entry("extension", success(2, "\"ok\"")),
+      entry("host", call(6, "ping")),
+    ],
+  )
+  assert_eq(summary_of(found), ["ActiveCallLimit@4[]", "ActiveCallLimit@6[]"])
+}
+
+///|
+test "a cancellation of an earlier batch call is excused in the batch reply" {
+  let compile = id => call(id, "compile", params="{\"source\": \"x\"}")
+  let checker = @rpc.TranscriptChecker::new(lifecycle(), completeness=Complete)
+  let found = checker.feed_all(
+    ready("{\"cancellation\": true}") +
+    [
+      entry("host", "[" + compile(2) + ", " + compile(3) + "]"),
+      entry("host", cancel("2")),
+      entry("host", "[" + cancel("3") + "]"),
+      entry(
+        "extension",
+        "[" + failure(2, -32800) + ", " + failure(3, -32800) + "]",
+      ),
+      // Only the cancelled element is excused.
+      entry("host", "[" + compile(4) + ", " + compile(5) + "]"),
+      entry("host", cancel("4")),
+      entry(
+        "extension",
+        "[" + failure(5, -32800) + ", " + failure(4, -32800) + "]",
+      ),
+      // A cancellation of a single call does not excuse a batch call with
+      // the same id.
+      entry("host", compile(6)),
+      entry("host", "[" + compile(6) + "]"),
+      entry("host", cancel("6")),
+      entry("extension", "[" + failure(6, -32800) + "]"),
+      entry("extension", failure(6, -32800)),
+    ],
+  )
+  assert_eq(summary_of(found), ["UnknownError@9[7]", "UnknownError@13[11]"])
+  assert_eq(found[0].finding.map(f => f.path.pointer()), Some("/0/error/code"))
+  assert_eq(checker.finish().findings, [])
+}
+
+///|
+test "a cancellation of a call in the same batch gives no advisory" {
+  let compile = id => call(id, "compile", params="{\"source\": \"x\"}")
+  let checker = @rpc.TranscriptChecker::new(lifecycle(), completeness=Complete)
+  let found = checker.feed_all(
+    ready("{\"cancellation\": true}") +
+    [
+      entry("host", "[" + compile(2) + ", " + cancel("2") + "]"),
+      entry("extension", "[" + failure(2, -32800) + "]"),
+      entry("host", "[" + cancel("3") + ", " + compile(3) + "]"),
+      entry("extension", "[" + failure(3, -32800) + "]"),
+    ],
+  )
+  // The elements may be processed in any order, so the cancellation proves
+  // nothing and excuses nothing.
+  assert_eq(summary_of(found), ["UnknownError@4[3]", "UnknownError@6[5]"])
+  assert_eq(checker.finish().findings, [])
+}
+
+///|
+test "a null-id cancellation excuses no batch element" {
+  let compile = id => call(id, "compile", params="{\"source\": \"x\"}")
+  // A structured id is invalid in 2.0, so this element is answered with a
+  // null id.
+  let invalid = "{\"jsonrpc\": \"2.0\", \"method\": \"compile\", \"params\": {\"source\": \"x\"}, \"id\": {\"a\": 1}}"
+  let null_error = "{\"jsonrpc\": \"2.0\", \"id\": null, \"error\": {\"code\": -32800, \"message\": \"failed\"}}"
+  let checker = @rpc.TranscriptChecker::new(lifecycle(), completeness=Complete)
+  let found = checker.feed_all(
+    ready("{\"cancellation\": true}") +
+    [
+      entry("host", "[" + compile(2) + ", " + invalid + "]"),
+      entry("host", cancel("null")),
+      entry("extension", "[" + success(2, "\"ok\"") + ", " + null_error + "]"),
+    ],
+  )
+  // The null key of a batch answers an invalid element, not one call, so the
+  // cancellation names no active call and the reply keeps its finding.
+  assert_eq(summary_of(found), [
+    "InvalidId@3[]", "CancelInactiveCall@4[]", "UnknownError@5[3]", "InvalidContext@5[3]",
+  ])
+  assert_eq(found[2].finding.map(f => f.path.pointer()), Some("/1/error/code"))
+  assert_eq(checker.finish().findings, [])
+}
+
+///|
+test "a notification is not the source call of a capability" {
+  let progress = entry(
+    "extension",
+    notify("progress", params="{\"message\": \"m\"}"),
+  )
+  let init_params = "{\"host\": \"h\"}"
+  // A single notification, and a notification element of a batch.
+  for
+    sent in [
+      notify("initialize", params=init_params),
+      "[" +
+      notify("initialize", params=init_params) +
+      ", " +
+      call(9, "ping") +
+      "]",
+    ] {
+    let checker = @rpc.TranscriptChecker::new(lifecycle())
+    let found = checker
+      .feed_all([entry("host", sent), progress])
+      .filter(f => !(f.code is Message(_)))
+    assert_eq(summary_of(found), ["CapabilityNotAdvertised@1[]"])
+  }
+  // A real source call that came earlier stays the related entry.
+  let checker = @rpc.TranscriptChecker::new(lifecycle())
+  let found = checker
+    .feed_all([
+      entry("host", call(1, "initialize", params=init_params)),
+      entry("host", notify("initialize", params=init_params)),
+      progress,
+    ])
+    .filter(f => !(f.code is Message(_)))
+  assert_eq(summary_of(found), ["CapabilityNotAdvertised@2[0]"])
 }
