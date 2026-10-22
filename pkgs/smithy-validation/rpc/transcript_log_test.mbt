@@ -613,3 +613,21 @@ test "mapping json is validated" {
 fn tally(counts : @rpc.LogCounts) -> (Int32, Int32, Int32, Int32) {
   (counts.lines, counts.not_json, counts.skipped, counts.entries)
 }
+
+///|
+test "log records nest at most 128 levels" {
+  fn record(depth : Int32) -> String {
+    "{\"dir\": \"in\", \"message\": " +
+    "[".repeat(depth - 1) +
+    "]".repeat(depth - 1) +
+    "}\n"
+  }
+
+  let (entries, findings, counts) = read_log(
+    in_out(),
+    record(128) + record(129),
+  )
+  assert_eq(findings, [])
+  assert_eq(entries.length(), 1)
+  assert_eq(tally(counts), (2, 1, 0, 1))
+}

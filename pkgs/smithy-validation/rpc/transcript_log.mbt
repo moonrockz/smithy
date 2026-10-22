@@ -274,7 +274,7 @@ pub fn LogMapping::from_json(
     raise @validation.ConfigurationError(message)
   }
 
-  let json = @json.parse(text) catch {
+  let json = parse_bounded_json(text) catch {
     _ =>
       return fail(
         "I expected a JSON object for the log mapping, and I found text that is not JSON.",
@@ -688,7 +688,7 @@ fn LogReader::read_line(
     return
   }
   let record : Span = { start: first, end: last, }
-  let json = @json.parse(text[first:last].to_owned()) catch {
+  let json = parse_bounded_json(text[first:last]) catch {
     _ => {
       self.not_json += 1
       return

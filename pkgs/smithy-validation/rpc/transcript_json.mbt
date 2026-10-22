@@ -10,6 +10,21 @@ pub(all) struct TranscriptDocument {
 } derive(Eq, Debug)
 
 ///|
+/// The most nesting levels that a transcript reader parses in one JSON value,
+/// as the message validator allows. Deeper text is not parsed.
+const JSON_NESTING_DEPTH : Int32 = 128
+
+///|
+/// Parses JSON text with at most JSON_NESTING_DEPTH levels; deeper text raises
+/// DepthLimitExceeded. The pinned core marks an explicit `max_nesting_depth`
+/// label as deprecated (a label migration that later releases undo), so the
+/// warning is allowed here only.
+#warnings("-deprecated")
+fn parse_bounded_json(text : StringView) -> Json raise @json.ParseError {
+  @json.parse(text, max_nesting_depth=JSON_NESTING_DEPTH)
+}
+
+///|
 /// A problem at a code unit offset of the document text.
 priv suberror JsonDocumentError {
   Problem((String, Int32))
@@ -179,9 +194,7 @@ fn object_members(
       ("I expected a valid member name, and I found an invalid string.", i),
     )
     let key = match
-      (@json.parse(text[i:key_end].to_owned()) catch {
-        _ => raise invalid_name
-      }) {
+      (parse_bounded_json(text[i:key_end]) catch { _ => raise invalid_name }) {
       String(key) => key
       _ => raise invalid_name
     }
@@ -300,7 +313,7 @@ fn invalid_document(
 
 ///|
 fn parse_span(text : String, span : Span) -> Json raise JsonDocumentError {
-  @json.parse(text[span.start:span.end].to_owned()) catch {
+  parse_bounded_json(text[span.start:span.end]) catch {
     _ =>
       raise Problem(
         (

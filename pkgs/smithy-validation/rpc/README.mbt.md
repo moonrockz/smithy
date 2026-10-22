@@ -376,7 +376,8 @@ records. `LogMapping::from_json(text, peers)` reads the same mapping from JSON, 
 peer name must be one of `peers`, and an unknown key raises.
 
 Lines that are blank or not JSON after the prefix, such as plain text and copied `Content-Length`
-headers, and records that the selector rejects are only counted in `counts()`. A line longer than
+headers, and records that the selector rejects are only counted in `counts()`. A record nested
+deeper than 128 levels, the depth limit of the message validator, counts as not JSON. A line longer than
 `line_bytes` (1 MiB of UTF-8 by default), a sender value that the map lacks and a missing message
 field are `InvalidTranscript` findings at the line and column, and the line is dropped. An entry's
 location is its line and the column where its message starts. The reader leaves `receiver` as

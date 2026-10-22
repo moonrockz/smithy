@@ -287,3 +287,18 @@ test "many entries are located in one scan" {
     Some({ line: count + 1, column: 33, }),
   )
 }
+
+///|
+test "document values nest at most 128 levels" {
+  let deep = "[".repeat(129) + "]".repeat(129)
+  let (_, problems) = @rpc.read_json_transcript(
+    "{\"entries\": [], \"expect\": [" + deep + "]}",
+  )
+  assert_eq(problems.length(), 1)
+  assert_true(problems[0].message.has_prefix("I expected a valid JSON value"))
+  let (_, problems) = @rpc.read_json_transcript(
+    "{\"entries\": [], \"expect\": [" + "[".repeat(127) + "]".repeat(127) + "]}",
+  )
+  assert_eq(problems.length(), 1)
+  assert_true(problems[0].message.has_prefix("I expected an object"))
+}
