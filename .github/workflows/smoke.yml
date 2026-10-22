@@ -1,0 +1,162 @@
+# Smoke: run each release binary on a runner of its own OS, record the evidence, report a failure.
+#
+# CI (after a push to main) and Release call this workflow. The caller uploads the `dist` artifact
+# in the same run. This workflow never builds: it checks the bytes that the caller built.
+#
+# Evidence: when `record` is true and every platform passed, `record` saves `evidence.json` in the
+# GitHub Actions cache under `smoke-evidence-<fingerprint>` (see scripts/smoke.mbtx). A later run with
+# the same fingerprint finds the key with a lookup and skips smoke, except a release. Only callers
+# that are not pull request runs set `record`. A cache entry that a pull request run writes stays in
+# the scope of that pull request, so main never reads it.
+#
+# Report: when `report-failure` is true and smoke failed, `report` opens the issue
+# "Smoke failed on main", or comments on the open one.
+
+name: Smoke
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: The version that `smithy version` must print
+        type: string
+        required: true
+      fingerprint:
+        description: The fingerprint of the smoke inputs (mise run smoke:fingerprint)
+        type: string
+        default: ''
+      record:
+        description: Save the evidence when every platform passed
+        type: boolean
+        default: false
+      report-failure:
+        description: Open or update the "Smoke failed on main" issue when smoke failed
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  MISE_EXPERIMENTAL: 'true'
+
+jobs:
+  # These runners only run the binaries. They never build, so they need no mise.
+  # Keep the platforms in the order of `platforms` in scripts/smoke.mbtx.
+  smoke:
+    name: Smoke (${{ matrix.asset }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            asset: linux-x64
+            unpack: tar
+          - runner: ubuntu-24.04-arm
+            asset: linux-arm64
+            unpack: tar
+          - runner: macos-latest
+            asset: darwin-arm64
+            unpack: tar
+          - runner: macos-15-intel
+            asset: darwin-x64
+            unpack: tar
+          - runner: windows-latest
+            asset: windows-x64
+            unpack: zip
+    steps:
+      - name: Download dist/
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Unpack the archive (tar)
+        if: matrix.unpack == 'tar'
+        shell: bash
+        run: |
+          mkdir smoke
+          tar -xzf "dist/smithy-${{ matrix.asset }}.tar.gz" -C smoke
+
+      - name: Unpack the archive (zip)
+        if: matrix.unpack == 'zip'
+        shell: pwsh
+        run: Expand-Archive -Path "dist/smithy-${{ matrix.asset }}.zip" -DestinationPath smoke
+
+      - name: Run smithy version and check the version
+        shell: bash
+        env:
+          EXPECTED: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          bin=smoke/smithy
+          if [ "${{ matrix.asset }}" = "windows-x64" ]; then bin=smoke/smithy.exe; fi
+          chmod +x "$bin" || true
+          out="$("$bin" version)"
+          echo "$out"
+          if [ -z "$EXPECTED" ]; then
+            echo "::error::the caller gave no version"; exit 1
+          fi
+          pattern="(^|[^0-9.])${EXPECTED//./\\.}([^0-9.]|$)"
+          if ! grep -Eq "$pattern" <<<"$out"; then
+            echo "::error::smithy version did not print $EXPECTED"; exit 1
+          fi
+
+  record:
+    name: Record smoke evidence
+    runs-on: ubuntu-latest
+    needs: [smoke]
+    if: inputs.record && inputs.fingerprint != ''
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download dist/
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      # It fails when HEAD has another fingerprint than the one the caller looked up.
+      - name: Write the evidence
+        env:
+          FINGERPRINT: ${{ inputs.fingerprint }}
+        run: mise run smoke:record -- dist .smoke-evidence
+
+      # Keep the path the same as in the lookups: the cache version includes it.
+      - name: Save the evidence
+        uses: actions/cache/save@v6
+        with:
+          path: .smoke-evidence
+          key: smoke-evidence-${{ inputs.fingerprint }}
+
+  report:
+    name: Report the smoke failure
+    runs-on: ubuntu-latest
+    needs: [smoke]
+    if: failure() && inputs.report-failure
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mise run smoke:report
