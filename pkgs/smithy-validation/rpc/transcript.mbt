@@ -40,12 +40,23 @@ fn render_id(id : RequestId) -> String {
 }
 
 ///|
+/// How the reply to a pending entry is checked.
+priv enum PendingForm {
+  /// Against the original message text.
+  SingleMessage
+  /// As the one null-ID invalid-request error that an empty or unreadable
+  /// request batch needs.
+  InvalidWholeBatch
+}
+
+///|
 /// A call, or an unreadable entry, that waits for a reply.
 priv struct Pending {
   entry : Int32
   text : String
   location : SourceLocation?
   id : RequestId
+  form : PendingForm
 }
 
 ///|
@@ -56,12 +67,15 @@ priv struct Answer {
 }
 
 ///|
-/// What one peer has sent: its active calls, its unreadable entries, the IDs
-/// the other peer answered, and its 1.0 notifications.
+/// What one peer has sent: its active calls, its unreadable entries, its
+/// pending request batches, the IDs the other peer answered, and its 1.0
+/// notifications.
 priv struct PeerState {
   name : PeerName
   active : Map[CallKey, Pending]
   unreadable : @deque.Deque[Pending]
+  /// In entry order, so the earliest batch comes first.
+  batches : Array[PendingBatch]
   answered : Map[CallKey, Answer]
   answered_order : @deque.Deque[Answer]
   mut next_seq : Int32
@@ -116,6 +130,7 @@ pub fn TranscriptChecker::new(
       name,
       active: Map([]),
       unreadable: @deque.Deque([]),
+      batches: [],
       answered: Map([]),
       answered_order: @deque.Deque([]),
       next_seq: 0,
@@ -308,19 +323,21 @@ pub fn TranscriptChecker::feed(
     }
   }
   match value {
-    Array(_) =>
-      // Transcript batches are linked by a later slice.
+    Array(_) if self.protocol.version() == V1_0 =>
       self.report_messages(
         step,
         [
           self.protocol_finding(
             UnsupportedMessage,
             None,
-            "I do not check transcript batches yet; entry \{step.index} from \{sender.to_string()} is a JSON array.",
+            "I expected one JSON-RPC 1.0 message, because version 1.0 has no batches; entry \{step.index} from \{sender.to_string()} is a JSON array.",
           ),
         ],
         [],
       )
+    Array(values) if is_reply_batch(values) =>
+      self.reply_batch(step, receiver, values)
+    Array(values) => self.request_batch(step, receiver, values)
     Object(fields) if fields.contains("method") =>
       self.request(step, receiver, value)
     Object(_) => self.reply(step, receiver, value)
@@ -496,6 +513,7 @@ fn TranscriptChecker::track_call(
           text: step.entry.message,
           location: step.entry.location,
           id,
+          form: SingleMessage,
         }
       }
   }
@@ -505,6 +523,7 @@ fn TranscriptChecker::track_call(
 fn TranscriptChecker::track_unreadable(
   self : TranscriptChecker,
   step : Step,
+  form~ : PendingForm = SingleMessage,
 ) -> Unit {
   let sender = step.entry.sender
   let state = self.state(sender)
@@ -528,6 +547,7 @@ fn TranscriptChecker::track_unreadable(
     text: step.entry.message,
     location: step.entry.location,
     id: Absent,
+    form,
   })
 }
 
@@ -633,13 +653,23 @@ fn TranscriptChecker::reply(
       self.answer(step, service, value, pending, errors)
       return
     }
-  } else if key is Some(key) {
-    if caller.active.get(key) is Some(call) {
-      caller.active.remove(key)
-      self.answer(step, service, value, call, errors)
-      self.remember_answer(caller, key, step.index)
-      return
-    }
+  } else if key is Some(key) && caller.active.get(key) is Some(call) {
+    caller.active.remove(key)
+    self.answer(step, service, value, call, errors)
+    self.remember_answer(caller, key, step.index)
+    return
+  }
+  if key is Some(key) && caller.batch_with(key) is Some(batch) {
+    self.report(
+      step,
+      WrongReplyForm,
+      [batch.entry],
+      "I expected a reply batch from \{responder_name.to_string()} to the batch at entry \{batch.entry} from \{caller_name.to_string()}; entry \{step.index} sent a single reply with \{render_id(id)}.",
+    )
+    self.report_messages(step, errors, [])
+    return
+  }
+  if key is Some(key) && key != null_key {
     if caller.answered.get(key) is Some(first) {
       self.report(
         step,
@@ -701,11 +731,19 @@ fn TranscriptChecker::answer(
   call : Pending,
   envelope_errors : Array[Finding],
 ) -> Unit {
-  match service {
-    Some((service, false)) => {
+  match (service, call.form) {
+    (Some((service, false)), SingleMessage) => {
       let result = service.validate_response_json(
         value,
         context=Some(OriginalRequest(call.text)),
+        legacy_errors=self.legacy_errors,
+      )
+      self.report_messages(step, result.findings, [call.entry])
+    }
+    (Some((service, false)), InvalidWholeBatch) => {
+      let result = service.validate_response_checked(
+        value,
+        InvalidBatch(error_code("-32600")),
         legacy_errors=self.legacy_errors,
       )
       self.report_messages(step, result.findings, [call.entry])
@@ -742,48 +780,65 @@ pub fn TranscriptChecker::finish(self : TranscriptChecker) -> TranscriptSummary 
     return summary
   }
   let out = []
-  let waiting : Array[(PeerName, Pending)] = []
+  let waiting : Array[(PeerName, Waiting)] = []
   if self.correlation {
     for state in self.peers {
       for _, call in state.active {
-        waiting.push((state.name, call))
+        waiting.push((state.name, WaitingCall(call)))
       }
       // A 1.0 unreadable entry needs no reply.
       if self.protocol.version() == V2_0 {
         for unreadable in state.unreadable {
-          waiting.push((state.name, unreadable))
+          waiting.push((state.name, WaitingCall(unreadable)))
         }
+      }
+      for batch in state.batches {
+        waiting.push((state.name, WaitingBatch(batch)))
       }
     }
   }
-  waiting.sort_by((a, b) => a.1.entry.compare(b.1.entry))
+  waiting.sort_by((a, b) => a.1.entry().compare(b.1.entry()))
   for item in waiting {
     let (sender, pending) = item
     let receiver = self.protocol
       .other(sender)
       .map(p => p.to_string())
       .unwrap_or("")
+    let (reply, what, related) = match pending {
+      WaitingCall(call) =>
+        (
+          "reply",
+          "from \{receiver} to entry \{call.entry} from \{sender.to_string()} with \{render_id(call.id)}",
+          [],
+        )
+      WaitingBatch(batch) =>
+        (
+          "reply batch",
+          "from \{receiver} to the batch at entry \{batch.entry} from \{sender.to_string()}",
+          [batch.entry],
+        )
+    }
     let (code, severity, message) = match self.completeness {
       Complete =>
         (
           MissingReply,
           @validation.Error,
-          "I expected a reply from \{receiver} to entry \{pending.entry} from \{sender.to_string()} with \{render_id(pending.id)}; the complete transcript has none.",
+          "I expected a \{reply} \{what}; the complete transcript has none.",
         )
       Partial =>
         (
           OutstandingCall,
           @validation.Advisory,
-          "I found no reply yet from \{receiver} to entry \{pending.entry} from \{sender.to_string()} with \{render_id(pending.id)}; the transcript is partial.",
+          "I found no \{reply} yet \{what}; the transcript is partial.",
         )
     }
     self.add(out, {
       code,
       severity,
-      entry: Some(pending.entry),
-      location: pending.location,
+      entry: Some(pending.entry()),
+      location: pending.location(),
       sender: Some(sender),
-      related: [],
+      related,
       finding: None,
       message,
     })

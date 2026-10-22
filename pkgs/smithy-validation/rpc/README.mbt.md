@@ -155,9 +155,9 @@ normalized exact coefficients/exponents, so `1`, `1.0` and `1e0` correlate witho
 expanding large exponents. Numeric IDs remain distinct from strings.
 
 Both batch APIs report `UnsupportedMessage` under 1.0. Multiple 1.0 objects in HTTP/stream framing
-are a separate transport concern. Batches do not define scheduling, handler execution, peer
-direction, outstanding calls across batches or partial transcript completeness. Exchanges remain
-a separate capability.
+are a separate transport concern. The batch APIs check one supplied association. They do not
+define scheduling, handler execution, peer direction or outstanding calls across batches;
+`TranscriptChecker` links batches between two peers (see Transcripts).
 
 ## Two-peer protocols
 
@@ -282,10 +282,20 @@ Correlation follows these rules:
   protocol shape.
 - With `correlation=false` the checker validates each message only; replies keep the
   `LimitedScope` advisory and no call is tracked.
-- Batch entries (JSON arrays) are not linked yet; they give `UnsupportedMessage`.
+- A 2.0 array entry is a batch. It is a reply batch when an element is an object with `result`
+  or `error` and no element has `method`. Any other array, `[]` too, is a request batch.
+- A request batch is one unit. It is checked with `validate_request_batch` and waits for one
+  reply batch. An all-notification batch needs no reply. An empty batch waits for one null-ID
+  `-32600` error object, as an unreadable entry does.
+- A reply batch answers the earliest pending batch of the other peer whose IDs include every reply
+  ID. It is checked with `OriginalBatch` context, so missing replies inside the batch are reported
+  at once, and its findings name the batch in `related`. A reply batch that fits no batch is an
+  `UnsolicitedResponse`. A single reply to a call inside a pending batch is `WrongReplyForm`.
+- At `finish`, each pending batch is one `MissingReply` or `OutstandingCall`, with the batch in
+  `related`. A 1.0 array entry is `UnsupportedMessage`, because 1.0 has no batches.
 
 `TranscriptLimits::new` bounds memory and output: `active_calls` (1024, per sender, also for
-unreadable entries), `answered_ids` (4096, per sender, also for remembered 1.0 notifications),
+unreadable entries and pending batches), `answered_ids` (4096, per sender, also for remembered 1.0 notifications),
 `entry_bytes` (1 MiB) and `findings` (10,000). An unknown sender gives `UnknownPeer` and an
 oversized entry gives `EntryLimit`; both entries are skipped. A call beyond `active_calls` gives
 `ActiveCallLimit` and is not tracked. When the answered memory forgets an ID, a late duplicate is
@@ -374,8 +384,8 @@ See the [value profile](../README.mbt.md) for default limits and unsupported con
 including runtime contract conditions and regex features.
 
 `validate_request` rejects response objects. Both entry points reject top-level arrays with
-`UnsupportedMessage`. Explicit batch entry points handle arrays; transcript correlation and
-transport behavior belong to later slices.
+`UnsupportedMessage`. Explicit batch entry points handle arrays, and `TranscriptChecker` links
+them in transcripts; transport behavior belongs to later slices.
 The package introduces no Ion, WIT, WAC, wasm-devkit or JSON Schema conversion dependencies.
 `mise run test:validation-consumer` builds separate packaged JSON and RPC consumers, audits
 their resolved dependency manifests and runs both examples on all four targets.

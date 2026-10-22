@@ -271,14 +271,6 @@ test "unknown peers and oversized entries are findings" {
 }
 
 ///|
-test "array entries wait for batch support" {
-  let checker = @rpc.TranscriptChecker::new(editor())
-  let found = checker.feed(entry("client", "[" + hover("1") + "]"))
-  assert_eq(codes(found), ["UnsupportedMessage"])
-  assert_true(found[0].message.contains("batch"))
-}
-
-///|
 test "finding and active call limits are findings" {
   let checker = @rpc.TranscriptChecker::new(
     editor(),

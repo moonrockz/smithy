@@ -186,7 +186,12 @@ the earliest unreadable entry of the other peer, then an explicit-null 2.0 call,
 advisory when both exist. Other replies are duplicate, wrong-responder, reply-to-notification or
 unsolicited findings. Completeness is declared: `finish` reports missing replies only for a `Complete`
 transcript. Tables are bounded by `TranscriptLimits`, so memory does not grow with the length of a
-stream. Transcript batches are not linked yet.
+stream. A 2.0 request batch is one unit that waits for one reply batch. A reply batch answers the
+earliest pending batch of the other peer whose IDs include every reply ID, and is checked with
+`OriginalBatch` context; one that fits no batch is unsolicited. A single reply to a call inside a
+pending batch is `WrongReplyForm`. An empty batch waits for one null-ID `-32600` error object, and an
+all-notification batch needs no reply. At `finish`, each pending batch counts as one unanswered unit.
+A 1.0 array entry stays `UnsupportedMessage`.
 
 ## Rule and original-example coverage
 

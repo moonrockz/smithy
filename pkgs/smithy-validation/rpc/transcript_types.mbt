@@ -119,7 +119,7 @@ pub impl @json.ToJson for TranscriptFinding with fn to_json(self) {
 ///|
 /// Bounds on the checker's memory and output. Exceeding one gives a finding.
 pub struct TranscriptLimits {
-  /// Active calls per sender, and unreadable entries per sender.
+  /// Active calls, unreadable entries and pending batches, each per sender.
   active_calls : Int32
   /// Answered IDs and remembered 1.0 notifications per sender.
   answered_ids : Int32
@@ -180,7 +180,7 @@ pub(all) struct TranscriptSummary {
   /// Findings known only at the end of input.
   findings : Array[TranscriptFinding]
   entries : Int32
-  /// Calls and 2.0 unreadable entries still waiting for a reply.
+  /// Calls, 2.0 unreadable entries and request batches still waiting for a reply.
   outstanding : Int32
   correlation : Bool
   /// False when a limit stopped a check.

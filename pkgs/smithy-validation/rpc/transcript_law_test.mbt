@@ -4,7 +4,7 @@ fn pick(n : Int32, size : Int32) -> Int32 {
 }
 
 ///|
-/// One entry from a pool of calls, replies, notifications, invalid and
+/// One entry from a pool of calls, replies, notifications, batches, invalid and
 /// wrong-ID entries for the Editor protocol, in both directions.
 fn pooled_entry(choice : Int32, id : Int32) -> @rpc.TranscriptEntry {
   let id = pick(id, 4).to_string()
@@ -27,6 +27,20 @@ fn pooled_entry(choice : Int32, id : Int32) -> @rpc.TranscriptEntry {
     ("client", "{\"jsonrpc\": \"2.0\", \"id\": null, \"method\": \"shutdown\"}"),
     ("nobody", "{}"),
     ("client", "[" + hover(id) + "]"),
+    ("client", "[" + hover(id) + "," + hover("\"" + id + "\"") + "]"),
+    ("server", "[" + hover_reply(id) + "]"),
+    (
+      "server",
+      "[" + hover_reply("\"" + id + "\"") + "," + hover_reply(id) + "]",
+    ),
+    ("client", "[]"),
+    ("client", "[1, {\"jsonrpc\": \"2.0\", \"method\": \"exit\"}]"),
+    (
+      "server", "[{\"jsonrpc\": \"2.0\", \"error\": {\"code\": -32600, \"message\": \"Invalid Request\"}, \"id\": null}]",
+    ),
+    (
+      "server", "{\"jsonrpc\": \"2.0\", \"error\": {\"code\": -32600, \"message\": \"Invalid Request\"}, \"id\": null}",
+    ),
   ]
   let (sender, message) = pool[pick(choice, pool.length())]
   { sender: peer(sender), message, location: None, }
@@ -100,12 +114,17 @@ fn shaped(text : String, choice : Int32) -> String {
   let ids = ["1", "null", "[1, {\"a\": 2}]", "1.0e400", "\"x\""]
   let id = ids[pick(choice / 15, ids.length())]
   let quoted = Json::string(text).stringify()
-  match pick(choice / 3, 5) {
+  let reply = "{\"jsonrpc\": \"2.0\", \"id\": " +
+    id +
+    ", \"result\": " +
+    quoted +
+    "}"
+  match pick(choice / 3, 6) {
     0 => text
     1 => "{\"method\": " + quoted + ", \"params\": [], \"id\": " + id + "}"
     2 => "{\"result\": null, \"error\": null, \"id\": " + id + "}"
-    3 =>
-      "{\"jsonrpc\": \"2.0\", \"id\": " + id + ", \"result\": " + quoted + "}"
+    3 => reply
+    4 => "[" + reply + ", " + text + "]"
     _ => "[" + text + "]"
   }
 }

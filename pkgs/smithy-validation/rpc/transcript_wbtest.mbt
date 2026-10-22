@@ -1,10 +1,12 @@
 ///|
-/// The largest active, unreadable, answered and notification table of any peer.
+/// The largest active, unreadable, answered, notification and pending batch
+/// table of any peer.
 fn TranscriptChecker::table_sizes(
   self : TranscriptChecker,
-) -> (Int32, Int32, Int32, Int32) {
+) -> (Int32, Int32, Int32, Int32, Int32) {
   let mut active = 0
   let mut unreadable = 0
+  let mut batches = 0
   let mut answered = 0
   let mut notifications = 0
   for state in self.peers {
@@ -15,8 +17,9 @@ fn TranscriptChecker::table_sizes(
       larger(state.answered.length(), state.answered_order.length()),
     )
     notifications = larger(notifications, state.notifications.length())
+    batches = larger(batches, state.batches.length())
   }
-  (active, unreadable, answered, notifications)
+  (active, unreadable, answered, notifications, batches)
 }
 
 ///|
@@ -60,8 +63,8 @@ fn bounded_protocol(version : ProtocolVersion) -> ProtocolDescription raise {
 }
 
 ///|
-/// Answered calls, duplicate replies, unanswered calls, notifications and
-/// unreadable entries.
+/// Answered calls, duplicate replies, unanswered calls, notifications,
+/// unreadable entries and, for 2.0, unanswered batches.
 fn bounded_entry(version : ProtocolVersion, i : Int32) -> TranscriptEntry {
   let marker = if version == V2_0 { "\"jsonrpc\": \"2.0\", " } else { "" }
   let error = if version == V1_0 { ", \"error\": null" } else { "" }
@@ -90,6 +93,14 @@ fn bounded_entry(version : ProtocolVersion, i : Int32) -> TranscriptEntry {
         marker +
         "\"method\": \"ping\", \"params\": [], \"id\": \"open-\{i}\"}",
       )
+    // Another cycle leaves a 2.0 batch unanswered.
+    4 if version == V2_0 && i / 6 % 10 == 5 =>
+      (
+        "client",
+        "[{" +
+        marker +
+        "\"method\": \"ping\", \"params\": [], \"id\": \"batch-\{i}\"}]",
+      )
     _ =>
       (
         "server",
@@ -108,19 +119,21 @@ test "tables stay within limits" {
       completeness=Complete,
       limits~,
     )
-    let mut largest = (0, 0, 0, 0)
+    let mut largest = (0, 0, 0, 0, 0)
     for i in 0..<10000 {
       checker.feed(bounded_entry(version, i)) |> ignore
-      let (active, unreadable, answered, notifications) = checker.table_sizes()
+      let (active, unreadable, answered, notifications, batches) = checker.table_sizes()
       assert_true(active <= 4, msg="active calls at entry \{i}")
       assert_true(unreadable <= 4, msg="unreadable entries at entry \{i}")
       assert_true(answered <= 4, msg="answered ids at entry \{i}")
       assert_true(notifications <= 4, msg="notifications at entry \{i}")
+      assert_true(batches <= 4, msg="pending batches at entry \{i}")
       largest = (
         larger(largest.0, active),
         larger(largest.1, unreadable),
         larger(largest.2, answered),
         larger(largest.3, notifications),
+        larger(largest.4, batches),
       )
     }
     // Every table was exercised up to its limit.
@@ -129,6 +142,8 @@ test "tables stay within limits" {
     assert_eq(largest.2, 4)
     if version == V1_0 {
       assert_eq(largest.3, 4)
+    } else {
+      assert_eq(largest.4, 4)
     }
     let summary = checker.finish()
     assert_eq(summary.entries, 10000)
