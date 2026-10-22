@@ -346,7 +346,7 @@ pub fn TranscriptChecker::feed(
       }
       self.report_messages(step, findings, [])
       if self.correlation {
-        self.track_unreadable(step)
+        self.track_unreadable(step) |> ignore
       }
       return step.out
     }
@@ -435,20 +435,22 @@ fn TranscriptChecker::request(
   if !self.correlation {
     return
   }
-  // A call applies the order rules only when the checker tracks it.
-  if !(class is Call(_, _)) {
-    self.order_request(step, receiver, value) |> ignore
-  }
+  // A call or an unreadable entry applies the order rules only when the
+  // checker tracks it.
   match class {
-    Silent => ()
+    Silent => self.order_request(step, receiver, value) |> ignore
     LegacyNotification => {
+      self.order_request(step, receiver, value) |> ignore
       let state = self.state(step.entry.sender)
       state.notifications.push_back(step.index)
       if state.notifications.length() > self.limits.answered_ids {
         state.notifications.pop_front() |> ignore
       }
     }
-    Unreadable => self.track_unreadable(step)
+    Unreadable =>
+      if self.track_unreadable(step) {
+        self.order_request(step, receiver, value) |> ignore
+      }
     Call(key, id) => self.track_call(step, receiver, value, key, id, form)
   }
 }
@@ -548,11 +550,14 @@ fn TranscriptChecker::track_call(
 }
 
 ///|
+/// Tracks an unreadable entry, which only a null-ID error can answer. It
+/// gives false when the entry is refused at the limit: then the entry, like
+/// a refused call, applies no order rule.
 fn TranscriptChecker::track_unreadable(
   self : TranscriptChecker,
   step : Step,
   form~ : PendingForm = SingleMessage,
-) -> Unit {
+) -> Bool {
   let sender = step.entry.sender
   let state = self.state(sender)
   if state.unreadable.length() >= self.limits.active_calls {
@@ -567,7 +572,7 @@ fn TranscriptChecker::track_unreadable(
         [],
         "I expected at most \{self.limits.active_calls} unanswered unreadable entries from \{sender.to_string()}; I do not track entry \{step.index}.",
       )
-      return
+      return false
     }
   }
   let form = match (self.protocol.version(), form) {
@@ -582,6 +587,7 @@ fn TranscriptChecker::track_unreadable(
     form,
     method_: None,
   })
+  true
 }
 
 ///|

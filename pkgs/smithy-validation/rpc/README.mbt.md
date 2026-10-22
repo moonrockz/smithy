@@ -335,7 +335,8 @@ the last accepted call of the capability source, when there is one. A rejected m
 transition, and its reply moves the session nowhere, but its call is still correlated. A call that
 correlation refuses with `ActiveIdReused` or `ActiveCallLimit` is not checked against the session:
 it takes no transition and cancels nothing. The same holds for each element of a refused request
-batch. In a request batch, the checker checks the elements in array order, and a reply batch settles
+batch, and for an unreadable entry (a request without a usable ID) that `ActiveCallLimit` refuses.
+In a request batch, the checker checks the elements in array order, and a reply batch settles
 each answered call.
 
 A cancellation names a call of its own sender: an active call, or a call in an earlier pending

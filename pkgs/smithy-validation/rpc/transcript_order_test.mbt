@@ -751,6 +751,30 @@ test "a refused call does not transition or cancel" {
 }
 
 ///|
+test "an unreadable entry refused at the limit does not transition" {
+  // An id of true is not usable, so each call is an unreadable entry.
+  let unreadable = method_ => {
+    "{\"jsonrpc\": \"2.0\", \"id\": true, \"method\": \"" + method_ + "\"}"
+  }
+  let entries = [
+    entry("host", unreadable("ping")),
+    entry("host", unreadable("exit")),
+    entry("host", call(3, "ping")),
+  ]
+  // A tracked unreadable exit moves the session to stopped, so the ping
+  // after it is out of order.
+  let checker = @rpc.TranscriptChecker::new(lifecycle())
+  let found = checker.feed_all(entries).filter(f => !(f.code is Message(_)))
+  assert_eq(summary_of(found), ["StateViolation@2[1]"])
+  // At the limit, the checker does not track the exit, so it applies no
+  // transition, like a refused call.
+  let limits = @rpc.TranscriptLimits::new(active_calls=1)
+  let checker = @rpc.TranscriptChecker::new(lifecycle(), limits~)
+  let found = checker.feed_all(entries).filter(f => !(f.code is Message(_)))
+  assert_eq(summary_of(found), ["ActiveCallLimit@1[]"])
+}
+
+///|
 test "a cancellation of an earlier batch call is excused in the batch reply" {
   let compile = id => call(id, "compile", params="{\"source\": \"x\"}")
   let checker = @rpc.TranscriptChecker::new(lifecycle(), completeness=Complete)

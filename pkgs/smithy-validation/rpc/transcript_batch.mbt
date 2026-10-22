@@ -152,7 +152,7 @@ fn TranscriptChecker::request_batch(
   }
   match keys {
     // An empty batch is answered by one null-ID error object.
-    None => self.track_unreadable(step, form=InvalidWholeBatch)
+    None => self.track_unreadable(step, form=InvalidWholeBatch) |> ignore
     Some(keys) => self.track_batch(step, receiver, values, keys)
   }
 }
