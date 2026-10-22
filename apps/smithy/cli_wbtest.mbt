@@ -676,6 +676,7 @@ test "transcript CLI reads --expect and --legacy-errors" {
 priv struct FakeInput {
   chunks : Array[Bytes]
   error : Error?
+  close_error : Error?
   mut reads : Int32
   mut closes : Int32
 }
@@ -695,7 +696,12 @@ fn FakeInput::source(self : FakeInput) -> InputSource {
         b""
       }
     },
-    close: () => self.closes += 1,
+    close: () => {
+      self.closes += 1
+      if self.close_error is Some(error) {
+        raise error
+      }
+    },
   }
 }
 
@@ -704,6 +710,7 @@ test "read_chunks gives each chunk, closes once and returns a read error" {
   let input = FakeInput::{
     chunks: [b"ab", b"c"],
     error: None,
+    close_error: None,
     reads: 0,
     closes: 0,
   }
@@ -716,6 +723,7 @@ test "read_chunks gives each chunk, closes once and returns a read error" {
   let input = FakeInput::{
     chunks: [b"ab"],
     error: Some(CliError("could not read stdin", 1)),
+    close_error: None,
     reads: 0,
     closes: 0,
   }
@@ -728,6 +736,7 @@ test "read_chunks gives each chunk, closes once and returns a read error" {
   let input = FakeInput::{
     chunks: [],
     error: Some(CliError("could not read 'dir.jsonl'", 1)),
+    close_error: None,
     reads: 0,
     closes: 0,
   }
@@ -735,10 +744,22 @@ test "read_chunks gives each chunk, closes once and returns a read error" {
   assert_true(failure is Unreadable(CliError("could not read 'dir.jsonl'", 1)))
   assert_eq(input.reads, 1)
   assert_eq(input.closes, 1)
+  // A close error with no byte and no read error is not an unreadable input.
+  let input = FakeInput::{
+    chunks: [],
+    error: None,
+    close_error: Some(CliError("could not close stdin", 1)),
+    reads: 0,
+    closes: 0,
+  }
+  let failure = read_chunks(input.source(), _ => fail("expected no chunk"))
+  assert_true(failure is Failed(CliError("could not close stdin", 1)))
+  assert_eq(input.closes, 1)
   // An error of the consumer closes the source and propagates.
   let input = FakeInput::{
     chunks: [b"ab", b"c"],
     error: None,
+    close_error: None,
     reads: 0,
     closes: 0,
   }
@@ -865,6 +886,7 @@ test "a read error part-way through a log still writes the summary" {
   let input = FakeInput::{
     chunks: [unsolicited],
     error: Some(CliError("could not read stdin", 1)),
+    close_error: None,
     reads: 0,
     closes: 0,
   }
@@ -898,6 +920,7 @@ test "a log that fails on its first read is unreadable like a missing file" {
   let input = FakeInput::{
     chunks: [],
     error: Some(CliError("could not read 'dir.jsonl'", 1)),
+    close_error: None,
     reads: 0,
     closes: 0,
   }
@@ -917,7 +940,7 @@ test "a log that fails on its first read is unreadable like a missing file" {
 test "a log matches --expect at the end and the status follows the match" {
   let log = b"{\"dir\":\"response\",\"message\":{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":null}}\n"
   fn input() -> FakeInput {
-    { chunks: [log], error: None, reads: 0, closes: 0, }
+    { chunks: [log], error: None, close_error: None, reads: 0, closes: 0, }
   }
 
   let unsolicited = @rpc.ExpectedFinding::new(
