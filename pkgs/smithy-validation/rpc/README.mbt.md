@@ -159,6 +159,45 @@ are a separate transport concern. Batches do not define scheduling, handler exec
 direction, outstanding calls across batches or partial transcript completeness. Exchanges remain
 a separate capability.
 
+## Two-peer protocols
+
+A `@jsonRpcProtocol` structure names two peers and the service each peer accepts. A peer with no
+`accepts` accepts nothing. `ProtocolDescription::from_smithy` selects a version and prepares one
+`PreparedService` per receiving peer. See `examples/json-rpc/peers.smithy`.
+
+```mbt check
+///|
+test "describe a two-peer protocol" {
+  let loaded = @rpc.loader()
+    .add_idl(
+      "peers.smithy",
+      (
+        #|$version: "2"
+        #|namespace demo
+        #|use smithy.rpc#jsonRpc
+        #|use smithy.rpc#jsonRpcProtocol
+        #|use smithy.rpc#method
+        #|@jsonRpcProtocol(versions: ["2.0"], peers: [{name: "client"}, {name: "server", accepts: Api}])
+        #|structure Link {}
+        #|@jsonRpc(versions: ["2.0"])
+        #|service Api { version: "1", operations: [Ping] }
+        #|@method(name: "ping", params: "named", nullResult: true)
+        #|operation Ping {}
+      ),
+    )
+    .assemble()
+  guard loaded.model is Some(model) else { fail("model did not load") }
+  let link = @rpc.ProtocolDescription::from_smithy(
+    model,
+    @smithy.ShapeId::parse("demo#Link").unwrap(),
+    @rpc.V2_0,
+  )
+  let server = @rpc.PeerName::parse("server").unwrap()
+  assert_true(link.service_for(server) is Some(_))
+  assert_eq(link.other(server).map(p => p.to_string()), Some("client"))
+}
+```
+
 ## CLI
 
 From the repository root:

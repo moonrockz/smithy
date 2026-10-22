@@ -162,6 +162,15 @@ ambiguous correlation. Identical invalid-element errors form a multiset. See the
 typed batch contexts, indexed results, single invalid-whole-batch errors and resource policies.
 Transcript mode with explicit directions remains planned.
 
+## Two-peer protocols
+
+`smithy.rpc#jsonRpcProtocol` marks a structure as a protocol between exactly two named peers. Each peer
+may `accept` one JSON-RPC service, which is the service that peer receives calls and notifications for.
+`ProtocolDescription::from_smithy(model, protocol, version)` rejects a missing shape or trait, an
+undeclared version, equal peer names and an accepted service that does not declare the version. It
+prepares one `PreparedService` per accepting peer; `service_for` gives `None` for a peer that accepts
+nothing. Transcript checking builds on this description.
+
 ## Rule and original-example coverage
 
 The table separates request and single-response coverage from follow-on batch/exchange work. R = requests/notifications,

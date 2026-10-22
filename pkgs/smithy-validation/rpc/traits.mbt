@@ -37,5 +37,14 @@ pub fn trait_definitions() -> String {
     #|list MemberOrder { member: String }
     #|@trait(selector: "structure[trait|error]")
     #|structure rpcError { @required code: Integer, dataMember: String, absentData: Boolean }
+    #|@trait(selector: "structure")
+    #|structure jsonRpcProtocol { @required versions: Versions, @required peers: Peers }
+    #|@length(min: 2, max: 2)
+    #|list Peers { member: Peer }
+    #|structure Peer { @required name: PeerName, accepts: ServiceRef }
+    #|@pattern("^[A-Za-z][A-Za-z0-9_-]{0,63}$")
+    #|string PeerName
+    #|@idRef(failWhenMissing: true, selector: "service")
+    #|string ServiceRef
   )
 }
