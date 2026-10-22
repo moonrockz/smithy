@@ -96,9 +96,10 @@ fn markdown_problem(
 }
 
 ///|
-/// The sender of a `jsonrpc A -> B` or `jsonrpc A` info string rest. The
-/// receiver, when given, must differ from the sender.
-fn read_direction(rest : String) -> Result[PeerName, String] {
+/// The sender and the named receiver of a `jsonrpc A -> B` or `jsonrpc A` info
+/// string rest. The receiver, when given, must differ from the sender; the
+/// checker compares it with the other peer.
+fn read_direction(rest : String) -> Result[(PeerName, PeerName?), String] {
   let parts = rest.split("->").map(part => part.trim().to_owned()).collect()
   if parts.length() > 2 || parts[0].is_empty() {
     return Err(
@@ -110,6 +111,7 @@ fn read_direction(rest : String) -> Result[PeerName, String] {
       "I expected a peer name as the sender, and I found \"\{parts[0]}\".",
     )
   }
+  let mut named : PeerName? = None
   if parts.length() == 2 {
     guard PeerName::parse(parts[1]) is Some(receiver) else {
       return Err(
@@ -121,8 +123,9 @@ fn read_direction(rest : String) -> Result[PeerName, String] {
         "I expected the receiver to be the other peer, and I found \"\{receiver.to_string()}\" on both sides.",
       )
     }
+    named = Some(receiver)
   }
-  Ok(sender)
+  Ok((sender, named))
 }
 
 ///|
@@ -268,9 +271,10 @@ pub fn read_markdown_transcript(
     }
     if is_entry {
       match read_direction(rest) {
-        Ok(sender) =>
+        Ok((sender, receiver)) =>
           entries.push({
             sender,
+            receiver,
             message: body,
             location: Some({ line: body_number, column: 1, }),
           })

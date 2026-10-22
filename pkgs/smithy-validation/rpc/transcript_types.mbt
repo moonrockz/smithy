@@ -17,6 +17,8 @@ pub(all) struct SourceLocation {
 /// One message sent by a named peer. The receiver is the other peer.
 pub(all) struct TranscriptEntry {
   sender : PeerName
+  /// The receiver the document names, if any; it must be the other peer.
+  receiver : PeerName?
   message : String
   location : SourceLocation?
 } derive(Eq, Debug)

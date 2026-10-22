@@ -107,7 +107,12 @@ fn bounded_entry(version : ProtocolVersion, i : Int32) -> TranscriptEntry {
         "{" + marker + "\"result\": null" + error + ", \"id\": \{i - 5}}",
       )
   }
-  { sender: PeerName::parse(sender).unwrap(), message, location: None, }
+  {
+    sender: PeerName::parse(sender).unwrap(),
+    message,
+    receiver: None,
+    location: None,
+  }
 }
 
 ///|

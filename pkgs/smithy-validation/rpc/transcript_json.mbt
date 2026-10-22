@@ -324,6 +324,7 @@ fn read_entry(
   }
   {
     sender,
+    receiver: None,
     message: text[message.start:message.end].to_owned(),
     location: Some(source_location(text, message.start)),
   }

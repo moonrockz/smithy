@@ -43,7 +43,7 @@ fn pooled_entry(choice : Int32, id : Int32) -> @rpc.TranscriptEntry {
     ),
   ]
   let (sender, message) = pool[pick(choice, pool.length())]
-  { sender: peer(sender), message, location: None, }
+  { sender: peer(sender), message, receiver: None, location: None, }
 }
 
 ///|
@@ -151,6 +151,7 @@ test "the checker never panics on arbitrary text" {
           }
           let found = checker.feed({
             sender,
+            receiver: None,
             message: shaped(message, choice),
             location: None,
           })

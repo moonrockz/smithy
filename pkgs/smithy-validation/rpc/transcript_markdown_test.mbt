@@ -167,3 +167,31 @@ test "an unterminated fence is reported at its opening line" {
   let (_, quiet) = @rpc.read_markdown_transcript("```json\n{")
   assert_eq(quiet, [])
 }
+
+///|
+test "a named receiver is kept and a wrong one is an unknown peer" {
+  let text =
+    #|```jsonrpc client -> server
+    #|{"jsonrpc": "2.0", "id": 1, "method": "shutdown"}
+    #|```
+    #|```jsonrpc client -> sevrer
+    #|{"jsonrpc": "2.0", "id": 2, "method": "shutdown"}
+    #|```
+    #|```jsonrpc client
+    #|{"jsonrpc": "2.0", "id": 3, "method": "shutdown"}
+    #|```
+  let (document, problems) = @rpc.read_markdown_transcript(text)
+  assert_eq(problems, [])
+  assert_eq(document.entries.map(e => e.receiver.map(p => p.to_string())), [
+    Some("server"),
+    Some("sevrer"),
+    None,
+  ])
+  let run = @rpc.run_transcript(editor(), document, problems)
+  let unknown = run.findings.filter(f => f.code == @rpc.UnknownPeer)
+  assert_eq(unknown.map(f => f.entry), [Some(1)])
+  assert_true(unknown[0].message.contains("sevrer"))
+  assert_true(unknown[0].message.contains("server"))
+  // The skipped entry is not tracked as a call: entries 0 and 2 stay outstanding.
+  assert_eq(run.summary.outstanding, 2)
+}

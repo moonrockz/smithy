@@ -202,7 +202,8 @@ test "describe a two-peer protocol" {
 
 `TranscriptChecker` checks a conversation between the two peers of a `ProtocolDescription`.
 Each `TranscriptEntry` names its sender and holds the original message text. The receiver is
-the other peer. `feed` returns the findings for one entry at once, and `feed_all` accepts a
+the other peer; an entry may also name one (`receiver: Some(peer)`, as a Markdown `A -> B` does),
+and the checker reports a named receiver that is not the other peer as `UnknownPeer`. `feed` returns the findings for one entry at once, and `feed_all` accepts a
 group of any size; both give the same findings in the same order. `finish` returns the
 end-of-input findings and a summary. It is idempotent, and a feed after it is ignored. The
 checker does no I/O and never raises: problems are `TranscriptFinding` values.
@@ -240,16 +241,19 @@ test "check a two-peer transcript" {
   let found = checker.feed_all([
     {
       sender: client,
+      receiver: None,
       message: "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}",
       location: None,
     },
     {
       sender: server,
+      receiver: None,
       message: "{\"jsonrpc\":\"2.0\",\"id\":1.0,\"result\":null}",
       location: None,
     },
     {
       sender: server,
+      receiver: None,
       message: "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":null}",
       location: None,
     },
@@ -320,8 +324,9 @@ holds when no item is missing and every unlisted finding is an advisory.
 
 `read_markdown_transcript` reads the same `TranscriptDocument` from Markdown. A fenced block (three or
 more backticks or tildes; the closing fence uses the same character and is at least as long) whose
-info string is `jsonrpc A -> B` or `jsonrpc A` is an entry sent by `A`; `B`, when given, must differ
-from `A`. A `jsonrpc` fence with no direction is an `InvalidTranscript` finding. A `jsonrpc-expect`
+info string is `jsonrpc A -> B` or `jsonrpc A` is an entry sent by `A`; `B`, when given, is kept as the
+entry's `receiver` and must be the other peer, or the checker reports `UnknownPeer` and skips the entry.
+The reader itself rejects a `B` equal to `A` or not a peer name. A `jsonrpc` fence with no direction is an `InvalidTranscript` finding. A `jsonrpc-expect`
 fence holds a JSON array of `{code, entry?, related?}` items. Other fences and all prose are ignored.
 Front matter between `---` lines on the first lines may give `version` and `complete`; other keys are
 ignored. The block body is the message exactly as written, located at the first body line, column 1.

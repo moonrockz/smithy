@@ -281,6 +281,15 @@ pub fn TranscriptChecker::feed(
     )
     return step.out
   }
+  if entry.receiver is Some(named) && named != receiver {
+    self.report(
+      step,
+      UnknownPeer,
+      [],
+      "I expected entry \{step.index} from \{sender.to_string()} to go to \{receiver.to_string()}, the other peer of protocol \{self.protocol.protocol().to_string()}; it names \{named.to_string()}.",
+    )
+    return step.out
+  }
   let bytes = utf8_length(entry.message)
   if bytes > self.limits.entry_bytes {
     self.report(

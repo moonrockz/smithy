@@ -1,6 +1,6 @@
 ///|
 fn entry(sender : String, message : String) -> @rpc.TranscriptEntry {
-  { sender: peer(sender), message, location: None, }
+  { sender: peer(sender), message, receiver: None, location: None, }
 }
 
 ///|
@@ -370,6 +370,7 @@ test "transcript findings render as JSON" {
     entry("server", hover_reply("9")),
     {
       sender: peer("client"),
+      receiver: None,
       message: hover("2"),
       location: Some({ line: 3, column: 5, }),
     },
@@ -407,4 +408,17 @@ test "transcript codes keep the stable code names" {
   // FindingCode constructors stay unambiguous without a qualifier.
   let codes = [@rpc.DuplicateResponse, @rpc.MissingResponse, @rpc.AmbiguousId]
   assert_eq(codes.length(), 3)
+}
+
+///|
+test "a named receiver must be the other peer" {
+  let checker = @rpc.TranscriptChecker::new(editor())
+  let found = checker.feed_all([
+    { ..entry("client", hover("1")), receiver: Some(peer("server")), },
+    { ..entry("client", hover("2")), receiver: Some(peer("client")), },
+    { ..entry("client", hover("3")), receiver: Some(peer("nobody")), },
+  ])
+  assert_eq(codes(found), ["UnknownPeer", "UnknownPeer"])
+  assert_eq(found.map(f => f.entry), [Some(1), Some(2)])
+  assert_eq(checker.finish().outstanding, 1)
 }

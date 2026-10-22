@@ -215,7 +215,7 @@ needs no missing item and no unlisted error.
 blocks as the expect list, and optional front matter keys `version` and `complete`. It ignores other
 fences and prose. A message is the block body as written, located at its first line. A `jsonrpc` fence with
 no direction, a receiver equal to the sender, and an unterminated fence are `InvalidTranscript` findings.
-A receiver other than `other(A)` is not detected yet, because an entry stores only its sender.
+The receiver of `A -> B` is stored in `TranscriptEntry.receiver` (the JSON reader leaves it `None`); when it is not `other(A)`, `TranscriptChecker::feed` reports `UnknownPeer` and skips the entry.
 `run_transcript` is the shared read-check-match pipeline of the CLI and the BDD world.
 
 ## Rule and original-example coverage
