@@ -230,16 +230,10 @@ fn TranscriptChecker::reply_batch(
         Some(step.entry.message),
         context=Some(BatchEnvelopeOnly),
       )
-      let findings = if borrowed {
-        result.findings.map(f => {
-          ..f,
-          shape: self.protocol.protocol(),
-          operation: None,
-        })
-      } else {
-        result.findings
-      }
-      (findings, result.entries.map(e => e.result.id))
+      (
+        self.envelope_findings(result.findings, borrowed),
+        result.entries.map(e => e.result.id),
+      )
     }
     None => ([], values.map(read_id))
   }

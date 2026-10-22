@@ -310,7 +310,7 @@ pub fn TranscriptChecker::feed(
     )
     return step.out
   }
-  let bytes = utf8_length(entry.message)
+  let bytes = @validation.utf8_length(entry.message)
   if bytes > self.limits.entry_bytes {
     self.report(
       step,
@@ -385,24 +385,6 @@ pub fn TranscriptChecker::feed_all(
     out.append(self.feed(entry))
   }
   out
-}
-
-///|
-fn utf8_length(text : String) -> Int32 {
-  let mut bytes = 0
-  for c in text.iter() {
-    let n = c.to_int()
-    bytes += if n < 0x80 {
-      1
-    } else if n < 0x800 {
-      2
-    } else if n < 0x10000 {
-      3
-    } else {
-      4
-    }
-  }
-  bytes
 }
 
 ///|
@@ -614,6 +596,21 @@ fn TranscriptChecker::reply_service(
 }
 
 ///|
+/// The envelope findings of a reply, checked by `reply_service`. A borrowed
+/// service is not the responder's, so its findings name the protocol shape.
+fn TranscriptChecker::envelope_findings(
+  self : TranscriptChecker,
+  findings : Array[Finding],
+  borrowed : Bool,
+) -> Array[Finding] {
+  if borrowed {
+    findings.map(f => { ..f, shape: self.protocol.protocol(), operation: None, })
+  } else {
+    findings
+  }
+}
+
+///|
 fn read_id(value : Json) -> RequestId {
   guard value is Object(fields) && fields.get("id") is Some(raw) else {
     return Absent
@@ -640,16 +637,7 @@ fn TranscriptChecker::reply(
         context=Some(EnvelopeOnly),
         legacy_errors=self.legacy_errors,
       )
-      let findings = if borrowed {
-        result.findings.map(f => {
-          ..f,
-          shape: self.protocol.protocol(),
-          operation: None,
-        })
-      } else {
-        result.findings
-      }
-      (findings, result.id)
+      (self.envelope_findings(result.findings, borrowed), result.id)
     }
     None => ([], read_id(value))
   }

@@ -78,25 +78,6 @@ fn closes_fence(content : String, open : Fence) -> Bool {
 }
 
 ///|
-/// An InvalidTranscript reader finding at a one-based line and column.
-fn located_problem(
-  line : Int32,
-  column : Int32,
-  message : String,
-) -> TranscriptFinding {
-  {
-    code: InvalidTranscript,
-    severity: @validation.Error,
-    entry: None,
-    location: Some({ line, column, }),
-    sender: None,
-    related: [],
-    finding: None,
-    message,
-  }
-}
-
-///|
 /// The sender and the named receiver of a `jsonrpc A -> B` or `jsonrpc A` info
 /// string rest. The receiver, when given, must differ from the sender; the
 /// checker compares it with the other peer.
@@ -159,8 +140,7 @@ fn read_front_matter(
           _ =>
             findings.push(
               located_problem(
-                line.number,
-                1,
+                { line: line.number, column: 1, },
                 "I expected \"1.0\" or \"2.0\" for \"version\" in the front matter, and I found \{value}.",
               ),
             )
@@ -172,8 +152,7 @@ fn read_front_matter(
           _ =>
             findings.push(
               located_problem(
-                line.number,
-                1,
+                { line: line.number, column: 1, },
                 "I expected true or false for \"complete\" in the front matter, and I found \{value}.",
               ),
             )
@@ -268,8 +247,7 @@ pub fn read_markdown_transcript(
     if !closed {
       findings.push(
         located_problem(
-          line.number,
-          1,
+          { line: line.number, column: 1, },
           "I expected a closing fence for this \{word} block, and I found the end of the text.",
         ),
       )
@@ -289,14 +267,20 @@ pub fn read_markdown_transcript(
             message: body,
             location: Some({ line: body_number, column: 1, }),
           })
-        Err(message) => findings.push(located_problem(line.number, 1, message))
+        Err(message) =>
+          findings.push(
+            located_problem({ line: line.number, column: 1, }, message),
+          )
       }
     } else {
       let items = read_expected(body, { start: 0, end: body.length(), }) catch {
         Problem((message, at)) => {
           let place = source_location(body, at)
           findings.push(
-            located_problem(body_number + place.line - 1, place.column, message),
+            located_problem(
+              { line: body_number + place.line - 1, column: place.column, },
+              message,
+            ),
           )
           continue
         }

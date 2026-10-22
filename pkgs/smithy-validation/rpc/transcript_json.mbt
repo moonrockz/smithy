@@ -294,24 +294,6 @@ fn source_location(text : String, at : Int32) -> SourceLocation {
 }
 
 ///|
-fn invalid_document(
-  locator : Locator,
-  at : Int32,
-  message : String,
-) -> TranscriptFinding {
-  {
-    code: InvalidTranscript,
-    severity: @validation.Error,
-    entry: None,
-    location: Some(locator.locate(at)),
-    sender: None,
-    related: [],
-    finding: None,
-    message,
-  }
-}
-
-///|
 fn parse_span(text : String, span : Span) -> Json raise JsonDocumentError {
   parse_bounded_json(text[span.start:span.end]) catch {
     _ =>
@@ -487,7 +469,7 @@ pub fn read_json_transcript(
   let locator = Locator::new(text)
   fn problem(error : JsonDocumentError) -> Unit {
     let Problem((message, at)) = error
-    findings.push(invalid_document(locator, at, message))
+    findings.push(located_problem(locator.locate(at), message))
   }
 
   let start = document_start(text)
@@ -592,9 +574,8 @@ pub fn read_json_transcript(
             }
             _ =>
               findings.push({
-                ..invalid_document(
-                  locator,
-                  at,
+                ..located_problem(
+                  locator.locate(at),
                   "I do not know the transcript member \"\{key}\"; I ignored it.",
                 ),
                 severity: @validation.Advisory,
@@ -643,6 +624,6 @@ pub fn read_expected_findings(
     (read_expected(text, { start, end, }), [])
   } catch {
     Problem((message, at)) =>
-      ([], [invalid_document(Locator::new(text), at, message)])
+      ([], [located_problem(source_location(text, at), message)])
   }
 }
