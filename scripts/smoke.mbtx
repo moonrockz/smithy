@@ -1,0 +1,486 @@
+///|
+/// Smoke evidence. The smoke job runs each release binary on a runner of its own OS. Its result
+/// depends on the inputs of the binaries and of the check, not on the whole tree. The fingerprint
+/// names those inputs: a SHA-256 of their `git ls-tree` entries at HEAD. A trusted run that smokes
+/// every platform records evidence under the fingerprint, in the GitHub Actions cache. A later run with
+/// the same fingerprint carries the evidence forward and smokes nothing. A release always smokes.
+///
+/// Usage:
+///   smoke.mbtx fingerprint            print the fingerprint and the version; write them to GITHUB_OUTPUT
+///   smoke.mbtx inputs                 list the input entries of the fingerprint
+///   smoke.mbtx record <dist> <out>    write <out>/evidence.json for the dist/ that passed smoke
+///   smoke.mbtx report                 open an issue for a failed smoke, or comment on the open one
+///
+/// `record` needs FINGERPRINT and the GitHub run variables. It fails when HEAD has another
+/// fingerprint. `report` needs GH_TOKEN and the GitHub run variables. The script exits with a
+/// non-zero code on failure.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/core/encoding/hex",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/sys",
+  "moonrockz/moonspec@0.11.0",
+  "moonrockz/expect@0.6.1",
+}
+
+///|
+let usage : String = "Usage: smoke.mbtx fingerprint | inputs | record <dist> <out> | report"
+
+///|
+/// The first line of the fingerprint text. Change it when the meaning of the fingerprint changes.
+let schema : String = "smoke-evidence v1"
+
+///|
+/// Single files that are inputs: the version and the workspace, the toolchain pins, the build and
+/// pack scripts, the zig-cross pin, this script, and the workflows that build and smoke.
+let input_files : Array[String] = [
+  "moon.mod", "moon.work", ".config/mise/config.toml", "scripts/dist.mbtx", "scripts/zig-cross.mbtx",
+  "scripts/smoke.mbtx", ".github/workflows/ci.yml", ".github/workflows/release.yml",
+  ".github/workflows/smoke.yml",
+]
+
+///|
+/// Folders whose files are inputs: the CLI and its package closure, and the setup action.
+let input_dirs : Array[String] = [
+  "apps/smithy/", "pkgs/", ".github/actions/setup/",
+]
+
+///|
+/// Files in the input folders that only tests and docs read. They are not part of a release binary.
+let test_only_suffixes : Array[String] = [
+  "_test.mbt", "_wbtest.mbt", ".md", ".feature",
+]
+
+///|
+/// The platforms that the smoke job runs, in the order of the matrix in `.github/workflows/smoke.yml`.
+let platforms : Array[String] = [
+  "linux-x64", "linux-arm64", "darwin-arm64", "darwin-x64", "windows-x64",
+]
+
+///|
+let report_title : String = "Smoke failed on main"
+
+///|
+fn fail_with(message : String) -> Unit {
+  eprintln("❌ \{message}")
+  @sys.exit(1)
+}
+
+///|
+/// The path is an input of the release binaries or of the smoke check.
+fn is_input(path : String) -> Bool {
+  if input_files.contains(path) {
+    return true
+  }
+  input_dirs.any(dir => path.has_prefix(dir)) &&
+  !test_only_suffixes.any(suffix => path.has_suffix(suffix))
+}
+
+///|
+/// One entry of `git ls-tree`.
+struct Entry {
+  mode : String
+  object : String
+  path : String
+} derive(Eq, Debug)
+
+///|
+/// The entries of `git ls-tree -r -z` output: `<mode> <type> <object>\t<path>`, NUL-terminated.
+/// Submodules (type commit) stay: a new submodule commit is a new input.
+fn tree_entries(listing : String) -> Array[Entry] {
+  let entries = []
+  for record in listing.split("\u{0}") {
+    guard record.find("\t") is Some(tab) else { continue }
+    let meta = record.view(end_offset=tab).split(" ").collect()
+    guard meta.length() == 3 else { continue }
+    entries.push({
+      mode: meta[0].to_owned(),
+      object: meta[2].to_owned(),
+      path: record.view(start_offset=tab + 1).to_owned(),
+    })
+  }
+  entries
+}
+
+///|
+fn compare_lexical(a : String, b : String) -> Int {
+  let n = if a.length() < b.length() { a.length() } else { b.length() }
+  for i in 0..<n {
+    let c = a.code_unit_at(i).compare(b.code_unit_at(i))
+    if c != 0 {
+      return c
+    }
+  }
+  a.length().compare(b.length())
+}
+
+///|
+/// The input entries, sorted by path.
+fn inputs(entries : Array[Entry]) -> Array[Entry] {
+  let kept = entries.filter(e => is_input(e.path))
+  kept.sort_by((a, b) => compare_lexical(a.path, b.path))
+  kept
+}
+
+///|
+/// The text that the fingerprint hashes: the schema line, then `<mode> <object>\t<path>` per input.
+fn fingerprint_text(entries : Array[Entry]) -> String {
+  let buf = StringBuilder()
+  buf.write_string(schema + "\n")
+  for e in inputs(entries) {
+    buf.write_string("\{e.mode} \{e.object}\t\{e.path}\n")
+  }
+  buf.to_string()
+}
+
+///|
+fn fingerprint(entries : Array[Entry]) -> String {
+  @hex.encode(
+    Bytes::from_array(@crypto.sha256(@utf8.encode(fingerprint_text(entries)))),
+  )
+}
+
+///|
+/// The checksums of `checksums.txt` (`<sha256 hex>  <name>` per line), by name.
+fn checksum_lines(text : String) -> Array[(String, String)] {
+  let lines = []
+  for line in text.split("\n") {
+    guard line.find("  ") is Some(gap) else { continue }
+    lines.push(
+      (
+        line.view(start_offset=gap + 2).trim().to_owned(),
+        line.view(end_offset=gap).trim().to_owned(),
+      ),
+    )
+  }
+  lines
+}
+
+///|
+/// The evidence that a trusted run records after every platform passed smoke.
+fn evidence_json(
+  fingerprint~ : String,
+  commit~ : String,
+  run~ : String,
+  attempt~ : String,
+  event~ : String,
+  git_ref~ : String,
+  checksums~ : String,
+) -> String {
+  let sums : Map[String, Json] = Map([])
+  for pair in checksum_lines(checksums) {
+    sums[pair.0] = Json::string(pair.1)
+  }
+  let json : Json = {
+    "schema": Json::string(schema),
+    "fingerprint": Json::string(fingerprint),
+    "commit": Json::string(commit),
+    "run": Json::string(run),
+    "attempt": Json::string(attempt),
+    "event": Json::string(event),
+    "ref": Json::string(git_ref),
+    "platforms": Json::array(platforms.map(Json::string)),
+    "checksums": Json::object(sums),
+  }
+  json.stringify(indent=2)
+}
+
+///|
+fn report_body(
+  run~ : String,
+  commit~ : String,
+  git_ref~ : String,
+  event~ : String,
+) -> String {
+  "Smoke failed in \{run} (\{event}, \{git_ref}, commit \{commit}).\n\n" +
+  "A release binary did not run, or printed the wrong version, on one of its platforms. " +
+  "A release of these inputs will fail its smoke job. Fix the cause, then close this issue. " +
+  "Run the Release workflow with `dry_run` to smoke again."
+}
+
+///|
+fn env_or(name : String, default : String) -> String {
+  match @env.get_env_var(name) {
+    Some(value) if value != "" => value
+    _ => default
+  }
+}
+
+///|
+fn run_url() -> String {
+  let server = env_or("GITHUB_SERVER_URL", "https://github.com")
+  let repo = env_or("GITHUB_REPOSITORY", "")
+  let id = env_or("GITHUB_RUN_ID", "")
+  "\{server}/\{repo}/actions/runs/\{id}"
+}
+
+///|
+async fn output_of(cmd : String, args : Array[String]) -> (Int, String) {
+  let (code, out, err) = @process.collect_output(cmd, args) catch {
+    _ => return (1, "cannot start \{cmd}")
+  }
+  if code != 0 {
+    return (code, out.text() + err.text())
+  }
+  (code, out.text())
+}
+
+///|
+async fn head_entries() -> Array[Entry] {
+  let (code, out) = output_of("git", ["ls-tree", "-r", "-z", "--full-tree", "HEAD"])
+  if code != 0 {
+    fail_with("`git ls-tree -r -z --full-tree HEAD` failed: \{out.trim()}")
+  }
+  tree_entries(out)
+}
+
+///|
+fn mod_version(moon_mod : String) -> String? {
+  for line in moon_mod.split("\n") {
+    let line = line.trim()
+    guard line.has_prefix("version") else { continue }
+    let rest = line.view(start_offset=7).trim_start()
+    guard rest.has_prefix("=") else { continue }
+    let value = rest.view(start_offset=1).trim()
+    guard value.length() >= 2 && value.has_prefix("\"") && value.has_suffix("\"") else {
+      continue
+    }
+    return Some(value.view(start_offset=1, end_offset=value.length() - 1).to_owned())
+  }
+  None
+}
+
+///|
+async fn write_outputs(text : String) -> Unit {
+  match @env.get_env_var("GITHUB_OUTPUT") {
+    Some(path) if path != "" => @fs.write_file(path, text, append=true)
+    _ => ()
+  }
+}
+
+///|
+async fn run_fingerprint() -> Unit {
+  let fp = fingerprint(head_entries())
+  let version = match mod_version(@fs.read_file("moon.mod").text()) {
+    Some(v) => v
+    None => {
+      fail_with("moon.mod has no version")
+      ""
+    }
+  }
+  println("fingerprint=\{fp}")
+  println("version=\{version}")
+  write_outputs("fingerprint=\{fp}\nversion=\{version}\n")
+}
+
+///|
+async fn run_record(dist : String, out : String) -> Unit {
+  let expected = env_or("FINGERPRINT", "")
+  if expected == "" {
+    fail_with("FINGERPRINT is not set")
+  }
+  let fp = fingerprint(head_entries())
+  if fp != expected {
+    fail_with(
+      "HEAD has fingerprint \{fp}, not \{expected}: the evidence would name other inputs",
+    )
+  }
+  let sums_path = "\{dist}/checksums.txt"
+  if !@fs.exists(sums_path) {
+    fail_with("\{sums_path} does not exist")
+  }
+  let json = evidence_json(
+    fingerprint=fp,
+    commit=env_or("GITHUB_SHA", ""),
+    run=run_url(),
+    attempt=env_or("GITHUB_RUN_ATTEMPT", "1"),
+    event=env_or("GITHUB_EVENT_NAME", ""),
+    git_ref=env_or("GITHUB_REF", ""),
+    checksums=@fs.read_file(sums_path).text(),
+  )
+  @fs.mkdir(out, recursive=true, allow_exist=true)
+  @fs.write_file("\{out}/evidence.json", json + "\n")
+  println(json)
+  match @env.get_env_var("GITHUB_STEP_SUMMARY") {
+    Some(path) if path != "" =>
+      @fs.write_file(
+        path,
+        "### Smoke evidence\n\nKey `smoke-evidence-\{fp}`\n\n```json\n\{json}\n```\n",
+        append=true,
+      )
+    _ => ()
+  }
+}
+
+///|
+async fn run_report() -> Unit {
+  let repo = env_or("GITHUB_REPOSITORY", "")
+  if repo == "" {
+    fail_with("GITHUB_REPOSITORY is not set")
+  }
+  let body = report_body(
+    run=run_url(),
+    commit=env_or("GITHUB_SHA", ""),
+    git_ref=env_or("GITHUB_REF", ""),
+    event=env_or("GITHUB_EVENT_NAME", ""),
+  )
+  let (code, out) = output_of("gh", [
+    "issue", "list", "--repo", repo, "--state", "open", "--search", "\"\{report_title}\" in:title",
+    "--json", "number,title", "--jq", ".[] | select(.title == \"\{report_title}\") | .number",
+  ])
+  if code != 0 {
+    fail_with("`gh issue list` failed: \{out.trim()}")
+  }
+  let number = out.trim().split("\n").next().map(s => s.to_owned()).unwrap_or("")
+  let args = if number != "" {
+    ["issue", "comment", number, "--repo", repo, "--body", body]
+  } else {
+    ["issue", "create", "--repo", repo, "--title", report_title, "--body", body]
+  }
+  let (code, out) = output_of("gh", args)
+  if code != 0 {
+    fail_with("`gh \{args[0]} \{args[1]}` failed: \{out.trim()}")
+  }
+  println(out.trim())
+}
+
+///|
+async fn main {
+  let args = @env.args()[1:].to_owned()
+  match args {
+    ["fingerprint"] => run_fingerprint()
+    ["inputs"] =>
+      for e in inputs(head_entries()) {
+        println("\{e.mode} \{e.object}\t\{e.path}")
+      }
+    ["record", dist, out] => run_record(dist, out)
+    ["report"] => run_report()
+    _ => {
+      eprintln(usage)
+      @sys.exit(2)
+    }
+  }
+}
+
+///|
+struct SmokeWorld {
+  tree : Map[String, Entry]
+  mut taken : String
+  mut entries : Array[Entry]
+}
+
+///|
+fn SmokeWorld::new() -> SmokeWorld {
+  { tree: Map([]), taken: "", entries: [] }
+}
+
+///|
+fn SmokeWorld::current(self : SmokeWorld) -> Array[Entry] {
+  self.tree.values().collect()
+}
+
+///|
+fn yes(answer : String) -> Bool {
+  answer == "yes"
+}
+
+///|
+impl @moonspec.World for SmokeWorld with fn configure(self, setup) {
+  setup.then2("the path {string} is an input: {string}", fn(
+    path : String,
+    answer : String,
+  ) raise {
+    @expect.expect(is_input(path)).to_equal(yes(answer))
+  })
+  setup.given3("the tree has {string} {string} {string}", fn(
+    mode : String,
+    object : String,
+    path : String,
+  ) {
+    self.tree[path] = { mode, object, path }
+  })
+  setup.given0("the tree is empty", fn() { self.tree.clear() })
+  setup.when0("I take the fingerprint", fn() {
+    self.taken = fingerprint(self.current())
+  })
+  setup.then0("the fingerprint is the same", fn() raise {
+    @expect.expect(fingerprint(self.current())).to_equal(self.taken)
+  })
+  setup.then0("the fingerprint is not the same", fn() raise {
+    @expect.expect(fingerprint(self.current()) != self.taken).to_equal(true)
+  })
+  setup.then1("the fingerprint text is:", fn(doc : @moonspec.DocString) raise {
+    @expect.expect(fingerprint_text(self.current())).to_equal(
+      doc.content + "\n",
+    )
+  })
+  setup.then1("the fingerprint has {int} hex digits", fn(n : Int) raise {
+    let fp = fingerprint(self.current())
+    @expect.expect(fp.length()).to_equal(n)
+    @expect.expect(fp.to_lower() == fp).to_equal(true)
+  })
+  setup.when1("I read the ls-tree records {string}", fn(records : String) {
+    self.entries = tree_entries(records.replace_all(old="|", new="\u{0}") + "\u{0}")
+  })
+  setup.then1("the entries are {string}", fn(expected : String) raise {
+    @expect.expect(
+      self.entries.map(e => "\{e.mode} \{e.object} \{e.path}").join("|"),
+    ).to_equal(expected)
+  })
+  setup.then8(
+    "the evidence for fingerprint {string} of commit {string} in run {string} attempt {string} of event {string} on {string} with the checksums {string} is:",
+    fn(
+      fingerprint : String,
+      commit : String,
+      run : String,
+      attempt : String,
+      event : String,
+      git_ref : String,
+      checksums : String,
+      doc : @moonspec.DocString,
+    ) raise {
+      @expect.expect(
+        evidence_json(
+          fingerprint~,
+          commit~,
+          run~,
+          attempt~,
+          event~,
+          git_ref~,
+          checksums=checksums.replace_all(old="|", new="\n"),
+        ),
+      ).to_equal(doc.content)
+    },
+  )
+  setup.then5(
+    "the report for run {string} of commit {string} on {string} by {string} is:",
+    fn(
+      run : String,
+      commit : String,
+      git_ref : String,
+      event : String,
+      doc : @moonspec.DocString,
+    ) raise {
+      @expect.expect(report_body(run~, commit~, git_ref~, event~)).to_equal(
+        doc.content,
+      )
+    },
+  )
+}
+
+///|
+async test "smoke feature" {
+  @moonspec.run_or_fail(
+    SmokeWorld::new,
+    @moonspec.RunOptions::new([
+      @moonspec.FeatureSource::File("features/smoke.feature"),
+    ]),
+  )
+  |> ignore
+}
