@@ -596,9 +596,14 @@ pub fn Model::is_current(self : Model) -> Bool {
 }
 
 ///|
-/// True when the page waits for a check.
+/// True when a check of newer text than the result on the page runs or
+/// comes. Every change starts a wait that ends in a check, so a change since
+/// the newest request is enough: the result on the page is then for older
+/// text, also during the 250 ms wait and after an answer for older text.
 pub fn Model::checking(self : Model) -> Bool {
-  (self.waiting && self.inflight == Validating) || self.pending
+  (self.waiting && self.inflight == Validating) ||
+  self.pending ||
+  self.edits != self.sent_edits
 }
 
 ///|

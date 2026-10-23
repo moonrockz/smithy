@@ -70,3 +70,16 @@ test("a result for old text never replaces the result for newer text", async ({ 
   expect(answered).toBeGreaterThanOrEqual(0);
   expect(after.slice(answered).filter((state) => state !== "✓ valid")).toEqual([]);
 });
+
+test("right after a change, the result for the old text shows as checking", async ({ lightpanda: page }) => {
+  await replaceInEditor(page, "quantity: Integer", "quantity: Intger");
+  await settled(page);
+  await expect(page.locator(".pg-check")).toHaveText("● 1 error");
+  await replaceInEditor(page, "quantity: Intger", "quantity: Integer");
+  // The page has the change when the row of the old result is stale. The wait of 250 ms before the
+  // check has not ended, so no request runs yet: the status must still say that a check comes.
+  await expect(page.locator(".pg-diag-stale")).toHaveCount(1);
+  expect(await page.textContent(".pg-check")).toBe("● 1 error · checking");
+  await settled(page);
+  await expect(page.locator(".pg-check")).toHaveText("✓ valid");
+});

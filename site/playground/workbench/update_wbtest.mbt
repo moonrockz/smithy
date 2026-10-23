@@ -683,3 +683,52 @@ test "mismatch: a transform ends, the work that waits is not sent, and a good an
   assert_false(m.mismatch)
   assert_eq(m.check, Checked(items=[], shapes=1))
 }
+
+///|
+test "stale status: right after a change, the result on the page is marked as checking" {
+  let m = answered()
+  assert_false(m.checking())
+  // The wait of 250 ms has not ended: no request runs, and none waits.
+  let (m, _) = update(m, Edited)
+  assert_false(m.waiting)
+  assert_false(m.pending)
+  assert_true(m.checking())
+  assert_false(m.is_current())
+}
+
+///|
+test "stale status: an answer for older text during the wait of a newer change stays marked as checking" {
+  let m = answered()
+  // A change is sent; then the text changes again, and its wait has not ended
+  // when the answer for the older text comes.
+  let (m, _) = run(m, [Edited, Debounced(edits=1), Edited])
+  let (m, effects) = update(
+    m,
+    Answered(
+      seq=2,
+      answer=Validated(items=[error_at(2)], shapes=0, protocols=[]),
+    ),
+  )
+  assert_eq(effects, [])
+  assert_false(m.waiting)
+  assert_false(m.pending)
+  assert_eq(m.check, Checked(items=[], shapes=1))
+  assert_true(m.checking())
+  // The wait ends: the newest text goes, and the mark stays until its answer.
+  let (m, _) = update(m, Debounced(edits=2))
+  assert_true(m.checking())
+  let (m, _) = update(
+    m,
+    Answered(seq=3, answer=Validated(items=[], shapes=1, protocols=[])),
+  )
+  assert_false(m.checking())
+  assert_true(m.is_current())
+}
+
+///|
+test "stale status: a stopped check with no change is not marked as checking" {
+  let (m, _) = Model::start(data())
+  let (m, _) = update(m, TimedOut(seq=1))
+  assert_eq(m.check, Stopped)
+  assert_false(m.checking())
+}
