@@ -638,3 +638,48 @@ test "transform: an answer for an old request does not show" {
   assert_eq(effects, [ShowFile(seq=2, index=0)])
   assert_eq(update(m, CopyClicked).1, [CopyFile(seq=2, index=0)])
 }
+
+///|
+test "mismatch: a Worker of another build shows the message at once, with no restart" {
+  assert_eq(
+    MISMATCH_TEXT,
+    "The page and its checker do not match. Reload the page.",
+  )
+  let (m, _) = Model::start(data())
+  assert_false(m.mismatch)
+  let (m, effects) = update(m, Mismatched)
+  assert_true(m.mismatch)
+  assert_false(m.waiting)
+  assert_eq(m.check, Unchecked)
+  // A new Worker would load the same script, so none starts.
+  assert_eq(effects, [])
+  // The timer of the request ends with no second message.
+  let (m2, late) = update(m, TimedOut(seq=1))
+  assert_eq(m2, m)
+  assert_eq(late, [])
+  // While no request runs, the message changes nothing.
+  let (m3, none) = update(m, Mismatched)
+  assert_eq(m3, m)
+  assert_eq(none, [])
+}
+
+///|
+test "mismatch: a transform ends, the work that waits is not sent, and a good answer clears the message" {
+  let m = answered()
+  let (m, _) = update(m, RunClicked)
+  assert_eq(m.tx, TxRunning)
+  let (m, _) = run(m, [Edited, Debounced(edits=1)])
+  assert_true(m.pending)
+  let (m, effects) = update(m, Mismatched)
+  assert_true(m.mismatch)
+  assert_eq(m.tx, TxIdle)
+  assert_false(m.pending)
+  assert_eq(effects, [])
+  let (m, _) = run(m, [Edited, Debounced(edits=2)])
+  let (m, _) = update(
+    m,
+    Answered(seq=m.seq, answer=Validated(items=[], shapes=1, protocols=[])),
+  )
+  assert_false(m.mismatch)
+  assert_eq(m.check, Checked(items=[], shapes=1))
+}

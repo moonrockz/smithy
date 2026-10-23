@@ -143,7 +143,11 @@ waits, and the newest text goes when that request ends. Each request has a new `
 answer to its newest request, and only while the text is the text that it checked; until then the previous
 result stays, marked as checking, and its rows do not move the cursor. When the Worker gives no answer in 10
 seconds, the page ends it, starts a new one and says so. When the Worker stops with an error, the page starts a
-new one at once and says that the check failed. The Smithy library needs minutes for a model of 1 MB
+new one at once and says that the check failed. The page loads `ui.js` and the Worker with the git ref of the build as the query
+(`?v=<ref>`, `SiteConfig::versioned`): Pages caches each file for 600 seconds, and a new page must not run an old
+Worker. A Worker that cannot read a request answers `Blocked` with `seq` -1; that answer, or an answer that the
+page cannot read, shows at once "The page and its checker do not match. Reload the page." (`#pg-mismatch`), and no
+new Worker starts. The Smithy library needs minutes for a model of 1 MB
 (the time grows with the square of the shape count), so such a model stops at that limit.
 
 ### Share links, Download and "Open in playground"

@@ -1,10 +1,17 @@
 ///|
+/// The URL of the Worker script of the build, with its git ref as the query,
+/// as `ui.js` has. A page of one build then never runs the Worker of another.
+fn worker_url(config : @data.SiteConfig) -> String {
+  config.versioned(config.base + "playground/worker.js")
+}
+
+///|
 /// The data of the playground page: the samples of the picker, read from
-/// `content`, the Worker under `base` and the Smithy version of this build.
+/// `content`, the Worker at `worker` and the Smithy version of this build.
 /// A missing sample is a broken build.
 fn playground_data(
   content : String,
-  base : String,
+  worker : String,
 ) -> Result[@workbench.PlaygroundData, String] {
   let paths = @samples.manifest.map(source => source.path) +
     @samples.transcript_manifest.map(source => source.path)
@@ -42,7 +49,7 @@ fn playground_data(
   }
   Ok({
     version: @smithy.version(),
-    worker: base + "playground/worker.js",
+    worker,
     samples,
     selected: @samples.default_index,
     transcripts,

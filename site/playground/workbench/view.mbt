@@ -147,6 +147,7 @@ fn check_status(m : Model) -> Html {
     []
   }
   let main = match m.check {
+    _ if m.mismatch => @html.span(class="pg-err", "Failed")
     Unchecked => @html.span(class="pg-hint", "Not checked")
     Checked(..) if m.errors() > 0 =>
       @html.span(class="pg-err", "● " + plural(m.errors(), "error", "errors"))
@@ -275,6 +276,7 @@ fn diagnostic_row(
 ///|
 fn validate_panel(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
   match m.check {
+    Unchecked if m.mismatch => []
     Unchecked => [@html.p(class="pg-empty", "The playground checks the model.")]
     Refused(reason) => [@html.p(class="pg-notice", reason)]
     Stopped =>
@@ -697,6 +699,26 @@ fn results_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
 }
 
 ///|
+/// The text when the Worker script is of another build than the page.
+pub const MISMATCH_TEXT : String = "The page and its checker do not match. Reload the page."
+
+///|
+/// The message when the Worker script is of another build than the page. The
+/// element is always there, so a screen reader reads the change.
+fn mismatch_notice(m : Model) -> Html {
+  @html.div(
+    id="pg-mismatch",
+    class="pg-sharestatus",
+    attrs=@html.Attrs::build().role("alert"),
+    if m.mismatch {
+      [@html.span(class="pg-err", MISMATCH_TEXT)]
+    } else {
+      []
+    },
+  )
+}
+
+///|
 /// The workbench: the toolbar, the model editor and the result tabs. The
 /// pre-render shows it with no result; the playground script then mounts it
 /// again in the element with id `APP_ID` and starts the editor.
@@ -704,6 +726,7 @@ pub fn view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   @html.div(class="pg", [
     toolbar(m, emit),
     share_status(m, emit),
+    mismatch_notice(m),
     @html.div(class="pg-bench", [
       model_pane(m),
       @html.div(class="pg-splitter", ([] : Array[Html])),

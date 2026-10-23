@@ -61,7 +61,7 @@ pub fn view(m : Model, emit : @rabbita.Emit[Msg], site_json : String) -> Html {
       // index.js, which hydrates the page first.
       if m.route == Playground {
         script(
-          src=base + "playground/ui.js",
+          src=m.config.versioned(base + "playground/ui.js"),
           type_="module",
           ([] : Array[Html]),
         )

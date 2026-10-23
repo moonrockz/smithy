@@ -2,7 +2,7 @@
 /// The tests run with `site/` as the working directory, so `..` is the
 /// repository.
 test "playground_data reads every sample of the picker" {
-  guard playground_data("..", "/smithy/next/") is Ok(data) else {
+  guard playground_data("..", "/smithy/next/playground/worker.js") is Ok(data) else {
     fail("the samples did not load")
   }
   assert_eq(data.worker, "/smithy/next/playground/worker.js")
@@ -22,7 +22,8 @@ test "playground_data reads every sample of the picker" {
 
 ///|
 test "playground_data names a sample that is missing" {
-  match playground_data("/nonexistent-smithy-content", "/") {
+  match
+    playground_data("/nonexistent-smithy-content", "/playground/worker.js") {
     Err(message) => {
       assert_true(message.contains("examples/json-rpc/peers.smithy"))
       assert_true(message.contains("/nonexistent-smithy-content"))
@@ -33,7 +34,7 @@ test "playground_data names a sample that is missing" {
 
 ///|
 test "the playground has a search entry that names its samples" {
-  guard playground_data("..", "/smithy/") is Ok(data) else {
+  guard playground_data("..", "/smithy/playground/worker.js") is Ok(data) else {
     fail("the samples did not load")
   }
   let entry = playground_entry(data)
@@ -47,7 +48,7 @@ test "the playground has a search entry that names its samples" {
 
 ///|
 test "an example with a model in the picker gets a fragment that opens that model" {
-  guard playground_data("..", "/smithy/") is Ok(data) else {
+  guard playground_data("..", "/smithy/playground/worker.js") is Ok(data) else {
     fail("the samples did not load")
   }
   guard example_fragment("json-rpc", data) is Ok(Some(fragment)) else {
@@ -72,7 +73,7 @@ test "an example with a model in the picker gets a fragment that opens that mode
 
 ///|
 test "an example with no model in the picker has no fragment" {
-  guard playground_data("..", "/smithy/") is Ok(data) else {
+  guard playground_data("..", "/smithy/playground/worker.js") is Ok(data) else {
     fail("the samples did not load")
   }
   assert_eq(example_fragment("openrpc", data), Ok(None))
@@ -81,7 +82,7 @@ test "an example with no model in the picker has no fragment" {
 
 ///|
 test "every example gets its playground fragment, so that each page has all of them" {
-  guard playground_data("..", "/smithy/") is Ok(data) else {
+  guard playground_data("..", "/smithy/playground/worker.js") is Ok(data) else {
     fail("the samples did not load")
   }
   let example = (dir : String) => @content.Example::{
@@ -99,4 +100,16 @@ test "every example gets its playground fragment, so that each page has all of t
   assert_eq(examples[0].playground, example_fragment("json-rpc", data).unwrap())
   assert_true(examples[0].playground is Some(_))
   assert_eq(examples[1].playground, None)
+}
+
+///|
+test "the Worker URL has the git ref of the build as its query" {
+  let args = parse_args([
+    "prerender", "--content", "..", "--channel", "next", "--site-root", "/smithy/",
+    "--release-version", "v0.5.0", "--ref", "abc123", "--out", "dist/next",
+  ]).unwrap()
+  assert_eq(
+    worker_url(config_of(args)),
+    "/smithy/next/playground/worker.js?v=abc123",
+  )
 }

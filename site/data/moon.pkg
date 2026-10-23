@@ -5,6 +5,7 @@ import {
   "moonrockz/smithy-site/playground/workbench",
   "moonbitlang/core/json",
   "moonbitlang/core/debug",
+  "moonbitlang/core/encoding/utf8",
 }
 
 supported_targets = "js+native"

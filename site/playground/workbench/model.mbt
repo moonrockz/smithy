@@ -288,6 +288,9 @@ pub(all) struct Model {
   /// The state of a pasted link that waits for the answer of the user,
   /// because the editors have changes.
   incoming : @samples.ShareState?
+  /// True when the Worker could not read the newest request: the page and
+  /// the Worker script come from different builds. A reload fixes it.
+  mismatch : Bool
 } derive(Eq, Debug)
 
 ///|
@@ -308,6 +311,9 @@ pub(all) enum Msg {
   TimedOut(seq~ : Int32)
   /// The Worker stopped with an error; the text is the message of the browser.
   WorkerFailed(String)
+  /// The Worker could not read a request, or the page could not read its
+  /// answer: the Worker script is of another build than the page.
+  Mismatched
   OutputChosen(Output)
   SelectorEdited(String)
   RunClicked
@@ -524,6 +530,7 @@ pub fn Model::start_with(
       _ => NoShare
     },
     incoming: None,
+    mismatch: false,
   }
   m.send_validate()
 }
@@ -749,6 +756,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       }
     Answered(seq~, answer~) => {
       guard seq == m.seq && m.waiting else { return (m, []) }
+      let m = { ..m, mismatch: false, }
       match (m.inflight, answer) {
         (Validating, Validated(items~, shapes~, protocols~)) =>
           // The answer is for text that changed since: it does not show.
@@ -815,6 +823,30 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
             },
           }.next([RestartWorker])
       }
+    }
+    // A Worker of another build answers at once, so the page does not wait
+    // for the time limit. A new Worker would load the same script, so none
+    // starts, and the work that waits is not sent.
+    Mismatched => {
+      guard m.waiting else { return (m, []) }
+      let tx = if m.inflight == Transforming && m.tx == TxRunning {
+        TxIdle
+      } else {
+        m.tx
+      }
+      (
+        {
+          ..m,
+          mismatch: true,
+          waiting: false,
+          pending: false,
+          run_pending: false,
+          tr_pending: None,
+          goal: NoGoal,
+          tx,
+        },
+        [],
+      )
     }
     // An error while no request runs restarts nothing: a Worker that cannot
     // load would restart again and again.

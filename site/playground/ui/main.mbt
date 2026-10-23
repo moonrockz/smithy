@@ -174,65 +174,56 @@ fn language_of(name : String) -> String {
 }
 
 ///|
-/// The message for a reply of the Worker. A reply that does not decode gives
-/// `None`. The files of a transform stay in `runtime`.
-fn Runtime::reply_msg(self : Runtime, text : String) -> @workbench.Msg? {
+/// The message for a reply of the Worker. The files of a transform stay in
+/// `runtime`. A reply that does not decode, and the `Blocked` with `seq` -1
+/// that the Worker gives for a request that it could not read, come from a
+/// Worker of another build: they give `Mismatched`.
+fn Runtime::reply_msg(self : Runtime, text : String) -> @workbench.Msg {
   let response : @core.Response = @json.from_json(@json.parse(text)) catch {
-    _ => return None
+    _ => return Mismatched
   }
   match response {
+    Blocked(seq=-1, ..) => Mismatched
     Diagnostics(seq~, items~, shapes~, protocols~) =>
-      Some(
-        Answered(
-          seq~,
-          answer=Validated(
-            items=items.map(diagnostic_of),
-            shapes~,
-            protocols=protocols.map(p => {
-              id: p.id,
-              versions: p.versions,
-              peers: p.peers,
-            }),
-          ),
+      Answered(
+        seq~,
+        answer=Validated(
+          items=items.map(diagnostic_of),
+          shapes~,
+          protocols=protocols.map(p => {
+            id: p.id,
+            versions: p.versions,
+            peers: p.peers,
+          }),
         ),
       )
     Blocked(seq~, reason~, kind~) =>
-      Some(
-        Answered(
-          seq~,
-          answer=NotRun(
-            reason,
-            match kind {
-              ModelErrors => ModelErrors
-              Other => Other
-            },
-          ),
+      Answered(
+        seq~,
+        answer=NotRun(
+          reason,
+          match kind {
+            ModelErrors => ModelErrors
+            Other => Other
+          },
         ),
       )
     Transformed(seq~, files~, warnings~, service~) => {
       self.files[seq] = files
-      Some(
-        Answered(
-          seq~,
-          answer=Transformed(
-            files=files.map(file => file.0),
-            warnings~,
-            service~,
-          ),
-        ),
+      Answered(
+        seq~,
+        answer=Transformed(files=files.map(file => file.0), warnings~, service~),
       )
     }
     TranscriptProgress(seq~, entries~, findings~, checked~, done~, summary~) =>
-      Some(
-        Answered(
-          seq~,
-          answer=Progressed(
-            entries=entries.map(entry_of),
-            findings=findings.map(finding_of),
-            checked~,
-            done~,
-            summary=summary.map(summary_of),
-          ),
+      Answered(
+        seq~,
+        answer=Progressed(
+          entries=entries.map(entry_of),
+          findings=findings.map(finding_of),
+          checked~,
+          done~,
+          summary=summary.map(summary_of),
         ),
       )
   }
@@ -257,7 +248,7 @@ fn Runtime::start_worker(self : Runtime) -> Unit {
   self.worker = Some(
     Worker::start(
       self.data.worker,
-      text => if self.reply_msg(text) is Some(msg) { (self.dispatch)(msg) },
+      text => (self.dispatch)(self.reply_msg(text)),
       message => (self.dispatch)(WorkerFailed(message)),
     ),
   )

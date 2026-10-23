@@ -151,3 +151,16 @@ test "the playground page carries its samples and round-trips" {
   }
   assert_eq(SiteData::decode(data.encode()), Some(data))
 }
+
+///|
+test "versioned adds the git ref of the build as the query" {
+  let config = sample().config
+  assert_eq(
+    config.versioned("/smithy/next/playground/ui.js"),
+    "/smithy/next/playground/ui.js?v=abc123",
+  )
+  let tagged = { ..config, git_ref: "v0.5.0", }
+  assert_eq(tagged.versioned("/a.js"), "/a.js?v=v0.5.0")
+  let odd = { ..config, git_ref: "refs/heads/a b&c", }
+  assert_eq(odd.versioned("/a.js"), "/a.js?v=refs%2Fheads%2Fa%20b%26c")
+}

@@ -128,7 +128,7 @@ pub async fn build_site(args : Args) -> Unit {
       @sys.exit(1)
     }
   }
-  let playground = match playground_data(args.content, config.base) {
+  let playground = match playground_data(args.content, worker_url(config)) {
     Ok(data) => data
     Err(message) => {
       println("prerender: " + message)

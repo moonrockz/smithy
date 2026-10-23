@@ -575,6 +575,8 @@ async test "the playground page has the empty workbench and its script" {
   assert_true(html.contains("<title>Playground — smithy</title>"))
   assert_true(html.contains("id=\"pg-app\""))
   assert_true(html.contains("id=\"pg-editor\""))
+  // The element of the message for a Worker of another build is empty.
+  assert_true(html.contains("id=\"pg-mismatch\""))
   assert_true(
     html.contains("<option value=\"1\" selected>With a mistake</option>"),
   )
@@ -591,7 +593,8 @@ async test "the playground page has the empty workbench and its script" {
     ] {
     assert_true(html.contains(text))
   }
-  assert_true(html.contains("src=\"/smithy/playground/ui.js\""))
+  // The query names the build, so that a cached ui.js of another build does not run.
+  assert_true(html.contains("src=\"/smithy/playground/ui.js?v=v0.5.0\""))
   // The site nav is on the page.
   assert_true(html.contains("class=\"ms-nav\""))
 }
