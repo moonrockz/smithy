@@ -361,7 +361,10 @@ fn Runtime::run(self : Runtime, effect : @workbench.Effect) -> Unit {
         )
       }
     }
-    LoadText(text) => editor_load(@workbench.EDITOR_ID, text)
+    LoadText(text) => {
+      self.saved_model = text
+      editor_load(@workbench.EDITOR_ID, text)
+    }
     Mark(items) => editor_mark(@workbench.EDITOR_ID, mark_json(items))
     MoveCursor(line~, column~) =>
       editor_go_to(@workbench.EDITOR_ID, line, column)
@@ -380,8 +383,10 @@ fn Runtime::run(self : Runtime, effect : @workbench.Effect) -> Unit {
       )
     SendTranscriptStep(seq~, count~) => self.post(TranscriptStep(seq~, count~))
     SendTranscriptReset(seq~) => self.post(TranscriptReset(seq~))
-    LoadTranscript(text~, format~) =>
+    LoadTranscript(text~, format~) => {
+      self.saved_transcript = text
       editor_show(@workbench.TRANSCRIPT_ID, text, transcript_language(format))
+    }
     SetTranscriptLanguage(format) =>
       editor_language(@workbench.TRANSCRIPT_ID, transcript_language(format))
     FollowTranscript(line~) => editor_follow(@workbench.TRANSCRIPT_ID, line)

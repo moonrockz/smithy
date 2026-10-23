@@ -84,6 +84,17 @@ test("a pasted link after an edit asks first: Keep my changes keeps them, Open r
   expect(page.errors).toEqual([]);
 });
 
+test("a pasted link after a fresh example pick opens with no question", async ({ page }) => {
+  await openPlayground(page, siteUrl("playground/"));
+  await page.selectOption("#pg-example", { label: "Order" });
+  await settled(page);
+  const fragment = shareFragment(linkState({ model: "namespace pasted\n" }));
+  await page.evaluate((f) => (location.hash = f), "#" + fragment);
+  await expect(page.locator("#pg-editor .cm-content")).toContainText("namespace pasted");
+  await expect(page.locator("#pg-incoming-open")).toHaveCount(0);
+  expect(page.errors).toEqual([]);
+});
+
 test("when the clipboard is missing, the page shows the link in a box", async ({ page }) => {
   await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { value: undefined }));
   await page.setViewportSize({ width: 360, height: 780 });

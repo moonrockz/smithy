@@ -247,3 +247,72 @@ test "link: a link that cannot be read keeps the state of the page" {
   // An empty fragment changes nothing.
   assert_eq(update(m, LinkOpened(opened=Default, dirty=true)), (m, []))
 }
+
+///|
+test "link: a transform that runs keeps the labels of its own run" {
+  let m = answered()
+  let (m, _) = update(m, RunClicked)
+  assert_eq(m.tx, TxRunning)
+  let running_output = m.tx_output
+  let (m, _) = update(
+    m,
+    LinkOpened(opened=Shared({ ..shared_state(), output: Idl, }), dirty=false),
+  )
+  // The tab still shows the run, and the picker shows the output of the link.
+  assert_eq(m.tx, TxRunning)
+  assert_eq(m.tx_output, running_output)
+  assert_eq(m.output, Idl)
+  let (m, _) = update(
+    m,
+    Answered(
+      seq=m.seq,
+      answer=Transformed(files=["model.json"], warnings=[], service=None),
+    ),
+  )
+  match m.tx {
+    TxDone(output~, edits~, ..) => {
+      // The old answer is labeled with its own output and marked old.
+      assert_eq(output, running_output)
+      assert_true(edits < m.edits)
+    }
+    _ => fail("I expected the answer of the run")
+  }
+}
+
+///|
+test "link: an Open clears a Run and a Step that waited for a request" {
+  let m = answered()
+  let (m, _) = update(m, Edited)
+  let (m, _) = update(m, Debounced(edits=m.edits))
+  assert_true(m.waiting)
+  let (m, _) = update(m, RunClicked)
+  assert_true(m.run_pending)
+  assert_eq(m.tx, TxRunning)
+  let m = { ..m, tr_pending: Some(StepAction), goal: ToEnd, }
+  let (m, _) = update(m, LinkOpened(opened=Shared(shared_state()), dirty=false))
+  assert_false(m.run_pending)
+  assert_eq(m.tr_pending, None)
+  assert_eq(m.goal, NoGoal)
+  // No transform runs, so the tab is not left in the running state.
+  assert_eq(m.tx, TxIdle)
+}
+
+///|
+test "link: the first page and a later link make the same shared sample" {
+  let (first, _) = Model::start_with(tr_data(), Shared(shared_state()))
+  let (later, _) = update(
+    answered(),
+    LinkOpened(opened=Shared(shared_state()), dirty=false),
+  )
+  assert_eq(first.data.samples.last(), later.data.samples.last())
+  assert_eq(first.data.transcripts.last(), later.data.transcripts.last())
+  assert_eq(first.settings, later.settings)
+}
+
+///|
+test "link: picking an example loads its text, which the page takes as unchanged" {
+  // The page script keeps the loaded text as the text without changes.
+  let m = answered()
+  let (_, effects) = update(m, SampleChosen(0))
+  assert_eq(effects, [LoadText("namespace a\n")])
+}

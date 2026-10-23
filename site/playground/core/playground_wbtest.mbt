@@ -1128,6 +1128,17 @@ test "share: the decoder stops at the limit and does not unpack a bomb" {
 }
 
 ///|
+test "share: a stream of exactly the limit unpacks, one byte more does not" {
+  let exact = Bytes::from_array(Array::make(MAX_STATE_BYTES, b'a'))
+  match bounded_inflate(@flate.deflate_all(exact)) {
+    Ok(bytes) => assert_eq(bytes.length(), MAX_STATE_BYTES)
+    Err(message) => fail(message)
+  }
+  let over = Bytes::from_array(Array::make(MAX_STATE_BYTES + 1, b'a'))
+  assert_true(bounded_inflate(@flate.deflate_all(over)) is Err(_))
+}
+
+///|
 test "share: a model of a few hundred KB still fits when its link is short" {
   let state = { ..sample_state(), model: "// line\n".repeat(50000), }
   assert_true(state.model.length() >= 400000)

@@ -447,27 +447,7 @@ pub fn Model::start_with(
   opened : Opened,
 ) -> (Model, Array[Effect]) {
   let data = match opened {
-    Shared(state) => {
-      let transcript : @samples.TranscriptSample = {
-        title: "Shared link",
-        path: "",
-        protocol: state.protocol,
-        format: state.format,
-        version: state.version,
-        preset: state.log_preset,
-        text: state.transcript,
-      }
-      {
-        ..data,
-        samples: [
-          ..data.samples,
-          { title: "Shared link", path: "", model: state.model, },
-        ],
-        selected: data.samples.length(),
-        transcripts: [..data.transcripts, transcript],
-        transcript: data.transcripts.length(),
-      }
-    }
+    Shared(state) => data.with_shared(state)
     _ => data
   }
   let sample = if data.selected >= 0 && data.selected < data.samples.length() {
@@ -664,17 +644,15 @@ pub fn Model::warnings(self : Model) -> Int32 {
 }
 
 ///|
-/// Open the state of a link in a page that runs. The state joins the pickers
-/// as "Shared link", in place of the one of an earlier link. The texts go to
-/// the editors, which send their own change messages; the check starts after
-/// the wait as for any change. The settings stay as the link gives them until
-/// that check lists the protocols, then they fit the model.
-fn Model::reopen(
-  self : Model,
+/// The data with the state of a link as the last sample of both pickers, titled
+/// "Shared link" and selected. The state of an earlier link goes out. The page
+/// start and a link opened later both use this.
+fn PlaygroundData::with_shared(
+  self : PlaygroundData,
   state : @samples.ShareState,
-) -> (Model, Array[Effect]) {
-  let samples = self.data.samples.filter(s => s.path != "")
-  let transcripts = self.data.transcripts.filter(s => s.path != "")
+) -> PlaygroundData {
+  let samples = self.samples.filter(s => s.path != "")
+  let transcripts = self.transcripts.filter(s => s.path != "")
   let transcript : @samples.TranscriptSample = {
     title: "Shared link",
     path: "",
@@ -684,8 +662,8 @@ fn Model::reopen(
     preset: state.log_preset,
     text: state.transcript,
   }
-  let data = {
-    ..self.data,
+  {
+    ..self,
     samples: [
       ..samples,
       { title: "Shared link", path: "", model: state.model, },
@@ -694,20 +672,46 @@ fn Model::reopen(
     transcripts: [..transcripts, transcript],
     transcript: transcripts.length(),
   }
+}
+
+///|
+/// Open the state of a link in a page that runs. The state joins the pickers
+/// as "Shared link", in place of the one of an earlier link. The texts go to
+/// the editors, which send their own change messages; the check starts after
+/// the wait as for any change. The settings stay as the link gives them until
+/// that check lists the protocols, then they fit the model.
+fn Model::reopen(
+  self : Model,
+  state : @samples.ShareState,
+) -> (Model, Array[Effect]) {
+  let data = self.data.with_shared(state)
   let selector = state.selector.unwrap_or(DEFAULT_SELECTOR)
   let edits = self.edits + 1
+  // A transform that runs belongs to the page as it was: its answer comes
+  // with the output and selector of its own run, and the tab marks it old.
+  // A run that only waits for a request never starts.
+  let running = self.waiting && self.inflight == Transforming
+  let (tx, tx_output, tx_selector) = if running {
+    (self.tx, self.tx_output, self.tx_selector)
+  } else {
+    (TxIdle, state.output, selector)
+  }
+  let transcript = data.transcripts[data.transcript]
   (
     {
       ..self,
       data,
-      sample: samples.length(),
-      transcript: transcripts.length(),
+      sample: data.selected,
+      transcript: data.transcript,
       tab: state.tab,
       output: state.output,
       selector,
-      tx_output: state.output,
-      tx_selector: selector,
-      tx: TxIdle,
+      tx_output,
+      tx_selector,
+      tx,
+      run_pending: false,
+      tr_pending: None,
+      goal: NoGoal,
       copy: NotCopied,
       settings: { ..Settings::of_sample(transcript), complete: state.complete, },
       edits,
