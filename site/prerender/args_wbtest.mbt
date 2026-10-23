@@ -90,9 +90,11 @@ test "missing_sources skips a file that exists" {
 test "the hero sample equals the files in landing/sample" {
   let sample = @shell.hero_sample()
   let read = path => {
-    @fs.read_file_to_string("landing/sample/" + path) catch {
+    // A Windows checkout may give the files CRLF line endings.
+    let text = @fs.read_file_to_string("landing/sample/" + path) catch {
       _ => fail("I could not read landing/sample/\{path}")
     }
+    text.replace_all(old="\r\n", new="\n")
   }
   assert_eq(sample.model, read("order.smithy"))
   assert_eq(sample.value, read("order.json"))

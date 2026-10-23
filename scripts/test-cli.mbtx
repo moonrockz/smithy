@@ -1242,8 +1242,12 @@ async fn exercise_landing_sample(runner : Runner, root : String) -> Unit {
     fail("command.txt must start with smithy: \{command}")
   }
   let (_, err) = runner.command(words[1:].to_owned(), 1)
+  // A Windows checkout may turn the sample files into CRLF: compare without line-ending differences.
   let shown = @fs.read_file("\{sample}/output.txt").text()
-  assert_eq(err.replace_all(old="\r\n", new="\n"), shown)
+  assert_eq(
+    err.replace_all(old="\r\n", new="\n"),
+    shown.replace_all(old="\r\n", new="\n"),
+  )
 }
 
 ///|
