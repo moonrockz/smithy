@@ -416,3 +416,78 @@ test "source_of: documentation pages and examples have one, other routes none" {
   assert_eq(source_of(m.manifest, m.examples, Examples), None)
   assert_eq(source_of(m.manifest, m.examples, Landing), None)
 }
+
+///|
+fn doc_model(route : @route.Route) -> Model {
+  Model::init(site_data(route, None))
+}
+
+///|
+fn repr(cmd : @rabbita.Cmd) -> String {
+  @debug.to_string(cmd)
+}
+
+///|
+test "probe: only a 404 says the page is gone" {
+  assert_eq(classify_probe(None), Found)
+  assert_eq(
+    classify_probe(Some(@http.RequestError("HTTP 404 Not Found"))),
+    Gone,
+  )
+  assert_eq(classify_probe(Some(@http.RequestError("HTTP 404"))), Gone)
+  assert_eq(classify_probe(Some(@http.RequestError("HTTP 500"))), Failed)
+  assert_eq(classify_probe(Some(@http.RequestError("Failed to fetch"))), Failed)
+}
+
+///|
+test "counterpart: a 404 for the current route sets Missing" {
+  let m = doc_model(Doc("cli"))
+  let m = step(m, CounterpartChecked(Doc("cli"), Gone))
+  assert_eq(m.counterpart, Missing(Doc("cli")))
+}
+
+///|
+test "counterpart: a 200 for the current route sets Present" {
+  let m = step(doc_model(Doc("cli")), CounterpartChecked(Doc("cli"), Found))
+  assert_eq(m.counterpart, Present(Doc("cli")))
+}
+
+///|
+test "counterpart: an error keeps Unknown" {
+  let m = step(doc_model(Doc("cli")), CounterpartChecked(Doc("cli"), Failed))
+  assert_eq(m.counterpart, Unknown)
+}
+
+///|
+test "counterpart: a result for another route changes nothing" {
+  let m = doc_model(Doc("cli"))
+  let after = step(m, CounterpartChecked(Doc("smithy-syntax"), Gone))
+  assert_eq(after, m)
+}
+
+///|
+test "counterpart: a route change drops the old result and a late one is ignored" {
+  let m = step(doc_model(Doc("cli")), CounterpartChecked(Doc("cli"), Gone))
+  let url = @url.parse("http://localhost/smithy/docs/smithy-syntax/")
+  let m = step(m, UrlChanged(url))
+  assert_eq(m.route, Doc("smithy-syntax"))
+  assert_eq(m.counterpart, Unknown)
+  let late = step(m, CounterpartChecked(Doc("cli"), Gone))
+  assert_eq(late.counterpart, Unknown)
+}
+
+///|
+test "counterpart: the request is issued for a route of a site with a release" {
+  let m = doc_model(Doc("cli"))
+  assert_true(repr(check_counterpart(m, noop_emit())) != repr(@rabbita.none))
+}
+
+///|
+test "counterpart: no request without a release or for a missing page" {
+  let m = doc_model(Doc("cli"))
+  let none = repr(@rabbita.none)
+  let no_release = { ..m, config: { ..m.config, has_release: false, }, }
+  assert_eq(repr(check_counterpart(no_release, noop_emit())), none)
+  let missing = { ..m, route: NotFound("/x/"), }
+  assert_eq(repr(check_counterpart(missing, noop_emit())), none)
+}

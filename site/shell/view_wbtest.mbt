@@ -446,3 +446,83 @@ test "the download tab shows a command for GNU and one for macOS" {
     install_download.contains("shasum -a 256 -c --ignore-missing checksums.txt"),
   )
 }
+
+///|
+#cfg(not(target="js"))
+async fn next_view(
+  route : @route.Route,
+  counterpart : Counterpart,
+  markdown : String?,
+) -> String {
+  let m = Model::init(site_data(route, markdown))
+  render_model({
+    ..m,
+    config: { ..m.config, channel: Next, base: "/smithy/next/", },
+    counterpart,
+  })
+}
+
+///|
+#cfg(not(target="js"))
+async test "a next page the release lacks links the release to its docs index" {
+  let html = next_view(
+    Doc("smithy-syntax"),
+    Missing(Doc("smithy-syntax")),
+    Some("# C\n"),
+  )
+  assert_true(
+    html.contains(
+      "href=\"/smithy/docs/\" target=\"_self\" class=\"ms-version-link\">v0.5.0</a>",
+    ),
+  )
+  assert_true(
+    html.contains(
+      "href=\"/smithy/docs/\" target=\"_self\">Go to the v0.5.0 docs.",
+    ),
+  )
+  assert_true(!html.contains("href=\"/smithy/docs/smithy-syntax/\""))
+  // The current channel still links to itself.
+  assert_true(html.contains("href=\"/smithy/next/docs/smithy-syntax/\""))
+}
+
+///|
+#cfg(not(target="js"))
+async test "a next page the release lacks outside the docs links the release home" {
+  let html = next_view(Examples, Missing(Examples), None)
+  assert_true(
+    html.contains(
+      "href=\"/smithy/\" target=\"_self\" class=\"ms-version-link\">v0.5.0</a>",
+    ),
+  )
+  assert_true(!html.contains("href=\"/smithy/examples/\""))
+}
+
+///|
+#cfg(not(target="js"))
+async test "unknown, present or stale results link page for page" {
+  for c in [Unknown, Present(Doc("smithy-syntax")), Missing(Doc("cli"))] {
+    let html = next_view(Doc("smithy-syntax"), c, Some("# C\n"))
+    assert_true(
+      html.contains(
+        "href=\"/smithy/docs/smithy-syntax/\" target=\"_self\" class=\"ms-version-link\">v0.5.0</a>",
+      ),
+    )
+    assert_true(
+      html.contains(
+        "href=\"/smithy/docs/smithy-syntax/\" target=\"_self\">Go to the v0.5.0 docs.",
+      ),
+    )
+  }
+}
+
+///|
+#cfg(not(target="js"))
+async test "a release page the next lacks links next to its docs index" {
+  let m = Model::init(site_data(Doc("cli"), Some("# C\n")))
+  let html = render_model({ ..m, counterpart: Missing(Doc("cli")), })
+  assert_true(
+    html.contains(
+      "href=\"/smithy/next/docs/\" target=\"_self\" class=\"ms-version-link\">next</a>",
+    ),
+  )
+}

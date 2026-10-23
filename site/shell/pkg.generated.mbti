@@ -16,9 +16,13 @@ import {
 }
 
 // Values
+pub fn check_counterpart(Model, @cmd.Emit[Msg]) -> @cmd.Cmd
+
+pub fn classify_probe(Error?) -> Probe
+
 pub fn code_view(String, String) -> @html.Html
 
-pub fn component(@data.SiteData, String, initial_theme? : Theme) -> @rabbita.Val[@html.Html]
+pub fn component(@data.SiteData, String, initial_theme? : Theme, probe_other? : Bool) -> @rabbita.Val[@html.Html]
 
 pub fn current_results(Model) -> Array[(String, Array[@search.Match])]
 
@@ -39,6 +43,15 @@ pub fn view(Model, @cmd.Emit[Msg], String) -> @html.Html
 // Errors
 
 // Types and methods
+pub(all) enum Counterpart {
+  Unknown
+  Present(@route.Route)
+  Missing(@route.Route)
+} derive(Eq, @debug.Debug)
+pub fn Counterpart::equal(Self, Self) -> Bool
+pub fn Counterpart::not_equal(Self, Self) -> Bool
+pub fn Counterpart::to_repr(Self) -> @debug.Repr
+
 pub struct HeroSample {
   model : String
   value : String
@@ -76,6 +89,7 @@ pub(all) struct Model {
   search : SearchState
   install_tab : InstallTab
   menu_open : Bool
+  counterpart : Counterpart
   pending_anchor : String?
 } derive(Eq, @debug.Debug)
 pub fn Model::equal(Self, Self) -> Bool
@@ -97,6 +111,7 @@ pub(all) enum Msg {
   KeyDown(@common.Keyboard)
   SelectTab(InstallTab)
   ToggleMenu
+  CounterpartChecked(@route.Route, Probe)
 }
 
 pub(all) enum PageState {
@@ -108,6 +123,15 @@ pub(all) enum PageState {
 pub fn PageState::equal(Self, Self) -> Bool
 pub fn PageState::not_equal(Self, Self) -> Bool
 pub fn PageState::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Probe {
+  Found
+  Gone
+  Failed
+} derive(Eq, @debug.Debug)
+pub fn Probe::equal(Self, Self) -> Bool
+pub fn Probe::not_equal(Self, Self) -> Bool
+pub fn Probe::to_repr(Self) -> @debug.Repr
 
 pub(all) struct SearchState {
   open : Bool
