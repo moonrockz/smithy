@@ -58,33 +58,15 @@ test "samples: the mistake is peers.smithy with Intger for Integer" {
 }
 
 ///|
-fn core_format(format : @samples.TranscriptFormat) -> @core.TranscriptFormat {
-  match format {
-    Markdown => Markdown
-    Json => Json
-    Jsonl => Jsonl
-  }
-}
-
-///|
-fn core_preset(preset : @samples.LogPreset) -> @core.LogPreset {
-  match preset {
-    DirMessage(directions) =>
-      DirMessage(directions.map(d => { value: d.value, peer: d.peer, }))
-    Raw(sender~) => Raw(sender~)
-  }
-}
-
-///|
 /// The codes of the findings of a transcript of the picker, checked against
 /// `examples/json-rpc/peers.smithy` with the settings of the picker.
 fn transcript_codes(source : @samples.TranscriptSource) -> Array[String] raise {
   let (findings, summary) = run_all(
     repository_file("examples/json-rpc/peers.smithy"),
     source.protocol,
-    core_format(source.format),
+    source.format,
     repository_file(source.path),
-    log_preset?=source.preset.map(core_preset),
+    log_preset?=source.preset,
     version?=source.version,
   )
   assert_eq(

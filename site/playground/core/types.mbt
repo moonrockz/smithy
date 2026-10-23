@@ -11,32 +11,9 @@ pub(all) enum Output {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
-/// The encoding of the transcript text.
-pub(all) enum TranscriptFormat {
-  Markdown
-  Json
-  Jsonl
-} derive(Eq, Debug, ToJson, FromJson)
-
-///|
-/// The sender of the message of a log record whose `dir` member has this
-/// value: the CLI option `--direction value=peer`.
-pub(all) struct Direction {
-  value : String
-  peer : String
-} derive(Eq, Debug, ToJson, FromJson)
-
-///|
-/// How the lines of a JSONL log become transcript entries: the CLI option
-/// `--log-preset`.
-pub(all) enum LogPreset {
-  /// `{"dir", "message"}` records. Each direction names the sender for one
-  /// `dir` value. With no direction, "request" is the first peer of the
-  /// protocol and "response" the second, as in the CLI.
-  DirMessage(Array[Direction])
-  /// Each line is a JSON-RPC message from `sender`: `--log-preset raw --sender`.
-  Raw(sender~ : String)
-} derive(Eq, Debug, ToJson, FromJson)
+/// The transcript format and the log preset of a request are the types of the
+/// samples of the picker, so the page sends them with no conversion.
+pub using @samples {type TranscriptFormat, type Direction, type LogPreset}
 
 ///|
 /// A message from the page to the Worker. `seq` comes back unchanged in the

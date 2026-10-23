@@ -458,6 +458,15 @@ fn Model::can_step(self : Model) -> Bool {
 }
 
 ///|
+/// True while a check of newer model text waits or runs: the wait after a
+/// change, a pending check, or a check that the Worker runs.
+fn Model::model_check_due(self : Model) -> Bool {
+  self.edits != self.sent_edits ||
+  self.pending ||
+  (self.waiting && self.inflight == Validating)
+}
+
+///|
 /// Run a button of the tab now; no request runs.
 fn Model::act(self : Model, action : Action) -> (Model, Array[Effect]) {
   let m = { ..self, tr_pending: None, }
@@ -470,6 +479,10 @@ fn Model::act(self : Model, action : Action) -> (Model, Array[Effect]) {
         } else {
           m.send_step(goal)
         }
+      } else if m.model_check_due() {
+        // A start waits for the check of the newest model text, so that its
+        // settings fit the protocols of that model.
+        ({ ..m, tr_pending: Some(action), }, [])
       } else {
         m.send_start(goal)
       }
@@ -608,8 +621,12 @@ fn transcript_update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
     TranscriptSampleChosen(index) =>
       match m.data.transcripts.get(index) {
         Some(sample) =>
+          // The settings fit the protocols of the model, so the picker,
+          // the request and the hint agree.
           (
-            { ..m, transcript: index, settings: Settings::of_sample(sample), },
+            { ..m, transcript: index, }.with_settings(
+              Settings::of_sample(sample),
+            ),
             [LoadTranscript(text=sample.text, format=sample.format)],
           )
         None => (m, [])
@@ -771,22 +788,45 @@ fn format_extension(format : @samples.TranscriptFormat) -> String {
 }
 
 ///|
+/// The text as one word of a POSIX shell: as it is when the shell leaves it
+/// alone, else in single quotes (`shell_quote`).
+fn shell_word(text : String) -> String {
+  let plain = text != "" &&
+    text
+    .iter()
+    .all(c => {
+      (c >= 'a' && c <= 'z') ||
+      (c >= 'A' && c <= 'Z') ||
+      (c >= '0' && c <= '9') ||
+      "#._-=/:@+,".contains_char(c)
+    })
+  if plain {
+    text
+  } else {
+    shell_quote(text)
+  }
+}
+
+///|
 /// The CLI command that gives the same findings.
 pub fn transcript_hint(settings : Settings) -> String {
-  let parts = ["smithy validate rpc transcript --protocol \{settings.protocol}"]
+  let parts = [
+    "smithy validate rpc transcript --protocol \{shell_word(settings.protocol)}",
+  ]
   if settings.complete {
     parts.push("--complete")
   }
   if settings.format == Jsonl {
-    parts.push("--version \{settings.version}")
+    parts.push("--version \{shell_word(settings.version)}")
     match settings.preset {
       DirMessage(directions) => {
         parts.push("--log-preset dir-message")
         for d in directions {
-          parts.push("--direction \{d.value}=\{d.peer}")
+          parts.push("--direction \{shell_word(d.value + "=" + d.peer)}")
         }
       }
-      Raw(sender~) => parts.push("--log-preset raw --sender \{sender}")
+      Raw(sender~) =>
+        parts.push("--log-preset raw --sender \{shell_word(sender)}")
     }
   }
   parts.push("model.smithy transcript.\{format_extension(settings.format)}")

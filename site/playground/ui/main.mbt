@@ -54,24 +54,6 @@ fn output_of(output : @workbench.Output) -> @core.Output {
 }
 
 ///|
-fn format_of(format : @samples.TranscriptFormat) -> @core.TranscriptFormat {
-  match format {
-    Markdown => Markdown
-    Json => Json
-    Jsonl => Jsonl
-  }
-}
-
-///|
-fn preset_of(preset : @samples.LogPreset) -> @core.LogPreset {
-  match preset {
-    DirMessage(directions) =>
-      DirMessage(directions.map(d => { value: d.value, peer: d.peer, }))
-    Raw(sender~) => Raw(sender~)
-  }
-}
-
-///|
 /// The language of the transcript editor. A log has one JSON value on each
 /// line, and other lines, so it is plain text.
 fn transcript_language(format : @samples.TranscriptFormat) -> String {
@@ -291,9 +273,9 @@ fn Runtime::run(self : Runtime, effect : @workbench.Effect) -> Unit {
           seq~,
           model=editor_text(@workbench.EDITOR_ID),
           protocol=settings.protocol,
-          format=format_of(settings.format),
+          format=settings.format,
           complete=settings.complete,
-          log_preset=settings.request_preset().map(preset_of),
+          log_preset=settings.request_preset(),
           version=settings.request_version(),
           text=editor_text(@workbench.TRANSCRIPT_ID),
         ),

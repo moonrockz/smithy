@@ -47,16 +47,22 @@ fn tr_data() -> PlaygroundData {
 ///|
 /// A page whose first check has its answer, with two protocols.
 fn ready() -> Model {
+  ready_with([chat_protocol, editor_protocol])
+}
+
+///|
+/// A page whose first check has its answer, with these protocols.
+fn ready_with(protocols : Array[Protocol]) -> Model {
   let (m, _) = Model::start(tr_data())
-  update(
-    m,
-    Answered(
-      seq=1,
-      answer=Validated(items=[], shapes=4, protocols=[
-        chat_protocol, editor_protocol,
-      ]),
-    ),
-  ).0
+  update(m, Answered(seq=1, answer=Validated(items=[], shapes=4, protocols~))).0
+}
+
+///|
+/// The Editor protocol with the peers of the log sample.
+let log_protocol : Protocol = {
+  id: "a#Editor",
+  versions: ["2.0"],
+  peers: ["client", "server"],
 }
 
 ///|
@@ -282,7 +288,7 @@ test "transcript: Run all checks in groups and appends the findings of each" {
 }
 
 ///|
-test "queue: Step while a check runs waits, and goes before the pending check" {
+test "queue: Step while a check runs waits, then the check of the newest text, then the start" {
   let (m, _) = Model::start(tr_data())
   let (m, effects) = update(m, StepClicked)
   assert_eq(effects, [])
@@ -296,32 +302,47 @@ test "queue: Step while a check runs waits, and goes before the pending check" {
       answer=Validated(items=[], shapes=1, protocols=[chat_protocol]),
     ),
   )
-  // The transcript goes first; the newest text waits for it.
+  // The answer is for older text, so it does not show. The start needs the
+  // protocols of the newest text, so the check of that text goes first.
   assert_eq(effects, [
-    SendTranscriptStart(seq=2, settings=m.settings),
+    SendValidate(seq=2),
     Wait(ms=timeout_ms, then=TimedOut(seq=2)),
   ])
-  assert_true(m.pending)
+  assert_true(m.tr_running())
   let (m, effects) = update(
     m,
-    Answered(seq=2, answer=progressed(entries=[entry(0, 5)], checked=0)),
-  )
-  // The pending check goes before the step that the start still needs.
-  assert_eq(effects, [
-    SendValidate(seq=3),
-    Wait(ms=timeout_ms, then=TimedOut(seq=3)),
-  ])
-  let (_, effects) = update(
-    m,
     Answered(
-      seq=3,
+      seq=2,
       answer=Validated(items=[], shapes=1, protocols=[chat_protocol]),
     ),
   )
   assert_eq(effects, [
     Mark([]),
-    SendTranscriptStep(seq=4, count=1),
+    SendTranscriptStart(seq=3, settings=m.settings),
+    Wait(ms=timeout_ms, then=TimedOut(seq=3)),
+  ])
+  // A change while the start runs: its check goes before the step that the
+  // start still needs.
+  let (m, _) = run(m, [Edited, Debounced(edits=2)])
+  let (m, effects) = update(
+    m,
+    Answered(seq=3, answer=progressed(entries=[entry(0, 5)], checked=0)),
+  )
+  assert_eq(effects, [
+    SendValidate(seq=4),
     Wait(ms=timeout_ms, then=TimedOut(seq=4)),
+  ])
+  let (_, effects) = update(
+    m,
+    Answered(
+      seq=4,
+      answer=Validated(items=[], shapes=1, protocols=[chat_protocol]),
+    ),
+  )
+  assert_eq(effects, [
+    Mark([]),
+    SendTranscriptStep(seq=5, count=1),
+    Wait(ms=timeout_ms, then=TimedOut(seq=5)),
   ])
 }
 
@@ -543,7 +564,7 @@ test "log: a JSONL log fits its version and preset to the protocol" {
 
 ///|
 test "transcript: a sample of the picker loads its text and its settings" {
-  let m = ready()
+  let m = ready_with([chat_protocol, log_protocol])
   let (m, effects) = update(m, TranscriptSampleChosen(1))
   assert_eq(effects, [LoadTranscript(text="{}\n", format=Jsonl)])
   assert_eq(m.transcript, 1)
@@ -562,7 +583,7 @@ test "transcript: a sample of the picker loads its text and its settings" {
 
 ///|
 test "transcript: a document sends no version and no preset; a log sends both" {
-  let m = ready()
+  let m = ready_with([chat_protocol, log_protocol])
   assert_eq(m.settings.request_version(), None)
   assert_eq(m.settings.request_preset(), None)
   let (m, _) = update(m, TranscriptSampleChosen(1))
@@ -709,4 +730,109 @@ test "stale: a version or preset does not make the check of a document old" {
   // For a log, the version and the preset count.
   let (log, _) = update(m, FormatChosen(Jsonl))
   assert_false(log.tr_current())
+}
+
+///|
+test "transcript: a sample fits its settings to the protocols of the model" {
+  // The model has no a#Editor: the first protocol and its version. Its peers
+  // are those of the preset, so the preset stays.
+  let (m, _) = update(ready_with([chat_protocol]), TranscriptSampleChosen(1))
+  assert_eq(m.settings, {
+    protocol: "a#Chat",
+    format: Jsonl,
+    complete: false,
+    version: "1.0",
+    preset: DirMessage([
+      { value: "in", peer: "client", },
+      { value: "out", peer: "server", },
+    ]),
+  })
+  assert_eq(
+    transcript_hint(m.settings),
+    "smithy validate rpc transcript --protocol a#Chat --version 1.0 --log-preset dir-message --direction in=client --direction out=server model.smithy transcript.jsonl",
+  )
+  // Peers that the protocol does not have give its default preset.
+  let (m, _) = update(ready(), TranscriptSampleChosen(1))
+  assert_eq(m.settings.protocol, "a#Editor")
+  assert_eq(m.settings.version, "2.0")
+  assert_eq(
+    m.settings.preset,
+    DirMessage([
+      { value: "request", peer: "ide", },
+      { value: "response", peer: "lsp", },
+    ]),
+  )
+}
+
+///|
+test "queue: Step before the check of a new model waits for that check, then starts with fitted settings" {
+  // The page opens with a model with errors: no protocols, so the settings do not fit yet.
+  let (m, _) = Model::start(tr_data())
+  let (m, _) = update(
+    m,
+    Answered(
+      seq=1,
+      answer=Validated(items=[error_at(1)], shapes=0, protocols=[]),
+    ),
+  )
+  let (m, _) = update(m, TranscriptSampleChosen(1))
+  // A new model: its check waits for the end of the change.
+  let (m, _) = update(m, Edited)
+  let (m, effects) = update(m, StepClicked)
+  assert_eq(effects, [])
+  assert_true(m.tr_running())
+  let (m, effects) = update(m, Debounced(edits=1))
+  assert_eq(effects, [
+    SendValidate(seq=2),
+    Wait(ms=timeout_ms, then=TimedOut(seq=2)),
+  ])
+  let (m, effects) = update(
+    m,
+    Answered(
+      seq=2,
+      answer=Validated(items=[], shapes=1, protocols=[editor_protocol]),
+    ),
+  )
+  let fitted : Settings = {
+    protocol: "a#Editor",
+    format: Jsonl,
+    complete: false,
+    version: "2.0",
+    preset: DirMessage([
+      { value: "request", peer: "ide", },
+      { value: "response", peer: "lsp", },
+    ]),
+  }
+  assert_eq(m.settings, fitted)
+  assert_eq(effects, [
+    Mark([]),
+    SendTranscriptStart(seq=3, settings=fitted),
+    Wait(ms=timeout_ms, then=TimedOut(seq=3)),
+  ])
+}
+
+///|
+test "queue: a stopped check does not hold a Step back" {
+  let (m, _) = Model::start(tr_data())
+  let (m, _) = update(m, TimedOut(seq=1))
+  let (_, effects) = update(m, StepClicked)
+  assert_eq(effects[0], SendTranscriptStart(seq=2, settings=m.settings))
+}
+
+///|
+test "hint: a value that the shell splits is quoted" {
+  let settings : Settings = {
+    protocol: "a#Chat",
+    format: Jsonl,
+    complete: false,
+    version: "2.0",
+    preset: DirMessage([
+      { value: "in out", peer: "client", },
+      { value: "it's", peer: "server", },
+    ]),
+  }
+  assert_eq(
+    transcript_hint(settings),
+    "smithy validate rpc transcript --protocol a#Chat --version 2.0 --log-preset dir-message --direction 'in out=client' --direction 'it'\\''s=server' model.smithy transcript.jsonl",
+  )
 }

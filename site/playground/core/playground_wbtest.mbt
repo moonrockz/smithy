@@ -402,7 +402,11 @@ test "transcript: a wrong result gives the CLI findings" {
 
 ///|
 test "transcript: an entry goes to the other peer, and a reply names no receiver" {
-  for (text, format) in [(chat_markdown, Markdown), (chat_json, Json)] {
+  for
+    (text, format) in [
+      (chat_markdown, TranscriptFormat::Markdown),
+      (chat_json, Json),
+    ] {
     let (entries, _, _, _) = progress_of(start(Session::new(), text, format~))
     assert_eq(entries.map(e => (e.index, e.sender, e.receiver)), [
       (0, "client", Some("server")),
@@ -638,7 +642,7 @@ test "transcript: the dir-message preset maps each dir value to its sender" {
   let log =
     #|{"dir": "in", "message": {"method": "postMessage", "params": ["a"], "id": 1}}
     #|{"dir": "out", "message": {"result": 1, "error": null, "id": 1}}
-  let preset = DirMessage([
+  let preset : LogPreset = DirMessage([
     { value: "in", peer: "client", },
     { value: "out", peer: "server", },
   ])
