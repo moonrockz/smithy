@@ -172,6 +172,20 @@ test("Open in playground links to a state that decodes to the model of the examp
   await expect(page.locator("#pg-share-status")).toBeEmpty();
 });
 
+test("Open in playground shows after a move from /examples/ to an example with no page load", async ({ lightpanda: page }) => {
+  await page.goto(siteUrl("examples/"));
+  await expect(page.locator("#ms-open-playground")).toHaveCount(0);
+  // A mark on the window lives only while the page does not load again.
+  await page.evaluate(() => {
+    window.noPageLoad = true;
+  });
+  await page.locator('a.ms-excard[href$="/examples/json-rpc/"]').dispatchEvent("click");
+  await expect(page).toHaveURL(siteUrl("examples/json-rpc/"));
+  await expectJsonRpcButton(page);
+  expect(await page.evaluate(() => window.noPageLoad)).toBe(true);
+  expect(page.errors).toEqual([]);
+});
+
 test("an example whose directory has no model in the picker has no button", async ({ lightpanda: page }) => {
   await page.goto(siteUrl("examples/openrpc/"));
   await expect(page.locator("h1").first()).toBeVisible();

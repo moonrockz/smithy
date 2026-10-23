@@ -88,3 +88,21 @@ fn example_fragment(
     }
   }
 }
+
+///|
+/// The examples, each with the fragment of "Open in playground". Every page
+/// carries them: the site moves between example pages with no page load, so
+/// the page that opens first must already know the fragment of each example.
+fn with_playground_links(
+  examples : Array[@content.Example],
+  data : @workbench.PlaygroundData,
+) -> Result[Array[@content.Example], String] {
+  let out = []
+  for e in examples {
+    match example_fragment(e.dir, data) {
+      Ok(playground) => out.push({ ..e, playground, })
+      Err(message) => return Err(message)
+    }
+  }
+  Ok(out)
+}

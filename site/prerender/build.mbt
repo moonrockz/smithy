@@ -128,7 +128,28 @@ pub async fn build_site(args : Args) -> Unit {
       @sys.exit(1)
     }
   }
-  let examples = @content.Example::build(read_example_dirs(args.content))
+  let playground = match playground_data(args.content, config.base) {
+    Ok(data) => data
+    Err(message) => {
+      println("prerender: " + message)
+      @sys.exit(1)
+      return
+    }
+  }
+  // Every page carries the playground fragment of each example. A fragment
+  // that is too long fails the build.
+  let examples = match
+    with_playground_links(
+      @content.Example::build(read_example_dirs(args.content)),
+      playground,
+    ) {
+    Ok(examples) => examples
+    Err(message) => {
+      println("prerender: " + message)
+      @sys.exit(1)
+      return
+    }
+  }
   let texts : Map[String, String] = Map([])
   for f in files {
     texts.set(f.0, f.1)
@@ -175,17 +196,7 @@ pub async fn build_site(args : Args) -> Unit {
     }
     routes.push(page.route.to_path())
   }
-  let playground = match playground_data(args.content, config.base) {
-    Ok(data) => data
-    Err(message) => {
-      println("prerender: " + message)
-      @sys.exit(1)
-      return
-    }
-  }
-  write_examples(
-    args, config, manifest, examples, playground, texts, entries, routes,
-  )
+  write_examples(args, config, manifest, examples, texts, entries, routes)
   write_file(
     args.out + "/" + page_path(@route.Playground),
     render_page({

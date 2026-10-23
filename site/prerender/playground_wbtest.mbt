@@ -78,3 +78,25 @@ test "an example with no model in the picker has no fragment" {
   assert_eq(example_fragment("openrpc", data), Ok(None))
   assert_eq(example_fragment("nope", data), Ok(None))
 }
+
+///|
+test "every example gets its playground fragment, so that each page has all of them" {
+  guard playground_data("..", "/smithy/") is Ok(data) else {
+    fail("the samples did not load")
+  }
+  let example = (dir : String) => @content.Example::{
+    dir,
+    title: dir,
+    summary: "",
+    files: [],
+    playground: None,
+  }
+  guard with_playground_links([example("json-rpc"), example("openrpc")], data)
+    is Ok(examples) else {
+    fail("the fragments fit")
+  }
+  assert_eq(examples.map(e => e.dir), ["json-rpc", "openrpc"])
+  assert_eq(examples[0].playground, example_fragment("json-rpc", data).unwrap())
+  assert_true(examples[0].playground is Some(_))
+  assert_eq(examples[1].playground, None)
+}

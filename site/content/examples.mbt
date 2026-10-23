@@ -24,8 +24,7 @@ pub(all) struct Example {
   /// The files of the directory other than the README, sorted.
   files : Array[String]
   /// The share fragment of the playground state of this example, or `None`
-  /// when the playground has no model of it. Only the page of this example
-  /// carries it, because it can have 8000 characters.
+  /// when the playground has no model of it.
   playground : String?
 } derive(Eq, Debug, ToJson, FromJson)
 

@@ -61,7 +61,6 @@ async fn write_examples(
   config : @data.SiteConfig,
   manifest : @content.Manifest,
   examples : Array[@content.Example],
-  playground : @workbench.PlaygroundData,
   texts : Map[String, String],
   entries : Array[@search.Entry],
   routes : Array[String],
@@ -91,27 +90,12 @@ async fn write_examples(
   for e in examples {
     let route : @route.Route = Example(e.dir)
     let text = texts.get(e.source()).unwrap_or("")
-    // Only the page of the example carries its playground fragment.
-    let fragment = match example_fragment(e.dir, playground) {
-      Ok(fragment) => fragment
-      Err(message) => {
-        println("prerender: " + message)
-        @sys.exit(1)
-        return
-      }
-    }
     write_file(
       args.out + "/" + page_path(route),
       render_page({
         config,
         pages: manifest.pages,
-        examples: examples.map(x => {
-          if x.dir == e.dir {
-            { ..x, playground: fragment, }
-          } else {
-            x
-          }
-        }),
+        examples,
         route,
         markdown: Some(text),
         playground: None,

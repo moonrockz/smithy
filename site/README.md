@@ -178,9 +178,10 @@ that cannot be read keeps the page and shows the message. The fragment that the 
 inflate stops at `MAX_STATE_BYTES` (`bounded_inflate`, `Inflater::step` with a 64 KB buffer).
 
 An example page (`/examples/<dir>`) shows "Open in playground" when `playground/samples` has a model under
-`examples/<dir>/` (`example_state`). The pre-render computes the fragment (`example_fragment` in `prerender`),
-puts it in the data of that page only, and the button is a plain link: `/playground/#v1...`. It needs no script.
-A fragment over the limit fails the build.
+`examples/<dir>/` (`example_state`). The pre-render computes the fragment of each example once
+(`with_playground_links` in `prerender`) and puts all of them in the site data of every page: a click from
+`/examples/` to an example page loads no new page, so the first page must have them. The button is a plain link:
+`/playground/#v1...`. It needs no script. A fragment over the limit fails the build.
 
 ## Packages
 
