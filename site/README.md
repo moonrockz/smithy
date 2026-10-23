@@ -71,6 +71,14 @@ tags" add the tag rule `v*`. The release workflow can run on a tag ref, and the 
 lets only the default branch deploy, so a run on a tag would be refused without the rule. To recover from a refused
 deploy, run `gh workflow run site.yml --ref main`.
 
+## Examples pages
+
+`/examples/` lists the directories of `examples/` that have a `README.md`, as cards. `/examples/<dir>` shows that
+README, then the other files of the directory with GitHub links at the build's ref. The prerender reads the
+directories (`prerender/examples.mbt`), and `content/examples.mbt` keeps those with a README. One line for each
+card is in the `summaries` table of `content/examples.mbt`: add a line when you add a README. A README link to
+another example's README stays on the site.
+
 ## Landing sample
 
 `landing/sample/` holds the hero example: `order.smithy`, `order.json`, `command.txt` and `output.txt`. The page text

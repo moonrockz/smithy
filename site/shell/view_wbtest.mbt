@@ -346,3 +346,94 @@ async test "with no release, the not found page links only to the next docs" {
   assert_true(!html.contains("Docs (v0.5.0)"))
   assert_true(html.contains("Docs (next)"))
 }
+
+///|
+#cfg(not(target="js"))
+async test "the examples index has one card for each example" {
+  let html = render_route(Examples, None)
+  assert_true(html.contains("<h1>Start from a working project</h1>"))
+  assert_true(html.contains("href=\"/smithy/examples/openrpc/\""))
+  assert_true(html.contains("href=\"/smithy/examples/json-rpc/\""))
+  assert_true(html.contains("<b>Export a service as OpenRPC</b>"))
+  assert_true(
+    html.contains("Generate an OpenRPC 1.3.2 document from a service."),
+  )
+  assert_true(html.contains("<title>Examples — smithy</title>"))
+  assert_true(!html.contains("ms-menu"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "an example page shows the README, then the files at the build ref" {
+  let html = render_route(
+    Example("openrpc"),
+    Some(
+      "# Export a service as OpenRPC\n\nSee [JSON-RPC](../json-rpc/README.md).\n",
+    ),
+  )
+  assert_true(html.contains("Export a service as OpenRPC"))
+  assert_true(html.contains("href=\"/smithy/examples/json-rpc/\""))
+  assert_true(html.contains("<h2>Files</h2>"))
+  assert_true(
+    html.contains(
+      "href=\"https://github.com/moonrockz/smithy/blob/v0.5.0/examples/openrpc/model.smithy\"",
+    ),
+  )
+  assert_true(
+    html.contains(
+      "href=\"https://github.com/moonrockz/smithy/tree/v0.5.0/examples/openrpc\"",
+    ),
+  )
+  assert_true(!html.contains("/tree/main/"))
+  assert_true(
+    html.contains("<title>Export a service as OpenRPC — smithy</title>"),
+  )
+  assert_true(html.contains("href=\"/smithy/examples/\""))
+}
+
+///|
+#cfg(not(target="js"))
+async test "an example without other files has no Files section" {
+  let html = render_route(Example("json-rpc"), Some("# Validate JSON-RPC\n"))
+  assert_true(!html.contains("<h2>Files</h2>"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "an unknown example renders the not-found view" {
+  assert_true(render_route(Example("nope"), None).contains("Page not found"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "the nav, the hero button and the cards use the examples routes" {
+  let html = render_route(Landing, None)
+  assert_true(
+    html.contains("<a href=\"/smithy/examples/\" target=\"_self\">Examples</a>"),
+  )
+  assert_true(
+    html.contains(
+      "href=\"/smithy/examples/\" target=\"_self\" class=\"ms-btn\">Browse examples</a>",
+    ),
+  )
+  assert_true(html.contains("href=\"/smithy/examples/openrpc/\""))
+  assert_true(html.contains("href=\"/smithy/examples/json-rpc/\""))
+  assert_true(html.contains("2 examples with a README."))
+  // No page for this directory in the test data: the card links to GitHub at the ref.
+  assert_true(
+    html.contains(
+      "href=\"https://github.com/moonrockz/smithy/tree/v0.5.0/examples/ion-validation-consumer\"",
+    ),
+  )
+  assert_true(!html.contains("/tree/main/"))
+}
+
+///|
+test "the download tab shows a command for GNU and one for macOS" {
+  assert_true(
+    install_download.contains("sha256sum -c --ignore-missing checksums.txt"),
+  )
+  assert_true(
+    install_download.contains("shasum -a 256 -c --ignore-missing checksums.txt"),
+  )
+}

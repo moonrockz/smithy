@@ -80,7 +80,7 @@ fn nav_bar(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
     ]),
     @html.nav(class="ms-links", [
       @html.a(href=@route.href(base, DocsIndex), "Docs"),
-      @html.a(href=examples_url, "Examples"),
+      @html.a(href=@route.href(base, Examples), "Examples"),
       @html.a(class="ms-extlink", href=@data.api_docs_url, [
         @html.text("API"),
         icon_external(),
@@ -136,7 +136,7 @@ fn icon_github() -> Html {
 }
 
 ///|
-fn footer_view(_m : Model) -> Html {
+fn footer_view() -> Html {
   @html.footer(class="ms-footer", [
     @html.span("smithy.mbt · moonrockz · smithy " + @smithy.version()),
     @html.span("Apache-2.0"),

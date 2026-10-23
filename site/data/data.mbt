@@ -59,6 +59,8 @@ pub extend SiteConfig with FromJson::{from_json}
 pub(all) struct SiteData {
   config : SiteConfig
   pages : Array[@content.Page]
+  /// The examples that have a README.
+  examples : Array[@content.Example]
   route : @route.Route
   /// Markdown of the current page; `None` for the landing page and 404.
   markdown : String?
@@ -98,11 +100,18 @@ pub fn SiteData::manifest(self : SiteData) -> @content.Manifest {
 pub fn link_context(
   config : SiteConfig,
   manifest : @content.Manifest,
+  examples : Array[@content.Example],
   source : String,
 ) -> @markdown.LinkContext {
   {
     source,
-    resolve: path => manifest.find_source(path).map(p => p.route),
+    resolve: path => {
+      match manifest.find_source(path) {
+        Some(page) => Some(page.route)
+        None =>
+          @content.Example::find_source(examples, path).map(e => Example(e.dir))
+      }
+    },
     repo_url: github_repo,
     git_ref: config.git_ref,
   }

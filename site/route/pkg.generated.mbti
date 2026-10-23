@@ -18,6 +18,8 @@ pub(all) enum Route {
   Landing
   DocsIndex
   Doc(String)
+  Examples
+  Example(String)
   NotFound(String)
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn Route::equal(Self, Self) -> Bool

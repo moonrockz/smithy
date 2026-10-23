@@ -76,7 +76,17 @@ test "missing_sources names each fixed source that is not there" {
 }
 
 ///|
+/// The tests run with `site/` as the working directory, so `../README.md` is
+/// the repository README.
+test "missing_sources skips a file that exists" {
+  let missing = missing_sources("..", ["README.md", "docs/nope-smithy.md"])
+  assert_eq(missing, ["docs/nope-smithy.md"])
+}
+
+///|
 /// The landing page shows `site/landing/sample/`; the page text must equal the files.
+/// This test and the next ones read paths relative to `site/`: they assume that the
+/// module root is the working directory.
 test "the hero sample equals the files in landing/sample" {
   let sample = @shell.hero_sample()
   let read = path => {
@@ -124,4 +134,38 @@ test "--no-release clears has_release, also as the last flag" {
   let last = parse_args(["prerender", "--channel", "next", "--no-release"]).unwrap()
   assert_eq(config_of(last).has_release, false)
   assert_eq(config_of(parse_args(["prerender"]).unwrap()).has_release, true)
+}
+
+///|
+/// The examples of the repository, read as the build reads them. After the
+/// examples task these are the six that had a README and the five that got one.
+test "the repository examples with a README are the eleven documented ones" {
+  let dirs = read_example_dirs("..") catch {
+    _ => fail("I could not read ../examples")
+  }
+  let found = @content.Example::build(dirs)
+  assert_eq(found.map(e => e.dir), [
+    "authenticated-repositories", "github-release", "json-rpc", "maven-repository",
+    "npm-archive", "npm-registry", "openrpc", "protocol-tests", "public-archive",
+    "rpc-consumer", "validation-consumer",
+  ])
+  for e in found {
+    assert_true(e.title != "", msg="\{e.dir} has no title")
+    assert_true(e.summary != "", msg="\{e.dir} has no summary")
+  }
+  let rpc = found.iter().find_first(e => e.dir == "json-rpc").unwrap()
+  assert_true(rpc.files.contains("transcripts/chat.json"))
+  assert_true(rpc.files.contains("peers.smithy"))
+  assert_true(!rpc.files.contains("README.md"))
+  // A directory without a README is read but not published.
+  assert_true(dirs.iter().any(d => d.dir == "local-resources"))
+  assert_true(!found.iter().any(e => e.dir == "local-resources"))
+}
+
+///|
+test "read_example_dirs: a tree without examples has none" {
+  let dirs = read_example_dirs("/nonexistent-smithy-content") catch {
+    _ => fail("a missing examples directory is not an error")
+  }
+  assert_eq(dirs.length(), 0)
 }

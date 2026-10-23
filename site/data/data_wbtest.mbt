@@ -19,6 +19,14 @@ fn sample() -> SiteData {
         group: Libraries,
       },
     ],
+    examples: [
+      {
+        dir: "openrpc",
+        title: "Export a service as OpenRPC",
+        summary: "S",
+        files: ["model.smithy"],
+      },
+    ],
     route: Doc("smithy-syntax"),
     markdown: Some("# Configuration\n\nQuote \" < > & </script> done\n"),
   }
@@ -39,11 +47,21 @@ test "decode rejects invalid input" {
 ///|
 test "link_context resolves published sources only" {
   let data = sample()
-  let ctx = link_context(data.config, data.manifest(), "apps/smithy/README.md")
+  let ctx = link_context(
+    data.config,
+    data.manifest(),
+    data.examples,
+    "apps/smithy/README.md",
+  )
   assert_eq(
     (ctx.resolve)("pkgs/smithy-syntax/README.mbt.md"),
     Some(Doc("smithy-syntax")),
   )
+  assert_eq(
+    (ctx.resolve)("examples/openrpc/README.md"),
+    Some(Example("openrpc")),
+  )
+  assert_eq((ctx.resolve)("examples/openrpc/model.smithy"), None)
   assert_eq((ctx.resolve)("docs/plans/x.md"), None)
   assert_eq(ctx.git_ref, "abc123")
   assert_eq(ctx.repo_url, github_repo)
@@ -88,7 +106,12 @@ test "a release page without markdown round-trips" {
 ///|
 test "link_context carries the given source" {
   let data = sample()
-  let ctx = link_context(data.config, data.manifest(), "docs/guide/x.md")
+  let ctx = link_context(
+    data.config,
+    data.manifest(),
+    data.examples,
+    "docs/guide/x.md",
+  )
   assert_eq(ctx.source, "docs/guide/x.md")
   assert_eq(ctx.git_ref, "abc123")
 }

@@ -90,6 +90,7 @@ pub extend SearchState with @debug.Debug::{to_repr}
 pub(all) struct Model {
   config : @data.SiteConfig
   manifest : @content.Manifest
+  examples : Array[@content.Example]
   route : @route.Route
   page : PageState
   theme : Theme
@@ -132,31 +133,48 @@ let closed_search : SearchState = {
 }
 
 ///|
+/// The repository path of the Markdown file that a route shows, or `None`
+/// for a route with no such file (the landing page, the examples index, 404).
+fn source_of(
+  manifest : @content.Manifest,
+  examples : Array[@content.Example],
+  route : @route.Route,
+) -> String? {
+  match route {
+    Example(dir) => @content.Example::find(examples, dir).map(e => e.source())
+    _ => manifest.find(route).map(p => p.source)
+  }
+}
+
+///|
 fn parse_page(
   config : @data.SiteConfig,
   manifest : @content.Manifest,
+  examples : Array[@content.Example],
   route : @route.Route,
   markdown : String,
 ) -> @markdown.Document {
-  let source = match manifest.find(route) {
-    Some(page) => page.source
-    None => ""
-  }
-  @markdown.parse(markdown, @data.link_context(config, manifest, source))
+  let source = source_of(manifest, examples, route).unwrap_or("")
+  @markdown.parse(
+    markdown,
+    @data.link_context(config, manifest, examples, source),
+  )
 }
 
 ///|
 pub fn Model::init(data : @data.SiteData) -> Model {
   let manifest = data.manifest()
-  let page = match (manifest.find(data.route), data.markdown) {
+  let page = match
+    (source_of(manifest, data.examples, data.route), data.markdown) {
     (None, _) => NoContent
     (Some(_), Some(md)) =>
-      Ready(parse_page(data.config, manifest, data.route, md))
+      Ready(parse_page(data.config, manifest, data.examples, data.route, md))
     (Some(_), None) => Loading
   }
   {
     config: data.config,
     manifest,
+    examples: data.examples,
     route: data.route,
     page,
     theme: Auto,

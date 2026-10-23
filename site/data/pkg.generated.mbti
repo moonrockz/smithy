@@ -14,7 +14,7 @@ pub let api_docs_url : String
 
 pub let github_repo : String
 
-pub fn link_context(SiteConfig, @content.Manifest, String) -> @markdown.LinkContext
+pub fn link_context(SiteConfig, @content.Manifest, Array[@content.Example], String) -> @markdown.LinkContext
 
 // Errors
 
@@ -37,6 +37,7 @@ pub(all) struct SiteConfig {
   release_base : String
   next_base : String
   release_version : String
+  has_release : Bool
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn SiteConfig::equal(Self, Self) -> Bool
 pub fn SiteConfig::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
@@ -47,6 +48,7 @@ pub fn SiteConfig::to_repr(Self) -> @debug.Repr
 pub(all) struct SiteData {
   config : SiteConfig
   pages : Array[@content.Page]
+  examples : Array[@content.Example]
   route : @route.Route
   markdown : String?
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)

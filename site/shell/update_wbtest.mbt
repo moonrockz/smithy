@@ -30,6 +30,15 @@ fn site_data(route : @route.Route, markdown : String?) -> @data.SiteData {
         group: Libraries,
       },
     ],
+    examples: [
+      {
+        dir: "openrpc",
+        title: "Export a service as OpenRPC",
+        summary: "Generate an OpenRPC 1.3.2 document from a service.",
+        files: ["model.smithy", "smithy-build.json"],
+      },
+      { dir: "json-rpc", title: "Validate JSON-RPC", summary: "S", files: [], },
+    ],
     route,
     markdown,
   }
@@ -350,4 +359,60 @@ test "opening search closes the phone menu" {
   assert_true(s.search.open)
   assert_false(s.menu_open)
   assert_false(step(m, key("/")).menu_open)
+}
+
+///|
+test "init shows an example README, and nothing for the examples index" {
+  let m = Model::init(
+    site_data(Example("openrpc"), Some("# Export a service as OpenRPC\n")),
+  )
+  match m.page {
+    Ready(doc) => assert_eq(doc.title, "Export a service as OpenRPC")
+    _ => fail("expected a ready page")
+  }
+  assert_eq(Model::init(site_data(Examples, None)).page, NoContent)
+  assert_eq(Model::init(site_data(Example("nope"), None)).page, NoContent)
+}
+
+///|
+test "navigating to an example loads its README" {
+  let m = Model::init(site_data(Landing, None))
+  let m2 = step(
+    m,
+    UrlChanged(@url.parse("http://localhost/smithy/examples/openrpc/")),
+  )
+  assert_eq(m2.route, Example("openrpc"))
+  assert_eq(m2.page, Loading)
+  let m3 = step(
+    m2,
+    ContentLoaded(Example("openrpc"), Ok("# Export a service as OpenRPC\n")),
+  )
+  assert_true(m3.page is Ready(_))
+  let index = step(
+    m3,
+    UrlChanged(@url.parse("http://localhost/smithy/examples/")),
+  )
+  assert_eq(index.route, Examples)
+  assert_eq(index.page, NoContent)
+  let missing = step(
+    m3,
+    UrlChanged(@url.parse("http://localhost/smithy/examples/nope")),
+  )
+  assert_eq(missing.page, NoContent)
+}
+
+///|
+test "source_of: documentation pages and examples have one, other routes none" {
+  let m = Model::init(site_data(Landing, None))
+  assert_eq(
+    source_of(m.manifest, m.examples, Example("openrpc")),
+    Some("examples/openrpc/README.md"),
+  )
+  assert_eq(
+    source_of(m.manifest, m.examples, Doc("cli")),
+    Some("apps/smithy/README.md"),
+  )
+  assert_eq(source_of(m.manifest, m.examples, Example("nope")), None)
+  assert_eq(source_of(m.manifest, m.examples, Examples), None)
+  assert_eq(source_of(m.manifest, m.examples, Landing), None)
 }

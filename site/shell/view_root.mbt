@@ -21,6 +21,12 @@ let theme_script : String =
 fn page_title(m : Model) -> String {
   match (m.route, m.manifest.find(m.route)) {
     (Landing, _) => "Smithy for MoonBit"
+    (Examples, _) => "Examples — smithy"
+    (Example(dir), _) =>
+      match @content.Example::find(m.examples, dir) {
+        Some(e) => e.title + " — smithy"
+        None => "Page not found — smithy"
+      }
     (_, Some(page)) => page.title + " — smithy"
     (_, None) => "Page not found — smithy"
   }
@@ -54,7 +60,7 @@ pub fn view(m : Model, emit : @rabbita.Emit[Msg], site_json : String) -> Html {
     body([
       nav_bar(m, emit),
       main_(class="ms-main", [content_view(m, emit)]),
-      footer_view(m),
+      footer_view(),
       search_view(m, emit),
     ]),
   ])
@@ -64,6 +70,12 @@ pub fn view(m : Model, emit : @rabbita.Emit[Msg], site_json : String) -> Html {
 fn content_view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   match (m.route, m.manifest.find(m.route)) {
     (Landing, _) => landing_view(m, emit)
+    (Examples, _) => examples_index_view(m)
+    (Example(dir), _) =>
+      match @content.Example::find(m.examples, dir) {
+        Some(e) => example_view(m, e)
+        None => not_found_view(m)
+      }
     (_, Some(page)) => docs_view(m, page, emit)
     (_, None) => not_found_view(m)
   }

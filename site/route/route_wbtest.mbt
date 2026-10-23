@@ -65,3 +65,27 @@ test "strip_base: a sibling prefix is not under the base" {
 test "NotFound path round-trips through parse" {
   assert_eq(Route::parse(NotFound("docs/a/b").to_path()), NotFound("docs/a/b"))
 }
+
+///|
+test "parse: the examples index and an example" {
+  assert_eq(Route::parse("examples"), Examples)
+  assert_eq(Route::parse("/examples/"), Examples)
+  assert_eq(Route::parse("examples/json-rpc"), Example("json-rpc"))
+  assert_eq(Route::parse("/examples/json-rpc/"), Example("json-rpc"))
+  assert_eq(Route::parse("examples/json-rpc/index.html"), Example("json-rpc"))
+  assert_eq(Route::parse("examples/a/b"), NotFound("examples/a/b"))
+}
+
+///|
+test "examples routes: to_path, href and JSON round trip" {
+  assert_eq(Examples.to_path(), "examples")
+  assert_eq(Example("openrpc").to_path(), "examples/openrpc")
+  assert_eq(href("/smithy/", Examples), "/smithy/examples/")
+  assert_eq(
+    href("/smithy/next/", Example("openrpc")),
+    "/smithy/next/examples/openrpc/",
+  )
+  for r in [Examples, Example("openrpc")] {
+    assert_eq(@json.from_json(Json(r)), r)
+  }
+}

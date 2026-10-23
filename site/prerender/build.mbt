@@ -128,9 +128,16 @@ pub async fn build_site(args : Args) -> Unit {
       @sys.exit(1)
     }
   }
+  let examples = @content.Example::build(read_example_dirs(args.content))
   let texts : Map[String, String] = Map([])
   for f in files {
     texts.set(f.0, f.1)
+  }
+  for e in examples {
+    texts.set(
+      e.source(),
+      @fs.read_file_to_string(args.content + "/" + e.source()),
+    )
   }
   let entries : Array[@search.Entry] = []
   let routes : Array[String] = [""]
@@ -139,6 +146,7 @@ pub async fn build_site(args : Args) -> Unit {
     render_page({
       config,
       pages: manifest.pages,
+      examples,
       route: Landing,
       markdown: None,
     }),
@@ -150,6 +158,7 @@ pub async fn build_site(args : Args) -> Unit {
       render_page({
         config,
         pages: manifest.pages,
+        examples,
         route: page.route,
         markdown: Some(text),
       }),
@@ -157,13 +166,14 @@ pub async fn build_site(args : Args) -> Unit {
     write_file(args.out + "/content/" + page.source, text)
     let doc = @markdown.parse(
       text,
-      @data.link_context(config, manifest, page.source),
+      @data.link_context(config, manifest, examples, page.source),
     )
     for e in @search.entries_for(page.title, page.route, doc) {
       entries.push(e)
     }
     routes.push(page.route.to_path())
   }
+  write_examples(args, config, manifest, examples, texts, entries, routes)
   // `/docs/` shows the default page; GitHub Pages needs a real file for it.
   let default_route = manifest.default_route()
   match manifest.find(default_route) {
@@ -173,6 +183,7 @@ pub async fn build_site(args : Args) -> Unit {
         render_page({
           config,
           pages: manifest.pages,
+          examples,
           route: default_route,
           markdown: Some(texts.get(page.source).unwrap_or("")),
         }),
@@ -186,6 +197,7 @@ pub async fn build_site(args : Args) -> Unit {
     render_page({
       config,
       pages: manifest.pages,
+      examples,
       route: NotFound("404"),
       markdown: None,
     }),

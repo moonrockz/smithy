@@ -10,15 +10,44 @@ import {
 // Values
 pub fn classify(String) -> (@route.Route, Group)?
 
+pub fn example_summary(String) -> String
+
 pub fn fixed_sources() -> Array[String]
 
 pub fn is_excluded(String) -> Bool
+
+pub fn lex_compare(String, String) -> Int
 
 pub fn normalize_path(String) -> String
 
 // Errors
 
 // Types and methods
+pub(all) struct Example {
+  dir : String
+  title : String
+  summary : String
+  files : Array[String]
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Example::build(Array[ExampleDir]) -> Array[Self]
+pub fn Example::equal(Self, Self) -> Bool
+pub fn Example::find(Array[Self], String) -> Self?
+pub fn Example::find_source(Array[Self], String) -> Self?
+pub fn Example::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+pub fn Example::not_equal(Self, Self) -> Bool
+pub fn Example::source(Self) -> String
+pub fn Example::to_json(Self) -> Json
+pub fn Example::to_repr(Self) -> @debug.Repr
+
+pub(all) struct ExampleDir {
+  dir : String
+  title : String
+  files : Array[String]
+} derive(Eq, @debug.Debug)
+pub fn ExampleDir::equal(Self, Self) -> Bool
+pub fn ExampleDir::not_equal(Self, Self) -> Bool
+pub fn ExampleDir::to_repr(Self) -> @debug.Repr
+
 pub(all) enum Group {
   Guides
   Cli

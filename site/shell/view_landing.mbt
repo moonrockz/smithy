@@ -1,7 +1,11 @@
 ///|
-let examples_url : String = @data.github_repo + "/tree/main/examples"
+/// The `examples/` directory on GitHub at the ref of this build.
+fn examples_url(config : @data.SiteConfig) -> String {
+  @data.github_repo + "/tree/" + config.git_ref + "/examples"
+}
 
 ///|
+/// The changelog on `main`, not at the ref of a build: `main` lists every release.
 let changelog_url : String = @data.github_repo + "/blob/main/CHANGELOG.md"
 
 ///|
@@ -26,6 +30,8 @@ let install_download : String =
   #|curl -LO https://github.com/moonrockz/smithy/releases/latest/download/smithy-linux-x64.tar.gz
   #|curl -LO https://github.com/moonrockz/smithy/releases/latest/download/checksums.txt
   #|sha256sum -c --ignore-missing checksums.txt
+  #|# macOS has no sha256sum. Use this command there:
+  #|shasum -a 256 -c --ignore-missing checksums.txt
 
 ///|
 let install_tabs : Array[(InstallTab, String, String)] = [
@@ -125,9 +131,7 @@ let example_cards : Array[(String, String, String, String)] = [
     "GitHub release assets", "Use model archives attached to a release.", "github-release",
     "github-release",
   ),
-  (
-    "All examples →", "14 runnable projects in the repository.", "examples/", "",
-  ),
+  ("All examples →", "", "examples/", ""),
 ]
 
 ///|
@@ -213,7 +217,11 @@ fn hero_view(base : String) -> Html {
           href=@route.href(base, DocsIndex),
           "Get started",
         ),
-        @html.a(class="ms-btn", href=examples_url, "Browse examples"),
+        @html.a(
+          class="ms-btn",
+          href=@route.href(base, Examples),
+          "Browse examples",
+        ),
       ]),
       @html.div(class="ms-facts", [
         @html.span([@html.b("native · wasm · js"), @html.text(" targets")]),
@@ -286,17 +294,31 @@ fn install_view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
 }
 
 ///|
-fn examples_view() -> Html {
+/// A card links to the page of its example. An example without a README has no
+/// page: its card links to the directory on GitHub.
+fn example_card_href(m : Model, dir : String) -> String {
+  if dir == "" {
+    return @route.href(m.config.base, Examples)
+  }
+  match @content.Example::find(m.examples, dir) {
+    Some(_) => @route.href(m.config.base, Example(dir))
+    None => example_tree_url(m.config, dir)
+  }
+}
+
+///|
+fn examples_view(m : Model) -> Html {
   @html.section(class="ms-section", [
     section_head("Examples", "Start from a working project"),
     @html.div(
       class="ms-ex",
       example_cards.map(c => {
-        @html.a(
-          class="ms-excard",
-          href=if c.3 == "" { examples_url } else { examples_url + "/" + c.3 },
-          [@html.b(c.0), @html.span(c.1), @html.i(c.2)],
-        )
+        let text = if c.3 == "" {
+          "\{m.examples.length()} examples with a README."
+        } else {
+          c.1
+        }
+        example_card(example_card_href(m, c.3), c.0, text, c.2)
       }),
     ),
   ])
@@ -310,6 +332,6 @@ fn landing_view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
     paths_view(base),
     why_view(),
     install_view(m, emit),
-    examples_view(),
+    examples_view(m),
   ])
 }

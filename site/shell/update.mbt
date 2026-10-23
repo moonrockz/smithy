@@ -62,11 +62,12 @@ fn site_path(config : @data.SiteConfig, path : String) -> String? {
 ///|
 fn fetch_page(
   config : @data.SiteConfig,
-  page : @content.Page,
+  route : @route.Route,
+  source : String,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
-  @http.get(config.base + "content/" + page.source).expect_text(
-    emit.map(r => ContentLoaded(page.route, r)),
+  @http.get(config.base + "content/" + source).expect_text(
+    emit.map(r => ContentLoaded(route, r)),
   )
 }
 
@@ -113,12 +114,12 @@ fn on_url_changed(
     return (closed, scroll_cmd(anchor))
   }
   let next = { ..closed, route, }
-  match m.manifest.find(route) {
-    Some(page) =>
+  match source_of(m.manifest, m.examples, route) {
+    Some(source) =>
       // The anchor is not in the DOM until the content is Ready.
       (
         { ..next, page: Loading, pending_anchor: anchor, },
-        fetch_page(m.config, page, emit),
+        fetch_page(m.config, route, source, emit),
       )
     None =>
       ({ ..next, page: NoContent, pending_anchor: None, }, @nav.scroll_to_top())
@@ -152,7 +153,7 @@ pub fn update(
     ContentLoaded(route, result) => {
       guard route == m.route else { return (m, @rabbita.none) }
       let page = match result {
-        Ok(md) => Ready(parse_page(m.config, m.manifest, route, md))
+        Ok(md) => Ready(parse_page(m.config, m.manifest, m.examples, route, md))
         Err(_) => PageFailed
       }
       ({ ..m, page, pending_anchor: None, }, scroll_cmd(m.pending_anchor))

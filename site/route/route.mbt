@@ -5,6 +5,10 @@ pub(all) enum Route {
   /// `/docs/`. The manifest says which page it opens.
   DocsIndex
   Doc(String)
+  /// `/examples/`: the cards of the examples that have a README.
+  Examples
+  /// `/examples/<dir>`: the README of `examples/<dir>` and its files.
+  Example(String)
   NotFound(String)
 } derive(Eq, Debug, ToJson, FromJson)
 
@@ -44,6 +48,8 @@ pub fn Route::parse(path : String) -> Route {
     [] => Landing
     ["docs"] => DocsIndex
     ["docs", slug] => Doc(slug)
+    ["examples"] => Examples
+    ["examples", dir] => Example(dir)
     _ => NotFound(segs.join("/"))
   }
 }
@@ -55,6 +61,8 @@ pub fn Route::to_path(self : Route) -> String {
     Landing => ""
     DocsIndex => "docs"
     Doc(slug) => "docs/" + slug
+    Examples => "examples"
+    Example(dir) => "examples/" + dir
     NotFound(path) => path
   }
 }
