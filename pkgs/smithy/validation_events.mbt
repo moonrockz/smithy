@@ -468,6 +468,7 @@ fn validator_factory_configuration_error(
 fn Model::configured_validation_events(
   self : Model,
   definition : NodeValue,
+  graph : SelectorGraph,
 ) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
   if !(definition is Object(_)) {
@@ -502,24 +503,22 @@ fn Model::configured_validation_events(
       }
     }
     let reachable : Map[String, Bool] = Map([])
-    let pending = selector.select_ids(self)
+    let pending = selector.select_ids_in(graph)
     for shape_id, shape in self.shapes {
       if shape.trait_value("smithy.api#trait") is Some(_) ||
         shape.trait_value("smithy.api#metadata") is Some(_) {
         pending.push(shape_id.to_string())
       }
     }
-    let edges = selector_edges(self)
     while !pending.is_empty() {
       let current = pending.pop().unwrap()
       if reachable.contains(current) {
         continue
       }
       reachable[current] = true
-      for edge in edges {
-        if edge.from.to_string() == current {
-          pending.push(edge.to.to_string())
-        }
+      guard ShapeId::parse(current) is Some(id) else { continue }
+      for edge in graph.outgoing(id) {
+        pending.push(edge.to.to_string())
       }
     }
     for shape_id, shape in self.shapes {
@@ -550,7 +549,7 @@ fn Model::configured_validation_events(
         return events
       }
     }
-    let mut matches = selector.select_ids(self)
+    let mut matches = selector.select_ids_in(graph)
     // The reference ignores prelude matches when deciding whether EmitNone fires.
     if name == "EmitNoneSelector" {
       matches = matches.filter(shape_id => !shape_id.has_prefix("smithy.api#"))
@@ -579,7 +578,7 @@ fn Model::configured_validation_events(
               return events
             }
           }
-          for selection in selector.select_matches(self) {
+          for selection in selector.select_matches_in(graph) {
             guard self.get(selection.id) is Some(shape) else { continue }
             if bound is Some(trait_id) && shape.trait_value(trait_id) is None {
               continue
@@ -625,7 +624,7 @@ fn Model::configured_validation_events(
   let candidate_ids = match validation_string(definition, "selector") {
     Some(expression) => {
       let selector = Selector::parse(expression) catch { _ => return [] }
-      Some(selector.select_ids(self))
+      Some(Set::from_array(selector.select_ids_in(graph)))
     }
     None => None
   }
@@ -663,8 +662,14 @@ fn Model::configured_validation_events(
 }
 
 ///|
-fn Model::trait_target_events(self : Model) -> Array[ValidationEvent] {
+fn Model::trait_target_events(
+  self : Model,
+  graph : SelectorGraph,
+) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
+  // The shapes that each trait selector matches, computed once per trait.
+  // `None` marks a selector that does not parse.
+  let targets : Map[ShapeId, Set[ShapeId]?] = Map([])
   for _, shape in self.shapes {
     if shape.source.file == "<contracts>" || shape.id.namespace == "smithy.api" {
       continue
@@ -695,8 +700,18 @@ fn Model::trait_target_events(self : Model) -> Array[ValidationEvent] {
         expression != "*" else {
         continue
       }
-      let selector = Selector::parse(expression) catch { _ => continue }
-      if !selector.select_ids(self).contains(shape.id.to_string()) {
+      let matched = match targets.get(trait_id) {
+        Some(matched) => matched
+        None => {
+          let matched = Some(Selector::parse(expression).select_set_in(graph)) catch {
+            _ => None
+          }
+          targets[trait_id] = matched
+          matched
+        }
+      }
+      guard matched is Some(matched) else { continue }
+      if !matched.contains(shape.id) {
         events.push(
           validation_event(
             "TraitTarget",
@@ -717,7 +732,10 @@ fn Model::trait_target_events(self : Model) -> Array[ValidationEvent] {
 }
 
 ///|
-fn Model::trait_validator_events(self : Model) -> Array[ValidationEvent] {
+fn Model::trait_validator_events(
+  self : Model,
+  graph : SelectorGraph,
+) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
   for trait_id, trait_shape in self.shapes {
     guard trait_shape.trait_value("smithy.api#traitValidators")
@@ -752,7 +770,8 @@ fn Model::trait_validator_events(self : Model) -> Array[ValidationEvent] {
           continue
         }
         let selector = Selector::parse(expression) catch { _ => continue }
-        for shape_id in selector.select_ids_from(self, applied.id.to_string()) {
+        for
+          shape_id in selector.select_ids_from_in(graph, applied.id.to_string()) {
           guard self.get(shape_id) is Some(shape) else { continue }
           let suffix = match validation_string(definition, "message") {
             Some(message) => ": " + message
@@ -827,8 +846,9 @@ fn Model::collect_validation_events(
   let events : Array[ValidationEvent] = []
   events.append(initial)
   events.append(self.validation_metadata_events())
-  events.append(self.trait_target_events())
-  events.append(self.trait_validator_events())
+  let graph = SelectorGraph::new(self)
+  events.append(self.trait_target_events(graph))
+  events.append(self.trait_validator_events(graph))
   events.append(self.constraint_trait_events())
   events.append(self.basic_trait_events())
   events.append(self.default_trait_events())
@@ -846,7 +866,7 @@ fn Model::collect_validation_events(
   events.append(self.protocol_test_events())
   events.append(self.recursion_and_format_events())
   for definition in validation_array(self.metadata.get("validators")) {
-    events.append(self.configured_validation_events(definition))
+    events.append(self.configured_validation_events(definition, graph))
   }
   let decorated = events
     .filter(event => {

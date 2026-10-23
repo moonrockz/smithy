@@ -147,8 +147,8 @@ new one at once and says that the check failed. The page loads `ui.js` and the W
 (`?v=<ref>`, `SiteConfig::versioned`): Pages caches each file for 600 seconds, and a new page must not run an old
 Worker. A Worker that cannot read a request answers `Blocked` with `seq` -1; that answer, or an answer that the
 page cannot read, shows at once "The page and its checker do not match. Reload the page." (`#pg-mismatch`), and no
-new Worker starts. The Smithy library needs minutes for a model of 1 MB
-(the time grows with the square of the shape count), so such a model stops at that limit.
+new Worker starts. The time of a check grows linearly with the shape count: a model of 1 MB takes about 3 seconds
+on a laptop, so the limit stops only a model of several MB.
 
 ### Share links, Download and "Open in playground"
 

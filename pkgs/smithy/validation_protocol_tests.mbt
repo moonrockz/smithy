@@ -3,6 +3,7 @@
 /// timestamps use epoch seconds, blobs are plain text, and optional nulls are allowed.
 fn Model::protocol_test_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
+  let id_refs = IdRefSelections::new(self)
   for trait_name in ["httpRequestTests", "httpResponseTests"] {
     let trait_id = "smithy.test#" + trait_name
     let ids : Map[String, Array[Shape]] = Map([])
@@ -77,6 +78,7 @@ fn Model::protocol_test_events(self : Model) -> Array[ValidationEvent] {
               Some(owner),
               event_id,
               "ERROR",
+              id_refs~,
               protocol_params=true,
             ) {
             let id = if event.id.has_prefix(event_id + ".UnknownMember.") {

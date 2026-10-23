@@ -13,4 +13,5 @@ import {
   "moonrockz/smithy",
   "moonrockz/smithy-syntax" @syntax,
   "moonbitlang/core/quickcheck",
+  "moonbitlang/core/test",
 } for "test"

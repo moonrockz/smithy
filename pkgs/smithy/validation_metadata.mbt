@@ -1,10 +1,10 @@
 ///|
 fn metadata_directed_graph(
-  model : Model,
+  selector_graph : SelectorGraph,
   prelude : Bool,
 ) -> Map[ShapeId, Array[ShapeId]] {
   let graph : Map[ShapeId, Array[ShapeId]] = Map([])
-  for edge in selector_edges(model) {
+  for edge in selector_graph.edges {
     if edge.label != "trait" && (prelude || edge.to.namespace != "smithy.api") {
       graph.get_or_init(edge.from, () => []).push(edge.to)
     }
@@ -32,6 +32,7 @@ fn metadata_reachable(
 ///|
 fn Model::metadata_trait_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
+  let id_refs = IdRefSelections::new(self)
   let definitions : Map[String, Array[Shape]] = Map([])
   for _, shape in self.shapes {
     if shape.trait_value("smithy.api#metadata") is Some(value) &&
@@ -112,6 +113,7 @@ fn Model::metadata_trait_events(self : Model) -> Array[ValidationEvent] {
           None,
           "TypedMetadata." + key,
           "ERROR",
+          id_refs~,
         ),
       )
     }
@@ -135,7 +137,7 @@ fn Model::unstable_feature_events(self : Model) -> Array[ValidationEvent] {
       owners[id] = feature_id
     }
   }
-  let graph = metadata_directed_graph(self, false)
+  let graph = metadata_directed_graph(SelectorGraph::new(self), false)
   let stable : Map[ShapeId, Bool] = Map([])
   let containers : Map[ShapeId, Array[ShapeId]] = Map([])
   for service in services {
@@ -267,7 +269,8 @@ fn Model::unstable_feature_events(self : Model) -> Array[ValidationEvent] {
 ///|
 fn Model::shape_closure_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
-  let graph = metadata_directed_graph(self, true)
+  let selector_graph = SelectorGraph::new(self)
+  let graph = metadata_directed_graph(selector_graph, true)
   let seen : Map[String, Bool] = Map([])
   for closure in validation_array(self.metadata.get("shapeClosures")) {
     guard validation_string(closure, "id") is Some(id) else { continue }
@@ -371,7 +374,7 @@ fn Model::shape_closure_events(self : Model) -> Array[ValidationEvent] {
         }
       }
       let selected = selector
-        .select_ids(self)
+        .select_ids_in(selector_graph)
         .filter_map(id => ShapeId::parse(id))
       roots.append(selected)
       if selected.iter().all(id => populated.contains(id.namespace)) {

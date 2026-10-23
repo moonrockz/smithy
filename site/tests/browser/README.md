@@ -50,7 +50,8 @@ test of the root and the share link from `/next/` to the root use this rule.
 | `transform`: JSON AST of the valid sample (first line `{`, `"smithy": "2.0"`), a selector, the blocked copy for model errors, the reason of the library for another block, the OpenAPI note, OpenRPC | Lightpanda |
 | `transcript`: the chat variant gives TypeMismatch, RequiredMember and MissingResponse under their entries; Step one entry at a time and Reset; the editor log with its version and preset (the summary of the README); the empty states for a model with errors and a model with no protocol; a change after the check | Lightpanda |
 | `typing`: key input fixes the model; Ctrl-Shift-[ and ] fold and unfold; token colors | Chromium |
-| `large`: a pasted 1 MB model, typing while the Worker runs, the stopped check (review focus 2); typing bursts during a check of about 3 s (the model is sized by one timed check on the machine) end in its result | Chromium |
+| `large`: a pasted 1 MB model, typing while the Worker runs, and its check inside the 10 s limit (review focus 2); typing bursts during a check of about 3 s (the model is sized by one timed check on the machine) end in its result | Chromium |
+| `scale`: a pasted model of 1 MB from `scale-model.js` (the generator of `pkgs/smithy/validation_scale_test.mbt`) gives its diagnostics in the Validate tab inside the 10 s limit: the error and warning counts, and a total that includes one NOTE for each unit; its JSON AST of about 5.4 MB shows in the Transform tab inside the limit, and Copy and Download give the whole file | Chromium |
 | `transform` (Chromium): Copy through the clipboard API, Download, OpenAPI for a model that Validate marks with warnings shown, an old output after a change, no page scroll at 360 and 1440 px with an output | Chromium |
 | `transcript` (Chromium): a log of 20,000 lines with Run all while typing in the model editor (review focus 2: frame gaps, findings before the end, at most 200 rows, the page does not scroll); no page scroll at 360 and 1440 px with findings; a click on the line of an entry | Chromium |
 | `share` (Lightpanda): a share round trip restores the model, the tab and every Transcript setting, and the Transform output and selector; a protocol that the model lacks is fitted; a corrupt, foreign-format, over-long and over-size link each show a message and the default example (review focus 5); a link from `/next/` opens on the root (when the root is this checkout); the "Open in playground" link decodes to the model of the example, also after a move from `/examples/` with no page load. The clipboard is missing, so the page shows the link | Lightpanda |
@@ -70,6 +71,10 @@ Why some checks run on Chromium:
 - **Layout.** Lightpanda has no layout engine: widths, scroll widths and element boxes are not real. The
   360 px and 1440 px checks, and Playwright's `click` (which needs a box), run on Chromium. The Lightpanda tests
   click with `dispatchEvent("click")`.
+- **Large texts.** Lightpanda has no layout. When an editor gets the 1 MB model of `scale` (75,600 lines), the
+  update of CodeMirror runs for more than 30 s, and the Lightpanda watchdog stops the page. A JSON output of
+  5.4 MB in the output editor does the same. Also, a CDP message to Lightpanda can have 1 MB at most
+  (`--cdp-max-message-size`). So the `scale` tests run on Chromium.
 - **Computed colors.** Lightpanda does not apply CodeMirror's style sheets to computed styles, so the token
   colors are checked on Chromium.
 

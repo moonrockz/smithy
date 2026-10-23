@@ -178,6 +178,7 @@ fn Model::pagination_properties(
 ///|
 fn Model::pagination_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
+  let graph = SelectorGraph::new(self)
   for _, operation in self.shapes {
     guard operation.body is Operation(..) &&
       operation.trait_value("smithy.api#paginated") is Some(config) else {
@@ -190,7 +191,7 @@ fn Model::pagination_events(self : Model) -> Array[ValidationEvent] {
     }
     for _, service in self.shapes {
       guard service.body is Service(..) &&
-        self
+        graph
         .http_contained_operations(service)
         .iter()
         .any(op => op.id == operation.id) else {
@@ -309,7 +310,7 @@ fn Model::protocol_events(self : Model) -> Array[ValidationEvent] {
 ///|
 fn Model::streaming_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
-  let edges = selector_edges(self)
+  let graph = SelectorGraph::new(self)
   for _, member_ in self.shapes {
     guard member_.body is Member(target~) &&
       self.shapes.get(target) is Some(stream) &&
@@ -331,10 +332,7 @@ fn Model::streaming_events(self : Model) -> Array[ValidationEvent] {
     guard self.shapes.get(member_.id.root()) is Some(container) else {
       continue
     }
-    for edge in edges {
-      if edge.to != container.id {
-        continue
-      }
+    for edge in graph.incoming(container.id) {
       guard self.shapes.get(edge.from) is Some(owner) else { continue }
       if edge.label == "input" || edge.label == "mixin" || edge.label == "trait" {
         continue
@@ -447,8 +445,8 @@ fn Model::streaming_events(self : Model) -> Array[ValidationEvent] {
             ),
           )
         }
-        for edge in edges {
-          if edge.from == id && edge.label != "trait" {
+        for edge in graph.outgoing(id) {
+          if edge.label != "trait" {
             pending.push(edge.to)
           }
         }

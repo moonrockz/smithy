@@ -39,7 +39,7 @@ fn Model::service_conflict_severity(
 ///|
 fn Model::service_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
-  let edges = selector_edges(self)
+  let graph = SelectorGraph::new(self)
   for _, service in self.shapes {
     guard service.body is Service(rename~, ..) else { continue }
     let closure : Map[ShapeId, Shape] = Map([])
@@ -50,8 +50,8 @@ fn Model::service_events(self : Model) -> Array[ValidationEvent] {
       }
       guard self.shapes.get(id) is Some(shape) else { continue }
       closure[id] = shape
-      for edge in edges {
-        if edge.from == id && edge.label != "trait" {
+      for edge in graph.outgoing(id) {
+        if edge.label != "trait" {
           pending.push(edge.to)
         }
       }

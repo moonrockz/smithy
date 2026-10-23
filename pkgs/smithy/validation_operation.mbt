@@ -1,7 +1,7 @@
 ///|
 fn Model::operation_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
-  let edges = selector_edges(self)
+  let graph = SelectorGraph::new(self)
   for descriptor in ["input", "output"] {
     let opposite = if descriptor == "input" { "output" } else { "input" }
     for _, shape in self.shapes {
@@ -9,10 +9,7 @@ fn Model::operation_events(self : Model) -> Array[ValidationEvent] {
         continue
       }
       let operations : Set[ShapeId] = Set([])
-      for edge in edges {
-        if edge.to != shape.id {
-          continue
-        }
+      for edge in graph.incoming(shape.id) {
         guard self.shapes.get(edge.from) is Some(owner) else { continue }
         if edge.label == descriptor {
           operations.add(owner.id)

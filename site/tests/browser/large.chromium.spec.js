@@ -1,8 +1,8 @@
-// Review focus 2: a pasted 1 MB model keeps the page responsive. Typing works while the Worker runs.
-// The library needs minutes for a model this large, so the Worker is stopped after 10 seconds and the
-// page says so. Only one request runs at a time, so the limit measures one check. No result for old
-// text replaces a newer one. Runs on Chromium: it needs key input and a 1 MB insert
-// (README.md).
+// Review focus 2: a pasted 1 MB model keeps the page responsive. Typing works while the Worker runs,
+// and the check ends with its result inside the 10 second limit (about 3 s on a laptop). Only one
+// request runs at a time, so the limit measures one check. No result for old text replaces a newer
+// one. worker.lightpanda.spec.js covers a Worker that does not answer in time. Runs on Chromium: it
+// needs key input and a 1 MB insert (README.md).
 import { expect, test } from "./fixtures.js";
 import { chooseSample, openPlayground, settled } from "./playground.js";
 import { siteUrl } from "./site.js";
@@ -15,7 +15,7 @@ function largeModel(size = 1_000_000) {
   return text;
 }
 
-test("a 1 MB model keeps typing and the status bar live, and a stopped check names the reason", async ({ page, context }) => {
+test("a 1 MB model keeps typing and the status bar live, and its check ends inside the limit", async ({ page, context }) => {
   test.setTimeout(90_000);
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await openPlayground(page, siteUrl("playground/"));
@@ -44,17 +44,13 @@ test("a 1 MB model keeps typing and the status bar live, and a stopped check nam
   await expect(page.locator(".pg-diag.pg-diag-stale")).toHaveCount(1);
   await expect(page.locator("button.pg-diag")).toHaveCount(0);
 
-  // No answer in 10 seconds: the page stops the Worker and says so.
-  await expect(page.locator(".pg-notice")).toHaveText(
-    "The check took more than 10 seconds, so the playground stopped it and started a new Worker. Change the model to check it again.",
-    { timeout: 20_000 },
-  );
-  // The text typed during the first check goes to the new Worker, which also stops after 10 seconds.
-  await expect(page.locator(".pg-check")).toHaveText("Stopped", { timeout: 25_000 });
-  await expect(page.locator(".pg-diag")).toHaveCount(0);
-  await expect(page.locator("#pg-editor .cm-lintRange-error")).toHaveCount(0);
+  // The check of the pasted text ends, and then the check of the text typed during it. Each one
+  // ends inside the 10 second limit, so the page stops no Worker.
+  await expect(page.locator(".pg-okbox")).toHaveText(/^✓ The model is valid\. \d+ shapes\.$/, { timeout: 25_000 });
+  await expect(page.locator(".pg-status")).toHaveAttribute("data-waiting", "false");
+  await expect(page.locator(".pg-notice")).toHaveCount(0);
 
-  // The new Worker answers.
+  // The Worker answers the next model.
   await chooseSample(page, "Order");
   await settled(page);
   await expect(page.locator(".pg-okbox")).toHaveText("✓ The model is valid. 1 shape.");
@@ -81,12 +77,12 @@ async function timeOneCheck(page, model) {
 }
 
 // A model whose check takes about `target` milliseconds on this machine. The time of a check grows
-// with the square of the shape count, so the size follows from one timed check.
+// linearly with the shape count (smithy-2qe.43), so the size follows from one timed check.
 async function modelForCheckTime(page, target) {
   const probe = 40_000;
   const ms = await timeOneCheck(page, largeModel(probe));
-  const size = Math.round(probe * Math.sqrt(target / Math.max(ms, 1)));
-  return largeModel(Math.min(Math.max(size, 10_000), 200_000));
+  const size = Math.round((probe * target) / Math.max(ms, 1));
+  return largeModel(Math.min(Math.max(size, 10_000), 2_000_000));
 }
 
 test("typing bursts during a long check end in its result, not in a stopped check", async ({ page, context }) => {

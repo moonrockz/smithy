@@ -590,14 +590,14 @@ fn Model::http_events(self : Model) -> Array[ValidationEvent] {
 ///|
 fn Model::http_ignored_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
-  let edges = selector_edges(self)
+  let graph = SelectorGraph::new(self)
   for _, container in self.shapes {
     guard container.body is Structure(_) && !http_trait(container, "mixin") else {
       continue
     }
-    let relationships = edges.filter(e => {
-      e.to == container.id && e.label != "trait"
-    })
+    let relationships = graph
+      .incoming(container.id)
+      .filter(e => e.label != "trait")
     for member_ in self.http_members(container.id) {
       let bindings = [
         "httpHeader", "httpLabel", "httpPayload", "httpPrefixHeaders", "httpQueryParams",
@@ -673,28 +673,26 @@ fn Model::http_ignored_events(self : Model) -> Array[ValidationEvent] {
 }
 
 ///|
-fn Model::http_contained_operations(
-  self : Model,
+fn SelectorGraph::http_contained_operations(
+  self : SelectorGraph,
   service : Shape,
 ) -> Array[Shape] {
   let result : Array[Shape] = []
   let pending = [service.id]
   let seen : Set[ShapeId] = Set([])
-  let edges = selector_edges(self)
   while pending.pop() is Some(id) {
     if seen.contains(id) {
       continue
     }
     seen.add(id)
-    guard self.shapes.get(id) is Some(shape) else { continue }
+    guard self.model.shapes.get(id) is Some(shape) else { continue }
     if shape.body is Operation(..) {
       result.push(shape)
       continue
     }
-    for edge in edges {
-      if edge.from == id &&
-        edge.label != "trait" &&
-        self.shapes.get(edge.to) is Some(target) &&
+    for edge in self.outgoing(id) {
+      if edge.label != "trait" &&
+        self.model.shapes.get(edge.to) is Some(target) &&
         target.body is (Operation(..) | Resource(..)) {
         pending.push(edge.to)
       }
@@ -734,15 +732,32 @@ fn http_uri_key(uri : String) -> (Array[String], Map[String, String]) {
 }
 
 ///|
+/// The method and the `http_uri_key` of an `http` trait value, as one key:
+/// two operations can conflict only when their keys are equal.
+fn http_endpoint_group(config : NodeValue) -> String {
+  let method = match validation_string(config, "method") {
+    Some(method) => "=" + method
+    None => "-"
+  }
+  let (segments, query) = http_uri_key(
+    validation_string(config, "uri").unwrap_or("/"),
+  )
+  let pairs = query.iter().map(pair => pair.0 + "=" + pair.1).to_array()
+  pairs.sort()
+  method + "\u{0}" + segments.join("/") + "\u{0}" + pairs.join("&")
+}
+
+///|
 fn Model::http_service_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
   let any_http = self.shapes.iter().any(p => http_trait(p.1, "http"))
   if !any_http {
     return events
   }
+  let graph = SelectorGraph::new(self)
   for _, service in self.shapes {
     guard service.body is Service(..) else { continue }
-    let operations = self.http_contained_operations(service)
+    let operations = graph.http_contained_operations(service)
     let mut protocol : ShapeId? = None
     for trait_id, _ in service.traits {
       if self.shapes.get(trait_id) is Some(definition) &&
@@ -780,23 +795,31 @@ fn Model::http_service_events(self : Model) -> Array[ValidationEvent] {
         }
       }
     }
+    // Only operations with the same method and URI key can conflict, so
+    // compare each operation with its own group and not with all others.
+    let groups : Map[String, Array[Shape]] = Map([])
+    for operation in operations {
+      guard operation.trait_value("smithy.api#http") is Some(config) else {
+        continue
+      }
+      let key = http_endpoint_group(config)
+      match groups.get(key) {
+        Some(group) => group.push(operation)
+        None => groups[key] = [operation]
+      }
+    }
     for operation in operations {
       guard operation.trait_value("smithy.api#http") is Some(config) else {
         continue
       }
       let uri = validation_string(config, "uri").unwrap_or("/")
       let conflicts : Array[String] = []
-      for other in operations {
+      for other in groups.get(http_endpoint_group(config)).unwrap_or([]) {
         guard other.id != operation.id &&
           other.trait_value("smithy.api#http") is Some(other_config) else {
           continue
         }
         let other_uri = validation_string(other_config, "uri").unwrap_or("/")
-        if validation_string(config, "method") !=
-          validation_string(other_config, "method") ||
-          http_uri_key(uri) != http_uri_key(other_uri) {
-          continue
-        }
         if !self.http_endpoints_conflict(operation, other) {
           continue
         }

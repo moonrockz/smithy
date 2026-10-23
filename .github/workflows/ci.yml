@@ -55,6 +55,12 @@ jobs:
       - name: Build ${{ matrix.target }}
         run: mise run build -- ${{ matrix.target }} --release
 
+      # Validation time must stay near linear in the shape count (smithy-2qe.43).
+      # The bounds leave room for a shared runner; the local defaults are tighter.
+      - name: Benchmark validation
+        if: matrix.target == 'native'
+        run: mise run bench:validate -- --no-build --max-seconds 8 --max-ratio 3 --cutoff 60
+
   test:
     name: Test (${{ matrix.target }})
     runs-on: ubuntu-latest
