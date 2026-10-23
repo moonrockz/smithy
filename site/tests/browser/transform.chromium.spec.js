@@ -104,6 +104,9 @@ for (const [width, height] of [
     await expect(page.locator(".pg-notices .pg-notice")).toBeVisible({ timeout: 15_000 });
     await page.selectOption("#pg-output-kind", "json-ast");
     await page.getByRole("button", { name: "Run", exact: true }).click();
+    // The OpenAPI output also starts with "{", so wait for the end of the second run: while it
+    // runs, the button says "Running" and the output editor is hidden, with no box.
+    await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled({ timeout: 15_000 });
     await expect(page.locator("#pg-output .cm-line").first()).toHaveText("{", { timeout: 15_000 });
     await noPageScroll(page);
     // The editor sizes itself after its first paint, so poll for its box.
