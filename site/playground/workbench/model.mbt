@@ -73,6 +73,8 @@ pub(all) enum Check {
   Refused(String)
   /// The Worker did not answer in time and was replaced.
   Stopped
+  /// The Worker stopped with an error, given by the browser, and was replaced.
+  Failed(String)
 } derive(Eq, Debug)
 
 ///|
@@ -107,6 +109,9 @@ pub(all) struct Model {
   sent_edits : Int32
   /// True while the newest request has no answer.
   waiting : Bool
+  /// True when the text changed and its wait ended while a request ran.
+  /// The newest text goes to the Worker when that request ends.
+  pending : Bool
   check : Check
   /// The cursor, from 1.
   line : Int32
@@ -129,6 +134,8 @@ pub(all) enum Msg {
   Answered(seq~ : Int32, answer~ : Answer)
   /// The time for the request with this number ended.
   TimedOut(seq~ : Int32)
+  /// The Worker stopped with an error; the text is the message of the browser.
+  WorkerFailed(String)
   SampleChosen(Int32)
   TabChosen(Tab)
   DiagnosticChosen(line~ : Int32, column~ : Int32)
@@ -187,6 +194,7 @@ pub fn Model::start(data : PlaygroundData) -> (Model, Array[Effect]) {
     seq: 0,
     sent_edits: 0,
     waiting: false,
+    pending: false,
     check: Unchecked,
     line: 1,
     column: 1,
@@ -207,9 +215,30 @@ pub fn Model::first_text(self : Model) -> String {
 fn Model::send(self : Model) -> (Model, Array[Effect]) {
   let seq = self.seq + 1
   (
-    { ..self, seq, sent_edits: self.edits, waiting: true, },
+    { ..self, seq, sent_edits: self.edits, waiting: true, pending: false, },
     [SendValidate(seq~), Wait(ms=timeout_ms, then=TimedOut(seq~))],
   )
+}
+
+///|
+/// True when the result on the page is for the text in the editor: no
+/// change since its request, and no newer request running.
+pub fn Model::is_current(self : Model) -> Bool {
+  !self.waiting && self.edits == self.sent_edits
+}
+
+///|
+/// After the newest request ended with no result to show: send the newest
+/// text when a change waits for it. One request runs at a time, so the time
+/// limit of a request measures that request only.
+fn Model::next(self : Model, effects : Array[Effect]) -> (Model, Array[Effect]) {
+  let m = { ..self, waiting: false, }
+  if m.pending {
+    let (sent, more) = m.send()
+    (sent, [..effects, ..more])
+  } else {
+    (m, effects)
+  }
 }
 
 ///|
@@ -235,13 +264,19 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       let edits = m.edits + 1
       ({ ..m, edits, }, [Wait(ms=DEBOUNCE_MS, then=Debounced(edits~))])
     }
-    Debounced(edits~) => if edits == m.edits { m.send() } else { (m, []) }
-    Answered(seq~, answer~) => {
-      // Only the answer to the newest request counts, and only while the text
-      // is the text that it checked.
-      guard seq == m.seq && m.waiting && m.edits == m.sent_edits else {
-        return (m, [])
+    // Only one request runs at a time: a change while one runs waits for it.
+    Debounced(edits~) =>
+      if edits != m.edits {
+        (m, [])
+      } else if m.waiting {
+        ({ ..m, pending: true, }, [])
+      } else {
+        m.send()
       }
+    Answered(seq~, answer~) => {
+      guard seq == m.seq && m.waiting else { return (m, []) }
+      // The answer is for text that changed since: it does not show.
+      guard m.edits == m.sent_edits else { return m.next([]) }
       match answer {
         Validated(items~, shapes~) =>
           (
@@ -254,7 +289,13 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
     }
     TimedOut(seq~) => {
       guard seq == m.seq && m.waiting else { return (m, []) }
-      ({ ..m, waiting: false, check: Stopped, }, [RestartWorker, Mark([])])
+      { ..m, check: Stopped, }.next([RestartWorker, Mark([])])
+    }
+    // An error while no request runs restarts nothing: a Worker that cannot
+    // load would restart again and again.
+    WorkerFailed(message) => {
+      guard m.waiting else { return (m, []) }
+      { ..m, check: Failed(message), }.next([RestartWorker, Mark([])])
     }
     SampleChosen(index) =>
       match m.data.samples.get(index) {
@@ -263,6 +304,12 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       }
     TabChosen(tab) => ({ ..m, tab, }, [])
     CursorMoved(line~, column~) => ({ ..m, line, column, }, [])
-    DiagnosticChosen(line~, column~) => (m, [MoveCursor(line~, column~)])
+    // A row of an older result names a place in older text.
+    DiagnosticChosen(line~, column~) =>
+      if m.is_current() {
+        (m, [MoveCursor(line~, column~)])
+      } else {
+        (m, [])
+      }
   }
 }

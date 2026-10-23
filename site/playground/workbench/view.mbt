@@ -70,6 +70,7 @@ fn check_status(m : Model) -> Html {
     Checked(..) => @html.span(class="pg-ok", "✓ valid")
     Refused(_) => @html.span(class="pg-hint", "Not checked")
     Stopped => @html.span(class="pg-err", "Stopped")
+    Failed(_) => @html.span(class="pg-err", "Failed")
   }
   let warnings = if m.warnings() > 0 {
     [
@@ -148,7 +149,13 @@ fn location(d : Diagnostic) -> String {
 }
 
 ///|
-fn diagnostic_row(d : Diagnostic, emit : @rabbita.Emit[Msg]) -> Html {
+/// A row of a result for older text names a place in that text, so a click
+/// on it does not move the cursor.
+fn diagnostic_row(
+  d : Diagnostic,
+  current : Bool,
+  emit : @rabbita.Emit[Msg],
+) -> Html {
   let severity = d.severity.to_lower()
   let shape = match d.shape {
     Some(id) => [@html.text(" · "), @html.span(class="pg-shape", id)]
@@ -168,7 +175,9 @@ fn diagnostic_row(d : Diagnostic, emit : @rabbita.Emit[Msg]) -> Html {
       ),
     ]),
   ]
-  if d.start_line > 0 {
+  if !current {
+    @html.div(class="pg-diag pg-diag-stale", body)
+  } else if d.start_line > 0 {
     @html.button(
       class="pg-diag",
       title="Go to line \{d.start_line}",
@@ -192,6 +201,24 @@ fn validate_panel(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
           "The check took more than 10 seconds, so the playground stopped it and started a new Worker. Change the model to check it again.",
         ),
       ]
+    Failed(message) => {
+      let detail = if message == "" {
+        []
+      } else {
+        [@html.code(class="pg-detail", message)]
+      }
+      [
+        @html.div(
+          class="pg-notice",
+          [
+            @html.p(
+              "The check failed because the Worker stopped with an error. The playground started a new Worker. Change the model to check it again.",
+            ),
+            ..detail,
+          ],
+        ),
+      ]
+    }
     Checked(items~, shapes~) => {
       let head = if m.errors() == 0 {
         [
@@ -208,7 +235,11 @@ fn validate_panel(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
         } else {
           items.length()
         }]
-      let rows = listed.iter().map(d => diagnostic_row(d, emit)).to_array()
+      let current = m.is_current()
+      let rows = listed
+        .iter()
+        .map(d => diagnostic_row(d, current, emit))
+        .to_array()
       let more = if items.length() > MAX_LISTED {
         [
           @html.p(

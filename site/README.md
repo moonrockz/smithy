@@ -31,7 +31,9 @@ mise run site:test:browser           # browser tests against _site (tests/browse
 
 The site needs the npm packages of `package.json`, as `bun.lock` pins them: CodeMirror for the playground and
 Playwright for the browser tests. `site:build` runs `bun install --frozen-lockfile` itself. Bun and Lightpanda
-are pinned in `.config/mise/config.toml`.
+are pinned in `site/mise.toml`, which mise reads only in `site/`, so the other CI jobs do not install them. The
+site scripts run bun and Lightpanda with `site/` as the working directory. Run `mise trust` and `mise install`
+in `site/` once.
 
 `mise run site:build -- --content <repo dir> --channel release|next --site-root /smithy/ --release-version vX.Y.Z --ref <git ref> --out <dir>`
 builds one version. The scripts are `scripts/site-*.mbtx`.
@@ -117,9 +119,12 @@ the new page, so that no other page runs the playground script.
 editor and then the MoonBit script) and `<out>/playground/worker.js`. The pre-render reads the samples from
 `--content` and puts them in the site data of the playground page.
 
-The page sends Validate 250 ms after the last change. Each request has a new `seq`. The page uses only the answer
-to its newest request, and only while the text is the text that it checked. When the Worker gives no answer in
-10 seconds, the page ends it, starts a new one and says so. The Smithy library needs minutes for a model of 1 MB
+The page sends Validate 250 ms after the last change. Only one request runs at a time: a change while one runs
+waits, and the newest text goes when that request ends. Each request has a new `seq`. The page uses only the
+answer to its newest request, and only while the text is the text that it checked; until then the previous
+result stays, marked as checking, and its rows do not move the cursor. When the Worker gives no answer in 10
+seconds, the page ends it, starts a new one and says so. When the Worker stops with an error, the page starts a
+new one at once and says that the check failed. The Smithy library needs minutes for a model of 1 MB
 (the time grows with the square of the shape count), so such a model stops at that limit.
 
 ## Packages

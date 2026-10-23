@@ -1,7 +1,7 @@
 # Browser tests of the site
 
 These tests load the built site in a headless browser. Playwright (pinned in `site/bun.lock`) drives
-[Lightpanda](https://github.com/lightpanda-io/browser) 1.0.1 (pinned in `.config/mise/config.toml`) through
+[Lightpanda](https://github.com/lightpanda-io/browser) 1.0.1 (pinned in `site/mise.toml`) through
 `chromium.connectOverCDP`. A check that Lightpanda cannot run uses Playwright's own Chromium. The table below
 lists each such check and why.
 
@@ -10,13 +10,15 @@ lists each such check and why.
 ```bash
 mise run site:pages -- --out _site   # build both channels, as GitHub Pages serves them
 cd site
+mise trust && mise install           # once: bun and Lightpanda from site/mise.toml
 bun install --frozen-lockfile
 bunx playwright install chromium     # once, for the Chromium checks
 bun run test:browser                 # or, from the repository root: mise run site:test:browser
 ```
 
 `playwright.config.js` starts two servers: `moonx scripts/site-dev.mbtx --serve _site --base /smithy/`, which
-serves `_site` under `/smithy/` as GitHub Pages does, and `lightpanda serve --load-resources worker`. Lightpanda
+serves `_site` under `/smithy/` as GitHub Pages does, and `lightpanda serve --load-resources worker` (in `site/`,
+where the mise shim finds the Lightpanda of `site/mise.toml`). Lightpanda
 does not run a Web Worker without `--load-resources worker`. Outside CI, a server that already runs on the same
 port is used. The environment variables `SITE_DIR`, `SITE_PORT` and `LIGHTPANDA_CDP` change the defaults
 (`_site`, 8091, `http://127.0.0.1:9222`).
@@ -31,9 +33,9 @@ project `chromium`.
 | `probe`: a Web Worker runs the Smithy library; CodeMirror renders its DOM and reads a change of it; the clipboard API | Lightpanda |
 | `smoke`: the default sample shows one error, the diagnostic moves the cursor, the fix gives the valid state (both channels) | Lightpanda |
 | `half-typed`: an unbalanced brace, a deleted `$version`, an empty editor, a burst of edits (review focus 1) | Lightpanda |
-| `worker`: a Worker that does not answer in 10 seconds is ended and a new one starts | Lightpanda |
+| `worker`: a Worker that does not answer in 10 seconds is ended and a new one starts; a Worker that stops with an error is replaced at once, once | Lightpanda |
 | `typing`: key input fixes the model; Ctrl-Shift-[ and ] fold and unfold; token colors | Chromium |
-| `large`: a pasted 1 MB model, typing while the Worker runs, the stopped check (review focus 2) | Chromium |
+| `large`: a pasted 1 MB model, typing while the Worker runs, the stopped check (review focus 2); typing bursts on a 100 KB model end in its result | Chromium |
 | `layout`: no page scroll at 360 px, stacked and side-by-side panes, links into and out of the playground | Chromium |
 
 Why some checks run on Chromium:

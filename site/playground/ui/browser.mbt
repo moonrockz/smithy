@@ -49,14 +49,21 @@ extern "js" fn editor_go_to(id : String, line : Int32, column : Int32) -> Unit =
 type Worker
 
 ///|
-/// Start the Worker script at `url`; `on_reply` gets each message it posts.
+/// Start the Worker script at `url`; `on_reply` gets each message it posts,
+/// and `on_error` the message of an error that stops it: a script that does
+/// not load, or a trap in the library.
 extern "js" fn Worker::start(
   url : String,
   on_reply : (String) -> Unit,
+  on_error : (String) -> Unit,
 ) -> Worker =
-  #|(url, onReply) => {
+  #|(url, onReply, onError) => {
   #|  const worker = new Worker(url)
   #|  worker.onmessage = (event) => onReply(event.data)
+  #|  worker.onerror = (event) => {
+  #|    event.preventDefault()
+  #|    onError(event.message ?? '')
+  #|  }
   #|  return worker
   #|}
 

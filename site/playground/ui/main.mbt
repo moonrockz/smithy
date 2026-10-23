@@ -58,11 +58,11 @@ fn reply_msg(text : String) -> @workbench.Msg? {
 ///|
 fn Runtime::start_worker(self : Runtime) -> Unit {
   self.worker = Some(
-    Worker::start(self.data.worker, text => {
-      if reply_msg(text) is Some(msg) {
-        (self.dispatch)(msg)
-      }
-    }),
+    Worker::start(
+      self.data.worker,
+      text => if reply_msg(text) is Some(msg) { (self.dispatch)(msg) },
+      message => (self.dispatch)(WorkerFailed(message)),
+    ),
   )
 }
 

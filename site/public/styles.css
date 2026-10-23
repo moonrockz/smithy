@@ -180,6 +180,9 @@ button.pg-diag:hover, button.pg-diag:focus-visible { background: var(--soft); }
 .pg-okbox, .pg-notice { margin: 14px; padding: 12px 14px; border-radius: 8px; }
 .pg-okbox { background: var(--ok-soft); color: var(--ok); font-weight: 700; }
 .pg-notice { background: var(--err-soft); color: var(--err); }
+.pg-notice p { margin: 0; }
+.pg-detail { display: block; margin-top: 6px; font-size: 0.75rem; overflow-wrap: anywhere; }
+.pg-diag-stale { opacity: 0.6; }
 
 /* Docs */
 .ms-docs { display: grid; grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr) minmax(11rem, 15rem); gap: 2rem;

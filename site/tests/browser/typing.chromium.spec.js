@@ -44,4 +44,5 @@ test("Smithy tokens have the kinds of the site highlighter", async ({ page }) =>
   expect(await color("EchoChat")).toBe("rgb(210, 168, 255)"); // shape name
   expect(await color("@jsonRpcProtocol")).toBe("rgb(255, 166, 87)"); // trait
   expect(await color('"1.0"')).toBe("rgb(165, 214, 255)"); // string
+  expect(page.errors).toEqual([]);
 });
