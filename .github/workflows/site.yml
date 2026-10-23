@@ -25,6 +25,12 @@ on:
       - pkgs/**/README.mbt.md
       - scripts/site-*.mbtx
       - .github/workflows/site.yml
+      - .config/mise/config.toml
+      - .github/actions/setup/**
+      - pkgs/artifact-resources/**
+      - pkgs/jmespath/**
+      - pkgs/smithy-syntax/**
+      - pkgs/smithy/**
   push:
     branches: [main]
     paths:
@@ -35,6 +41,12 @@ on:
       - pkgs/**/README.mbt.md
       - scripts/site-*.mbtx
       - .github/workflows/site.yml
+      - .config/mise/config.toml
+      - .github/actions/setup/**
+      - pkgs/artifact-resources/**
+      - pkgs/jmespath/**
+      - pkgs/smithy-syntax/**
+      - pkgs/smithy/**
   workflow_dispatch:
   workflow_call:
 
@@ -56,6 +68,7 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.sha || 'main' }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install mise and the pinned toolchain
         uses: ./.github/actions/setup
@@ -64,6 +77,10 @@ jobs:
 
       - name: Install warren
         run: moon install moonbit-community/warren@0.4.5
+
+      # site/ is outside moon.work, so ci.yml and `mise run check` skip it. --no-build: the next step builds.
+      - name: Test the site packages
+        run: moonx scripts/site-check.mbtx --no-build
 
       - name: Build both channels and check the links of each
         run: mise run site:pages -- --out _site

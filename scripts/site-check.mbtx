@@ -1,11 +1,13 @@
 ///|
 /// Test the site packages, build both channels of the site, and check their links.
 ///
-/// Usage: `mise run site:check`, or `moonx scripts/site-check.mbtx`.
+/// Usage: `mise run site:check [-- --no-build]`, or `moonx scripts/site-check.mbtx [--no-build]`.
+/// `--no-build` runs the package tests only. The Pages workflow uses it, because it builds both channels itself.
 /// The builds are the ones the Pages workflow makes (`scripts/site-pages.mbtx`): each channel is a full
 /// build of its own checkout. The output goes to a temporary directory, which the script removes at the end.
 import {
   "moonbitlang/async@0.22.5",
+  "moonbitlang/core/env",
   "moonbitlang/async@0.22.5/fs",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/async@0.22.5/stdio",
@@ -52,12 +54,15 @@ async fn run(
 
 ///|
 /// Run the steps in order; return the first non-zero code.
-async fn steps(tmp : String) -> Int32 {
+async fn steps(tmp : String, build : Bool) -> Int32 {
   for command in test_commands {
     let code = run(command[0], command[1:].to_owned(), cwd="site")
     if code != 0 {
       return code
     }
+  }
+  if !build {
+    return 0
   }
   run("moonx", ["scripts/site-pages.mbtx", "--out", tmp + "/site"])
 }
@@ -87,9 +92,31 @@ async fn with_cleanup(
 }
 
 ///|
+/// Whether to build the channels. `args` has the script binary at index 0.
+/// Returns `None` for an argument the script does not know.
+fn parse_build(args : ArrayView[String]) -> Bool? {
+  let mut build = true
+  for arg in args[1:] {
+    match arg {
+      "--no-build" => build = false
+      _ => return None
+    }
+  }
+  Some(build)
+}
+
+///|
 async fn main {
+  let build = match parse_build(@env.args()[:]) {
+    Some(b) => b
+    None => {
+      eprintln("site:check: unknown argument; the only one is --no-build")
+      @sys.exit(2)
+      return
+    }
+  }
   let tmp = @fs.tmpdir(prefix="site-check")
-  let code = with_cleanup(() => steps(tmp), () => cleanup(tmp))
+  let code = with_cleanup(() => steps(tmp, build), () => cleanup(tmp))
   if code != 0 {
     eprintln("site:check: failed")
     @sys.exit(code)
@@ -115,4 +142,11 @@ async test "with_cleanup runs the cleanup after a body that returns" {
 ///|
 async test "with_cleanup survives a cleanup that raises" {
   assert_eq(with_cleanup(() => 0, () => fail("x")), 0)
+}
+
+///|
+test "parse_build builds by default and skips the build for --no-build" {
+  assert_eq(parse_build(["bin"][:]), Some(true))
+  assert_eq(parse_build(["bin", "--no-build"][:]), Some(false))
+  assert_eq(parse_build(["bin", "--x"][:]), None)
 }

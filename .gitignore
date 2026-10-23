@@ -2,6 +2,8 @@
 
 # MoonBit default build output directory.
 _build/
+# Output of `mise run site:pages -- --out _site` at the repository root.
+_site/
 # Local MoonBit package cache directory.
 .mooncakes/
 
