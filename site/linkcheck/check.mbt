@@ -130,6 +130,10 @@ pub fn check(
   let pages : Array[String] = []
   html_files(dist, "", pages)
   for page in pages {
+    // The other channel's site can live below this one: it has its own check.
+    if ignore.iter().any(prefix => (base + page).has_prefix(prefix)) {
+      continue
+    }
     let html = @fs.read_file_to_string(dist + "/" + page)
     for link in extract_links(html) {
       match internal_path(base, ignore, link) {

@@ -185,9 +185,12 @@ async test "the version picker marks the current version" {
       "href=\"/smithy/next/docs/smithy-syntax/\" target=\"_self\" class=\"ms-version-link ms-version-current\">next</a>",
     ),
   )
-  // The last release may lack a page of main: the release link opens its docs index.
-  assert_true(next.contains("href=\"/smithy/docs/\""))
-  assert_true(!next.contains("href=\"/smithy/docs/smithy-syntax/\""))
+  // The release link is the same page on the release channel.
+  assert_true(
+    next.contains(
+      "href=\"/smithy/docs/smithy-syntax/\" target=\"_self\" class=\"ms-version-link\">v0.5.0</a>",
+    ),
+  )
 }
 
 ///|
@@ -223,4 +226,21 @@ async test "sidebar shows the groups that have pages, then the reference links" 
   assert_true(!html.contains(">Migration<"))
   assert_true(html.contains("CHANGELOG.md"))
   assert_true(html.contains("Releases"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "the next banner links to the same page in the release docs" {
+  let m = Model::init(site_data(Doc("smithy-syntax"), Some("# C\n")))
+  let next = render_model({
+    ..m,
+    config: {
+      ..m.config,
+      channel: Next,
+      base: "/smithy/next/",
+      version: "next",
+    },
+  })
+  assert_true(next.contains("href=\"/smithy/docs/smithy-syntax/\""))
+  assert_true(next.contains("Go to the v0.5.0 docs."))
 }

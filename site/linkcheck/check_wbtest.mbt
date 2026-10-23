@@ -221,3 +221,41 @@ test "heading_ids finds h2 and h3 ids only" {
     ["b", "c"],
   )
 }
+
+///|
+test "internal_path skips links into the other channel's base" {
+  // The next build checks only links under its own base.
+  assert_eq(
+    internal_path("/smithy/next/", [], "/smithy/docs/smithy-syntax/"),
+    None,
+  )
+  assert_eq(
+    internal_path("/smithy/next/", [], "/smithy/next/docs/smithy-syntax/#a"),
+    Some("docs/smithy-syntax/"),
+  )
+  // The release build skips the next base below it.
+  assert_eq(
+    internal_path("/smithy/", ["/smithy/next/"], "/smithy/next/docs/cli/"),
+    None,
+  )
+}
+
+///|
+test "check does not read the pages of an ignored site below the base" {
+  let root = fixture(
+    "ignored_below",
+    ["", "docs/x"],
+    ["docs/x/index.html"],
+    "<a href=\"/b/docs/x/\">x</a>",
+  )
+  put(
+    root, "next/docs/x/index.html", "<a href=\"/b/docs/only-in-release/\">y</a>",
+  )
+  let strict = check(root, "/b/", [])
+  let ignoring = check(root, "/b/", ["/b/next/"])
+  rm_rf(root)
+  assert_eq(strict, [
+    "next/docs/x/index.html: broken link /b/docs/only-in-release/",
+  ])
+  assert_eq(ignoring, [])
+}

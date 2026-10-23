@@ -46,8 +46,6 @@ let peers_head : String =
   #|structure EchoChat {}
   #|
   #|@jsonRpc(versions: ["1.0"])
-  #|service ChatServer {
-  #|    version: "1"
 
 ///|
 test "smithy: first 20 lines of peers.smithy" {
@@ -56,7 +54,7 @@ test "smithy: first 20 lines of peers.smithy" {
   inspect(
     kinds(tokens),
     content=(
-      #|kw:$version str:"2" kw:namespace kw:use kw:use kw:use kw:use kw:use doc:/// JSON-RPC 1.0 section 4 echo and chat examples. tag:@jsonRpcProtocol str:"1.0" str:"client" str:"server" kw:structure type:EchoChat tag:@jsonRpc str:"1.0" kw:service type:ChatServer str:"1"
+      #|kw:$version str:"2" kw:namespace kw:use kw:use kw:use kw:use kw:use doc:/// JSON-RPC 1.0 section 4 echo and chat examples. tag:@jsonRpcProtocol str:"1.0" str:"client" str:"server" kw:structure type:EchoChat tag:@jsonRpc str:"1.0"
     ),
   )
 }
