@@ -7,6 +7,7 @@ fn Model::example_value_events(
   title : String,
   name : String,
   allow_constraint_errors : Bool,
+  id_refs : IdRefSelections,
 ) -> Array[ValidationEvent] {
   self
   .node_validation_events(
@@ -15,6 +16,7 @@ fn Model::example_value_events(
     Some(operation),
     "ExamplesTrait",
     "ERROR",
+    id_refs~,
     allow_constraint_errors~,
   )
   .map(event => {
@@ -37,13 +39,13 @@ fn Model::example_value_events(
 }
 
 ///|
-fn Model::example_services_contain_error(
-  self : Model,
+fn SelectorGraph::example_services_contain_error(
+  self : SelectorGraph,
   operation : Shape,
   error_id : ShapeId,
 ) -> Bool {
   let mut has_service = false
-  for _, service in self.shapes {
+  for _, service in self.model.shapes {
     guard service.body is Service(errors~, ..) else { continue }
     has_service = true
     if self
@@ -60,6 +62,7 @@ fn Model::example_services_contain_error(
 ///|
 fn Model::examples_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
+  let id_refs = IdRefSelections::new(self)
   for _, operation in self.shapes {
     guard operation.body is Operation(input~, output~, errors~) else {
       continue
@@ -89,7 +92,7 @@ fn Model::examples_events(self : Model) -> Array[ValidationEvent] {
         )
         events.append(
           self.example_value_events(
-            operation, input, input_value, title, "input", allow,
+            operation, input, input_value, title, "input", allow, id_refs,
           ),
         )
       }
@@ -108,7 +111,7 @@ fn Model::examples_events(self : Model) -> Array[ValidationEvent] {
         if self.shapes.contains(output) {
           events.append(
             self.example_value_events(
-              operation, output, value, title, "output", allow,
+              operation, output, value, title, "output", allow, id_refs,
             ),
           )
         }
@@ -119,14 +122,16 @@ fn Model::examples_events(self : Model) -> Array[ValidationEvent] {
           self.shapes.contains(target) &&
           (
             errors.contains(target) ||
-            self.example_services_contain_error(operation, target)
+            id_refs
+            .selector_graph()
+            .example_services_contain_error(operation, target)
           ) {
           let value = validation_field(error_, "content").unwrap_or(
             Object(Map([])),
           )
           events.append(
             self.example_value_events(
-              operation, target, value, title, "error", allow,
+              operation, target, value, title, "error", allow, id_refs,
             ),
           )
         } else {

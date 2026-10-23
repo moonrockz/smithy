@@ -590,14 +590,14 @@ fn Model::http_events(self : Model) -> Array[ValidationEvent] {
 ///|
 fn Model::http_ignored_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
-  let edges = selector_edges(self)
+  let graph = SelectorGraph::new(self)
   for _, container in self.shapes {
     guard container.body is Structure(_) && !http_trait(container, "mixin") else {
       continue
     }
-    let relationships = edges.filter(e => {
-      e.to == container.id && e.label != "trait"
-    })
+    let relationships = graph
+      .incoming(container.id)
+      .filter(e => e.label != "trait")
     for member_ in self.http_members(container.id) {
       let bindings = [
         "httpHeader", "httpLabel", "httpPayload", "httpPrefixHeaders", "httpQueryParams",
@@ -673,28 +673,26 @@ fn Model::http_ignored_events(self : Model) -> Array[ValidationEvent] {
 }
 
 ///|
-fn Model::http_contained_operations(
-  self : Model,
+fn SelectorGraph::http_contained_operations(
+  self : SelectorGraph,
   service : Shape,
 ) -> Array[Shape] {
   let result : Array[Shape] = []
   let pending = [service.id]
   let seen : Set[ShapeId] = Set([])
-  let edges = selector_edges(self)
   while pending.pop() is Some(id) {
     if seen.contains(id) {
       continue
     }
     seen.add(id)
-    guard self.shapes.get(id) is Some(shape) else { continue }
+    guard self.model.shapes.get(id) is Some(shape) else { continue }
     if shape.body is Operation(..) {
       result.push(shape)
       continue
     }
-    for edge in edges {
-      if edge.from == id &&
-        edge.label != "trait" &&
-        self.shapes.get(edge.to) is Some(target) &&
+    for edge in self.outgoing(id) {
+      if edge.label != "trait" &&
+        self.model.shapes.get(edge.to) is Some(target) &&
         target.body is (Operation(..) | Resource(..)) {
         pending.push(edge.to)
       }
@@ -740,9 +738,10 @@ fn Model::http_service_events(self : Model) -> Array[ValidationEvent] {
   if !any_http {
     return events
   }
+  let graph = SelectorGraph::new(self)
   for _, service in self.shapes {
     guard service.body is Service(..) else { continue }
-    let operations = self.http_contained_operations(service)
+    let operations = graph.http_contained_operations(service)
     let mut protocol : ShapeId? = None
     for trait_id, _ in service.traits {
       if self.shapes.get(trait_id) is Some(definition) &&

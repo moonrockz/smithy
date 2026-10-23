@@ -11,20 +11,22 @@ fn semantic_ticked(values : Array[String]) -> String {
 }
 
 ///|
-fn Model::semantic_closure(self : Model, root : ShapeId) -> Array[Shape] {
+fn SelectorGraph::semantic_closure(
+  self : SelectorGraph,
+  root : ShapeId,
+) -> Array[Shape] {
   let result : Array[Shape] = []
   let pending = [root]
   let seen : Set[ShapeId] = Set([])
-  let edges = selector_edges(self)
   while pending.pop() is Some(id) {
     if seen.contains(id) {
       continue
     }
     seen.add(id)
-    guard self.shapes.get(id) is Some(shape) else { continue }
+    guard self.model.shapes.get(id) is Some(shape) else { continue }
     result.push(shape)
-    for edge in edges {
-      if edge.from == id && edge.label != "trait" {
+    for edge in self.outgoing(id) {
+      if edge.label != "trait" {
         pending.push(edge.to)
       }
     }
@@ -35,6 +37,7 @@ fn Model::semantic_closure(self : Model, root : ShapeId) -> Array[Shape] {
 ///|
 fn Model::authentication_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
+  let graph = SelectorGraph::new(self)
   for _, service in self.shapes {
     guard service.body is Service(..) else { continue }
     let schemes : Set[String] = Set([])
@@ -54,7 +57,7 @@ fn Model::authentication_events(self : Model) -> Array[ValidationEvent] {
         ),
       )
     }
-    let shapes = self.http_contained_operations(service)
+    let shapes = graph.http_contained_operations(service)
     shapes.push(service)
     for shape in shapes {
       let invalid : Set[String] = Set([])
@@ -78,7 +81,7 @@ fn Model::authentication_events(self : Model) -> Array[ValidationEvent] {
         )
       }
     }
-    let documents = self
+    let documents = graph
       .semantic_closure(service.id)
       .filter(s => s.body.keyword() == "document")
     if documents.is_empty() {
@@ -114,7 +117,7 @@ fn Model::authentication_events(self : Model) -> Array[ValidationEvent] {
 ///|
 fn Model::idempotency_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
-  let edges = selector_edges(self)
+  let graph = SelectorGraph::new(self)
   for _, shape in self.shapes {
     if shape.body is Operation(errors~, ..) &&
       shape.trait_value("smithy.api#idempotent") is Some(config) {
@@ -157,10 +160,8 @@ fn Model::idempotency_events(self : Model) -> Array[ValidationEvent] {
       continue
     }
     let ignored : Map[String, Array[String]] = Map([])
-    for edge in edges {
-      if edge.to == container.id &&
-        edge.label != "input" &&
-        edge.label != "trait" {
+    for edge in graph.incoming(container.id) {
+      if edge.label != "input" && edge.label != "trait" {
         let label = if edge.label == "" { "member target" } else { edge.label }
         let ids = ignored.get(label).unwrap_or([])
         ids.push(edge.from.to_string())

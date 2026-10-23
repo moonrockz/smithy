@@ -1,4 +1,59 @@
 ///|
+/// The shapes that each `@idRef` selector expression selects in one model.
+/// A validator makes one for its pass, so each distinct expression runs at
+/// most once, however many node values it checks.
+priv struct IdRefSelections {
+  model : Model
+  mut graph : SelectorGraph?
+  selected : Map[String, Set[ShapeId]]
+}
+
+///|
+fn IdRefSelections::new(model : Model) -> IdRefSelections {
+  { model, graph: None, selected: Map([]), }
+}
+
+///|
+/// The selector graph of the model. It is built on first use, so a pass that
+/// checks no `@idRef` value does not build it.
+fn IdRefSelections::selector_graph(self : IdRefSelections) -> SelectorGraph {
+  match self.graph {
+    Some(graph) => graph
+    None => {
+      let graph = SelectorGraph::new(self.model)
+      self.graph = Some(graph)
+      graph
+    }
+  }
+}
+
+///|
+/// Tell whether the selector expression `selector` selects `id`, the shape
+/// that the node value `text` names. An expression that does not parse
+/// selects nothing.
+fn IdRefSelections::selects(
+  self : IdRefSelections,
+  selector : String,
+  id : ShapeId,
+  text : String,
+) -> Bool {
+  let selected = match self.selected.get(selector) {
+    Some(selected) => selected
+    None => {
+      let graph = self.selector_graph()
+      let selected = Selector::parse(selector).select_set_in(graph) catch {
+        _ => Set([])
+      }
+      self.selected[selector] = selected
+      selected
+    }
+  }
+  // `select_ids` returns rendered IDs, so the node value must also be the
+  // rendered form of the ID.
+  selected.contains(id) && id.to_string() == text
+}
+
+///|
 fn Model::node_validation_events(
   self : Model,
   value : NodeValue,
@@ -6,6 +61,7 @@ fn Model::node_validation_events(
   owner : Shape?,
   event_id : String,
   severity : String,
+  id_refs~ : IdRefSelections,
   allow_constraint_errors~ : Bool = false,
   protocol_params~ : Bool = false,
 ) -> Array[ValidationEvent] {
@@ -151,9 +207,7 @@ fn Model::node_validation_events(
                 let selector = validation_string(config, "selector").unwrap_or(
                   "*",
                 )
-                Selector::parse(selector).select_ids(self).contains(text) catch {
-                  _ => false
-                }
+                id_refs.selects(selector, id, text)
               }
             }
         }

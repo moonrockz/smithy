@@ -222,6 +222,7 @@ fn Assembly::validate(
       )
     }
   }
+  let id_refs = IdRefSelections::new(model)
   let names : Map[String, Array[Shape]] = Map([])
   for id, shape in model.shapes {
     let folded = id.to_string().to_lower()
@@ -324,6 +325,7 @@ fn Assembly::validate(
               Some(shape),
               "TraitValue",
               "ERROR",
+              id_refs~,
             ) {
             self.problem(
               "SM-MODEL-011",

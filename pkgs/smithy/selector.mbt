@@ -460,30 +460,119 @@ fn selector_compare(
 }
 
 ///|
-fn selector_add(out : Array[ShapeId], id : ShapeId) -> Unit {
-  if !out.contains(id) {
-    out.push(id)
+/// The relationship graph that selectors walk over one model: every edge in the
+/// order of `selector_edges`, and the same edges indexed by their source shape
+/// and by their target shape. Each index keeps the edge order, so a walk over
+/// an index visits the edges in the same order as a scan of all edges.
+///
+/// Build it once with `SelectorGraph::new` and evaluate many selectors with
+/// the `*_in` functions.
+priv struct SelectorGraph {
+  model : Model
+  edges : Array[SelectorEdge]
+  outgoing : Map[ShapeId, Array[SelectorEdge]]
+  incoming : Map[ShapeId, Array[SelectorEdge]]
+}
+
+///|
+fn SelectorGraph::new(model : Model) -> SelectorGraph {
+  let edges = selector_edges(model)
+  let outgoing : Map[ShapeId, Array[SelectorEdge]] = Map([])
+  let incoming : Map[ShapeId, Array[SelectorEdge]] = Map([])
+  for edge in edges {
+    outgoing.get_or_init(edge.from, () => []).push(edge)
+    incoming.get_or_init(edge.to, () => []).push(edge)
   }
+  { model, edges, outgoing, incoming, }
+}
+
+///|
+/// The edges from `id`, in edge order.
+fn SelectorGraph::outgoing(
+  self : SelectorGraph,
+  id : ShapeId,
+) -> Array[SelectorEdge] {
+  match self.outgoing.get(id) {
+    Some(edges) => edges
+    None => []
+  }
+}
+
+///|
+/// The edges to `id`, in edge order.
+fn SelectorGraph::incoming(
+  self : SelectorGraph,
+  id : ShapeId,
+) -> Array[SelectorEdge] {
+  match self.incoming.get(id) {
+    Some(edges) => edges
+    None => []
+  }
+}
+
+///|
+/// Shape IDs in the order that a selector step found them. `add` skips an ID
+/// that is already present; `add_all` keeps duplicates.
+priv struct SelectorIds {
+  ids : Array[ShapeId]
+  members : Set[ShapeId]
+}
+
+///|
+fn SelectorIds::new() -> SelectorIds {
+  { ids: [], members: Set([]), }
+}
+
+///|
+fn SelectorIds::from_array(ids : Array[ShapeId]) -> SelectorIds {
+  let result = SelectorIds::new()
+  result.add_all(ids)
+  result
+}
+
+///|
+fn SelectorIds::add(self : SelectorIds, id : ShapeId) -> Unit {
+  if !self.members.contains(id) {
+    self.members.add(id)
+    self.ids.push(id)
+  }
+}
+
+///|
+fn SelectorIds::add_all(self : SelectorIds, ids : Array[ShapeId]) -> Unit {
+  for id in ids {
+    self.members.add(id)
+    self.ids.push(id)
+  }
+}
+
+///|
+fn SelectorIds::contains(self : SelectorIds, id : ShapeId) -> Bool {
+  self.members.contains(id)
 }
 
 ///|
 fn selector_eval(
   steps : Array[SelectorStep],
   input : Array[ShapeId],
-  model : Model,
-  edges : Array[SelectorEdge],
+  graph : SelectorGraph,
   vars : Map[String, Array[ShapeId]],
-) -> Array[ShapeId] {
+) -> SelectorIds {
+  let model = graph.model
+  if steps.is_empty() {
+    return SelectorIds::from_array(input)
+  }
   let mut current = input
+  let mut result = SelectorIds::new()
   for step in steps {
-    let next : Array[ShapeId] = []
+    let next = SelectorIds::new()
     match step {
-      AnyShape => next.append(current)
+      AnyShape => next.add_all(current)
       ShapeType(keyword) =>
         for id in current {
           if model.shapes.get(id) is Some(shape) &&
             selector_type_matches(shape, keyword) {
-            selector_add(next, id)
+            next.add(id)
           }
         }
       Attribute(path, op, values, insensitive) =>
@@ -495,7 +584,7 @@ fn selector_eval(
               values,
               insensitive,
             ) {
-            selector_add(next, id)
+            next.add(id)
           }
         }
       ScopedAttribute(scope, assertions) =>
@@ -528,7 +617,7 @@ fn selector_eval(
               }
             }
             if matched {
-              selector_add(next, id)
+              next.add(id)
               break
             }
           }
@@ -539,36 +628,38 @@ fn selector_eval(
             let pending = [id]
             let seen : Set[ShapeId] = Set([id])
             while pending.pop() is Some(parent) {
-              for edge in edges {
-                if edge.from == parent &&
-                  edge.label != "trait" &&
-                  !seen.contains(edge.to) {
+              for edge in graph.outgoing(parent) {
+                if edge.label != "trait" && !seen.contains(edge.to) {
                   seen.add(edge.to)
-                  selector_add(next, edge.to)
+                  next.add(edge.to)
                   pending.push(edge.to)
                 }
               }
             }
           } else {
+            let forward = direction == ">" || direction == "->"
+            let reverse = direction == "<" || direction == "<-"
+            let edges = if forward {
+              graph.outgoing(id)
+            } else if reverse {
+              graph.incoming(id)
+            } else {
+              []
+            }
             for edge in edges {
               if (edge.label != "trait" || labels.contains("trait")) &&
                 (labels.is_empty() || labels.contains(edge.label)) {
-                if (direction == ">" || direction == "->") && edge.from == id {
-                  selector_add(next, edge.to)
-                } else if (direction == "<" || direction == "<-") &&
-                  edge.to == id {
-                  selector_add(next, edge.from)
-                }
+                next.add(if forward { edge.to } else { edge.from })
               }
             }
           }
         }
       VariableStore(name, selector) =>
         for id in current {
-          vars[name] = selector_eval(selector, [id], model, edges, vars)
-          selector_add(next, id)
+          vars[name] = selector_eval(selector, [id], graph, vars).ids
+          next.add(id)
         }
-      VariableGet(name) => next.append(vars.get(name).unwrap_or([]))
+      VariableGet(name) => next.add_all(vars.get(name).unwrap_or([]))
       Function(name, args) =>
         if name == "root" && args.length() == 1 {
           let all : Array[ShapeId] = []
@@ -578,16 +669,16 @@ fn selector_eval(
             }
           }
           let isolated : Map[String, Array[ShapeId]] = Map([])
-          next.append(selector_eval(args[0], all, model, edges, isolated))
+          next.add_all(selector_eval(args[0], all, graph, isolated).ids)
         } else if name == "recursive" && args.length() == 1 {
           for id in current {
             let pending = [id]
             let seen : Set[ShapeId] = Set([])
             while pending.pop() is Some(parent) {
-              for output in selector_eval(args[0], [parent], model, edges, vars) {
+              for output in selector_eval(args[0], [parent], graph, vars).ids {
                 if !seen.contains(output) {
                   seen.add(output)
-                  selector_add(next, output)
+                  next.add(output)
                   pending.push(output)
                 }
               }
@@ -611,18 +702,17 @@ fn selector_eval(
               }
               seen.add(parent)
               let mut qualified = inherited ||
-                !selector_eval(args[0], [parent], model, edges, vars).is_empty()
+                !selector_eval(args[0], [parent], graph, vars).ids.is_empty()
               if qualified &&
                 args.length() > 1 &&
-                !selector_eval(args[1], [parent], model, edges, vars).is_empty() {
+                !selector_eval(args[1], [parent], graph, vars).ids.is_empty() {
                 qualified = false
               }
               if qualified {
-                selector_add(next, parent)
+                next.add(parent)
               }
-              for edge in edges {
-                if edge.from == parent &&
-                  (edge.label == "resource" || edge.label == "operation") {
+              for edge in graph.outgoing(parent) {
+                if edge.label == "resource" || edge.label == "operation" {
                   pending.push((edge.to, qualified))
                 }
               }
@@ -632,45 +722,93 @@ fn selector_eval(
           for id in current {
             if name == "is" || name == "each" {
               for arg in args {
-                for output in selector_eval(arg, [id], model, edges, vars) {
-                  selector_add(next, output)
+                for output in selector_eval(arg, [id], graph, vars).ids {
+                  next.add(output)
                 }
               }
             } else if name == "test" || name == "not" || name == "in" {
               let mut matched = false
               for arg in args {
-                let output = selector_eval(arg, [id], model, edges, vars)
+                let output = selector_eval(arg, [id], graph, vars)
                 if (name == "in" && output.contains(id)) ||
-                  (name != "in" && !output.is_empty()) {
+                  (name != "in" && !output.ids.is_empty()) {
                   matched = true
                 }
               }
               if (name == "not" && !matched) || (name != "not" && matched) {
-                selector_add(next, id)
+                next.add(id)
               }
             }
           }
         }
     }
-    current = next
+    current = next.ids
+    result = next
   }
-  current
+  result
+}
+
+///|
+/// The shapes that match from any start shape, without duplicates, in the
+/// order that the evaluation found them.
+fn Selector::select_ids_unsorted_in(
+  self : Selector,
+  graph : SelectorGraph,
+) -> SelectorIds {
+  let result = SelectorIds::new()
+  for id, shape in graph.model.shapes {
+    if shape.source.file != "<contracts>" {
+      let vars : Map[String, Array[ShapeId]] = Map([])
+      for match_id in selector_eval(self.steps, [id], graph, vars).ids {
+        result.add(match_id)
+      }
+    }
+  }
+  result
+}
+
+///|
+/// `select_ids` over a graph that the caller built once for many selectors.
+fn Selector::select_ids_in(
+  self : Selector,
+  graph : SelectorGraph,
+) -> Array[String] {
+  let ids = self.select_ids_unsorted_in(graph).ids.map(id => id.to_string())
+  ids.sort_by((a, b) => a.lexical_compare(b))
+  ids
+}
+
+///|
+/// The shapes that `select_ids_in` returns, as a set for membership tests.
+fn Selector::select_set_in(
+  self : Selector,
+  graph : SelectorGraph,
+) -> Set[ShapeId] {
+  self.select_ids_unsorted_in(graph).members
 }
 
 ///|
 /// Return matching absolute shape IDs in lexical order.
 pub fn Selector::select_ids(self : Selector, model : Model) -> Array[String] {
-  let result : Array[ShapeId] = []
-  let edges = selector_edges(model)
-  for id, _ in model.shapes {
-    if model.shapes.get(id) is Some(shape) && shape.source.file != "<contracts>" {
-      let vars : Map[String, Array[ShapeId]] = Map([])
-      for match_id in selector_eval(self.steps, [id], model, edges, vars) {
-        selector_add(result, match_id)
-      }
-    }
+  self.select_ids_in(SelectorGraph::new(model))
+}
+
+///|
+/// `select_ids_from` over a graph that the caller built once for many
+/// selectors.
+fn Selector::select_ids_from_in(
+  self : Selector,
+  graph : SelectorGraph,
+  start_id : String,
+) -> Array[String] {
+  guard ShapeId::parse(start_id) is Some(start) &&
+    graph.model.shapes.get(start) is Some(_) else {
+    return []
   }
-  let ids = result.map(id => id.to_string())
+  let vars : Map[String, Array[ShapeId]] = Map([])
+  let ids = selector_eval(self.steps, [start], graph, vars).ids.map(id => {
+    id.to_string()
+  })
   ids.sort_by((a, b) => a.lexical_compare(b))
   ids
 }
@@ -682,20 +820,7 @@ pub fn Selector::select_ids_from(
   model : Model,
   start_id : String,
 ) -> Array[String] {
-  guard ShapeId::parse(start_id) is Some(start) &&
-    model.shapes.get(start) is Some(_) else {
-    return []
-  }
-  let vars : Map[String, Array[ShapeId]] = Map([])
-  let ids = selector_eval(
-    self.steps,
-    [start],
-    model,
-    selector_edges(model),
-    vars,
-  ).map(id => id.to_string())
-  ids.sort_by((a, b) => a.lexical_compare(b))
-  ids
+  self.select_ids_from_in(SelectorGraph::new(model), start_id)
 }
 
 ///|
@@ -710,14 +835,23 @@ pub fn Selector::select_matches(
   self : Selector,
   model : Model,
 ) -> Array[SelectorMatch] {
+  self.select_matches_in(SelectorGraph::new(model))
+}
+
+///|
+/// `select_matches` over a graph that the caller built once for many
+/// selectors.
+fn Selector::select_matches_in(
+  self : Selector,
+  graph : SelectorGraph,
+) -> Array[SelectorMatch] {
   let matches : Array[SelectorMatch] = []
-  let edges = selector_edges(model)
-  for start, shape in model.shapes {
+  for start, shape in graph.model.shapes {
     if shape.source.file == "<contracts>" {
       continue
     }
     let vars : Map[String, Array[ShapeId]] = Map([])
-    for id in selector_eval(self.steps, [start], model, edges, vars) {
+    for id in selector_eval(self.steps, [start], graph, vars).ids {
       let variables : Map[String, Array[String]] = Map([])
       for name, captured in vars {
         variables[name] = captured.map(value => value.to_string())

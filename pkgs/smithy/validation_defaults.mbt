@@ -1,6 +1,7 @@
 ///|
 fn Model::default_trait_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
+  let id_refs = IdRefSelections::new(self)
   let updates : Set[ShapeId] = Set([])
   for _, shape in self.shapes {
     if shape.body is Resource(update~, ..) && update is Some(id) {
@@ -88,6 +89,7 @@ fn Model::default_trait_events(self : Model) -> Array[ValidationEvent] {
           Some(shape),
           "DefaultTrait",
           "ERROR",
+          id_refs~,
         ),
       )
       match (target.body, value) {
