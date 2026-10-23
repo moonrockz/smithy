@@ -37,6 +37,33 @@ Names identify sources in diagnostics; `<prelude>` and `<contracts>` are reserve
 The loader does no file-system or network I/O. Repeated calls to `assemble`
 build fresh state without changing caller-owned AST documents.
 
+Use `add_builtin_idl(name, text)` for definitions that a library bundles, such
+as the traits of a protocol. The model treats that source like the prelude:
+`to_json_ast` and `to_idl` omit its shapes unless `include_prelude` is true,
+other sources cannot apply traits to its shapes, and a different definition of
+one of its shapes is an error. An exported model that holds the same
+definitions loads again without a conflict. After the call, the name is
+reserved for built-in definitions in every loader of the process.
+
+```mbt check
+///|
+test {
+  let loader = () => {
+    @smithy.Loader::new().add_builtin_idl(
+      "<example-tags>", "$version: \"2\"\nnamespace example.tags\n@trait\nstructure tag {}\n",
+    )
+  }
+  let model = loader()
+  .add_idl(
+    "model.smithy", "$version: \"2\"\nnamespace example\n@example.tags#tag\nstructure Tagged {}\n",
+  )
+  .assemble().model.unwrap()
+  assert_eq(model.to_idl().keys().to_array(), ["example"])
+  let again = loader().add_ast("model.json", model.to_json_ast()).assemble()
+  assert_true(!again.has_errors())
+}
+```
+
 ## Semantic records
 
 The optional [HTTP protocol test suite API](protocoltests/README.mbt.md) loads

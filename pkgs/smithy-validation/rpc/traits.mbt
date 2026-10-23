@@ -1,8 +1,14 @@
 ///|
 /// Opt in to the JSON-RPC trait model. Ordinary Smithy/JSON consumers do not
 /// depend on this package. Use this loader for IDL or JSON AST API definitions.
-pub fn loader() -> @smithy.Loader {
-  @smithy.Loader::new().add_idl("<smithy-rpc-traits>", trait_definitions())
+/// The trait definitions are a built-in source named `<smithy-rpc-traits>`, so
+/// an exported model omits them, as it omits the prelude. With protocol_tests,
+/// the loader also adds the Smithy protocol test traits.
+pub fn loader(protocol_tests~ : Bool = false) -> @smithy.Loader {
+  @smithy.Loader::new(protocol_tests~).add_builtin_idl(
+    "<smithy-rpc-traits>",
+    trait_definitions(),
+  )
 }
 
 ///|

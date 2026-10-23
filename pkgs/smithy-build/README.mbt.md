@@ -92,7 +92,11 @@ See the [acquisition limits and host matrix](../artifact-resources/README.mbt.md
 and [runnable example](../../examples/public-archive/README.md).
 
 Call `add_projection_import` to supply inputs for a projection when using the
-runner directly. `add_source` marks files for source artifacts; its optional
+runner directly. A projection with imports loads its model again from the JSON
+AST, which omits built-in definitions. `BuildRunner::new(config, loader=...)`
+takes the function that creates the loader for that step; the default is
+`@smithy.Loader::new`. Pass a loader that adds the same built-in sources as the
+loader of the build model, for example `loader=() => @rpc.loader()`. `add_source` marks files for source artifacts; its optional
 `source_file` argument identifies the original model filename when the artifact
 uses a relative name. Projected sources contain source shapes and metadata,
 including newly created shapes, and omit imported definitions.

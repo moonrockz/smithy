@@ -1251,6 +1251,73 @@ async fn exercise_landing_sample(runner : Runner, root : String) -> Unit {
 }
 
 ///|
+/// Every model command resolves the bundled smithy.rpc traits and treats their
+/// definitions as built-in, as it does for the prelude.
+async fn exercise_rpc_traits(runner : Runner, root : String) -> Unit {
+  let dir = runner.dir
+  let model = @fs.read_file(root + "/examples/json-rpc/peers.smithy").text()
+  @fs.write_file(dir + "/peers.smithy", model)
+  fn check_ast(text : String) raise {
+    guard @json.parse(text) is { "shapes": Object(shapes), .. } else {
+      fail("Expected a JSON AST: \{text}")
+    }
+    assert_false(shapes.keys().any(id => id.has_prefix("smithy.rpc#")), msg=text)
+    guard shapes.get("example.peers#ChatServer") is Some({ "traits": Object(traits), .. }) else {
+      fail("Expected the ChatServer traits: \{text}")
+    }
+    assert_true(traits.contains("smithy.rpc#jsonRpc"))
+  }
+  runner.command(["validate", "peers.smithy"], 0) |> ignore
+  let (ast, _) = runner.command(["ast", "peers.smithy"], 0)
+  check_ast(ast)
+  let (converted, _) = runner.command(["convert", "--to", "json", "peers.smithy"], 0)
+  check_ast(converted)
+  assert_eq(converted, ast)
+  let (selected, _) = runner.command(["select", "--selector", "[trait|smithy.rpc#jsonRpc]", "peers.smithy"], 0)
+  for service in ["ChatServer", "ChatClient", "LanguageServer", "LanguageClient", "Sink"] {
+    assert_true(selected.contains("example.peers#\{service}\n"), msg=selected)
+  }
+  assert_eq(selected.trim_end().to_owned().split("\n").count(), 5)
+  // The IDL output holds no smithy.rpc namespace and reads back to the same model.
+  runner.command(["convert", "--to", "idl", "--output-dir", "peers-idl", "peers.smithy"], 0) |> ignore
+  assert_true(@fs.exists(dir + "/peers-idl/example.peers.smithy"))
+  assert_false(@fs.exists(dir + "/peers-idl/smithy.rpc.smithy"))
+  let (round_trip, _) = runner.command(["ast", "peers-idl/example.peers.smithy"], 0)
+  // to_idl sorts the shapes, so compare the parsed documents.
+  assert_eq(@json.parse(round_trip), @json.parse(ast))
+  runner.command(["ast", "peers.smithy", "--output", "peers-ast.json"], 0) |> ignore
+  runner.command(["validate", "peers-ast.json"], 0) |> ignore
+  let (same, _) = runner.command(["diff", "--old", "peers.smithy", "--new", "peers.smithy"], 0)
+  assert_eq(same, "")
+  let (same_json, _) = runner.command(["diff", "--old", "peers-ast.json", "--new", "peers.smithy"], 0)
+  assert_eq(same_json, "")
+  // A projection with imports loads its model again from the JSON AST.
+  @fs.write_file(
+    dir + "/peers-extra.smithy",
+    "$version: \"2\"\nnamespace example.extra\n\nuse smithy.rpc#method\n\n@method(name: \"extra\", params: \"named\", nullResult: true)\noperation Extra {}\n",
+  )
+  @fs.write_file(
+    dir + "/peers-build.json",
+    "{\"version\":\"1.0\",\"sources\":[\"peers.smithy\"],\"outputDirectory\":\"peers-build\",\"projections\":{\"peers\":{\"imports\":[\"peers-extra.smithy\"],\"plugins\":{\"openrpc\":{\"service\":\"example.peers#LanguageServer\"}}}}}",
+  )
+  runner.command(["build", "--config", "peers-build.json"], 0) |> ignore
+  let document = @fs.read_file(dir + "/peers-build/peers/openrpc/openrpc.json").text()
+  assert_true(document.contains("textDocument/hover"), msg=document)
+  let projected = @fs.read_file(dir + "/peers-build/peers/model/model.json").text()
+  check_ast(projected)
+  assert_true(projected.contains("example.extra#Extra"))
+  runner.command(["clean", "--config", "peers-build.json"], 0) |> ignore
+  // A model that defines a bundled trait again gets the built-in diagnostic.
+  @fs.write_file(
+    dir + "/own-rpc.smithy",
+    "$version: \"2\"\nnamespace smithy.rpc\n\n@trait(selector: \"service\")\nstructure jsonRpc { other: String }\n",
+  )
+  let (own_out, own_err) = runner.command(["validate", "own-rpc.smithy"], 1)
+  let own = own_out + own_err
+  assert_true(own.contains("I cannot redefine the built-in shape smithy.rpc#jsonRpc."), msg=own)
+}
+
+///|
 async fn exercise(
   root : String,
   target : String,
@@ -1288,6 +1355,7 @@ async fn exercise(
   @fs.write_file("\{dir}/input.smithy", input)
   exercise_landing_sample(runner, root)
   exercise_rpc(runner, root, skip_stdin)
+  exercise_rpc_traits(runner, root)
   exercise_rpc_responses(runner, root, skip_stdin)
   exercise_rpc_batches(runner, root, skip_stdin)
   exercise_rpc_transcripts(runner, root, skip_stdin)

@@ -8,6 +8,10 @@ The library reports findings and never executes handlers or sends responses.
 Use `rpc.loader()` to opt in to the bundled `smithy.rpc` trait definitions, or add
 `rpc.trait_definitions()` to an existing loader. Models may be IDL or Smithy JSON AST.
 The ordinary Smithy loader does not automatically install these optional traits.
+`rpc.loader()` adds the definitions as the built-in source `<smithy-rpc-traits>`
+(see `Loader::add_builtin_idl`), so `to_json_ast` and `to_idl` omit them, as they
+omit the prelude. `rpc.loader(protocol_tests=true)` also adds the Smithy protocol
+test traits. The `smithy` CLI uses this loader for every model command.
 
 ```mbt check
 ///|

@@ -10,13 +10,40 @@ pub(all) enum ModelInput {
 /// Repeated assembly creates fresh state and does not mutate its inputs.
 pub struct Loader {
   inputs : Array[ModelInput]
+  builtins : Array[ModelInput]
   defaults : Array[@syntax.JsonAst]
   protocol_tests : Bool
 }
 
 ///|
 pub fn Loader::new(protocol_tests~ : Bool = false) -> Loader {
-  { inputs: [], defaults: [], protocol_tests, }
+  { inputs: [], builtins: [], defaults: [], protocol_tests, }
+}
+
+///|
+/// Names of the sources added with Loader::add_builtin_idl. Export and
+/// validation know a shape only by its source name, so every loader in the
+/// process shares this set.
+let registered_builtin_sources : Set[String] = Set([])
+
+///|
+/// Add an IDL source of built-in definitions, such as the trait definitions of
+/// a protocol. The model treats it like the prelude: to_json_ast and to_idl
+/// omit its shapes unless include_prelude is true, and other sources cannot
+/// apply traits to its shapes or define them with different contents. An
+/// exported model that holds identical definitions loads without a conflict.
+/// The name is reserved for built-in definitions in every loader of the
+/// process after this call.
+pub fn Loader::add_builtin_idl(
+  self : Loader,
+  name : String,
+  text : String,
+) -> Loader {
+  if !is_core_source(name) {
+    registered_builtin_sources.add(name)
+  }
+  self.builtins.push(Idl(name~, text~))
+  self
 }
 
 ///|
@@ -110,8 +137,13 @@ fn location(
 }
 
 ///|
-fn is_builtin_source(name : String) -> Bool {
+fn is_core_source(name : String) -> Bool {
   name == "<prelude>" || name == "<contracts>" || name == "<protocol-tests>"
+}
+
+///|
+fn is_builtin_source(name : String) -> Bool {
+  is_core_source(name) || registered_builtin_sources.contains(name)
 }
 
 ///|
@@ -412,6 +444,20 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
     inputs.push(
       ModelInput::Idl(name="<protocol-tests>", text=protocol_test_traits_text()),
     )
+  }
+  for input in self.builtins {
+    let name = match input {
+      Idl(name~, ..) | Json(name~, ..) | Ast(name~, ..) => name
+    }
+    if is_core_source(name) {
+      assembly.problem(
+        "SM-MODEL-001",
+        "I reserve the source name \{name} for built-in definitions.",
+        location(name),
+      )
+    } else {
+      inputs.push(input)
+    }
   }
   for input in self.inputs {
     let name = match input {

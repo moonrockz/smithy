@@ -280,3 +280,34 @@ test "peer names are validated" {
   assert_true(@rpc.PeerName::parse("a".repeat(65)) is None)
   assert_true(@rpc.PeerName::parse("a".repeat(64)) is Some(_))
 }
+
+///|
+test "the trait definitions are built in and stay out of exports" {
+  let loaded = @rpc.loader().add_idl("peers.smithy", peers_source()).assemble()
+  guard loaded.model is Some(model) else {
+    fail(loaded.diagnostics.map(d => d.message).join("\n"))
+  }
+  assert_eq(
+    model.get("smithy.rpc#jsonRpc").unwrap().source.file,
+    "<smithy-rpc-traits>",
+  )
+  let shapes = model.to_json_ast().shapes.unwrap_or(Map([]))
+  assert_false(shapes.keys().any(id => id.has_prefix("smithy.rpc#")))
+  assert_true(shapes.contains("example.peers#ChatServer"))
+  assert_eq(model.to_idl().keys().to_array(), ["example.peers"])
+  let copy = @rpc.loader()
+    .add_idl("traits.smithy", @rpc.trait_definitions())
+    .add_idl("peers.smithy", peers_source())
+    .assemble()
+  assert_true(copy.model is Some(_))
+  assert_false(copy.diagnostics.iter().any(d => d.severity == Error))
+}
+
+///|
+test "the loader can add the protocol test traits" {
+  let plain = @rpc.loader().assemble().model.unwrap()
+  assert_true(plain.get("smithy.test#httpRequestTests") is None)
+  let loaded = @rpc.loader(protocol_tests=true).assemble().model.unwrap()
+  assert_true(loaded.get("smithy.test#httpRequestTests") is Some(_))
+  assert_true(loaded.get("smithy.rpc#method") is Some(_))
+}
