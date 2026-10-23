@@ -21,12 +21,6 @@ zig = "0.17.0"
 # Changelog generator for the release notes
 "aqua:orhun/git-cliff" = "2.14.2"
 
-# JavaScript tooling for the site: bundles CodeMirror for the playground and runs Playwright (site/package.json)
-bun = "1.4.3"
-
-# Headless browser for the site's browser tests (no Windows build; the site workflow runs on Linux)
-"github:lightpanda-io/browser" = { version = "1.0.1", os = ["linux", "macos"] }
-
 # MoonBit toolchain, pinned. mise cannot resolve "latest" for an http: tool, and a pinned version
 # keeps CI and every machine on the same compiler. To move to a newer release, change the version
 # here and in each URL (with "+" written as "%2B"), taken from

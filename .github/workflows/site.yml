@@ -95,6 +95,18 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # bun and Lightpanda are pinned in site/mise.toml, so only this workflow installs them. mise reads that
+      # file in site/; the site scripts run bun and Lightpanda there. The file must be trusted before any
+      # mise shim runs in site/.
+      - name: Install the site's tools
+        working-directory: site
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mise trust
+          mise install
+
       - name: Install warren
         run: moon install moonbit-community/warren@0.4.5
 

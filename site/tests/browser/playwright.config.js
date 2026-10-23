@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { cdpUrl, sitePort, siteUrl } from "./site.js";
 
 const repo = fileURLToPath(new URL("../../..", import.meta.url));
+// site/mise.toml pins Lightpanda, so the mise shim finds it only in site/.
+const site = fileURLToPath(new URL("../..", import.meta.url));
 const siteDir = process.env.SITE_DIR ?? "_site";
 const cdpPort = new URL(cdpUrl).port;
 
@@ -34,6 +36,7 @@ export default defineConfig({
     {
       // Workers are off in Lightpanda unless --load-resources asks for them.
       command: `lightpanda serve --host 127.0.0.1 --port ${cdpPort} --load-resources worker`,
+      cwd: site,
       url: `${cdpUrl}/json/version`,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,

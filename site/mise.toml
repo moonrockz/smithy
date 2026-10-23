@@ -1,0 +1,11 @@
+# Tools that only the site needs. mise reads this file in site/ and below, on top of the repository's
+# .config/mise/config.toml, so the other CI jobs do not install them. The site scripts run bun and
+# Lightpanda with site/ as the working directory, where the mise shims find these versions.
+# Install them once with `mise trust site/mise.toml` and `mise install` in site/.
+
+[tools]
+# JavaScript tooling: bundles CodeMirror for the playground and runs Playwright (package.json, bun.lock)
+bun = "1.4.3"
+
+# Headless browser for the browser tests (no Windows build; the site workflow runs on Linux)
+"github:lightpanda-io/browser" = { version = "1.0.1", os = ["linux", "macos"] }
