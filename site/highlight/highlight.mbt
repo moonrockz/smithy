@@ -6,6 +6,10 @@ pub(all) enum Kind {
   Comment
   Number
   Tag
+  /// A shape name.
+  Type
+  /// A `///` comment.
+  DocComment
 } derive(Eq, Debug)
 
 ///|
@@ -35,11 +39,14 @@ let moonbit_keywords : Array[String] = [
 ]
 
 ///|
-let gherkin_keywords : Array[String] = [
-  "Feature:", "Background:", "Scenario Outline:", "Scenario Template:", "Scenario:",
-  "Example:", "Rule:", "Examples:", "Scenarios:", "Given", "When", "Then", "And",
-  "But", "*",
+let smithy_shape_keywords : Array[String] = [
+  "service", "resource", "operation", "structure", "union", "list", "map", "set",
+  "string", "blob", "boolean", "byte", "short", "integer", "long", "float", "double",
+  "bigInteger", "bigDecimal", "timestamp", "document", "enum", "intEnum", "apply",
 ]
+
+///|
+let smithy_statement_keywords : Array[String] = ["namespace", "use", "metadata"]
 
 ///|
 /// Collects tokens and merges neighbouring plain text.
@@ -160,29 +167,142 @@ fn scan_moonbit(s : Array[Char], out : Out) -> Unit {
 }
 
 ///|
-/// Strings and numbers inside one Gherkin step or table line.
-fn scan_gherkin_rest(
-  s : Array[Char],
-  from : Int32,
-  to : Int32,
-  out : Out,
-) -> Unit {
-  let mut i = from
-  while i < to {
+fn is_space(c : Char) -> Bool {
+  c == ' ' || c == '\t'
+}
+
+///|
+/// Index after the text block that starts at `i` (`"""`). An unclosed block
+/// runs to the end of the source.
+fn text_block_end(s : Array[Char], i : Int32) -> Int32 {
+  let mut j = i + 3
+  while j < s.length() {
+    if s[j] == '"' && j + 2 < s.length() && s[j + 1] == '"' && s[j + 2] == '"' {
+      return j + 3
+    }
+    j = j + 1
+  }
+  s.length()
+}
+
+///|
+/// Index after the number that starts at `i`: digits, a fraction and an exponent.
+fn number_end(s : Array[Char], i : Int32) -> Int32 {
+  let mut j = i
+  if s[j] == '-' {
+    j = j + 1
+  }
+  while j < s.length() {
+    let c = s[j]
+    if is_digit(c) || c == '.' {
+      j = j + 1
+    } else if (c == 'e' || c == 'E') &&
+      j + 1 < s.length() &&
+      (is_digit(s[j + 1]) || s[j + 1] == '+' || s[j + 1] == '-') {
+      j = j + 2
+    } else {
+      break
+    }
+  }
+  j
+}
+
+///|
+/// Smithy IDL. Keywords are contextual, as in the scanner of `smithy-syntax`:
+/// a shape keyword counts at the start of a line, and the name after it is a shape name.
+fn scan_smithy(s : Array[Char], out : Out) -> Unit {
+  let mut i = 0
+  let mut line_start = true
+  let mut expect_name = false
+  let mut expect_mods = false
+  while i < s.length() {
     let c = s[i]
-    if c == '"' {
-      let se = string_end(s, i)
-      let e = if se < to { se } else { to }
+    if c == '\n' {
+      out.push(Plain, "\n")
+      i = i + 1
+      line_start = true
+      expect_name = false
+      expect_mods = false
+      continue
+    }
+    if is_space(c) || c == ',' || c == '\r' {
+      out.push(Plain, slice(s, i, i + 1))
+      i = i + 1
+      continue
+    }
+    let at_start = line_start
+    line_start = false
+    if c == '/' && i + 1 < s.length() && s[i + 1] == '/' {
+      let e = line_end(s, i)
+      let kind = if i + 2 < s.length() && s[i + 2] == '/' {
+        DocComment
+      } else {
+        Comment
+      }
+      out.push(kind, slice(s, i, e))
+      i = e
+    } else if c == '"' &&
+      i + 2 < s.length() &&
+      s[i + 1] == '"' &&
+      s[i + 2] == '"' {
+      let e = text_block_end(s, i)
       out.push(Str, slice(s, i, e))
       i = e
-    } else if is_digit(c) && (i == from || !is_ident_char(s[i - 1])) {
-      let mut j = i
-      while j < to && (is_digit(s[j]) || s[j] == '.') {
+    } else if c == '"' {
+      let e = string_end(s, i)
+      out.push(Str, slice(s, i, e))
+      i = e
+    } else if (c == '@' || c == '$') &&
+      i + 1 < s.length() &&
+      is_ident_char(s[i + 1]) {
+      let mut j = i + 1
+      while j < s.length() &&
+            (is_ident_char(s[j]) || s[j] == '.' || s[j] == '#') {
         j = j + 1
       }
-      out.push(Number, slice(s, i, j))
+      out.push(if c == '@' { Tag } else { Keyword }, slice(s, i, j))
+      i = j
+    } else if is_digit(c) ||
+      (c == '-' && i + 1 < s.length() && is_digit(s[i + 1])) {
+      let e = number_end(s, i)
+      out.push(Number, slice(s, i, e))
+      i = e
+    } else if is_ident_char(c) {
+      let mut j = i
+      while j < s.length() && is_ident_char(s[j]) {
+        j = j + 1
+      }
+      let word = slice(s, i, j)
+      let mut k = j
+      while k < s.length() && is_space(s[k]) {
+        k = k + 1
+      }
+      // `list: String` names a member, not a shape.
+      let is_member = k < s.length() && s[k] == ':'
+      if is_member {
+        out.push(Plain, word)
+      } else if at_start && smithy_shape_keywords.contains(word) {
+        out.push(Keyword, word)
+        expect_name = true
+      } else if at_start && smithy_statement_keywords.contains(word) {
+        out.push(Keyword, word)
+      } else if expect_name {
+        out.push(Type, word)
+        expect_name = false
+        expect_mods = true
+      } else if expect_mods && (word == "for" || word == "with") {
+        out.push(Keyword, word)
+      } else if word == "true" || word == "false" || word == "null" {
+        out.push(Keyword, word)
+      } else {
+        out.push(Plain, word)
+      }
       i = j
     } else {
+      if c == '{' {
+        expect_name = false
+        expect_mods = false
+      }
       out.push(Plain, slice(s, i, i + 1))
       i = i + 1
     }
@@ -190,53 +310,39 @@ fn scan_gherkin_rest(
 }
 
 ///|
-fn scan_gherkin(s : Array[Char], out : Out) -> Unit {
+/// JSON and JSON Lines.
+fn scan_json(s : Array[Char], out : Out) -> Unit {
   let mut i = 0
   while i < s.length() {
-    let e = line_end(s, i)
-    let mut j = i
-    while j < e && (s[j] == ' ' || s[j] == '\t') {
-      j = j + 1
-    }
-    out.push(Plain, slice(s, i, j))
-    let rest = slice(s, j, e)
-    if rest.has_prefix("#") {
-      out.push(Comment, rest)
-    } else if rest.has_prefix("@") {
-      let mut k = j
-      while k < e {
-        if s[k] == '@' {
-          let mut m = k
-          while m < e && s[m] != ' ' {
-            m = m + 1
-          }
-          out.push(Tag, slice(s, k, m))
-          k = m
+    let c = s[i]
+    if c == '"' {
+      let e = string_end(s, i)
+      out.push(Str, slice(s, i, e))
+      i = e
+    } else if is_digit(c) ||
+      (c == '-' && i + 1 < s.length() && is_digit(s[i + 1])) {
+      let e = number_end(s, i)
+      out.push(Number, slice(s, i, e))
+      i = e
+    } else if is_ident_char(c) {
+      let mut j = i
+      while j < s.length() && is_ident_char(s[j]) {
+        j = j + 1
+      }
+      let word = slice(s, i, j)
+      out.push(
+        if word == "true" || word == "false" || word == "null" {
+          Keyword
         } else {
-          out.push(Plain, slice(s, k, k + 1))
-          k = k + 1
-        }
-      }
+          Plain
+        },
+        word,
+      )
+      i = j
     } else {
-      let mut matched = false
-      for kw in gherkin_keywords {
-        let n = kw.length()
-        if rest.has_prefix(kw) &&
-          (kw.has_suffix(":") || j + n >= e || s[j + n] == ' ') {
-          out.push(Keyword, kw)
-          scan_gherkin_rest(s, j + n, e, out)
-          matched = true
-          break
-        }
-      }
-      if !matched {
-        scan_gherkin_rest(s, j, e, out)
-      }
+      out.push(Plain, slice(s, i, i + 1))
+      i = i + 1
     }
-    if e < s.length() {
-      out.push(Plain, "\n")
-    }
-    i = e + 1
   }
 }
 
@@ -271,9 +377,9 @@ pub fn highlight(lang : String, code : String) -> Array[Token] {
   let chars = code.to_array()
   match lang {
     "moonbit" | "mbt" => scan_moonbit(chars, out)
-    "gherkin" | "feature" | "cucumber" => scan_gherkin(chars, out)
+    "smithy" => scan_smithy(chars, out)
     "bash" | "sh" | "shell" | "console" | "zsh" => scan_shell(chars, out)
-    "json" | "json5" | "jsonc" => scan_moonbit(chars, out)
+    "json" | "jsonl" => scan_json(chars, out)
     _ => out.push(Plain, code)
   }
   out.tokens

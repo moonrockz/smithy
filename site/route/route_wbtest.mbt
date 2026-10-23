@@ -3,40 +3,36 @@ test "parse: landing and docs index" {
   assert_eq(Route::parse(""), Landing)
   assert_eq(Route::parse("/"), Landing)
   assert_eq(Route::parse("index.html"), Landing)
-  assert_eq(Route::parse("docs"), Doc(default_doc_slug))
-  assert_eq(Route::parse("docs/"), Doc(default_doc_slug))
+  assert_eq(Route::parse("docs"), DocsIndex)
+  assert_eq(Route::parse("docs/"), DocsIndex)
 }
 
 ///|
 test "parse: equivalent path shapes give the same route" {
-  assert_eq(Route::parse("docs/configuration"), Doc("configuration"))
-  assert_eq(Route::parse("/docs/configuration/"), Doc("configuration"))
-  assert_eq(Route::parse("docs//configuration"), Doc("configuration"))
-  assert_eq(Route::parse("docs/configuration/index.html"), Doc("configuration"))
-  assert_eq(Route::parse("migrations/v0.11.0"), Migration("v0.11.0"))
+  assert_eq(Route::parse("docs/smithy-syntax"), Doc("smithy-syntax"))
+  assert_eq(Route::parse("/docs/smithy-syntax/"), Doc("smithy-syntax"))
+  assert_eq(Route::parse("docs//smithy-syntax"), Doc("smithy-syntax"))
+  assert_eq(Route::parse("docs/smithy-syntax/index.html"), Doc("smithy-syntax"))
 }
 
 ///|
 test "parse: anything else is not found" {
   assert_eq(Route::parse("docs/a/b"), NotFound("docs/a/b"))
   assert_eq(Route::parse("blog"), NotFound("blog"))
-  assert_eq(Route::parse("migrations"), NotFound("migrations"))
+  assert_eq(Route::parse("migrations/v0.5.0"), NotFound("migrations/v0.5.0"))
 }
 
 ///|
 test "to_path and href" {
   assert_eq(Landing.to_path(), "")
-  assert_eq(Doc("configuration").to_path(), "docs/configuration")
-  assert_eq(Migration("v0.11.0").to_path(), "migrations/v0.11.0")
+  assert_eq(Doc("smithy-syntax").to_path(), "docs/smithy-syntax")
+  assert_eq(DocsIndex.to_path(), "docs")
   assert_eq(href("/smithy/", Landing), "/smithy/")
   assert_eq(
-    href("/smithy/next/", Doc("configuration")),
-    "/smithy/next/docs/configuration/",
+    href("/smithy/next/", Doc("smithy-syntax")),
+    "/smithy/next/docs/smithy-syntax/",
   )
-  assert_eq(
-    href("/smithy/", Migration("v0.11.0")),
-    "/smithy/migrations/v0.11.0/",
-  )
+  assert_eq(href("/smithy/", DocsIndex), "/smithy/docs/")
 }
 
 ///|
@@ -54,7 +50,7 @@ test "strip_base: paths inside and outside the base" {
 
 ///|
 test "routes round-trip through JSON" {
-  for r in [Landing, Doc("configuration"), Migration("v0.11.0"), NotFound("x")] {
+  for r in [Landing, Doc("smithy-syntax"), DocsIndex, NotFound("x")] {
     let back : Route = @json.from_json(r.to_json())
     assert_eq(back, r)
   }

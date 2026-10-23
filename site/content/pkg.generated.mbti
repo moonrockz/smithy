@@ -10,9 +10,9 @@ import {
 // Values
 pub fn classify(String) -> (@route.Route, Group)?
 
-pub fn compare_versions(String, String) -> Int
+pub fn fixed_sources() -> Array[String]
 
-pub let guide_order : Array[String]
+pub fn is_excluded(String) -> Bool
 
 pub fn normalize_path(String) -> String
 
@@ -21,10 +21,13 @@ pub fn normalize_path(String) -> String
 // Types and methods
 pub(all) enum Group {
   Guides
-  Migrations
+  Cli
+  Libraries
+  Cookbook
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn Group::equal(Self, Self) -> Bool
 pub fn Group::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+pub fn Group::label(Self) -> String
 pub fn Group::not_equal(Self, Self) -> Bool
 pub fn Group::to_json(Self) -> Json
 pub fn Group::to_repr(Self) -> @debug.Repr
@@ -33,11 +36,14 @@ pub(all) struct Manifest {
   pages : Array[Page]
 } derive(Eq, @debug.Debug)
 pub fn Manifest::build(Array[SourceFile]) -> Self
+pub fn Manifest::default_route(Self) -> @route.Route
 pub fn Manifest::equal(Self, Self) -> Bool
 pub fn Manifest::find(Self, @route.Route) -> Page?
 pub fn Manifest::find_source(Self, String) -> Page?
+pub fn Manifest::groups(Self) -> Array[(Group, Array[Page])]
 pub fn Manifest::neighbors(Self, @route.Route) -> (Page?, Page?)
 pub fn Manifest::not_equal(Self, Self) -> Bool
+pub fn Manifest::resolve(Self, @route.Route) -> @route.Route
 pub fn Manifest::to_repr(Self) -> @debug.Repr
 
 pub(all) struct Page {

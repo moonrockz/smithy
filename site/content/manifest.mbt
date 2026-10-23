@@ -1,14 +1,9 @@
 ///|
-/// Guides in sidebar order. Guides not in this list follow, by slug.
-pub let guide_order : Array[String] = [
-  "getting-started", "step-definitions", "hooks-and-attachments", "testing-strategies",
-  "configuration",
-]
-
-///|
 pub(all) enum Group {
   Guides
-  Migrations
+  Cli
+  Libraries
+  Cookbook
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -88,124 +83,177 @@ fn is_slug(s : String) -> Bool {
 }
 
 ///|
-/// `[major, minor, patch]` of `vX.Y.Z`, or `None`.
-fn version_numbers(v : String) -> Array[Int32]? {
-  guard v.has_prefix("v") else { return None }
-  let out : Array[Int32] = []
-  for part in v[1:].split(".") {
-    let s = part.to_owned()
-    guard s != "" && s.iter().all(c => c >= '0' && c <= '9') else {
-      return None
-    }
-    let mut n = 0
-    for c in s {
-      n = n * 10 + (c.to_int() - '0'.to_int())
-    }
-    out.push(n)
+/// The sidebar label of a group.
+pub fn Group::label(self : Group) -> String {
+  match self {
+    Guides => "Guides"
+    Cli => "CLI"
+    Libraries => "Libraries"
+    Cookbook => "Cookbook"
   }
-  if out.length() == 3 {
-    Some(out)
+}
+
+///|
+/// The pages other than guides: route slug, repository path and group, in sidebar order.
+let fixed_pages : Array[(String, String, Group)] = [
+  ("cli", "apps/smithy/README.md", Cli),
+  ("smithy-syntax", "pkgs/smithy-syntax/README.mbt.md", Libraries),
+  ("smithy", "pkgs/smithy/README.mbt.md", Libraries),
+  ("smithy-validation", "pkgs/smithy-validation/README.mbt.md", Libraries),
+  (
+    "smithy-validation-rpc",
+    "pkgs/smithy-validation/rpc/README.mbt.md",
+    Libraries,
+  ),
+  (
+    "smithy-ion-validation",
+    "pkgs/smithy-ion-validation/README.mbt.md",
+    Libraries,
+  ),
+  ("smithy-build", "pkgs/smithy-build/README.mbt.md", Libraries),
+  ("smithy-diff", "pkgs/smithy-diff/README.mbt.md", Libraries),
+  ("smithy-jsonschema", "pkgs/smithy-jsonschema/README.mbt.md", Libraries),
+  ("smithy-openapi", "pkgs/smithy-openapi/README.mbt.md", Libraries),
+  ("smithy-openrpc", "pkgs/smithy-openrpc/README.mbt.md", Libraries),
+  ("jmespath", "pkgs/jmespath/README.mbt.md", Libraries),
+  ("artifact-resources", "pkgs/artifact-resources/README.mbt.md", Libraries),
+  ("protocol-tests", "pkgs/smithy/protocoltests/README.mbt.md", Libraries),
+  ("parsing", "docs/cookbook/parsing.mbt.md", Cookbook),
+  ("traversal", "docs/cookbook/traversal.mbt.md", Cookbook),
+  ("diagnostics", "docs/cookbook/diagnostics.mbt.md", Cookbook),
+]
+
+///|
+/// The repository paths of the pages that are not guides.
+pub fn fixed_sources() -> Array[String] {
+  fixed_pages.map(p => p.1)
+}
+
+///|
+let excluded_prefixes : Array[String] = [
+  "docs/superpowers/", "docs/spikes/", ".dev/", "tests/tck/",
+]
+
+///|
+let excluded_names : Array[String] = ["DESIGN.md", "AGENTS.md", "CONTEXT.md"]
+
+///|
+/// Whether a file is never published: working documents, design notes,
+/// agent instructions and the vendored test corpus.
+pub fn is_excluded(path : String) -> Bool {
+  let p = normalize_path(path)
+  let parts = p.split("/").map(s => s.to_owned()).collect()
+  excluded_names.contains(parts.last().unwrap_or("")) ||
+  excluded_prefixes.iter().any(x => p.has_prefix(x)) ||
+  parts.contains(".dev") ||
+  p.contains("/tests/tck/")
+}
+
+///|
+/// The slug of `docs/guide/<slug>.md` or `<slug>.mbt.md`.
+fn guide_slug(p : String) -> String? {
+  let name = match p.strip_prefix("docs/guide/") {
+    Some(rest) => rest.to_owned()
+    None => return None
+  }
+  let stem = if name.has_suffix(".mbt.md") {
+    name[:name.length() - 7].to_owned()
+  } else if name.has_suffix(".md") {
+    name[:name.length() - 3].to_owned()
+  } else {
+    return None
+  }
+  if is_slug(stem) {
+    Some(stem)
   } else {
     None
   }
 }
 
 ///|
-/// Compares `vX.Y.Z` strings numerically. Invalid versions sort first.
-pub fn compare_versions(a : String, b : String) -> Int32 {
-  match (version_numbers(a), version_numbers(b)) {
-    (Some(x), Some(y)) =>
-      if x[0] != y[0] {
-        x[0] - y[0]
-      } else if x[1] != y[1] {
-        x[1] - y[1]
-      } else {
-        x[2] - y[2]
-      }
-    (None, Some(_)) => -1
-    (Some(_), None) => 1
-    (None, None) => a.compare(b)
-  }
-}
-
-///|
 /// The route and group of a published source file, or `None` when the file
-/// is not published (for example anything under `docs/plans/`).
+/// is not published (for example anything under `docs/superpowers/`).
 pub fn classify(path : String) -> (@route.Route, Group)? {
   let p = normalize_path(path)
-  guard p.has_suffix(".md") else { return None }
-  let segs = p[:p.length() - 3].split("/").map(s => s.to_owned()).collect()
-  match segs {
-    ["docs", "guide", slug] if is_slug(slug) => Some((Doc(slug), Guides))
-    // Interim: the repository has no `docs/guide` yet; the CLI readme is the one guide.
-    ["apps", "smithy", "README"] => Some((Doc("cli"), Guides))
-    ["docs", "migrations", version] if version_numbers(version) is Some(_) =>
-      Some((Migration(version), Migrations))
-    _ => None
+  guard !is_excluded(p) else { return None }
+  if guide_slug(p) is Some(slug) {
+    return Some((Doc(slug), Guides))
   }
-}
-
-///|
-fn guide_rank(route : @route.Route) -> (Int32, String) {
-  match route {
-    Doc(slug) => {
-      let mut rank = guide_order.length()
-      for i, s in guide_order {
-        if s == slug && rank == guide_order.length() {
-          rank = i
-        }
-      }
-      (rank, slug)
+  for page in fixed_pages {
+    if page.1 == p {
+      return Some((Doc(page.0), page.2))
     }
-    _ => (guide_order.length(), "")
   }
+  None
 }
 
 ///|
-fn migration_version(route : @route.Route) -> String {
-  match route {
-    Migration(v) => v
-    _ => ""
+fn fixed_rank(route : @route.Route) -> Int32 {
+  for i, page in fixed_pages {
+    if @route.Route::Doc(page.0) == route {
+      return i
+    }
   }
+  fixed_pages.length()
 }
 
 ///|
 /// The manifest of the published files among `files`.
 pub fn Manifest::build(files : Array[SourceFile]) -> Manifest {
   let guides : Array[Page] = []
-  let migrations : Array[Page] = []
+  let others : Array[Page] = []
   for f in files {
     match classify(f.path) {
-      Some((route, Guides)) =>
-        guides.push({
+      Some((route, group)) => {
+        let page : Page = {
           route,
           title: f.title,
           source: normalize_path(f.path),
-          group: Guides,
-        })
-      Some((route, Migrations)) =>
-        migrations.push({
-          route,
-          title: f.title,
-          source: normalize_path(f.path),
-          group: Migrations,
-        })
+          group,
+        }
+        if group is Guides {
+          guides.push(page)
+        } else {
+          others.push(page)
+        }
+      }
       None => ()
     }
   }
-  guides.sort_by((a, b) => {
-    let (ra, sa) = guide_rank(a.route)
-    let (rb, sb) = guide_rank(b.route)
-    if ra != rb {
-      ra - rb
-    } else {
-      sa.compare(sb)
+  guides.sort_by((a, b) => a.route.to_path().compare(b.route.to_path()))
+  others.sort_by((a, b) => fixed_rank(a.route) - fixed_rank(b.route))
+  { pages: [..guides, ..others], }
+}
+
+///|
+/// The non-empty groups with their pages, in sidebar order.
+pub fn Manifest::groups(self : Manifest) -> Array[(Group, Array[Page])] {
+  let out : Array[(Group, Array[Page])] = []
+  for group in [Guides, Cli, Libraries, Cookbook] {
+    let pages = self.pages.filter(p => p.group == group)
+    if !pages.is_empty() {
+      out.push((group, pages))
     }
-  })
-  migrations.sort_by((a, b) => {
-    compare_versions(migration_version(b.route), migration_version(a.route))
-  })
-  { pages: [..guides, ..migrations], }
+  }
+  out
+}
+
+///|
+/// The page that `/docs/` opens: the first guide, or the CLI while there is none.
+pub fn Manifest::default_route(self : Manifest) -> @route.Route {
+  match self.pages.iter().find_first(p => p.group is Guides) {
+    Some(page) => page.route
+    None => Doc("cli")
+  }
+}
+
+///|
+/// `DocsIndex` becomes the page it opens. Other routes stay.
+pub fn Manifest::resolve(self : Manifest, route : @route.Route) -> @route.Route {
+  match route {
+    DocsIndex => self.default_route()
+    _ => route
+  }
 }
 
 ///|

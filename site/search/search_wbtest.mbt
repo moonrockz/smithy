@@ -18,7 +18,7 @@ fn config_doc() -> @markdown.Document {
 
 ///|
 test "entries_for splits a page at h2 and h3" {
-  let entries = entries_for("Configuration", Doc("configuration"), config_doc())
+  let entries = entries_for("Configuration", Doc("smithy-syntax"), config_doc())
   assert_eq(entries.map(e => e.anchor), [
     "", "config-fields", "test_kind-string", "cli-flags",
   ])
@@ -48,8 +48,8 @@ fn index() -> Index {
   )
   Index::new(
     [
-      ..entries_for("Configuration", Doc("configuration"), doc),
-      ..entries_for("Testing Strategies", Doc("testing-strategies"), other),
+      ..entries_for("Configuration", Doc("smithy-syntax"), doc),
+      ..entries_for("Testing Strategies", Doc("jmespath"), other),
     ],
   )
 }
@@ -102,7 +102,7 @@ test "group_by_page keeps first-seen page order" {
 
 ///|
 test "entries round-trip through JSON" {
-  let entries = entries_for("Configuration", Doc("configuration"), config_doc())
+  let entries = entries_for("Configuration", Doc("smithy-syntax"), config_doc())
   let back : Array[Entry] = @json.from_json(Json(entries))
   assert_eq(back, entries)
 }

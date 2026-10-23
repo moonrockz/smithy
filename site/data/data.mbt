@@ -28,7 +28,7 @@ pub extend Channel with FromJson::{from_json}
 pub(all) struct SiteConfig {
   /// Base path of this version, for example "/smithy/next/".
   base : String
-  /// "v0.11.0" for the release, "next" for main.
+  /// "v0.5.0" for the release, "next" for main.
   version : String
   channel : Channel
   /// Tag or commit SHA used for GitHub links.

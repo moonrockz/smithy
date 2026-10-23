@@ -103,7 +103,7 @@ fn on_url_changed(
   guard site_path(m.config, url.path) is Some(rest) else {
     return (m, @rabbita.none)
   }
-  let route = @route.Route::parse(rest)
+  let route = m.manifest.resolve(@route.Route::parse(rest))
   let anchor = match url.fragment {
     Some(id) if id != "" => Some(id)
     _ => None

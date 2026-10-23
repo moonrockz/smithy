@@ -8,17 +8,13 @@ fn sidebar(m : Model) -> Html {
       page.title,
     )
   }
-  let guides = m.manifest.pages.filter(p => p.group == Guides).map(link_for)
-  let migrations = m.manifest.pages
-    .filter(p => p.group == Migrations)
-    .map(link_for)
+  let groups = m.manifest
+    .groups()
+    .map(g => [@html.p(class="ms-side-group", g.0.label()), ..g.1.map(link_for)])
   @html.aside(
     class=class_if("ms-sidebar", "ms-sidebar-open", m.menu_open),
     [
-      @html.p(class="ms-side-group", "Guide"),
-      ..guides,
-      @html.p(class="ms-side-group", "Migration"),
-      ..migrations,
+      ..groups.flatten(),
       @html.p(class="ms-side-group", "Reference"),
       @html.a(
         class="ms-side-link",
@@ -29,6 +25,11 @@ fn sidebar(m : Model) -> Html {
         class="ms-side-link",
         href=@data.github_repo + "/releases",
         "Releases ↗",
+      ),
+      @html.a(
+        class="ms-side-link",
+        href=@data.github_repo + "/blob/main/CHANGELOG.md",
+        "Changelog ↗",
       ),
     ],
   )
@@ -53,7 +54,10 @@ fn next_banner(m : Model) -> Html {
       @html.div(class="ms-banner", [
         @html.text("You are reading the docs for main (unreleased). "),
         @html.a(
-          href=@route.href(m.config.release_base, m.route),
+          href=@route.href(
+            m.config.release_base,
+            release_route(m.config.channel, m.route),
+          ),
           "Go to the \{m.config.release_version} docs.",
         ),
       ])
@@ -125,7 +129,7 @@ fn docs_view(
     @html.article(class="ms-article", [
       next_banner(m),
       @html.div(class="ms-crumbs", [
-        @html.a(href=@route.href(base, Doc(@route.default_doc_slug)), "Docs"),
+        @html.a(href=@route.href(base, DocsIndex), "Docs"),
         @html.text(" / " + page.title),
       ]),
       if toc.is_empty() {

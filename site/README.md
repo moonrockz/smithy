@@ -4,8 +4,7 @@ The landing page and docs site at <https://moonrockz.github.io/smithy/>,
 built with [rabbita](https://github.com/moonbit-community/rabbita).
 
 The site is copied from the moonspec site (moonrockz/moonspec at commit
-`9ea9a688c3a39d95c91a28b2a40bb5332e8786f5`). Until the docs exist, the one published page is
-`apps/smithy/README.md`, as `/docs/cli/`.
+`9ea9a688c3a39d95c91a28b2a40bb5332e8786f5`).
 
 ## How the site uses the Smithy packages
 

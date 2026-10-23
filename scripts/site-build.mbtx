@@ -61,6 +61,17 @@ fn prerender_args(
 }
 
 ///|
+/// The message for a command that did not start, with the fix when it is known.
+fn spawn_failure_message(command : String, error : Error) -> String {
+  let base = "site:build: cannot start `\{command}`: \{error}"
+  if command == "warren" {
+    base + "\nInstall it with `moon install moonbit-community/warren@0.4.5`."
+  } else {
+    base
+  }
+}
+
+///|
 async fn run_checked(command : String, args : Array[String]) -> Unit {
   let code = @process.run(
     command,
@@ -68,7 +79,13 @@ async fn run_checked(command : String, args : Array[String]) -> Unit {
     cwd="site",
     stdout=@stdio.stdout,
     stderr=@stdio.stderr,
-  )
+  ) catch {
+    error => {
+      eprintln(spawn_failure_message(command, error))
+      @sys.exit(1)
+      return
+    }
+  }
   if code != 0 {
     eprintln("site:build: `\{command}` failed")
     @sys.exit(if code > 0 { code } else { 1 })
@@ -154,4 +171,18 @@ test "prerender_args puts the absolute paths first" {
   assert_eq(prerender_args(split, "/c", "/o"), [
     "--content", "/c", "--out", "/o", "--channel", "next",
   ])
+}
+
+///|
+test "a warren that cannot start names the install command" {
+  let message = spawn_failure_message("warren", Failure("no such file"))
+  assert_true(message.contains("moon install moonbit-community/warren@0.4.5"))
+  assert_true(message.contains("no such file"))
+}
+
+///|
+test "another command that cannot start has no install hint" {
+  let message = spawn_failure_message("moon", Failure("no such file"))
+  assert_true(!message.contains("moon install"))
+  assert_true(message.contains("`moon`"))
 }

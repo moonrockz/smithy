@@ -30,11 +30,11 @@ test "internal_path keeps only links under the base and not ignored" {
 }
 
 ///|
-test "target_file treats dotted version routes as directories" {
-  assert_eq(target_file("migrations/v0.11.0"), "migrations/v0.11.0/index.html")
+test "target_file treats dotted routes as directories" {
+  assert_eq(target_file("docs/a.b"), "docs/a.b/index.html")
   assert_eq(
-    target_file("content/docs/migrations/v0.11.0.md"),
-    "content/docs/migrations/v0.11.0.md",
+    target_file("content/docs/guide/a.b.md"),
+    "content/docs/guide/a.b.md",
   )
 }
 
@@ -102,7 +102,7 @@ fn fixture(
   put(
     root,
     "search-index.json",
-    Json([entry_for(Doc("x")), entry_for(Migration("v0.11.0"))]).stringify(),
+    Json([entry_for(Doc("x")), entry_for(Doc("a.b"))]).stringify(),
   )
   root
 }
@@ -142,12 +142,12 @@ test "check reports a route without an HTML file" {
 }
 
 ///|
-test "check reports a dotted migration route directory without index.html" {
-  let root = fixture("dotted", ["", "migrations/v0.11.0"], [], "<p></p>")
-  put(root, "migrations/v0.11.0/other.txt", "x")
+test "check reports a dotted route directory without index.html" {
+  let root = fixture("dotted", ["", "docs/a.b"], [], "<p></p>")
+  put(root, "docs/a.b/other.txt", "x")
   let problems = check(root, "/b/", [])
   rm_rf(root)
-  assert_eq(problems, ["route migrations/v0.11.0 has no HTML file"])
+  assert_eq(problems, ["route docs/a.b has no HTML file"])
 }
 
 ///|

@@ -45,6 +45,21 @@ fn read_markdown_dir(
 }
 
 ///|
+/// The files among `paths` that exist under `content`, as (repository path, text).
+fn read_markdown_files(
+  content : String,
+  paths : Array[String],
+) -> Array[(String, String)] raise {
+  let out : Array[(String, String)] = []
+  for path in paths {
+    if @fs.path_exists(content + "/" + path) {
+      out.push((path, @fs.read_file_to_string(content + "/" + path)))
+    }
+  }
+  out
+}
+
+///|
 async fn render_page(data : @data.SiteData) -> String {
   let json = data.encode()
   let html = @rabbita.new(() => @shell.component(data, json)).render(
@@ -54,15 +69,15 @@ async fn render_page(data : @data.SiteData) -> String {
 }
 
 ///|
-/// A build without guide pages is a wrong `--content` path, not a site.
+/// A build without any docs page is a wrong `--content` path, not a site.
 fn check_manifest(
   manifest : @content.Manifest,
   content : String,
 ) -> Result[Unit, String] {
-  if manifest.pages.iter().any(p => p.group is Guides) {
-    Ok(())
+  if manifest.pages.is_empty() {
+    Err("no docs pages found under \{content}")
   } else {
-    Err("no guide pages found under \{content}/docs/guide")
+    Ok(())
   }
 }
 
@@ -72,10 +87,7 @@ pub async fn build_site(args : Args) -> Unit {
   let config = config_of(args)
   let files = [
     ..read_markdown_dir(args.content, "docs/guide"),
-    ..read_markdown_dir(args.content, "docs/migrations"),
-    ..read_markdown_dir(args.content, "apps/smithy").filter(f => {
-      f.0 == "apps/smithy/README.md"
-    }),
+    ..read_markdown_files(args.content, @content.fixed_sources()),
   ]
   let manifest = @content.Manifest::build(
     files.map(f => { path: f.0, title: @markdown.title_of(f.1), }),
@@ -124,7 +136,7 @@ pub async fn build_site(args : Args) -> Unit {
     routes.push(page.route.to_path())
   }
   // `/docs/` shows the default page; GitHub Pages needs a real file for it.
-  let default_route : @route.Route = Doc(@route.default_doc_slug)
+  let default_route = manifest.default_route()
   match manifest.find(default_route) {
     Some(page) => {
       write_file(

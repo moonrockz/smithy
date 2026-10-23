@@ -7,8 +7,6 @@ import {
 }
 
 // Values
-pub let default_doc_slug : String
-
 pub fn href(String, Route) -> String
 
 pub fn strip_base(String, String) -> String?
@@ -18,8 +16,8 @@ pub fn strip_base(String, String) -> String?
 // Types and methods
 pub(all) enum Route {
   Landing
+  DocsIndex
   Doc(String)
-  Migration(String)
   NotFound(String)
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn Route::equal(Self, Self) -> Bool

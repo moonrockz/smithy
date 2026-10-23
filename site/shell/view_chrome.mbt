@@ -17,6 +17,16 @@ fn theme_icon(theme : Theme) -> String {
 }
 
 ///|
+/// The route in the release site that matches `route` of the next site. A page of
+/// main may not exist in the last release, so a docs page links to the docs index.
+fn release_route(channel : @data.Channel, route : @route.Route) -> @route.Route {
+  match (channel, route) {
+    (Next, Doc(_)) => DocsIndex
+    _ => route
+  }
+}
+
+///|
 fn version_picker(m : Model) -> Html {
   let c = m.config
   // A missing page has no counterpart in the other version: link to its home.
@@ -31,7 +41,7 @@ fn version_picker(m : Model) -> Html {
         "ms-version-current",
         c.channel == Release,
       ),
-      href=@route.href(c.release_base, route),
+      href=@route.href(c.release_base, release_route(c.channel, route)),
       c.release_version,
     ),
     @html.a(
@@ -79,7 +89,7 @@ fn nav_bar(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       ]),
     ]),
     @html.nav(class="ms-links", [
-      @html.a(href=@route.href(base, Doc(@route.default_doc_slug)), "Docs"),
+      @html.a(href=@route.href(base, DocsIndex), "Docs"),
       @html.a(href=@data.api_docs_url, "API ↗"),
       @html.a(href=@data.github_repo, "GitHub ↗"),
     ]),
@@ -117,7 +127,7 @@ fn footer_view(m : Model) -> Html {
 /// it is under, so this view names no version.
 fn not_found_view(m : Model) -> Html {
   let c = m.config
-  let docs = @route.Doc(@route.default_doc_slug)
+  let docs = @route.DocsIndex
   @html.section(class="ms-notfound", [
     @html.h1("Page not found"),
     @html.p("This page does not exist."),

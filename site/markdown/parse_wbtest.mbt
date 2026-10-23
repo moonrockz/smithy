@@ -4,7 +4,7 @@ fn plain_ctx(source : String) -> LinkContext {
     source,
     resolve: _ => None,
     repo_url: "https://github.com/moonrockz/smithy",
-    git_ref: "v0.11.0",
+    git_ref: "v0.5.0",
   }
 }
 
@@ -33,7 +33,7 @@ test "title, toc levels and block kinds" {
     #|> quoted
     #|
     #|---
-  let doc = parse(src, plain_ctx("docs/guide/configuration.md"))
+  let doc = parse(src, plain_ctx("docs/cookbook/parsing.mbt.md"))
   assert_eq(doc.title, "Configuration Reference")
   assert_eq(doc.toc, [
     { level: 2, id: "config-file", text: "Config File", },
@@ -99,7 +99,7 @@ test "inline_text and block_text flatten content" {
 
 ///|
 fn para(src : String) -> Array[Inline] {
-  let doc = parse(src, site_ctx("docs/guide/getting-started.md"))
+  let doc = parse(src, site_ctx("docs/cookbook/parsing.mbt.md"))
   match doc.blocks {
     [Paragraph(inlines)] => inlines
     _ => []
@@ -123,7 +123,7 @@ test "two trailing spaces make a hard break" {
 test "images use the raw GitHub URL" {
   assert_eq(para("![alt](img/a.png)"), [
     Image(
-      "https://raw.githubusercontent.com/moonrockz/smithy/v0.11.0/docs/guide/img/a.png",
+      "https://raw.githubusercontent.com/moonrockz/smithy/v0.5.0/docs/cookbook/img/a.png",
       "alt",
     ),
   ])
@@ -132,11 +132,11 @@ test "images use the raw GitHub URL" {
 ///|
 test "reference links resolve to site routes" {
   let doc = parse(
-    "[x][r]\n\n[r]: step-definitions.md\n",
-    site_ctx("docs/guide/getting-started.md"),
+    "[x][r]\n\n[r]: ../../pkgs/smithy-syntax/README.mbt.md\n",
+    site_ctx("docs/cookbook/parsing.mbt.md"),
   )
   assert_eq(doc.blocks, [
-    Paragraph([Link(Internal(Doc("step-definitions"), None), [Text("x")])]),
+    Paragraph([Link(Internal(Doc("smithy-syntax"), None), [Text("x")])]),
   ])
 }
 
@@ -147,7 +147,7 @@ test "strikethrough" {
 
 ///|
 test "nested lists" {
-  let doc = parse("- a\n  - b\n", site_ctx("docs/guide/getting-started.md"))
+  let doc = parse("- a\n  - b\n", site_ctx("docs/cookbook/parsing.mbt.md"))
   assert_eq(doc.blocks, [
     BulletList([
       [Paragraph([Text("a")]), BulletList([[Paragraph([Text("b")])]])],
@@ -157,23 +157,23 @@ test "nested lists" {
 
 ///|
 test "the first of two h1 headings is the title" {
-  let doc = parse("# One\n\n# Two\n", site_ctx("docs/guide/getting-started.md"))
+  let doc = parse("# One\n\n# Two\n", site_ctx("docs/cookbook/parsing.mbt.md"))
   assert_eq(doc.title, "One")
 }
 
 ///|
 test "rewrite_link: empty and bare-hash destinations" {
-  let ctx = site_ctx("docs/guide/getting-started.md")
+  let ctx = site_ctx("docs/cookbook/parsing.mbt.md")
   assert_eq(
     rewrite_link("", ctx),
-    External("https://github.com/moonrockz/smithy/tree/v0.11.0/docs/guide"),
+    External("https://github.com/moonrockz/smithy/tree/v0.5.0/docs/cookbook"),
   )
   assert_eq(rewrite_link("#", ctx), Anchor(""))
 }
 
 ///|
 test "rewrite_link: tel and protocol-relative links are external, data links are not" {
-  let ctx = site_ctx("docs/guide/getting-started.md")
+  let ctx = site_ctx("docs/cookbook/parsing.mbt.md")
   assert_eq(rewrite_link("tel:+123", ctx), External("tel:+123"))
   assert_eq(rewrite_link("//host/x", ctx), External("//host/x"))
   assert_eq(rewrite_link("data:image/png;base64,AAA", ctx), Blocked)
@@ -181,7 +181,7 @@ test "rewrite_link: tel and protocol-relative links are external, data links are
 
 ///|
 test "rewrite_link: javascript links are never clickable" {
-  let ctx = site_ctx("docs/guide/getting-started.md")
+  let ctx = site_ctx("docs/cookbook/parsing.mbt.md")
   assert_eq(rewrite_link("javascript:alert(1)", ctx), Blocked)
   assert_eq(rewrite_link("JavaScript:alert(1)", ctx), Blocked)
   assert_eq(rewrite_link("vbscript:x", ctx), Blocked)
@@ -202,27 +202,29 @@ test "autolinks and inline links never emit a script href" {
 
 ///|
 test "a tab inside a scheme is not a scheme" {
-  let ctx = site_ctx("docs/guide/getting-started.md")
+  let ctx = site_ctx("docs/cookbook/parsing.mbt.md")
   assert_eq(
     rewrite_link("java\tscript:alert(1)", ctx),
     External(
-      "https://github.com/moonrockz/smithy/tree/v0.11.0/docs/guide/java\tscript:alert(1)",
+      "https://github.com/moonrockz/smithy/tree/v0.5.0/docs/cookbook/java\tscript:alert(1)",
     ),
   )
 }
 
 ///|
 test "rewrite_link: paths and anchors that only look like schemes stay relative" {
-  let ctx = site_ctx("docs/guide/getting-started.md")
+  let ctx = site_ctx("docs/cookbook/parsing.mbt.md")
   assert_eq(
     rewrite_link("a.md#x://y", ctx),
     External(
-      "https://github.com/moonrockz/smithy/blob/v0.11.0/docs/guide/a.md#x://y",
+      "https://github.com/moonrockz/smithy/blob/v0.5.0/docs/cookbook/a.md#x://y",
     ),
   )
   assert_eq(
     rewrite_link("./a.md", ctx),
-    External("https://github.com/moonrockz/smithy/blob/v0.11.0/docs/guide/a.md"),
+    External(
+      "https://github.com/moonrockz/smithy/blob/v0.5.0/docs/cookbook/a.md",
+    ),
   )
 }
 
@@ -230,4 +232,15 @@ test "rewrite_link: paths and anchors that only look like schemes stay relative"
 test "an image with a blocked source becomes its alt text" {
   assert_eq(para("![pic](javascript:alert(1))"), [Text("pic")])
   assert_eq(para("![pic](data:text/html,x)"), [Text("pic")])
+}
+
+///|
+test "mbt check fences render as mbt code" {
+  let src = "```mbt check\ntest {\n  inspect(1, content=\"1\")\n}\n```\n\n```mbt nocheck\nlet x = 1\n```\n\n```smithy\nstring S\n```\n"
+  let doc = parse(src, plain_ctx("docs/cookbook/parsing.mbt.md"))
+  assert_eq(doc.blocks, [
+    CodeBlock("mbt", "test {\n  inspect(1, content=\"1\")\n}"),
+    CodeBlock("mbt", "let x = 1"),
+    CodeBlock("smithy", "string S"),
+  ])
 }

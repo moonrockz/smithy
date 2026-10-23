@@ -23,13 +23,13 @@ async test "landing page renders hero, tiles and install tabs" {
 ///|
 #cfg(not(target="js"))
 async test "docs page renders sidebar, article, toc and edit link" {
-  let md = "# Configuration\n\n## Config File\n\nSee [start](getting-started.md).\n\n```moonbit\nlet x = 1\n```\n"
-  let html = render_route(Doc("configuration"), Some(md))
-  assert_true(html.contains("Getting Started"))
+  let md = "# Configuration\n\n## Config File\n\nSee [start](../../apps/smithy/README.md).\n\n```moonbit\nlet x = 1\n```\n"
+  let html = render_route(Doc("smithy-syntax"), Some(md))
+  assert_true(html.contains("smithy CLI"))
   assert_true(html.contains("id=\"config-file\""))
-  assert_true(html.contains("href=\"/smithy/docs/getting-started/\""))
+  assert_true(html.contains("href=\"/smithy/docs/cli/\""))
   assert_true(html.contains("On this page"))
-  assert_true(html.contains("edit/main/docs/guide/configuration.md"))
+  assert_true(html.contains("edit/main/pkgs/smithy-syntax/README.mbt.md"))
   assert_true(html.contains("tk-kw"))
 }
 
@@ -51,14 +51,14 @@ async test "the menu button appears only where there is a sidebar" {
   assert_true(!render_route(Landing, None).contains("ms-menu"))
   assert_true(!render_route(Doc("nope"), None).contains("ms-menu"))
   assert_true(
-    render_route(Doc("configuration"), Some("# C\n")).contains("ms-menu"),
+    render_route(Doc("smithy-syntax"), Some("# C\n")).contains("ms-menu"),
   )
 }
 
 ///|
 #cfg(not(target="js"))
 async test "an open phone menu renders a backdrop" {
-  let m = Model::init(site_data(Doc("configuration"), Some("# C\n")))
+  let m = Model::init(site_data(Doc("smithy-syntax"), Some("# C\n")))
   assert_true(!render_model(m).contains("ms-sidebar-backdrop"))
   assert_true(
     render_model({ ..m, menu_open: true, }).contains("ms-sidebar-backdrop"),
@@ -104,7 +104,7 @@ async test "search dialog, install tabs and heading anchors carry ARIA" {
   assert_true(landing.contains("aria-selected=\"true\""))
   assert_true(landing.contains("aria-selected=\"false\""))
   assert_true(landing.contains("id=\"ms-search-btn\""))
-  let docs = render_route(Doc("configuration"), Some("# Configuration\n"))
+  let docs = render_route(Doc("smithy-syntax"), Some("# Configuration\n"))
   assert_true(docs.contains("aria-hidden=\"true\""))
   assert_true(docs.contains("tabindex=\"-1\""))
 }
@@ -139,7 +139,7 @@ async test "the search modal marks the selected result and the hits" {
   assert_true(!html[first + 1:].to_owned().contains("ms-search-selected"))
   assert_true(
     html.contains(
-      "href=\"/smithy/docs/configuration/#two\" target=\"_self\" class=\"ms-search-item ms-search-selected\"",
+      "href=\"/smithy/docs/smithy-syntax/#two\" target=\"_self\" class=\"ms-search-item ms-search-selected\"",
     ),
   )
   assert_true(html.contains("<mark>needle</mark>"))
@@ -149,7 +149,7 @@ async test "the search modal marks the selected result and the hits" {
 ///|
 #cfg(not(target="js"))
 async test "the next banner appears only on the next channel" {
-  let m = Model::init(site_data(Doc("configuration"), Some("# C\n")))
+  let m = Model::init(site_data(Doc("smithy-syntax"), Some("# C\n")))
   assert_true(!render_model(m).contains("ms-banner"))
   let next : Model = {
     ..m,
@@ -163,17 +163,17 @@ async test "the next banner appears only on the next channel" {
   let html = render_model(next)
   assert_true(html.contains("ms-banner"))
   assert_true(html.contains("docs for main (unreleased)"))
-  assert_true(html.contains("Go to the v0.11.0 docs."))
+  assert_true(html.contains("Go to the v0.5.0 docs."))
 }
 
 ///|
 #cfg(not(target="js"))
 async test "the version picker marks the current version" {
-  let m = Model::init(site_data(Doc("configuration"), Some("# C\n")))
+  let m = Model::init(site_data(Doc("smithy-syntax"), Some("# C\n")))
   let release = render_model(m)
   assert_true(release.contains("ms-version-link ms-version-current"))
   assert_true(
-    release.contains("class=\"ms-version-link ms-version-current\">v0.11.0</a>"),
+    release.contains("class=\"ms-version-link ms-version-current\">v0.5.0</a>"),
   )
   assert_true(!release.contains("ms-version-current\">next"))
   let next = render_model({
@@ -182,15 +182,18 @@ async test "the version picker marks the current version" {
   })
   assert_true(
     next.contains(
-      "href=\"/smithy/next/docs/configuration/\" target=\"_self\" class=\"ms-version-link ms-version-current\">next</a>",
+      "href=\"/smithy/next/docs/smithy-syntax/\" target=\"_self\" class=\"ms-version-link ms-version-current\">next</a>",
     ),
   )
+  // The last release may lack a page of main: the release link opens its docs index.
+  assert_true(next.contains("href=\"/smithy/docs/\""))
+  assert_true(!next.contains("href=\"/smithy/docs/smithy-syntax/\""))
 }
 
 ///|
 #cfg(not(target="js"))
 async test "loading and failed pages render their texts" {
-  let m = Model::init(site_data(Doc("configuration"), None))
+  let m = Model::init(site_data(Doc("smithy-syntax"), None))
   assert_true(render_model(m).contains("Loading…"))
   let failed = render_model({ ..m, page: PageFailed, })
   assert_true(failed.contains("This page could not be loaded."))
@@ -208,4 +211,16 @@ async test "the moonx install tab shows the moonx commands" {
   assert_true(
     html.contains("moonx moonrockz/smithy/apps/smithy@latest validate"),
   )
+}
+
+///|
+#cfg(not(target="js"))
+async test "sidebar shows the groups that have pages, then the reference links" {
+  let html = render_route(Doc("smithy-syntax"), Some("# S\n"))
+  assert_true(html.contains(">CLI<"))
+  assert_true(html.contains(">Libraries<"))
+  assert_true(!html.contains(">Guides<"))
+  assert_true(!html.contains(">Migration<"))
+  assert_true(html.contains("CHANGELOG.md"))
+  assert_true(html.contains("Releases"))
 }

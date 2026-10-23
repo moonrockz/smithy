@@ -4,58 +4,67 @@ fn site_ctx(source : String) -> LinkContext {
     source,
     resolve: path => {
       match path {
-        "docs/guide/step-definitions.md" => Some(Doc("step-definitions"))
-        "docs/guide/configuration.md" => Some(Doc("configuration"))
-        "docs/migrations/v0.11.0.md" => Some(Migration("v0.11.0"))
+        "pkgs/smithy-syntax/README.mbt.md" => Some(Doc("smithy-syntax"))
+        "pkgs/smithy/README.mbt.md" => Some(Doc("smithy"))
+        "docs/cookbook/parsing.mbt.md" => Some(Doc("parsing"))
+        "apps/smithy/README.md" => Some(Doc("cli"))
         _ => None
       }
     },
     repo_url: "https://github.com/moonrockz/smithy",
-    git_ref: "v0.11.0",
+    git_ref: "v0.5.0",
   }
 }
 
 ///|
 test "resolve_path normalizes relative paths" {
-  assert_eq(resolve_path("docs/guide/a.md", "b.md"), "docs/guide/b.md")
-  assert_eq(resolve_path("docs/guide/a.md", "./b.md"), "docs/guide/b.md")
+  assert_eq(resolve_path("docs/cookbook/a.md", "b.md"), "docs/cookbook/b.md")
+  assert_eq(resolve_path("docs/cookbook/a.md", "./b.md"), "docs/cookbook/b.md")
   assert_eq(
-    resolve_path("docs/migrations/v0.11.0.md", "../guide/step-definitions.md"),
-    "docs/guide/step-definitions.md",
+    resolve_path(
+      "docs/cookbook/parsing.mbt.md", "../../pkgs/smithy/README.mbt.md",
+    ),
+    "pkgs/smithy/README.mbt.md",
   )
-  assert_eq(resolve_path("docs/guide/a.md", "../../README.md"), "README.md")
-  assert_eq(resolve_path("docs/guide/a.md", "../../../x.md"), "x.md")
-  assert_eq(resolve_path("", "docs/guide/a.md"), "docs/guide/a.md")
+  assert_eq(resolve_path("docs/cookbook/a.md", "../../README.md"), "README.md")
+  assert_eq(resolve_path("docs/cookbook/a.md", "../../../x.md"), "x.md")
+  assert_eq(resolve_path("", "docs/cookbook/a.md"), "docs/cookbook/a.md")
 }
 
 ///|
 test "links to published pages become site routes" {
-  let ctx = site_ctx("docs/guide/getting-started.md")
+  let ctx = site_ctx("docs/cookbook/diagnostics.mbt.md")
+  assert_eq(rewrite_link("parsing.mbt.md", ctx), Internal(Doc("parsing"), None))
   assert_eq(
-    rewrite_link("step-definitions.md", ctx),
-    Internal(Doc("step-definitions"), None),
+    rewrite_link("./parsing.mbt.md#parse-a-model", ctx),
+    Internal(Doc("parsing"), Some("parse-a-model")),
   )
   assert_eq(
-    rewrite_link("step-definitions.md#supported-types", ctx),
-    Internal(Doc("step-definitions"), Some("supported-types")),
+    rewrite_link("../../pkgs/smithy-syntax/README.mbt.md#scanner", ctx),
+    Internal(Doc("smithy-syntax"), Some("scanner")),
   )
   assert_eq(
-    rewrite_link("./configuration.md", ctx),
-    Internal(Doc("configuration"), None),
+    rewrite_link("../../apps/smithy/README.md", ctx),
+    Internal(Doc("cli"), None),
   )
   assert_eq(
-    rewrite_link("../migrations/v0.11.0.md", ctx),
-    Internal(Migration("v0.11.0"), None),
+    rewrite_link("/pkgs/smithy/README.mbt.md#version", ctx),
+    Internal(Doc("smithy"), Some("version")),
   )
+}
+
+///|
+test "a link between two libraries is a site route" {
+  let ctx = site_ctx("pkgs/smithy-syntax/README.mbt.md")
   assert_eq(
-    rewrite_link("/docs/guide/configuration.md#steps-object", ctx),
-    Internal(Doc("configuration"), Some("steps-object")),
+    rewrite_link("../smithy/README.mbt.md#x", ctx),
+    Internal(Doc("smithy"), Some("x")),
   )
 }
 
 ///|
 test "anchors and absolute URLs stay as they are" {
-  let ctx = site_ctx("docs/guide/getting-started.md")
+  let ctx = site_ctx("docs/cookbook/diagnostics.mbt.md")
   assert_eq(rewrite_link("#codegen-mode", ctx), Anchor("codegen-mode"))
   assert_eq(
     rewrite_link("https://mooncakes.io/", ctx),
@@ -66,37 +75,45 @@ test "anchors and absolute URLs stay as they are" {
 
 ///|
 test "other repository files become GitHub links at the build ref" {
-  let ctx = site_ctx("docs/guide/getting-started.md")
+  let ctx = site_ctx("docs/cookbook/diagnostics.mbt.md")
   assert_eq(
-    rewrite_link("../plans/2026-10-13-site-design.md", ctx),
+    rewrite_link("../superpowers/specs/x.md", ctx),
     External(
-      "https://github.com/moonrockz/smithy/blob/v0.11.0/docs/plans/2026-10-13-site-design.md",
+      "https://github.com/moonrockz/smithy/blob/v0.5.0/docs/superpowers/specs/x.md",
     ),
   )
   assert_eq(
-    rewrite_link("../../README.md#cli", ctx),
-    External("https://github.com/moonrockz/smithy/blob/v0.11.0/README.md#cli"),
-  )
-  assert_eq(
-    rewrite_link("../../examples/todolist/", ctx),
+    rewrite_link("../../pkgs/smithy-syntax/DESIGN.md#scanner", ctx),
     External(
-      "https://github.com/moonrockz/smithy/tree/v0.11.0/examples/todolist",
+      "https://github.com/moonrockz/smithy/blob/v0.5.0/pkgs/smithy-syntax/DESIGN.md#scanner",
     ),
   )
   assert_eq(
-    rewrite_link("unpublished.md", ctx),
+    rewrite_link("../../examples/json-rpc/peers.smithy", ctx),
     External(
-      "https://github.com/moonrockz/smithy/blob/v0.11.0/docs/guide/unpublished.md",
+      "https://github.com/moonrockz/smithy/blob/v0.5.0/examples/json-rpc/peers.smithy",
+    ),
+  )
+  assert_eq(
+    rewrite_link("../../examples/json-rpc/", ctx),
+    External(
+      "https://github.com/moonrockz/smithy/tree/v0.5.0/examples/json-rpc",
+    ),
+  )
+  assert_eq(
+    rewrite_link("unpublished.mbt.md", ctx),
+    External(
+      "https://github.com/moonrockz/smithy/blob/v0.5.0/docs/cookbook/unpublished.mbt.md",
     ),
   )
 }
 
 ///|
 test "relative images load from raw GitHub" {
-  let ctx = site_ctx("docs/guide/getting-started.md")
+  let ctx = site_ctx("docs/cookbook/parsing.mbt.md")
   assert_eq(
     image_src("img/flow.png", ctx),
-    "https://raw.githubusercontent.com/moonrockz/smithy/v0.11.0/docs/guide/img/flow.png",
+    "https://raw.githubusercontent.com/moonrockz/smithy/v0.5.0/docs/cookbook/img/flow.png",
   )
   assert_eq(
     image_src("https://example.com/a.png", ctx),
@@ -119,13 +136,13 @@ test "relative images load from raw GitHub" {
 ///|
 test "parse applies link rewriting" {
   let doc = parse(
-    "See [steps](step-definitions.md#x).",
-    site_ctx("docs/guide/getting-started.md"),
+    "See [syntax](../../pkgs/smithy-syntax/README.mbt.md#x).",
+    site_ctx("docs/cookbook/parsing.mbt.md"),
   )
   assert_eq(doc.blocks, [
     Paragraph([
       Text("See "),
-      Link(Internal(Doc("step-definitions"), Some("x")), [Text("steps")]),
+      Link(Internal(Doc("smithy-syntax"), Some("x")), [Text("syntax")]),
       Text("."),
     ]),
   ])

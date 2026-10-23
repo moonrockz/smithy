@@ -64,6 +64,8 @@ code, pre, kbd { font-family: var(--mono); }
 .tk-com { color: #8b93a8; font-style: italic; }
 .tk-num { color: #f0abfc; }
 .tk-tag { color: #fbbf24; }
+.tk-type { color: #86efac; }
+.tk-doc { color: #8b93a8; font-style: italic; font-weight: 600; }
 
 /* Landing */
 .ms-landing { width: min(100% - 2 * var(--gutter), var(--page-max)); margin: 0 auto; padding: 0 0 3rem; }

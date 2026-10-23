@@ -158,10 +158,28 @@ async fn cleanup(tmp : String) -> Unit {
 }
 
 ///|
+/// Run `body`, then `after` on every exit path, also when `body` raises.
+/// A failed `body` gives code 1 and a message; a failed `after` gives a message only.
+async fn with_cleanup(
+  body : async () -> Int32 raise,
+  after : async () -> Unit raise,
+) -> Int32 {
+  let code = body() catch {
+    error => {
+      eprintln("site:check: \{error}")
+      1
+    }
+  }
+  after() catch {
+    error => eprintln("site:check: cleanup failed: \{error}")
+  }
+  code
+}
+
+///|
 async fn main {
   let tmp = @fs.tmpdir(prefix="site-check")
-  let code = steps(tmp)
-  cleanup(tmp)
+  let code = with_cleanup(() => steps(tmp), () => cleanup(tmp))
   if code != 0 {
     eprintln("site:check: failed")
     @sys.exit(code)
@@ -186,4 +204,24 @@ test "linkcheck_args adds --ignore only when given" {
   assert_eq(linkcheck_args("/d", "/smithy/next/"), [
     "scripts/site-linkcheck.mbtx", "--dist", "/d", "--base", "/smithy/next/",
   ])
+}
+
+///|
+async test "with_cleanup runs the cleanup after a body that raises" {
+  let ran = Ref(false)
+  let code = with_cleanup(() => fail("boom"), () => ran.val = true)
+  assert_eq(code, 1)
+  assert_true(ran.val)
+}
+
+///|
+async test "with_cleanup runs the cleanup after a body that returns" {
+  let ran = Ref(false)
+  assert_eq(with_cleanup(() => 3, () => ran.val = true), 3)
+  assert_true(ran.val)
+}
+
+///|
+async test "with_cleanup survives a cleanup that raises" {
+  assert_eq(with_cleanup(() => 0, () => fail("x")), 0)
 }

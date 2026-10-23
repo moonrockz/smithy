@@ -41,6 +41,8 @@ pub fn code_view(lang : String, code : String) -> Html {
       Comment => @html.span(class="tk-com", t.text)
       Number => @html.span(class="tk-num", t.text)
       Tag => @html.span(class="tk-tag", t.text)
+      Type => @html.span(class="tk-type", t.text)
+      DocComment => @html.span(class="tk-doc", t.text)
     }
   })
   @html.pre(

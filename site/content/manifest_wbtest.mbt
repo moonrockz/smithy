@@ -1,130 +1,181 @@
 ///|
-test "classify: only guides and migrations are published" {
+test "classify: guides, the CLI, libraries and the cookbook are published" {
   assert_eq(
-    classify("docs/guide/configuration.md"),
-    Some((Doc("configuration"), Guides)),
+    classify("docs/guide/getting-started.md"),
+    Some((Doc("getting-started"), Guides)),
   )
   assert_eq(
-    classify("./docs/guide/configuration.md"),
-    Some((Doc("configuration"), Guides)),
+    classify("./docs/guide/getting-started.mbt.md"),
+    Some((Doc("getting-started"), Guides)),
+  )
+  assert_eq(classify("apps/smithy/README.md"), Some((Doc("cli"), Cli)))
+  assert_eq(
+    classify("pkgs/smithy-syntax/README.mbt.md"),
+    Some((Doc("smithy-syntax"), Libraries)),
   )
   assert_eq(
-    classify("docs/migrations/v0.11.0.md"),
-    Some((Migration("v0.11.0"), Migrations)),
+    classify("pkgs/smithy-validation/rpc/README.mbt.md"),
+    Some((Doc("smithy-validation-rpc"), Libraries)),
   )
-  assert_eq(classify("docs/plans/2026-10-13-site-design.md"), None)
+  assert_eq(
+    classify("pkgs/smithy/protocoltests/README.mbt.md"),
+    Some((Doc("protocol-tests"), Libraries)),
+  )
+  assert_eq(
+    classify("docs/cookbook/parsing.mbt.md"),
+    Some((Doc("parsing"), Cookbook)),
+  )
+}
+
+///|
+test "classify: other files are not published" {
   assert_eq(classify("README.md"), None)
   assert_eq(classify("docs/guide/nested/x.md"), None)
   assert_eq(classify("docs/guide/Bad Name.md"), None)
-  assert_eq(classify("docs/guide/configuration.txt"), None)
-  assert_eq(classify("docs/migrations/latest.md"), None)
+  assert_eq(classify("docs/guide/start.txt"), None)
+  assert_eq(classify("docs/cookbook/README.md"), None)
+  assert_eq(classify("docs/migrations/2026-10-22-openrpc-library.md"), None)
+  assert_eq(classify("pkgs/smithy-syntax/README.md"), None)
+  assert_eq(classify("apps/smithy/OTHER.md"), None)
 }
 
 ///|
-test "compare_versions orders numerically" {
-  assert_true(compare_versions("v0.9.0", "v0.11.0") < 0)
-  assert_true(compare_versions("v1.0.0", "v0.11.0") > 0)
-  assert_eq(compare_versions("v0.11.0", "v0.11.0"), 0)
-}
-
-///|
-fn sample_files() -> Array[SourceFile] {
-  [
-    { path: "docs/migrations/v0.9.0.md", title: "To 0.9", },
-    { path: "docs/guide/configuration.md", title: "Configuration Reference", },
-    { path: "docs/plans/secret-design.md", title: "Secret", },
-    { path: "docs/guide/zzz-extra.md", title: "Extra", },
-    { path: "docs/guide/getting-started.md", title: "Getting Started", },
-    { path: "docs/migrations/v0.11.0.md", title: "To 0.11", },
+test "classify: the never-publish list wins over every rule" {
+  let paths = [
+    "docs/superpowers/plans/x.md", "docs/superpowers/specs/x.md", "docs/spikes/x.md",
+    ".dev/docs/x.md", ".dev/x.md", "pkgs/smithy-syntax/DESIGN.md", "docs/guide/DESIGN.md",
+    "docs/guide/AGENTS.md", "docs/guide/CONTEXT.md", "AGENTS.md", "CONTEXT.md", "pkgs/smithy-syntax/tests/tck/x.md",
+    "tests/tck/x.md",
   ]
-}
-
-///|
-test "build: guides in fixed order, then migrations newest first" {
-  let m = Manifest::build(sample_files())
-  assert_eq(m.pages.map(p => p.route), [
-    Doc("getting-started"),
-    Doc("configuration"),
-    Doc("zzz-extra"),
-    Migration("v0.11.0"),
-    Migration("v0.9.0"),
-  ])
-  assert_eq(m.pages[0].title, "Getting Started")
-  assert_eq(m.pages[0].source, "docs/guide/getting-started.md")
-}
-
-///|
-test "build: a tree without migrations still builds" {
-  let m = Manifest::build([
-    { path: "docs/guide/getting-started.md", title: "Start", },
-  ])
-  assert_eq(m.pages.length(), 1)
-  assert_eq(m.find(Migration("v0.11.0")), None)
-}
-
-///|
-test "find, find_source and neighbors" {
-  let m = Manifest::build(sample_files())
-  assert_eq(
-    m.find(Doc("configuration")).map(p => p.title),
-    Some("Configuration Reference"),
-  )
-  assert_eq(m.find(Doc("nope")), None)
-  assert_eq(
-    m.find_source("./docs/guide/configuration.md").map(p => p.route),
-    Some(Doc("configuration")),
-  )
-  assert_eq(m.find_source("docs/plans/secret-design.md"), None)
-  let (prev, next) = m.neighbors(Doc("configuration"))
-  assert_eq(prev.map(p => p.route), Some(Doc("getting-started")))
-  assert_eq(next.map(p => p.route), Some(Doc("zzz-extra")))
-  let (first_prev, _) = m.neighbors(Doc("getting-started"))
-  assert_eq(first_prev, None)
-  let (_, last_next) = m.neighbors(Migration("v0.9.0"))
-  assert_eq(last_next, None)
-}
-
-///|
-test "Page round-trips through JSON" {
-  let page : Page = {
-    route: Doc("configuration"),
-    title: "Configuration Reference",
-    source: "docs/guide/configuration.md",
-    group: Guides,
+  for p in paths {
+    assert_eq(is_excluded(p), true)
+    assert_eq(classify(p), None)
   }
-  let back : Page = @json.from_json(Json(page))
-  assert_eq(back, page)
+  assert_eq(is_excluded("docs/guide/start.md"), false)
 }
 
 ///|
-test "neighbors of an unknown route are empty" {
-  let m = Manifest::build(sample_files())
-  let (prev, next) = m.neighbors(Doc("nope"))
-  assert_eq(prev, None)
-  assert_eq(next, None)
-}
-
-///|
-test "compare_versions: invalid versions sort first, then lexically" {
-  assert_true(compare_versions("latest", "v0.1.0") < 0)
-  assert_true(compare_versions("v0.1.0", "latest") > 0)
-  assert_true(compare_versions("abc", "abd") < 0)
-  assert_true(compare_versions("abd", "abc") > 0)
-  assert_eq(compare_versions("abc", "abc"), 0)
-  assert_true(compare_versions("v1.0", "v0.0.1") < 0)
-}
-
-///|
-test "classify: a migration with a non-version name is not published" {
-  assert_eq(classify("docs/migrations/notes.md"), None)
+test "excluded names are not published even when listed as a source" {
   let m = Manifest::build([
-    { path: "docs/migrations/notes.md", title: "Notes", },
+    { path: "docs/guide/DESIGN.md", title: "Design", },
+    { path: "docs/guide/AGENTS.md", title: "Agents", },
+    { path: "docs/superpowers/plans/p.md", title: "Plan", },
+    { path: "tests/tck/x.md", title: "Tck", },
   ])
   assert_eq(m.pages.length(), 0)
 }
 
 ///|
-test "classify: the CLI readme is the interim guide" {
-  assert_eq(classify("apps/smithy/README.md"), Some((Doc("cli"), Guides)))
-  assert_eq(classify("apps/smithy/OTHER.md"), None)
+fn all_files() -> Array[SourceFile] {
+  [
+    { path: "docs/cookbook/diagnostics.mbt.md", title: "Report problems", },
+    { path: "pkgs/smithy/README.mbt.md", title: "smithy", },
+    { path: "docs/guide/zzz-extra.md", title: "Extra", },
+    { path: "pkgs/smithy-syntax/README.mbt.md", title: "smithy-syntax", },
+    { path: "docs/guide/install.mbt.md", title: "Install", },
+    { path: "apps/smithy/README.md", title: "smithy CLI", },
+    { path: "docs/cookbook/parsing.mbt.md", title: "Parse a model", },
+    { path: "docs/plans/secret.md", title: "Secret", },
+  ]
+}
+
+///|
+test "build: guides by slug, then CLI, libraries and cookbook in table order" {
+  let m = Manifest::build(all_files())
+  assert_eq(m.pages.map(p => p.route), [
+    Doc("install"),
+    Doc("zzz-extra"),
+    Doc("cli"),
+    Doc("smithy-syntax"),
+    Doc("smithy"),
+    Doc("parsing"),
+    Doc("diagnostics"),
+  ])
+  assert_eq(m.pages[0].source, "docs/guide/install.mbt.md")
+  assert_eq(m.pages[0].title, "Install")
+}
+
+///|
+test "build: a tree without docs/guide has no Guides group" {
+  let m = Manifest::build(
+    all_files().filter(f => !f.path.has_prefix("docs/guide/")),
+  )
+  assert_eq(m.pages.filter(p => p.group is Guides).length(), 0)
+  assert_eq(m.pages[0].route, Doc("cli"))
+  assert_eq(m.groups().map(g => g.0), [Cli, Libraries, Cookbook])
+}
+
+///|
+test "build: a tree with docs/guide starts with the Guides group" {
+  let m = Manifest::build(all_files())
+  assert_eq(m.groups().map(g => g.0), [Guides, Cli, Libraries, Cookbook])
+  assert_eq(m.groups()[0].1.map(p => p.route), [
+    Doc("install"),
+    Doc("zzz-extra"),
+  ])
+}
+
+///|
+test "build: an empty tree has no pages and no groups" {
+  let m = Manifest::build([])
+  assert_eq(m.pages.length(), 0)
+  assert_eq(m.groups().length(), 0)
+  assert_eq(m.default_route(), Doc("cli"))
+}
+
+///|
+test "default_route: the first guide, or the CLI while Guides is empty" {
+  assert_eq(Manifest::build(all_files()).default_route(), Doc("install"))
+  let no_guides = Manifest::build(
+    all_files().filter(f => !f.path.has_prefix("docs/guide/")),
+  )
+  assert_eq(no_guides.default_route(), Doc("cli"))
+}
+
+///|
+test "resolve: only the docs index changes" {
+  let m = Manifest::build(all_files())
+  assert_eq(m.resolve(DocsIndex), Doc("install"))
+  assert_eq(m.resolve(Doc("cli")), Doc("cli"))
+  assert_eq(m.resolve(Landing), Landing)
+}
+
+///|
+test "source_paths: the fixed pages in sidebar order" {
+  let paths = fixed_sources()
+  assert_eq(paths[0], "apps/smithy/README.md")
+  assert_eq(paths.length(), 1 + 13 + 3)
+  assert_eq(paths.contains("pkgs/smithy-validation/rpc/README.mbt.md"), true)
+  assert_eq(paths.contains("pkgs/smithy/protocoltests/README.mbt.md"), true)
+}
+
+///|
+test "find, find_source and neighbors" {
+  let m = Manifest::build(all_files())
+  assert_eq(m.find(Doc("smithy")).map(p => p.title), Some("smithy"))
+  assert_eq(
+    m.find_source("./pkgs/smithy-syntax/README.mbt.md").map(p => p.route),
+    Some(Doc("smithy-syntax")),
+  )
+  assert_eq(m.find_source("docs/plans/secret.md"), None)
+  let (prev, next) = m.neighbors(Doc("cli"))
+  assert_eq(prev.map(p => p.route), Some(Doc("zzz-extra")))
+  assert_eq(next.map(p => p.route), Some(Doc("smithy-syntax")))
+  let (first_prev, _) = m.neighbors(Doc("install"))
+  assert_eq(first_prev, None)
+  let (_, last_next) = m.neighbors(Doc("diagnostics"))
+  assert_eq(last_next, None)
+  assert_eq(m.neighbors(Doc("nope")).0, None)
+}
+
+///|
+test "Page round-trips through JSON" {
+  let page : Page = {
+    route: Doc("cli"),
+    title: "smithy CLI",
+    source: "apps/smithy/README.md",
+    group: Cli,
+  }
+  let back : Page = @json.from_json(Json(page))
+  assert_eq(back, page)
 }

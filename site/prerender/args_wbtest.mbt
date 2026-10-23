@@ -2,7 +2,7 @@
 test "parse_args reads every flag" {
   let args = parse_args([
     "prerender", "--content", "../release", "--channel", "next", "--site-root", "/smithy/",
-    "--release-version", "v0.11.0", "--ref", "abc", "--out", "dist/next",
+    "--release-version", "v0.5.0", "--ref", "abc", "--out", "dist/next",
   ])
   assert_eq(
     args,
@@ -10,7 +10,7 @@ test "parse_args reads every flag" {
       content: "../release",
       channel: Next,
       site_root: "/smithy/",
-      release_version: "v0.11.0",
+      release_version: "v0.5.0",
       git_ref: "abc",
       out: "dist/next",
     }),
@@ -37,35 +37,29 @@ test "config_of derives bases from the site root" {
 ///|
 test "page_path places each route in its own directory" {
   assert_eq(page_path(Landing), "index.html")
-  assert_eq(page_path(Doc("configuration")), "docs/configuration/index.html")
-  assert_eq(page_path(Migration("v0.11.0")), "migrations/v0.11.0/index.html")
+  assert_eq(page_path(Doc("smithy-syntax")), "docs/smithy-syntax/index.html")
+  assert_eq(page_path(DocsIndex), "docs/index.html")
 }
 
 ///|
-test "check_manifest rejects a manifest without guide pages" {
+test "check_manifest rejects a manifest without pages" {
   let empty : @content.Manifest = { pages: [], }
   assert_eq(
     check_manifest(empty, "../nope"),
-    Err("no guide pages found under ../nope/docs/guide"),
+    Err("no docs pages found under ../nope"),
   )
-  let migration_only : @content.Manifest = {
-    pages: [
-      {
-        route: Migration("v0.1.0"),
-        title: "M",
-        source: "docs/migrations/v0.1.0.md",
-        group: Migrations,
-      },
-    ],
-  }
-  assert_true(check_manifest(migration_only, ".") is Err(_))
 }
 
 ///|
-test "check_manifest accepts a manifest with a guide page" {
+test "check_manifest accepts a manifest with only the CLI page" {
   let m : @content.Manifest = {
     pages: [
-      { route: Doc("a"), title: "A", source: "docs/guide/a.md", group: Guides, },
+      {
+        route: Doc("cli"),
+        title: "C",
+        source: "apps/smithy/README.md",
+        group: Cli,
+      },
     ],
   }
   assert_eq(check_manifest(m, "."), Ok(()))

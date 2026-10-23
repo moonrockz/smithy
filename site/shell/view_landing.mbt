@@ -63,7 +63,7 @@ fn landing_view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
         @html.div(class="ms-cta", [
           @html.a(
             class="ms-btn ms-btn-primary",
-            href=@route.href(base, Doc(@route.default_doc_slug)),
+            href=@route.href(base, DocsIndex),
             "Get started",
           ),
           @html.a(class="ms-btn", href="#why", "Why smithy?"),

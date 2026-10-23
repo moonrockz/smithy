@@ -8,17 +8,17 @@ fn sample() -> SiteData {
       git_ref: "abc123",
       release_base: "/smithy/",
       next_base: "/smithy/next/",
-      release_version: "v0.11.0",
+      release_version: "v0.5.0",
     },
     pages: [
       {
-        route: Doc("configuration"),
+        route: Doc("smithy-syntax"),
         title: "Configuration",
-        source: "docs/guide/configuration.md",
-        group: Guides,
+        source: "pkgs/smithy-syntax/README.mbt.md",
+        group: Libraries,
       },
     ],
-    route: Doc("configuration"),
+    route: Doc("smithy-syntax"),
     markdown: Some("# Configuration\n\nQuote \" < > & </script> done\n"),
   }
 }
@@ -38,14 +38,10 @@ test "decode rejects invalid input" {
 ///|
 test "link_context resolves published sources only" {
   let data = sample()
-  let ctx = link_context(
-    data.config,
-    data.manifest(),
-    "docs/guide/getting-started.md",
-  )
+  let ctx = link_context(data.config, data.manifest(), "apps/smithy/README.md")
   assert_eq(
-    (ctx.resolve)("docs/guide/configuration.md"),
-    Some(Doc("configuration")),
+    (ctx.resolve)("pkgs/smithy-syntax/README.mbt.md"),
+    Some(Doc("smithy-syntax")),
   )
   assert_eq((ctx.resolve)("docs/plans/x.md"), None)
   assert_eq(ctx.git_ref, "abc123")
@@ -69,19 +65,19 @@ test "decode rejects a missing required field" {
 }
 
 ///|
-test "a release migration page without markdown round-trips" {
+test "a release page without markdown round-trips" {
   let data : SiteData = {
     ..sample(),
     config: {
       base: "/smithy/",
-      version: "v0.11.0",
+      version: "v0.5.0",
       channel: Release,
-      git_ref: "v0.11.0",
+      git_ref: "v0.5.0",
       release_base: "/smithy/",
       next_base: "/smithy/next/",
-      release_version: "v0.11.0",
+      release_version: "v0.5.0",
     },
-    route: Migration("v0.11.0"),
+    route: Doc("cli"),
     markdown: None,
   }
   assert_eq(SiteData::decode(data.encode()), Some(data))

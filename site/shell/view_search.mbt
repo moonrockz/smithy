@@ -23,10 +23,7 @@ fn search_view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       body.push(
         @html.p(class="ms-search-note", [
           @html.text("Search is not available. "),
-          @html.a(
-            href=@route.href(m.config.base, Doc(@route.default_doc_slug)),
-            "Open the docs",
-          ),
+          @html.a(href=@route.href(m.config.base, DocsIndex), "Open the docs"),
         ]),
       )
     IndexReady(_) =>

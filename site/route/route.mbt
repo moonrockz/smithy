@@ -1,13 +1,10 @@
 ///|
-/// The guide that `/docs/` opens.
-pub let default_doc_slug : String = "cli"
-
-///|
 /// A page of the site, without the base path.
 pub(all) enum Route {
   Landing
+  /// `/docs/`. The manifest says which page it opens.
+  DocsIndex
   Doc(String)
-  Migration(String)
   NotFound(String)
 } derive(Eq, Debug, ToJson, FromJson)
 
@@ -45,9 +42,8 @@ pub fn Route::parse(path : String) -> Route {
   let segs = segments(path)
   match segs {
     [] => Landing
-    ["docs"] => Doc(default_doc_slug)
+    ["docs"] => DocsIndex
     ["docs", slug] => Doc(slug)
-    ["migrations", version] => Migration(version)
     _ => NotFound(segs.join("/"))
   }
 }
@@ -57,8 +53,8 @@ pub fn Route::parse(path : String) -> Route {
 pub fn Route::to_path(self : Route) -> String {
   match self {
     Landing => ""
+    DocsIndex => "docs"
     Doc(slug) => "docs/" + slug
-    Migration(version) => "migrations/" + version
     NotFound(path) => path
   }
 }

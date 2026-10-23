@@ -8,25 +8,25 @@ fn site_data(route : @route.Route, markdown : String?) -> @data.SiteData {
   {
     config: {
       base: "/smithy/",
-      version: "v0.11.0",
+      version: "v0.5.0",
       channel: Release,
-      git_ref: "v0.11.0",
+      git_ref: "v0.5.0",
       release_base: "/smithy/",
       next_base: "/smithy/next/",
-      release_version: "v0.11.0",
+      release_version: "v0.5.0",
     },
     pages: [
       {
-        route: Doc("getting-started"),
-        title: "Getting Started",
-        source: "docs/guide/getting-started.md",
-        group: Guides,
+        route: Doc("cli"),
+        title: "smithy CLI",
+        source: "apps/smithy/README.md",
+        group: Cli,
       },
       {
-        route: Doc("configuration"),
+        route: Doc("smithy-syntax"),
         title: "Configuration",
-        source: "docs/guide/configuration.md",
-        group: Guides,
+        source: "pkgs/smithy-syntax/README.mbt.md",
+        group: Libraries,
       },
     ],
     route,
@@ -42,7 +42,7 @@ fn step(m : Model, msg : Msg) -> Model {
 ///|
 test "init parses the current page" {
   let m = Model::init(
-    site_data(Doc("configuration"), Some("# Configuration\n\n## A\n")),
+    site_data(Doc("smithy-syntax"), Some("# Configuration\n\n## A\n")),
   )
   match m.page {
     Ready(doc) => assert_eq(doc.title, "Configuration")
@@ -56,13 +56,13 @@ test "url changes inside the base switch routes" {
   let m = Model::init(site_data(Landing, None))
   let m2 = step(
     m,
-    UrlChanged(@url.parse("http://localhost/smithy/docs/configuration")),
+    UrlChanged(@url.parse("http://localhost/smithy/docs/smithy-syntax")),
   )
-  assert_eq(m2.route, Doc("configuration"))
+  assert_eq(m2.route, Doc("smithy-syntax"))
   assert_eq(m2.page, Loading)
   let m3 = step(
     m2,
-    ContentLoaded(Doc("configuration"), Ok("# Configuration\n")),
+    ContentLoaded(Doc("smithy-syntax"), Ok("# Configuration\n")),
   )
   assert_true(m3.page is Ready(_))
 }
@@ -72,13 +72,13 @@ test "url changes with a trailing slash switch routes" {
   let m = Model::init(site_data(Landing, None))
   let m2 = step(
     m,
-    UrlChanged(@url.parse("http://localhost/smithy/docs/configuration/")),
+    UrlChanged(@url.parse("http://localhost/smithy/docs/smithy-syntax/")),
   )
-  assert_eq(m2.route, Doc("configuration"))
+  assert_eq(m2.route, Doc("smithy-syntax"))
   let config = m.config
   assert_eq(
-    site_path(config, "/smithy/docs/configuration/"),
-    Some("docs/configuration/"),
+    site_path(config, "/smithy/docs/smithy-syntax/"),
+    Some("docs/smithy-syntax/"),
   )
   assert_eq(site_path(config, "/smithy/next/docs/x/"), None)
 }
@@ -88,7 +88,7 @@ test "url changes outside the base are ignored" {
   let m = Model::init(site_data(Landing, None))
   let m2 = step(
     m,
-    UrlChanged(@url.parse("http://localhost/smithy/next/docs/configuration")),
+    UrlChanged(@url.parse("http://localhost/smithy/next/docs/smithy-syntax")),
   )
   assert_eq(m2.route, Landing)
 }
@@ -104,9 +104,9 @@ test "unknown pages have no content" {
 ///|
 test "stale content for another route is dropped" {
   let m = Model::init(
-    site_data(Doc("configuration"), Some("# Configuration\n")),
+    site_data(Doc("smithy-syntax"), Some("# Configuration\n")),
   )
-  let m2 = step(m, ContentLoaded(Doc("getting-started"), Ok("# Other\n")))
+  let m2 = step(m, ContentLoaded(Doc("cli"), Ok("# Other\n")))
   assert_eq(m2.page, m.page)
 }
 
@@ -118,7 +118,7 @@ test "search opens, filters and closes" {
   assert_eq(opened.search.index, LoadingIndex)
   let entries : Array[@search.Entry] = [
     {
-      route: Doc("configuration"),
+      route: Doc("smithy-syntax"),
       anchor: "test_kind-string",
       page: "Configuration",
       path: ["test_kind (string)"],
@@ -163,16 +163,16 @@ test "theme cycles auto, dark, light" {
 test "entry_href builds route and anchor" {
   let config = site_data(Landing, None).config
   let e : @search.Entry = {
-    route: Doc("configuration"),
+    route: Doc("smithy-syntax"),
     anchor: "a-b",
     page: "C",
     path: [],
     text: "",
   }
-  assert_eq(entry_href(config, e), "/smithy/docs/configuration/#a-b")
+  assert_eq(entry_href(config, e), "/smithy/docs/smithy-syntax/#a-b")
   assert_eq(
     entry_href(config, { ..e, anchor: "", }),
-    "/smithy/docs/configuration/",
+    "/smithy/docs/smithy-syntax/",
   )
 }
 
@@ -182,14 +182,14 @@ test "a fragment waits for the content of another page" {
   let m2 = step(
     m,
     UrlChanged(
-      @url.parse("http://localhost/smithy/docs/configuration#test_kind"),
+      @url.parse("http://localhost/smithy/docs/smithy-syntax#test_kind"),
     ),
   )
   assert_eq(m2.page, Loading)
   assert_eq(m2.pending_anchor, Some("test_kind"))
   let m3 = step(
     m2,
-    ContentLoaded(Doc("configuration"), Ok("# Configuration\n")),
+    ContentLoaded(Doc("smithy-syntax"), Ok("# Configuration\n")),
   )
   assert_true(m3.page is Ready(_))
   assert_eq(m3.pending_anchor, None)
@@ -200,7 +200,7 @@ test "no fragment leaves nothing pending" {
   let m = Model::init(site_data(Landing, None))
   let m2 = step(
     m,
-    UrlChanged(@url.parse("http://localhost/smithy/docs/configuration")),
+    UrlChanged(@url.parse("http://localhost/smithy/docs/smithy-syntax")),
   )
   assert_eq(m2.pending_anchor, None)
 }
@@ -208,11 +208,11 @@ test "no fragment leaves nothing pending" {
 ///|
 test "a same-page fragment scrolls at once and stays unpended" {
   let m = Model::init(
-    site_data(Doc("configuration"), Some("# Configuration\n")),
+    site_data(Doc("smithy-syntax"), Some("# Configuration\n")),
   )
   let m2 = step(
     m,
-    UrlChanged(@url.parse("http://localhost/smithy/docs/configuration#a")),
+    UrlChanged(@url.parse("http://localhost/smithy/docs/smithy-syntax#a")),
   )
   assert_eq(m2.pending_anchor, None)
   assert_eq(m2.page, m.page)
@@ -238,7 +238,7 @@ fn key(k : String, meta~ : Bool = false) -> Msg {
 ///|
 fn three_entries() -> Array[@search.Entry] {
   ["one", "two", "three"].map(a => {
-    route: Doc("configuration"),
+    route: Doc("smithy-syntax"),
     anchor: a,
     page: "Configuration",
     path: [a],
@@ -258,7 +258,7 @@ fn searching() -> Model {
 test "internal link requests inside the base keep the model" {
   let m = Model::init(site_data(Landing, None))
   let req = UrlRequested(
-    Internal(@url.parse("http://localhost/smithy/docs/configuration/")),
+    Internal(@url.parse("http://localhost/smithy/docs/smithy-syntax/")),
   )
   assert_eq(step(m, req), m)
 }
@@ -267,7 +267,7 @@ test "internal link requests inside the base keep the model" {
 test "link requests into the other channel keep the model" {
   let m = Model::init(site_data(Landing, None))
   let req = UrlRequested(
-    Internal(@url.parse("http://localhost/smithy/next/docs/configuration/")),
+    Internal(@url.parse("http://localhost/smithy/next/docs/smithy-syntax/")),
   )
   assert_eq(step(m, req), m)
   assert_eq(step(m, req).route, Landing)
@@ -310,10 +310,10 @@ test "OpenSelected closes search" {
 
 ///|
 test "failed loads set the failure states" {
-  let m = Model::init(site_data(Doc("configuration"), None))
+  let m = Model::init(site_data(Doc("smithy-syntax"), None))
   assert_eq(m.page, Loading)
   assert_eq(
-    step(m, ContentLoaded(Doc("configuration"), Err(Failure("x")))).page,
+    step(m, ContentLoaded(Doc("smithy-syntax"), Err(Failure("x")))).page,
     PageFailed,
   )
   let s = step(m, OpenSearch)
@@ -323,11 +323,11 @@ test "failed loads set the failure states" {
 ///|
 test "a same-route fragment change keeps the page ready" {
   let m = Model::init(
-    site_data(Doc("configuration"), Some("# Configuration\n\n## A\n")),
+    site_data(Doc("smithy-syntax"), Some("# Configuration\n\n## A\n")),
   )
   let m2 = step(
     m,
-    UrlChanged(@url.parse("http://localhost/smithy/docs/configuration/#a")),
+    UrlChanged(@url.parse("http://localhost/smithy/docs/smithy-syntax/#a")),
   )
   assert_true(m2.page is Ready(_))
   assert_eq(m2.page, m.page)
