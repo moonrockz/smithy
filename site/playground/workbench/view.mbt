@@ -106,7 +106,7 @@ fn share_status(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       [
         @html.span(
           id="pg-incoming-text",
-          "Open the new link? Your changes will be lost.",
+          "Open the new link? You will lose your changes.",
         ),
         @html.button(
           id="pg-incoming-open",
@@ -275,7 +275,7 @@ fn diagnostic_row(
 ///|
 fn validate_panel(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
   match m.check {
-    Unchecked => [@html.p(class="pg-empty", "The model is being checked.")]
+    Unchecked => [@html.p(class="pg-empty", "The playground checks the model.")]
     Refused(reason) => [@html.p(class="pg-notice", reason)]
     Stopped =>
       [

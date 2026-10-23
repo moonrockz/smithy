@@ -238,7 +238,8 @@ fn log_controls(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
 fn transcript_notice(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
   if m.protocols.is_empty() {
     return match m.check {
-      Unchecked => [@html.p(class="pg-empty", "The model is being checked.")]
+      Unchecked =>
+        [@html.p(class="pg-empty", "The playground checks the model.")]
       _ if m.errors() > 0 =>
         [
           @html.div(class="pg-trnotice", [

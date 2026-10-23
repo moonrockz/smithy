@@ -173,7 +173,7 @@ Share link button and says to use Download. On the release channel, a build from
 `/playground/` page: the link then gives the 404 page of the site. A build with the playground but with an older
 format also shows the message of the table. A link pasted in the address bar of an open playground tab (a
 `hashchange`) opens in place with no page load (`Model::reopen`). When an editor differs from the text that the page
-loaded or shared last, a bar asks "Open the new link? Your changes will be lost." (`Open`, `Keep my changes`). A link
+loaded or shared last, a bar asks "Open the new link? You will lose your changes." (`Open`, `Keep my changes`). A link
 that cannot be read keeps the page and shows the message. The fragment that the page wrote itself is ignored. The
 inflate stops at `MAX_STATE_BYTES` (`bounded_inflate`, `Inflater::step` with a 64 KB buffer).
 

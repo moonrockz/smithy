@@ -64,7 +64,7 @@ test("a pasted link after an edit asks first: Keep my changes keeps them, Open r
   const fragment = shareFragment(linkState({ model: "namespace pasted\n", tab: "TransformTab", output: "Idl" }));
   await page.evaluate((f) => (location.hash = f), "#" + fragment);
   const ask = page.locator("#pg-incoming");
-  await expect(ask).toContainText("Open the new link? Your changes will be lost.");
+  await expect(ask).toContainText("Open the new link? You will lose your changes.");
   // Nothing changed yet.
   await expect(page.locator("#pg-editor .cm-content")).toContainText("namespace mine");
   await page.getByRole("button", { name: "Keep my changes" }).click();

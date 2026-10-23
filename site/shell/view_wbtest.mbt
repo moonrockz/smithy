@@ -50,7 +50,7 @@ async test "landing page has six feature tiles, one for the playground" {
   assert_eq(html.split("class=\"ms-tile\"").count(), 7)
   assert_true(
     html.contains(
-      "<h3>Runs in the browser</h3><p>The playground runs the same packages client-side. Nothing is uploaded.</p>",
+      "<h3>Runs in the browser</h3><p>The playground runs the same packages client-side. Nothing goes to a server.</p>",
     ),
   )
 }
@@ -582,7 +582,7 @@ async test "the playground page has the empty workbench and its script" {
     assert_true(html.contains(label))
   }
   assert_true(html.contains("smithy 0.0.1 · no server"))
-  assert_true(html.contains("The model is being checked."))
+  assert_true(html.contains("The playground checks the model."))
   // The Transform tab is in the page, and its output editor has its element.
   for
     text in [
