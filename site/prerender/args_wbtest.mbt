@@ -10,6 +10,7 @@ test "parse_args reads every flag" {
       content: "../release",
       channel: Next,
       site_root: "/smithy/",
+      base: None,
       release_version: "v0.5.0",
       git_ref: "abc",
       out: "dist/next",
@@ -89,16 +90,28 @@ test "the hero sample equals the files in landing/sample" {
 }
 
 ///|
-test "plan_sources fails on the next channel and skips on a release" {
+test "plan_sources fails when any fixed source is missing" {
   let all = @content.fixed_sources()
-  assert_eq(plan_sources(Next, "/c", []), Ok(all))
+  assert_eq(plan_sources("/c", []), Ok(all))
   assert_eq(
-    plan_sources(Next, "/c", ["README.md"]),
+    plan_sources("/c", ["README.md"]),
     Err("I could not find these source files under /c: README.md"),
   )
-  let first = all[0]
-  match plan_sources(Release, "/c", [first]) {
-    Ok(kept) => assert_eq(kept.length(), all.length() - 1)
-    Err(_) => fail("a release leaves a missing page out")
-  }
+  assert_eq(
+    plan_sources("/c", [all[0], all[1]]),
+    Err("I could not find these source files under /c: \{all[0]}, \{all[1]}"),
+  )
+}
+
+///|
+test "parse_args reads --base and keeps it apart from the site root" {
+  let args = parse_args([
+    "prerender", "--channel", "next", "--site-root", "/smithy", "--base", "/smithy",
+  ]).unwrap()
+  let c = config_of(args)
+  assert_eq(c.base, "/smithy/")
+  assert_eq(c.channel, Next)
+  assert_eq(c.version, "next")
+  assert_eq(c.release_base, "/smithy/")
+  assert_eq(c.next_base, "/smithy/next/")
 }

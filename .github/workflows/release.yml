@@ -1,4 +1,4 @@
-# Release: plan, validate, build-windows, build, smoke, publish, release.
+# Release: plan, validate, build-windows, build, smoke, publish, release, site.
 #
 # Windows is built on a Windows runner: a cross-built Windows binary reads its arguments wrongly.
 #
@@ -12,6 +12,7 @@
 #             the evidence when `record` is true.
 #   publish   publishes the modules to mooncakes.io. A module already published counts as done.
 #   release   creates the GitHub release from the dist artifact, or uploads the missing assets.
+#   site      calls site.yml to build and deploy the docs site after a real release. Never on a dry run.
 #
 # What each run does (scripts/release.mbtx, `checks`):
 #   release (push to main or a tag)  validate, build, smoke, record, publish, release. A release always
@@ -299,3 +300,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mise run release:github ${{ needs.plan.outputs.version }}
+
+  # Publish the docs site after a real release. The tag that `release` creates comes from GITHUB_TOKEN,
+  # which starts no other workflow, so the site workflow is called from here. `release` is true only for
+  # a real release, so a dry run, a pull request and the nightly run never reach this job.
+  site:
+    name: Site
+    needs: [plan, release]
+    if: needs.plan.outputs.release == 'true' && needs.plan.outputs.dry_run != 'true'
+    uses: ./.github/workflows/site.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

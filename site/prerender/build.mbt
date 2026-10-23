@@ -51,22 +51,18 @@ fn missing_sources(content : String, paths : Array[String]) -> Array[String] {
 }
 
 ///|
-/// The fixed sources to read. The `next` channel builds the working tree, which
-/// must have every source. A release built from an older tag can lack pages
-/// that were added later: those are named and left out.
+/// The fixed sources to read. Every channel builds its own checkout, so a missing
+/// source is a broken build, not an older release.
 fn plan_sources(
-  channel : @data.Channel,
   content : String,
   missing : Array[String],
 ) -> Result[Array[String], String] {
   if missing.is_empty() {
-    return Ok(@content.fixed_sources())
-  }
-  let names = missing.join(", ")
-  match channel {
-    Next =>
-      Err("I could not find these source files under \{content}: \{names}")
-    Release => Ok(@content.fixed_sources().filter(p => !missing.contains(p)))
+    Ok(@content.fixed_sources())
+  } else {
+    Err(
+      "I could not find these source files under \{content}: \{missing.join(", ")}",
+    )
   }
 }
 
@@ -110,15 +106,8 @@ fn check_manifest(
 pub async fn build_site(args : Args) -> Unit {
   let config = config_of(args)
   let missing = missing_sources(args.content, @content.fixed_sources())
-  let sources = match plan_sources(args.channel, args.content, missing) {
-    Ok(sources) => {
-      if !missing.is_empty() {
-        println(
-          "prerender: this release has no \{missing.join(", ")}. I leave those pages out.",
-        )
-      }
-      sources
-    }
+  let sources = match plan_sources(args.content, missing) {
+    Ok(sources) => sources
     Err(message) => {
       println("prerender: " + message)
       @sys.exit(1)

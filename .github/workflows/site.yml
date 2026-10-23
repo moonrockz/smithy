@@ -1,0 +1,95 @@
+# Site: build both channels of the Pages site, check the links of each, and deploy.
+#
+# Each channel is a full build of its own checkout (scripts/site-pages.mbtx):
+#   /smithy/       the release channel, built from the newest stable tag when that tag contains
+#                  site/moon.mod. Until a tag does, it is main with channel next and the "unreleased" banner.
+#   /smithy/next/  main, always.
+# A pull request builds and checks only. It never uploads or deploys.
+#
+# Deploy runs on a push to main, a manual run and a call from release.yml, never on a pull request.
+# release.yml creates the tag with GITHUB_TOKEN, and a tag push from that token starts no workflow, so
+# release.yml calls this workflow after the release. A failed deploy shows on the commit. This workflow
+# is not part of ci-ok.
+#
+# The repository needs Settings > Pages > Source "GitHub Actions". No workflow changes that setting.
+
+name: Site
+
+on:
+  pull_request:
+    paths:
+      - site/**
+      - docs/**
+      - examples/**
+      - apps/smithy/README.md
+      - pkgs/**/README.mbt.md
+      - scripts/site-*.mbtx
+      - .github/workflows/site.yml
+  push:
+    branches: [main]
+    paths:
+      - site/**
+      - docs/**
+      - examples/**
+      - apps/smithy/README.md
+      - pkgs/**/README.mbt.md
+      - scripts/site-*.mbtx
+      - .github/workflows/site.yml
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  MISE_EXPERIMENTAL: 'true'
+
+jobs:
+  build:
+    name: Build and check both channels
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # A pull request builds its own merge commit. Every other run builds main.
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.sha || 'main' }}
+          fetch-depth: 0
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install warren
+        run: moon install moonbit-community/warren@0.4.5
+
+      - name: Build both channels and check the links of each
+        run: mise run site:pages -- --out _site
+
+      - name: Upload the Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: [build]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

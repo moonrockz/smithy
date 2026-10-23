@@ -3,6 +3,8 @@ pub(all) struct Args {
   content : String
   channel : @data.Channel
   site_root : String
+  /// The base of this build when it is not the one the channel implies.
+  base : String?
   release_version : String
   git_ref : String
   out : String
@@ -25,6 +27,7 @@ pub fn parse_args(argv : Array[String]) -> Result[Args, String] {
     content: ".",
     channel: Next,
     site_root: "/smithy/",
+    base: None,
     release_version: "v0.0.0",
     git_ref: "main",
     out: "dist",
@@ -44,6 +47,7 @@ pub fn parse_args(argv : Array[String]) -> Result[Args, String] {
           _ => return Err("--channel must be release or next, got \{value}")
         }
       "--site-root" => args = { ..args, site_root: with_slashes(value), }
+      "--base" => args = { ..args, base: Some(with_slashes(value)), }
       "--release-version" => args = { ..args, release_version: value, }
       "--ref" => args = { ..args, git_ref: value, }
       "--out" => args = { ..args, out: value, }
@@ -61,7 +65,7 @@ pub fn config_of(args : Args) -> @data.SiteConfig {
   match args.channel {
     Release =>
       {
-        base: release_base,
+        base: args.base.unwrap_or(release_base),
         version: args.release_version,
         channel: Release,
         git_ref: args.git_ref,
@@ -71,7 +75,7 @@ pub fn config_of(args : Args) -> @data.SiteConfig {
       }
     Next =>
       {
-        base: next_base,
+        base: args.base.unwrap_or(next_base),
         version: "next",
         channel: Next,
         git_ref: args.git_ref,

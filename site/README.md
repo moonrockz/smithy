@@ -24,11 +24,47 @@ The footer shows `@smithy.version()`, which proves the mechanism.
 ```bash
 moon install moonbit-community/warren@0.4.5   # once
 mise run site:dev     # build at base / and serve on http://localhost:8080
-mise run site:check   # unit tests, build release + next, link check
+mise run site:check   # unit tests, build both channels as Pages does, link check
+mise run site:pages -- --out _site   # only the two channel builds and their link checks
 ```
 
 `mise run site:build -- --content <repo dir> --channel release|next --site-root /smithy/ --release-version vX.Y.Z --ref <git ref> --out <dir>`
 builds one version. The scripts are `scripts/site-*.mbtx`.
+
+## Channels and deploy
+
+Each channel is a full build of its own checkout (`scripts/site-pages.mbtx`, `mise run site:pages`):
+
+| URL | Build |
+|---|---|
+| `/smithy/` | The newest stable tag `vX.Y.Z`, when that tag contains `site/moon.mod`: the tag's own `site/`, built in a git worktree, channel release. |
+| `/smithy/` (no such tag yet) | `main`, channel next, with the "unreleased" banner. |
+| `/smithy/next/` | `main`, channel next. Always. |
+
+No tag contains `site/` yet, so today both URLs show `main`. After the first release that contains `site/`, the
+root shows that release. While the root is `main`, the version picker names the newest tag (or `v0.0.0`
+when there is none) but links to the root, which is `main`.
+
+A missing fixed docs source (see `@content.fixed_sources()`) fails the build of either channel. The link check
+runs on each output.
+
+`.github/workflows/site.yml` runs the build and deploys. It is not part of `ci-ok`, so a failed deploy on `main`
+shows on the commit and does not block a merge.
+
+| Trigger | Build and link check | Deploy |
+|---|---|---|
+| `pull_request` that changes a site input | yes, on the merge commit | no |
+| `push` to `main` that changes a site input | yes | yes |
+| `workflow_dispatch` | yes | yes |
+| `workflow_call` from `release.yml` (real release only) | yes | yes |
+
+A site input is `site/**`, `docs/**`, `examples/**`, `apps/smithy/README.md`, `pkgs/**/README.mbt.md`,
+`scripts/site-*.mbtx` or `.github/workflows/site.yml`. `release.yml` calls `site.yml` after the `release` job
+and never on a dry run, a pull request or the nightly run. The tag that the release job creates comes from
+`GITHUB_TOKEN`, which starts no workflow, so the call is how a release reaches Pages.
+
+Maintainer step, once: in the repository, open Settings, then Pages, and set Source to "GitHub Actions". The
+workflows never change repository settings. Until then the deploy job fails.
 
 ## Landing sample
 

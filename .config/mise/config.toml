@@ -283,8 +283,12 @@ description = "Build the site at base / and serve it on http://localhost:8080"
 run = "moonx scripts/site-dev.mbtx"
 
 [tasks."site:check"]
-description = "Test the site packages, build the release and next versions, and check their links"
+description = "Test the site packages, build both channels as the Pages workflow does, and check their links"
 run = "moonx scripts/site-check.mbtx"
+
+[tasks."site:pages"]
+description = "Build both channels as GitHub Pages serves them and check their links (args: --out)"
+run = "moonx scripts/site-pages.mbtx"
 
 [tasks."site:linkcheck"]
 description = "Check links, routes and the search index of a built site (args: --dist --base --ignore)"

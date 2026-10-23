@@ -2,6 +2,8 @@
 
 A [Smithy](https://smithy.io/) implementation for the MoonBit ecosystem, organized as a monorepo.
 
+The docs site is at <https://moonrockz.github.io/smithy/>. Its source is in [`site/`](site/README.md).
+
 ## Status
 
 The Smithy IDL 2.0 syntax layer (scanner, AST, CST, parser with recovery, diagnostics)

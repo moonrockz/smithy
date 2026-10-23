@@ -1,0 +1,369 @@
+///|
+/// Build both channels of the site as GitHub Pages serves them, and check the links of each.
+///
+/// Usage: `mise run site:pages -- --out _site`, or `moonx scripts/site-pages.mbtx --out _site`.
+/// Each channel is a full build of its own checkout. The root (`/smithy/`) is the release channel built
+/// from the newest stable tag, in a temporary git worktree, when that tag contains `site/moon.mod`. When
+/// no tag does, the root is `main` with channel next and the "unreleased" banner. `/smithy/next/` is
+/// always `main`. The workflow and `mise run site:check` both use this script.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let site_root : String = "/smithy/"
+
+///|
+let default_out : String = "_site"
+
+///|
+/// The release version shown while no tag exists.
+let no_tag_version : String = "v0.0.0"
+
+///|
+/// One build: where the `site/` comes from, which channel and which bases.
+struct Build {
+  /// The checkout to build. `None` is the working tree.
+  checkout : String?
+  channel : String
+  /// The base of the output when it is not the one the channel implies.
+  base : String?
+  version : String
+  git_ref : String
+  /// The output directory below the Pages root: "" for the root.
+  sub : String
+} derive(Eq, Debug)
+
+///|
+/// The builds for a Pages deploy. `tag` is the newest stable tag, if any; `tag_has_site` tells whether
+/// that tag contains `site/moon.mod`; `head` is the commit of `main`; `release_dir` is where the worktree
+/// of the tag lives.
+fn plan(
+  tag : String?,
+  tag_has_site : Bool,
+  head : String,
+  release_dir : String,
+) -> Array[Build] {
+  let version = tag.unwrap_or(no_tag_version)
+  let next : Build = {
+    checkout: None,
+    channel: "next",
+    base: None,
+    version,
+    git_ref: head,
+    sub: "next",
+  }
+  match tag {
+    Some(tag) if tag_has_site =>
+      [
+        {
+          checkout: Some(release_dir),
+          channel: "release",
+          base: None,
+          version: tag,
+          git_ref: tag,
+          sub: "",
+        },
+        next,
+      ]
+    _ =>
+      [
+        { checkout: None, channel: "next", base: Some(site_root), version, git_ref: head, sub: "", },
+        next,
+      ]
+  }
+}
+
+///|
+/// The value after `--out`, or the default.
+fn out_of(args : ArrayView[String]) -> String {
+  let mut out = default_out
+  let mut i = 0
+  while i + 1 < args.length() {
+    if args[i] == "--out" {
+      out = args[i + 1]
+    }
+    i += 1
+  }
+  out
+}
+
+///|
+/// The arguments of `site-build.mbtx` for one build. `out` is absolute: the build may run in a worktree.
+fn build_args(build : Build, out : String) -> Array[String] {
+  let args = [
+    "scripts/site-build.mbtx", "--content", ".", "--channel", build.channel, "--site-root",
+    site_root, "--release-version", build.version, "--ref", build.git_ref, "--out", out,
+  ]
+  if build.base is Some(base) {
+    args.push("--base")
+    args.push(base)
+  }
+  args
+}
+
+///|
+/// The arguments of `site-linkcheck.mbtx`. The root site ignores the `next/` site below it.
+fn linkcheck_args(build : Build, out : String) -> Array[String] {
+  let base = if build.sub.is_empty() {
+    site_root
+  } else {
+    site_root + build.sub + "/"
+  }
+  let args = ["scripts/site-linkcheck.mbtx", "--dist", out, "--base", base]
+  if build.sub.is_empty() {
+    args.push("--ignore")
+    args.push(site_root + "next/")
+  }
+  args
+}
+
+///|
+/// Run a command; return its exit code, 1 for a command that did not run.
+async fn run(
+  command : String,
+  args : Array[String],
+  cwd? : String,
+) -> Int32 {
+  let dir : StringView? = match cwd {
+    Some(d) => Some(d[:])
+    None => None
+  }
+  let code = @process.run(
+    command,
+    args,
+    cwd?=dir,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  ) catch {
+    error => {
+      eprintln("site:pages: `\{command}` did not run: \{error}")
+      return 1
+    }
+  }
+  if code >= 0 { code } else { 1 }
+}
+
+///|
+/// The output of a command, trimmed; `None` when it failed.
+async fn capture(command : String, args : Array[String]) -> String? {
+  let (code, output, _) = @process.collect_output(command, args)
+  if code == 0 {
+    Some(output.text().trim().to_owned())
+  } else {
+    None
+  }
+}
+
+///|
+/// Build and check every build of the plan; return the first non-zero code.
+async fn execute(builds : Array[Build], out_root : String) -> Int32 {
+  for build in builds {
+    let out = if build.sub.is_empty() {
+      out_root
+    } else {
+      out_root + "/" + build.sub
+    }
+    @fs.mkdir(out, recursive=true, allow_exist=true)
+    let cwd = build.checkout
+    let code = run("moonx", build_args(build, out), cwd?)
+    if code != 0 {
+      return code
+    }
+  }
+  for build in builds {
+    let out = if build.sub.is_empty() {
+      out_root
+    } else {
+      out_root + "/" + build.sub
+    }
+    let code = run("moonx", linkcheck_args(build, out), cwd?=build.checkout)
+    if code != 0 {
+      return code
+    }
+  }
+  0
+}
+
+///|
+async fn steps(out_root : String, release_dir : String) -> Int32 {
+  let tag = match capture("moonx", ["scripts/site-latest-tag.mbtx"]) {
+    Some("") => None
+    Some(tag) => Some(tag)
+    None => {
+      eprintln("site:pages: cannot find the latest tag")
+      return 1
+    }
+  }
+  let head = match capture("git", ["rev-parse", "HEAD"]) {
+    Some(head) => head
+    None => {
+      eprintln("site:pages: cannot read HEAD")
+      return 1
+    }
+  }
+  let has_site = match tag {
+    Some(tag) =>
+      capture("git", ["cat-file", "-e", tag + ":site/moon.mod"]) is Some(_)
+    None => false
+  }
+  match tag {
+    Some(tag) if has_site => {
+      println("site:pages: \{tag} has site/: the root is the release build of \{tag}")
+      let code = run("git", [
+        "-c", "core.hooksPath=/dev/null", "worktree", "add", "--detach", release_dir,
+        tag,
+      ])
+      if code != 0 {
+        return code
+      }
+    }
+    _ =>
+      println(
+        "site:pages: no stable tag contains site/: the root is main (unreleased)",
+      )
+  }
+  execute(plan(tag, has_site, head, release_dir), out_root)
+}
+
+///|
+async fn cleanup(tmp : String) -> Unit {
+  // Ignore failures, and keep git quiet: the worktree exists only when a release tag has site/.
+  let _ = capture("git", [
+    "-c",
+    "core.hooksPath=/dev/null",
+    "worktree",
+    "remove",
+    "--force",
+    tmp + "/release",
+  ])
+  let _ = capture("git", ["-c", "core.hooksPath=/dev/null", "worktree", "prune"])
+  @fs.rmdir(tmp, recursive=true)
+}
+
+///|
+/// Run `body`, then `after` on every exit path, also when `body` raises.
+async fn with_cleanup(
+  body : async () -> Int32 raise,
+  after : async () -> Unit raise,
+) -> Int32 {
+  let code = body() catch {
+    error => {
+      eprintln("site:pages: \{error}")
+      1
+    }
+  }
+  after() catch {
+    error => eprintln("site:pages: cleanup failed: \{error}")
+  }
+  code
+}
+
+///|
+async fn main {
+  let out_arg = out_of(@env.args()[1:])
+  @fs.mkdir(out_arg, recursive=true, allow_exist=true)
+  let out_root = @fs.realpath(out_arg)
+  let tmp = @fs.tmpdir(prefix="site-pages")
+  let code = with_cleanup(
+    () => steps(out_root, tmp + "/release"),
+    () => cleanup(tmp),
+  )
+  if code != 0 {
+    eprintln("site:pages: failed")
+    @sys.exit(code)
+  }
+  println("site:pages: OK")
+}
+
+///|
+test "build_args adds --base only for a root build of main" {
+  let builds = plan(Some("v0.5.0"), false, "abc", "/w")
+  let root = build_args(builds[0], "/o")
+  assert_eq(root[root.length() - 2:].to_owned(), ["--base", "/smithy/"])
+  assert_true(!build_args(builds[1], "/o/next").contains("--base"))
+}
+
+///|
+test "linkcheck_args: the root ignores next/, next does not" {
+  let builds = plan(Some("v0.5.0"), false, "abc", "/w")
+  assert_eq(linkcheck_args(builds[0], "/o"), [
+    "scripts/site-linkcheck.mbtx", "--dist", "/o", "--base", "/smithy/", "--ignore",
+    "/smithy/next/",
+  ])
+  assert_eq(linkcheck_args(builds[1], "/o/next"), [
+    "scripts/site-linkcheck.mbtx", "--dist", "/o/next", "--base", "/smithy/next/",
+  ])
+}
+
+///|
+test "out_of reads --out and defaults to _site" {
+  assert_eq(out_of(["--out", "x"]), "x")
+  assert_eq(out_of([]), "_site")
+}
+
+///|
+async test "with_cleanup runs the cleanup after a body that raises" {
+  let ran = Ref(false)
+  assert_eq(with_cleanup(() => fail("boom"), () => ran.val = true), 1)
+  assert_true(ran.val)
+}
+
+///|
+test "a tag with site/ gives the release channel at the root from the tag worktree" {
+  let builds = plan(Some("v1.2.0"), true, "abc", "/w/release")
+  assert_eq(builds.length(), 2)
+  assert_eq(builds[0], {
+    checkout: Some("/w/release"),
+    channel: "release",
+    base: None,
+    version: "v1.2.0",
+    git_ref: "v1.2.0",
+    sub: "",
+  })
+  assert_eq(builds[1], {
+    checkout: None,
+    channel: "next",
+    base: None,
+    version: "v1.2.0",
+    git_ref: "abc",
+    sub: "next",
+  })
+}
+
+///|
+test "a tag without site/ gives main at the root with channel next, and main at next" {
+  let builds = plan(Some("v0.5.0"), false, "abc", "/w/release")
+  assert_eq(builds.length(), 2)
+  assert_eq(builds[0], {
+    checkout: None,
+    channel: "next",
+    base: Some("/smithy/"),
+    version: "v0.5.0",
+    git_ref: "abc",
+    sub: "",
+  })
+  assert_eq(builds[1].sub, "next")
+  assert_eq(builds[1].checkout, None)
+}
+
+///|
+test "no tag at all gives the same plan as a tag without site/" {
+  let builds = plan(None, false, "abc", "/w/release")
+  assert_eq(builds[0].channel, "next")
+  assert_eq(builds[0].base, Some("/smithy/"))
+  assert_eq(builds[0].version, "v0.0.0")
+  assert_eq(builds[1].sub, "next")
+}
+
+///|
+test "a missing tag never uses the worktree even when told the tag has site/" {
+  let builds = plan(None, true, "abc", "/w/release")
+  assert_eq(builds[0].checkout, None)
+  assert_eq(builds[0].channel, "next")
+}
