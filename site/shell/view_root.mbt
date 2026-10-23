@@ -89,9 +89,14 @@ pub fn component(
   data : @data.SiteData,
   site_json : String,
   initial_theme~ : Theme = Auto,
+  probe_other~ : Bool = false,
 ) -> @rabbita.Val[Html] {
-  let (model, emit) = @rabbita.create_state(
-    { ..Model::init(data), theme: initial_theme, },
+  let (model, emit) = @rabbita.create_state_with_init(
+    init=emit => {
+      let m = { ..Model::init(data), theme: initial_theme, }
+      // Only the hydrated page asks: the pre-render has no network.
+      (m, if probe_other { check_counterpart(m, emit) } else { @rabbita.none })
+    },
     update~,
     subscriptions=(_m, emit) => {
       @sub.batch([

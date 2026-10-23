@@ -35,7 +35,12 @@ fn main {
   match @data.SiteData::decode(json) {
     Some(data) =>
       @rabbita.new(() => {
-        @shell.component(data, json, initial_theme=@shell.read_theme())
+        @shell.component(
+          data,
+          json,
+          initial_theme=@shell.read_theme(),
+          probe_other=true,
+        )
       }).hydrate()
     None => abort("smithy site: invalid smithy-data")
   }

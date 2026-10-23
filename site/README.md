@@ -45,6 +45,10 @@ No tag contains `site/` yet, so today both URLs show `main`. After the first rel
 root shows that release. While no release has a site, both outputs are built with `--no-release`: the version
 picker shows only "next", the banner says that no release has docs yet, and no page links to a release.
 
+The version picker and the banner link to the same page in the other version. After hydration, the page asks the
+other version for that URL with one `GET`. On a 404 the links go to the docs index (docs pages) or the home page. The
+choice is made at run time, because the release can come from an older tag.
+
 A missing fixed docs source (see `@content.fixed_sources()`) fails the build of either channel. The link check
 runs on each output.
 

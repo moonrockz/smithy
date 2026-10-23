@@ -72,6 +72,57 @@ fn fetch_page(
 }
 
 ///|
+/// The route to link in the other channel: the same page, or its docs
+/// index or home when a check found that page missing there.
+fn other_channel_route(m : Model) -> @route.Route {
+  let route = match m.route {
+    NotFound(_) => @route.Landing
+    r => r
+  }
+  match m.counterpart {
+    Missing(r) if r == m.route =>
+      match route {
+        DocsIndex | Doc(_) => @route.DocsIndex
+        _ => @route.Landing
+      }
+    _ => route
+  }
+}
+
+///|
+fn other_channel_base(config : @data.SiteConfig) -> String {
+  match config.channel {
+    Release => config.next_base
+    Next => config.release_base
+  }
+}
+
+///|
+/// Asks the other channel whether it has the page of `route`. Each channel
+/// is a separate build, so only a request can tell. A page that is not a
+/// route of this site (404) has a counterpart at its home, so it is not
+/// checked.
+pub fn check_counterpart(m : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Cmd {
+  if !m.config.has_release || m.route is NotFound(_) {
+    return @rabbita.none
+  }
+  let route = m.route
+  @http.get(@route.href(other_channel_base(m.config), route)).expect_empty(
+    emit.map(e => CounterpartChecked(route, classify_probe(e))),
+  )
+}
+
+///|
+/// Only a 404 says the page is missing. Another status or a network error
+/// says nothing, so the page-for-page link stays.
+pub fn classify_probe(error : Error?) -> Probe {
+  match error {
+    None => Found
+    Some(e) => if e.to_string().contains("HTTP 404") { Gone } else { Failed }
+  }
+}
+
+///|
 fn open_search(m : Model, emit : @rabbita.Emit[Msg]) -> (Model, @rabbita.Cmd) {
   let focus_cmd = run_effect(fn() { focus("ms-search-input") })
   match m.search.index {
@@ -113,16 +164,20 @@ fn on_url_changed(
   if route == m.route {
     return (closed, scroll_cmd(anchor))
   }
-  let next = { ..closed, route, }
+  let next = { ..closed, route, counterpart: Unknown, }
+  let check = check_counterpart(next, emit)
   match source_of(m.manifest, m.examples, route) {
     Some(source) =>
       // The anchor is not in the DOM until the content is Ready.
       (
         { ..next, page: Loading, pending_anchor: anchor, },
-        fetch_page(m.config, route, source, emit),
+        @rabbita.batch([fetch_page(m.config, route, source, emit), check]),
       )
     None =>
-      ({ ..next, page: NoContent, pending_anchor: None, }, @nav.scroll_to_top())
+      (
+        { ..next, page: NoContent, pending_anchor: None, },
+        @rabbita.batch([@nav.scroll_to_top(), check]),
+      )
   }
 }
 
@@ -204,6 +259,15 @@ pub fn update(
     KeyDown(key) => on_key(m, key, emit)
     SelectTab(tab) => ({ ..m, install_tab: tab, }, @rabbita.none)
     ToggleMenu => ({ ..m, menu_open: !m.menu_open, }, @rabbita.none)
+    CounterpartChecked(route, probe) => {
+      guard route == m.route else { return (m, @rabbita.none) }
+      let counterpart = match probe {
+        Found => Present(route)
+        Gone => Missing(route)
+        Failed => Unknown
+      }
+      ({ ..m, counterpart, }, @rabbita.none)
+    }
   }
 }
 

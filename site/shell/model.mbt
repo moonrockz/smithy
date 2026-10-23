@@ -87,6 +87,35 @@ pub extend SearchState with Eq::{equal, not_equal}
 pub extend SearchState with @debug.Debug::{to_repr}
 
 ///|
+/// What a check found at the same route in the other channel. The route
+/// keys the result: a result for any other route is stale.
+pub(all) enum Counterpart {
+  Unknown
+  Present(@route.Route)
+  Missing(@route.Route)
+} derive(Eq, Debug)
+
+///|
+pub extend Counterpart with Eq::{equal, not_equal}
+
+///|
+pub extend Counterpart with @debug.Debug::{to_repr}
+
+///|
+/// The outcome of one request for the other channel's page.
+pub(all) enum Probe {
+  Found
+  Gone
+  Failed
+} derive(Eq, Debug)
+
+///|
+pub extend Probe with Eq::{equal, not_equal}
+
+///|
+pub extend Probe with @debug.Debug::{to_repr}
+
+///|
 pub(all) struct Model {
   config : @data.SiteConfig
   manifest : @content.Manifest
@@ -97,6 +126,7 @@ pub(all) struct Model {
   search : SearchState
   install_tab : InstallTab
   menu_open : Bool
+  counterpart : Counterpart
   // Fragment to scroll to once the page being loaded is ready.
   pending_anchor : String?
 } derive(Eq, Debug)
@@ -122,6 +152,7 @@ pub(all) enum Msg {
   KeyDown(@common.Keyboard)
   SelectTab(InstallTab)
   ToggleMenu
+  CounterpartChecked(@route.Route, Probe)
 }
 
 ///|
@@ -181,6 +212,7 @@ pub fn Model::init(data : @data.SiteData) -> Model {
     search: closed_search,
     install_tab: Mise,
     menu_open: false,
+    counterpart: Unknown,
     pending_anchor: None,
   }
 }
