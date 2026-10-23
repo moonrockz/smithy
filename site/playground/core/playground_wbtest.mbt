@@ -7,18 +7,17 @@ fn start(
   log_preset? : String,
   model~ : String = chat_model,
   protocol~ : String = "example.peers#EchoChat",
+  version? : String,
 ) -> Response {
-  handle(
-    session,
-    TranscriptStart(
-      seq=1,
-      model~,
-      protocol~,
-      format~,
-      complete~,
-      log_preset~,
-      text~,
-    ),
+  session.start_transcript(
+    seq=1,
+    model~,
+    protocol~,
+    format~,
+    complete~,
+    log_preset~,
+    text~,
+    version?,
   )
 }
 
@@ -400,7 +399,7 @@ test "transcript: an expect list is matched against the findings" {
 test "transcript: a JSONL log uses the preset and counts its lines" {
   let session = Session::new()
   let (entries, findings, done, _) = progress_of(
-    start(session, chat_log, format=Jsonl),
+    start(session, chat_log, format=Jsonl, version="1.0"),
   )
   assert_eq(entries.length(), 2)
   assert_eq(findings, [])
@@ -431,7 +430,9 @@ test "transcript: a JSONL log uses the preset and counts its lines" {
 test "transcript: a raw log has one sender and no correlation" {
   let session = Session::new()
   let raw = "{\"method\": \"postMessage\", \"params\": [\"a\"], \"id\": 1}\n"
-  ignore(start(session, raw, format=Jsonl, log_preset="raw:client"))
+  ignore(
+    start(session, raw, format=Jsonl, version="1.0", log_preset="raw:client"),
+  )
   let (_, findings, done, summary) = progress_of(
     handle(session, TranscriptStep(seq=2, count=100)),
   )
@@ -462,17 +463,27 @@ test "transcript: a request that cannot start is blocked with a reason" {
     "example.peers#ChatServer: I expected the shape to carry the jsonRpcProtocol trait.",
   )
   assert_eq(
-    blocked_reason(start(session, chat_log, format=Jsonl, log_preset="raw")),
+    blocked_reason(
+      start(session, chat_log, format=Jsonl, version="1.0", log_preset="raw"),
+    ),
     "I expected a sender for the raw preset, as raw:<peer>.",
   )
   assert_eq(
     blocked_reason(
-      start(session, chat_log, format=Jsonl, log_preset="raw:nobody"),
+      start(
+        session,
+        chat_log,
+        format=Jsonl,
+        version="1.0",
+        log_preset="raw:nobody",
+      ),
     ),
     "I expected a peer of the protocol (client, server), but found 'nobody'.",
   )
   assert_eq(
-    blocked_reason(start(session, chat_log, format=Jsonl, log_preset="csv")),
+    blocked_reason(
+      start(session, chat_log, format=Jsonl, version="1.0", log_preset="csv"),
+    ),
     "I expected the log preset dir-message or raw:<peer>, but found 'csv'.",
   )
 }
@@ -499,12 +510,74 @@ test "transcript: step with no transcript, and reset, are blocked or empty" {
 ///|
 test "transcript: a problem of the document comes before the entries" {
   let session = Session::new()
-  let text = "---\nversion: 9\n---\n```jsonrpc client -> server\n{}\n```\n"
+  let text = "---\nversion: 1.0\nbad: 1\n---\n```jsonrpc client -> server\n{}\n```\n"
   let (entries, findings, done, _) = progress_of(start(session, text))
   assert_eq(entries.length(), 1)
+  assert_false(done)
+  assert_true(findings.length() <= 1)
+}
+
+///|
+test "transcript: a document with a bad version stops at the reader finding" {
+  let session = Session::new()
+  let text = "---\nversion: 9\n---\n```jsonrpc client -> server\n{}\n```\n"
+  let (entries, findings, done, summary) = progress_of(start(session, text))
+  assert_eq(entries.length(), 1)
+  assert_false(entries[0].checked)
   assert_eq(codes(findings), ["InvalidTranscript"])
   assert_eq(findings[0].line, Some(2))
-  assert_false(done)
+  assert_true(done)
+  let summary = summary.unwrap()
+  assert_false(summary.valid)
+  assert_false(summary.complete)
+  assert_eq(summary.errors, 1)
+  assert_eq(summary.entries, 0)
+}
+
+///|
+test "transcript: a document with no version is blocked" {
+  let session = Session::new()
+  let text = "```jsonrpc client -> server\n{}\n```\n"
+  assert_eq(
+    blocked_reason(start(session, text)),
+    "The transcript gives no JSON-RPC version. Add version: 1.0 or version: 2.0 to it.",
+  )
+  assert_eq(
+    blocked_reason(start(session, "{\"entries\": []}", format=Json)),
+    "The transcript gives no JSON-RPC version. Add version: 1.0 or version: 2.0 to it.",
+  )
+}
+
+///|
+test "transcript: a JSONL log needs a version, as the CLI needs --version" {
+  let session = Session::new()
+  let reason = "A JSONL log gives no JSON-RPC version. I need version 1.0 or 2.0."
+  assert_eq(
+    blocked_reason(
+      handle(
+        session,
+        TranscriptStart(
+          seq=1,
+          model=chat_model,
+          protocol="example.peers#EchoChat",
+          format=Jsonl,
+          complete=true,
+          log_preset=None,
+          text=chat_log,
+        ),
+      ),
+    ),
+    reason,
+  )
+  assert_eq(
+    blocked_reason(start(session, chat_log, format=Jsonl, version="3.0")),
+    "I expected 1.0 or 2.0 for the version.",
+  )
+  // A version that the protocol does not declare is a contract error.
+  assert_eq(
+    blocked_reason(start(session, chat_log, format=Jsonl, version="2.0")),
+    "example.peers#EchoChat: I expected the selected version 2.0 to be declared by the protocol.",
+  )
 }
 
 ///|
@@ -562,7 +635,9 @@ fn sample_state() -> ShareState {
   {
     model: chat_model,
     transcript: chat_markdown,
-    tab: Transcript,
+    tab: TranscriptTab,
+    selector: Some("structure"),
+    log_preset: None,
     output: OpenRpc,
     protocol: "example.peers#EchoChat",
     format: Markdown,
@@ -586,7 +661,7 @@ test "share: non-ASCII text survives the round trip" {
   let state = {
     ..sample_state(),
     model: "// é 日本語 🙂\nnamespace a",
-    tab: Validate,
+    tab: ValidateTab,
   }
   assert_eq(decode_share(encode_share(state)), Ok(state))
 }
@@ -679,4 +754,15 @@ test "transcript: a document that says complete is complete without the flag" {
   assert_eq(codes(findings), [
     "TypeMismatch", "RequiredMember", "MissingResponse",
   ])
+}
+
+///|
+test "share: a state without selector and log preset still decodes" {
+  let old = "{\"model\":\"m\",\"transcript\":\"t\",\"tab\":\"ValidateTab\",\"output\":\"JsonAst\",\"protocol\":\"a#B\",\"format\":\"Markdown\",\"complete\":false}"
+  let json = @json.parse(old)
+  let state : ShareState = @json.from_json(json)
+  assert_eq(state.selector, None)
+  assert_eq(state.log_preset, None)
+  let link = "v1." + base64url_encode(@flate.deflate_all(@utf8.encode(old)))
+  assert_eq(decode_share(link), Ok(state))
 }

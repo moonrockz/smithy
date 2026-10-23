@@ -15,8 +15,14 @@ pub fn handle(session : Session, request : Request) -> Response {
       log_preset~,
       text~
     ) =>
-      start_transcript(
-        session, seq, model, protocol, format, complete, log_preset, text,
+      session.start_transcript(
+        seq~,
+        model~,
+        protocol~,
+        format~,
+        complete~,
+        log_preset~,
+        text~,
       )
     TranscriptStep(seq~, count~) => step_transcript(session, seq, count)
     TranscriptReset(seq~) => {

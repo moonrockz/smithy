@@ -10,21 +10,30 @@ fn load(model : String) -> @smithy.LoadResult {
 }
 
 ///|
-/// Load the model text with the OpenAPI protocol definitions as provider
-/// defaults, as `smithy build` does for the openapi plugin. The model needs
-/// them to name `aws.protocols#restJson1`.
-fn load_with_http_protocols(model : String) -> @smithy.LoadResult {
+/// The OpenAPI protocol definitions as an assembled model, built on first use.
+/// `None` when they do not assemble.
+let http_protocols : @lazy.Lazy[@smithy.Model?] = Lazy(() => {
   let provider = @smithy.Loader::new()
   for input in @openapi.protocol_definitions() {
     ignore(provider.add(input))
   }
+  provider.assemble().model
+})
+
+///|
+/// Load the model text with the OpenAPI protocol definitions as provider
+/// defaults, as `smithy build` does for the openapi plugin. The model needs
+/// them to name `aws.protocols#restJson1`.
+fn load_with_http_protocols(
+  model : String,
+) -> Result[@smithy.LoadResult, String] {
+  let failure = "Could not load bundled OpenAPI protocol definitions"
+  guard http_protocols.force() is Some(protocols) else { return Err(failure) }
   let loader = @rpc.loader()
-  if provider.assemble().model is Some(protocols) {
-    ignore(loader.add_defaults(protocols)) catch {
-      _ => ()
-    }
+  ignore(loader.add_defaults(protocols)) catch {
+    _ => return Err(failure)
   }
-  loader.add_idl(MODEL_FILE, model).assemble()
+  Ok(loader.add_idl(MODEL_FILE, model).assemble())
 }
 
 ///|
@@ -33,14 +42,9 @@ fn is_error_event(event : @smithy.ValidationEvent) -> Bool {
 }
 
 ///|
-/// The number of events that stop a transform, or 1 for a load that gave no model.
+/// The number of events that stop a transform.
 fn error_count(loaded : @smithy.LoadResult) -> Int32 {
-  let count = loaded.validation_events().filter(is_error_event).length()
-  if count == 0 && loaded.model is None {
-    1
-  } else {
-    count
-  }
+  loaded.validation_events().filter(is_error_event).length()
 }
 
 ///|
@@ -49,6 +53,10 @@ fn clean_model(loaded : @smithy.LoadResult) -> Result[@smithy.Model, String] {
   let errors = error_count(loaded)
   match loaded.model {
     Some(model) if errors == 0 => Ok(model)
+    None if errors == 0 =>
+      Err(
+        "I could not build a model from the text, and I have no error to show.",
+      )
     _ =>
       Err(
         if errors == 1 {

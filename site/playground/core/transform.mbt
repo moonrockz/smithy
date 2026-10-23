@@ -170,7 +170,11 @@ fn transform(
   selector : String?,
 ) -> Response {
   let loaded = match output {
-    OpenApi30 | OpenApi31 => load_with_http_protocols(model)
+    OpenApi30 | OpenApi31 =>
+      match load_with_http_protocols(model) {
+        Ok(loaded) => loaded
+        Err(reason) => return Blocked(seq~, reason~)
+      }
     _ => load(model)
   }
   match clean_model(loaded) {

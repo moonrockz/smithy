@@ -148,9 +148,9 @@ pub(all) enum Response {
 
 ///|
 pub(all) enum Tab {
-  Validate
-  Transform
-  Transcript
+  ValidateTab
+  TransformTab
+  TranscriptTab
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -163,4 +163,6 @@ pub(all) struct ShareState {
   protocol : String
   format : TranscriptFormat
   complete : Bool
+  selector : String?
+  log_preset : String?
 } derive(Eq, Debug, ToJson, FromJson)

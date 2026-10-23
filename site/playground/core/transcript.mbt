@@ -32,7 +32,9 @@ pub fn Session::new() -> Session {
 }
 
 ///|
-fn finding_view(finding : @rpc.TranscriptFinding) -> FindingView {
+pub fn FindingView::from_finding(
+  finding : @rpc.TranscriptFinding,
+) -> FindingView {
   {
     code: finding.code.to_string(),
     severity: if finding.severity == @validation.Error {
@@ -80,7 +82,7 @@ fn progress(seq : Int32, active : Active) -> Response {
   TranscriptProgress(
     seq~,
     entries~,
-    findings=active.findings.map(finding_view),
+    findings=active.findings.map(FindingView::from_finding),
     done=active.summary is Some(_),
     summary=active.summary,
   )
@@ -127,7 +129,9 @@ fn Active::finish(self : Active) -> Unit {
     {
       matched: matched.is_match(),
       missing: matched.missing.map(expected_view),
-      unexpected: matched.unexpected.filter(is_error).map(finding_view),
+      unexpected: matched.unexpected
+      .filter(is_error)
+      .map(FindingView::from_finding),
     }
   })
   let counts = self.reader.map(reader => reader.counts())
@@ -143,33 +147,6 @@ fn Active::finish(self : Active) -> Unit {
     skipped: counts.map(c => c.skipped).unwrap_or(0),
     expectations,
   })
-}
-
-///|
-/// The wire version for a transcript: the document's, else the protocol's own
-/// when it declares one, else 2.0 when it declares that.
-fn choose_version(
-  protocol : @smithy.Shape,
-  document : @rpc.ProtocolVersion?,
-) -> @rpc.ProtocolVersion? {
-  if document is Some(_) {
-    return document
-  }
-  let declared = match protocol.trait_value("smithy.rpc#jsonRpcProtocol") {
-    Some(Object(fields)) =>
-      match fields.get("versions") {
-        Some(Array(versions)) => versions
-        _ => []
-      }
-    _ => []
-  }
-  if declared.contains(String("2.0")) {
-    return @rpc.ProtocolVersion::parse("2.0")
-  }
-  match declared {
-    [String(first), ..] => @rpc.ProtocolVersion::parse(first)
-    _ => None
-  }
 }
 
 ///|
@@ -295,17 +272,37 @@ fn protocol_error(error : Error) -> String {
 }
 
 ///|
-fn start_transcript(
-  session : Session,
-  seq : Int32,
-  model : String,
-  protocol : String,
-  format : TranscriptFormat,
-  complete : Bool,
-  log_preset : String?,
-  text : String,
+/// Start a transcript. A Markdown or JSON document gives its own version. A
+/// JSONL log gives none, so it needs `version` ("1.0" or "2.0"), as the CLI
+/// needs `--version`. `handle` passes no version, so a log is blocked there
+/// until the request has a version field.
+pub fn Session::start_transcript(
+  self : Session,
+  seq~ : Int32,
+  model~ : String,
+  protocol~ : String,
+  format~ : TranscriptFormat,
+  complete~ : Bool,
+  log_preset~ : String?,
+  text~ : String,
+  version? : String,
 ) -> Response {
-  session.active = None
+  self.active = None
+  let given = match version {
+    None => None
+    Some(text) =>
+      match @rpc.ProtocolVersion::parse(text) {
+        Some(parsed) => Some(parsed)
+        None =>
+          return Blocked(seq~, reason="I expected 1.0 or 2.0 for the version.")
+      }
+  }
+  if format == Jsonl && given is None {
+    return Blocked(
+      seq~,
+      reason="A JSONL log gives no JSON-RPC version. I need version 1.0 or 2.0.",
+    )
+  }
   let assembled = match clean_model(load(model)) {
     Ok(assembled) => assembled
     Err(reason) => return Blocked(seq~, reason~)
@@ -316,7 +313,7 @@ fn start_transcript(
       reason="I expected a shape ID for the protocol, but found '\{protocol}'.",
     )
   }
-  guard assembled.shapes.get(id) is Some(shape) else {
+  guard assembled.shapes.get(id) is Some(_) else {
     return Blocked(seq~, reason="I found no shape \{protocol} in the model.")
   }
   let (document, read_findings) = match format {
@@ -330,11 +327,19 @@ fn start_transcript(
     }
     Jsonl => (None, [])
   }
-  guard choose_version(shape, document.bind(d => d.version)) is Some(version) else {
-    return Blocked(
-      seq~,
-      reason="I could not find a JSON-RPC version for \{protocol}.",
-    )
+  let version = match (given, document.bind(d => d.version)) {
+    (Some(version), _) | (None, Some(version)) => version
+    (None, None) => {
+      // A document that I could not read may have lost its version. Its error
+      // findings explain the problem better than a missing version, as in the CLI.
+      if read_findings.any(is_error) {
+        return unread_document(seq, document.unwrap(), read_findings)
+      }
+      return Blocked(
+        seq~,
+        reason="The transcript gives no JSON-RPC version. Add version: 1.0 or version: 2.0 to it.",
+      )
+    }
   }
   let description = @rpc.ProtocolDescription::from_smithy(
     assembled, id, version,
@@ -393,7 +398,7 @@ fn start_transcript(
     }
   }
   active.advance(0)
-  session.active = Some(active)
+  self.active = Some(active)
   progress(seq, active)
 }
 
@@ -407,4 +412,41 @@ fn step_transcript(session : Session, seq : Int32, count : Int32) -> Response {
   }
   active.advance(count)
   progress(seq, active)
+}
+
+///|
+/// The response for a document that I cannot check: its reader findings only,
+/// and a summary that is not valid and not complete. The CLI writes the same.
+fn unread_document(
+  seq : Int32,
+  document : @rpc.TranscriptDocument,
+  read_findings : Array[@rpc.TranscriptFinding],
+) -> Response {
+  let entries = document.entries.mapi((index, entry) => {
+    index,
+    sender: entry.sender.to_string(),
+    receiver: entry.receiver.map(peer => peer.to_string()),
+    message: entry.message,
+    line: entry.location.map(at => at.line),
+    column: entry.location.map(at => at.column),
+    checked: false,
+  })
+  TranscriptProgress(
+    seq~,
+    entries~,
+    findings=read_findings.map(FindingView::from_finding),
+    done=true,
+    summary=Some({
+      valid: false,
+      complete: false,
+      entries: 0,
+      errors: read_findings.filter(is_error).length(),
+      outstanding: 0,
+      correlation: true,
+      lines: 0,
+      not_json: 0,
+      skipped: 0,
+      expectations: None,
+    }),
+  )
 }

@@ -103,6 +103,7 @@ changes, update the four files and the constants together.
 | `shell` | the rabbita component: model, update, views |
 | `app` | browser entry: hydrates the pre-rendered page |
 | `playground/core` | pure MoonBit core of the playground: requests, responses, transcript stepping and share links (native and js tests) |
+| `playground/examples_check` | native: tests of the playground core against `examples/json-rpc/`, including the comparison with `run_transcript` |
 | `prerender` | native: renders every route, writes content copies and the search index |
 | `linkcheck` | native: checks links, routes and the search index of a build |
 
