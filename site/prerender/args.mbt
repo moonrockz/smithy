@@ -6,6 +6,8 @@ pub(all) struct Args {
   /// The base of this build when it is not the one the channel implies.
   base : String?
   release_version : String
+  /// False when no release has a site, so the pages name no release.
+  has_release : Bool
   git_ref : String
   out : String
 } derive(Eq, Debug)
@@ -29,11 +31,17 @@ pub fn parse_args(argv : Array[String]) -> Result[Args, String] {
     site_root: "/smithy/",
     base: None,
     release_version: "v0.0.0",
+    has_release: true,
     git_ref: "main",
     out: "dist",
   }
   let mut i = 1
   while i < argv.length() {
+    if argv[i] == "--no-release" {
+      args = { ..args, has_release: false, }
+      i = i + 1
+      continue
+    }
     guard i + 1 < argv.length() else {
       return Err("missing value for \{argv[i]}")
     }
@@ -72,6 +80,7 @@ pub fn config_of(args : Args) -> @data.SiteConfig {
         release_base,
         next_base,
         release_version: args.release_version,
+        has_release: args.has_release,
       }
     Next =>
       {
@@ -82,6 +91,7 @@ pub fn config_of(args : Args) -> @data.SiteConfig {
         release_base,
         next_base,
         release_version: args.release_version,
+        has_release: args.has_release,
       }
   }
 }

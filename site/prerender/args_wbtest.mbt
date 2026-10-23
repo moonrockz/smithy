@@ -12,6 +12,7 @@ test "parse_args reads every flag" {
       site_root: "/smithy/",
       base: None,
       release_version: "v0.5.0",
+      has_release: true,
       git_ref: "abc",
       out: "dist/next",
     }),
@@ -114,4 +115,13 @@ test "parse_args reads --base and keeps it apart from the site root" {
   assert_eq(c.version, "next")
   assert_eq(c.release_base, "/smithy/")
   assert_eq(c.next_base, "/smithy/next/")
+}
+
+///|
+test "--no-release clears has_release, also as the last flag" {
+  let args = parse_args(["prerender", "--no-release", "--channel", "next"]).unwrap()
+  assert_eq(config_of(args).has_release, false)
+  let last = parse_args(["prerender", "--channel", "next", "--no-release"]).unwrap()
+  assert_eq(config_of(last).has_release, false)
+  assert_eq(config_of(parse_args(["prerender"]).unwrap()).has_release, true)
 }

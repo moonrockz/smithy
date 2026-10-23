@@ -9,6 +9,7 @@ fn sample() -> SiteData {
       release_base: "/smithy/",
       next_base: "/smithy/next/",
       release_version: "v0.5.0",
+      has_release: true,
     },
     pages: [
       {
@@ -76,6 +77,7 @@ test "a release page without markdown round-trips" {
       release_base: "/smithy/",
       next_base: "/smithy/next/",
       release_version: "v0.5.0",
+      has_release: true,
     },
     route: Doc("cli"),
     markdown: None,

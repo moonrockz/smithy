@@ -24,6 +24,12 @@ fn version_picker(m : Model) -> Html {
     NotFound(_) => @route.Landing
     r => r
   }
+  if !c.has_release {
+    // No release has docs yet: the only version is main, and it links nowhere.
+    return @html.div(class="ms-version", [
+      @html.span(class="ms-version-link ms-version-current", "next"),
+    ])
+  }
   @html.div(class="ms-version", [
     @html.a(
       class=class_if(
@@ -153,15 +159,23 @@ fn not_found_view(m : Model) -> Html {
   @html.section(class="ms-notfound", [
     @html.h1("Page not found"),
     @html.p("This page does not exist."),
-    @html.p([
-      @html.a(href=c.base, "Home"),
-      @html.text(" · "),
-      @html.a(
-        href=@route.href(c.release_base, docs),
-        "Docs (\{c.release_version})",
-      ),
-      @html.text(" · "),
-      @html.a(href=@route.href(c.next_base, docs), "Docs (next)"),
-    ]),
+    @html.p(
+      [
+        @html.a(href=c.base, "Home"),
+        @html.text(" · "),
+        ..if c.has_release {
+          [
+            @html.a(
+              href=@route.href(c.release_base, docs),
+              "Docs (\{c.release_version})",
+            ),
+            @html.text(" · "),
+          ]
+        } else {
+          []
+        },
+        @html.a(href=@route.href(c.next_base, docs), "Docs (next)"),
+      ],
+    ),
   ])
 }

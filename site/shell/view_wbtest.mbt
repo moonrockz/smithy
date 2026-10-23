@@ -311,3 +311,38 @@ async test "the next banner links to the same page in the release docs" {
   assert_true(next.contains("href=\"/smithy/docs/smithy-syntax/\""))
   assert_true(next.contains("Go to the v0.5.0 docs."))
 }
+
+///|
+#cfg(not(target="js"))
+async test "with no release, the root and next name no release and link to none" {
+  let m = Model::init(site_data(Doc("smithy-syntax"), Some("# C\n")))
+  for base in ["/smithy/", "/smithy/next/"] {
+    let html = render_model({
+      ..m,
+      config: {
+        ..m.config,
+        channel: Next,
+        base,
+        version: "next",
+        git_ref: "abc",
+        has_release: false,
+      },
+    })
+    assert_true(html.contains("No release has docs yet."))
+    assert_true(!html.contains(">v0.5.0<"))
+    assert_true(!html.contains("Go to the"))
+    assert_true(html.contains("ms-version-current\">next</span>"))
+  }
+}
+
+///|
+#cfg(not(target="js"))
+async test "with no release, the not found page links only to the next docs" {
+  let m = Model::init(site_data(NotFound("/x/"), None))
+  let html = render_model({
+    ..m,
+    config: { ..m.config, channel: Next, has_release: false, },
+  })
+  assert_true(!html.contains("Docs (v0.5.0)"))
+  assert_true(html.contains("Docs (next)"))
+}

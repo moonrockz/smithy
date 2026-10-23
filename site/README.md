@@ -42,8 +42,8 @@ Each channel is a full build of its own checkout (`scripts/site-pages.mbtx`, `mi
 | `/smithy/next/` | `main`, channel next. Always. |
 
 No tag contains `site/` yet, so today both URLs show `main`. After the first release that contains `site/`, the
-root shows that release. While the root is `main`, the version picker names the newest tag (or `v0.0.0`
-when there is none) but links to the root, which is `main`.
+root shows that release. While no release has a site, both outputs are built with `--no-release`: the version
+picker shows only "next", the banner says that no release has docs yet, and no page links to a release.
 
 A missing fixed docs source (see `@content.fixed_sources()`) fails the build of either channel. The link check
 runs on each output.
@@ -65,6 +65,11 @@ and never on a dry run, a pull request or the nightly run. The tag that the rele
 
 Maintainer step, once: in the repository, open Settings, then Pages, and set Source to "GitHub Actions". The
 workflows never change repository settings. Until then the deploy job fails.
+
+Maintainer step, once: open Settings, then Environments, then `github-pages`, and under "Deployment branches and
+tags" add the tag rule `v*`. The release workflow can run on a tag ref, and the default `github-pages` environment
+lets only the default branch deploy, so a run on a tag would be refused without the rule. To recover from a refused
+deploy, run `gh workflow run site.yml --ref main`.
 
 ## Landing sample
 

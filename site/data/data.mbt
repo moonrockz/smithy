@@ -37,6 +37,8 @@ pub(all) struct SiteConfig {
   next_base : String
   /// Label of the release version, for the version picker.
   release_version : String
+  /// False while no release has a site: the release entry is then left out.
+  has_release : Bool
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|

@@ -50,6 +50,12 @@ fn toc_links(doc : @markdown.Document) -> Array[Html] {
 fn next_banner(m : Model) -> Html {
   match m.config.channel {
     Release => @html.nothing
+    Next if !m.config.has_release =>
+      @html.div(class="ms-banner", [
+        @html.text(
+          "You are reading the docs for main (unreleased). No release has docs yet.",
+        ),
+      ])
     Next =>
       @html.div(class="ms-banner", [
         @html.text("You are reading the docs for main (unreleased). "),

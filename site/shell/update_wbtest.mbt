@@ -14,6 +14,7 @@ fn site_data(route : @route.Route, markdown : String?) -> @data.SiteData {
       release_base: "/smithy/",
       next_base: "/smithy/next/",
       release_version: "v0.5.0",
+      has_release: true,
     },
     pages: [
       {
