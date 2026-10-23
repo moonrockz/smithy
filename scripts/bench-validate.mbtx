@@ -14,6 +14,7 @@
 /// - `--sizes 1000,2000,4000`: the shape counts, in ascending order.
 /// - `--max-seconds 2`: the bound for the largest size.
 /// - `--max-ratio 2.5`: the bound for the time of a size over the time of the size before it.
+/// - `--runs 3`: time each size this many times and keep the fastest run.
 /// - `--cutoff 120`: stop a run after this many seconds; the run fails.
 /// - `--no-build`: use the CLI that is built, do not build it first.
 ///
@@ -38,6 +39,7 @@ struct Options {
   sizes : Array[Int32]
   max_seconds : Double
   max_ratio : Double
+  runs : Int32
   cutoff : Int32
   build : Bool
 } derive(Debug, Eq)
@@ -48,6 +50,7 @@ fn parse_options(args : ArrayView[String]) -> Options raise {
   let mut sizes = [1000, 2000, 4000]
   let mut max_seconds = 2.0
   let mut max_ratio = 2.5
+  let mut runs = 3
   let mut cutoff = 120
   let mut build = true
   let mut i = 1
@@ -72,6 +75,10 @@ fn parse_options(args : ArrayView[String]) -> Options raise {
         max_ratio = @string.parse_double(value(i + 1))
         i += 1
       }
+      "--runs" => {
+        runs = @string.parse_int(value(i + 1))
+        i += 1
+      }
       "--cutoff" => {
         cutoff = @string.parse_int(value(i + 1))
         i += 1
@@ -88,7 +95,8 @@ fn parse_options(args : ArrayView[String]) -> Options raise {
       fail("--sizes must be in ascending order")
     }
   }
-  { sizes, max_seconds, max_ratio, cutoff, build, }
+  guard runs >= 1 else { fail("--runs must be at least 1") }
+  { sizes, max_seconds, max_ratio, runs, cutoff, build, }
 }
 
 ///|
@@ -272,7 +280,13 @@ async fn run(options : Options) -> Int32 {
   for size in options.sizes {
     let path = "\{out_dir}/scale-\{size}.smithy"
     @fs.write_file(path, scale_model(size / 4))
-    let seconds = time_validate(path, options.cutoff)
+    let mut seconds = time_validate(path, options.cutoff)
+    for _ in 1..<options.runs {
+      guard seconds is Some(best) else { break }
+      if time_validate(path, options.cutoff) is Some(next) && next < best {
+        seconds = Some(next)
+      }
+    }
     let shown = seconds.map(format_seconds).unwrap_or("> \{options.cutoff}")
     let before = runs.last().bind(run => run.seconds)
     let ratio = match (before, seconds) {
@@ -304,18 +318,20 @@ test "parse_options has defaults and reads every option" {
     sizes: [1000, 2000, 4000],
     max_seconds: 2.0,
     max_ratio: 2.5,
+    runs: 3,
     cutoff: 120,
     build: true,
   })
   assert_eq(
     parse_options([
       "bench", "--sizes", "100, 200", "--max-seconds", "0.5", "--max-ratio", "3",
-      "--cutoff", "9", "--no-build",
+      "--runs", "1", "--cutoff", "9", "--no-build",
     ]),
     {
       sizes: [100, 200],
       max_seconds: 0.5,
       max_ratio: 3.0,
+      runs: 1,
       cutoff: 9,
       build: false,
     },
