@@ -20,8 +20,8 @@ let test_commands : Array[Array[String]] = [
   ["moon", "fmt", "--check"],
   ["moon", "test", "--target", "native"],
   ["moon", "test", "--target", "js"],
-  ["moon", "check", "--target", "native"],
-  ["moon", "check", "--target", "js"],
+  ["moon", "check", "--deny-warn", "--target", "native"],
+  ["moon", "check", "--deny-warn", "--target", "js"],
 ]
 
 ///|
