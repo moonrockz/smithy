@@ -4,11 +4,41 @@ pub using @syntax {type SimpleType}
 ///|
 /// A shape's source in the assembled input. JSON paths use JSON Pointer;
 /// IDL locations retain the parser's UTF-16 span.
+/// The kind tells whether the source holds built-in definitions.
 pub(all) struct SourceLocation {
   file : String
   path : String
   span : @syntax.Span?
+  kind : SourceKind
 } derive(Eq, Debug)
+
+///|
+/// Where the definitions of a source come from.
+pub(all) enum SourceKind {
+  /// A model input that the caller supplies, or a provider default.
+  User
+  /// Definitions that the loader bundles: the prelude, the contracts, the
+  /// protocol test traits and the sources added with Loader::add_builtin_idl.
+  BuiltIn
+} derive(Eq, Debug)
+
+///|
+/// Create a source location. The kind is User unless the caller gives it.
+pub fn SourceLocation::new(
+  file : String,
+  path~ : String = "",
+  span? : @syntax.Span,
+  kind~ : SourceKind = User,
+) -> SourceLocation {
+  { file, path, span, kind, }
+}
+
+///|
+/// Tell whether the location is in a source of built-in definitions. Exports
+/// omit the shapes of such a source, and other sources cannot change them.
+pub fn SourceLocation::is_builtin(self : SourceLocation) -> Bool {
+  self.kind is BuiltIn
+}
 
 ///|
 /// An assembly error. Syntax diagnostics retain their original code and span.

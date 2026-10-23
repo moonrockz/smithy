@@ -203,3 +203,37 @@ test "build info lists projected services and operations" {
   assert_true(info.contains("example#Api"))
   assert_true(info.contains("example#Get"))
 }
+
+///|
+test "a projection with imports loads its model again with the runner loader" {
+  let definitions = "$version: \"2\"\nnamespace example.tags\n@trait(selector: \"structure\")\nstructure tag {}\n"
+  let loader = () => {
+    @smithy.Loader::new().add_builtin_idl("<example-tags>", definitions)
+  }
+  let model = loader()
+  .add_idl(
+    "input.smithy", "$version: \"2\"\nnamespace example\n@example.tags#tag\nstructure Tagged {}\n",
+  )
+  .assemble().model.unwrap()
+  let config = @build.BuildConfig::parse(
+    "{\"version\":\"1.0\",\"projections\":{\"extra\":{\"imports\":[\"extra.smithy\"]}}}",
+  )
+  let extra = @smithy.ModelInput::Idl(
+    name="extra.smithy",
+    text="$version: \"2\"\nnamespace extra\n@example.tags#tag\nstructure Added {}\n",
+  )
+  let plain = @build.BuildRunner::new(config)
+    .add_projection_import("extra", extra)
+    .run_result(model)
+  assert_false(plain.errors.is_empty())
+  let artifacts = @build.BuildRunner::new(config, loader~)
+    .add_projection_import("extra", extra)
+    .run(model)
+  guard @json.parse(artifacts["extra/model/model.json"])
+    is { "shapes": Object(shapes), .. } else {
+    fail("Expected shapes in the projected model")
+  }
+  assert_true(shapes.contains("extra#Added"))
+  assert_true(shapes.contains("example#Tagged"))
+  assert_false(shapes.contains("example.tags#tag"))
+}

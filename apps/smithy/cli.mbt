@@ -730,11 +730,8 @@ fn run(args : Array[String]) -> Int32 raise {
       error => raise error
     }
   }
-  let loader = if opts.rpc_version is Some(_) || opts.transcript is Some(_) {
-    @rpc.loader()
-  } else {
-    @smithy.Loader::new(protocol_tests=opts.protocol_tests)
-  }
+  // Every model command resolves the bundled smithy.rpc traits.
+  let loader = @rpc.loader(protocol_tests=opts.protocol_tests)
   let inputs : Map[String, String] = Map([])
   let formatted : Array[(String, String)] = []
   let mut failed = false

@@ -119,8 +119,7 @@ pub fn Model::to_json_ast(
 ) -> @syntax.JsonAst raise {
   let shapes : Map[String, Json] = Map([])
   for id, shape in self.shapes {
-    if id.member is Some(_) ||
-      (!include_prelude && is_builtin_source(shape.source.file)) {
+    if id.member is Some(_) || (!include_prelude && shape.source.is_builtin()) {
       continue
     }
     let fields : Map[String, Json] = {

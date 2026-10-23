@@ -10,12 +10,21 @@ pub struct BuildRunner {
   source_origins : Set[String]
   source_metadata : Set[String]
   projection_imports : Map[String, Array[@smithy.ModelInput]]
+  loader : () -> @smithy.Loader
 }
 
 ///|
-pub fn BuildRunner::new(config : BuildConfig) -> BuildRunner {
+/// Create a runner for a build configuration. A projection with imports loads
+/// its model again from the JSON AST, which omits built-in definitions. The
+/// loader function gives the loader for that step; pass one that adds the
+/// same built-in sources as the loader of the build model.
+pub fn BuildRunner::new(
+  config : BuildConfig,
+  loader~ : () -> @smithy.Loader = () => @smithy.Loader::new(),
+) -> BuildRunner {
   {
     config,
+    loader,
     plugins: Map([]),
     sources: Map([]),
     source_conflicts: [],
@@ -116,7 +125,7 @@ fn BuildRunner::merge_projection_imports(
         "Could not serialize model before projection imports",
       )
   }
-  let loader = @smithy.Loader::new().add_ast("<projection-base>", document)
+  let loader = (self.loader)().add_ast("<projection-base>", document)
   for input in inputs {
     ignore(loader.add(input))
   }

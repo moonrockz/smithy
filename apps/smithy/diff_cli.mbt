@@ -1,6 +1,6 @@
 ///|
 fn diff_load(path : String) -> @smithy.Model? raise {
-  let loader = @smithy.Loader::new()
+  let loader = @rpc.loader()
   // Reuse local resource discovery, including directory traversal and JAR
   // manifests. This runner only collects inputs; no projection or plugin runs.
   let runner = @build.BuildRunner::new(

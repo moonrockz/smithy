@@ -748,16 +748,12 @@ fn run_build(
     return 0
   }
   let credentials = config.resolve_credentials(environment)
-  let loader = @smithy.Loader::new()
+  // The build model and every projection that loads its model again resolve
+  // the bundled smithy.rpc traits.
+  let loader = @rpc.loader()
   let plugin_names = config.plugins.keys().to_array()
   for projection in config.projections {
     plugin_names.append(projection.plugins.keys().to_array())
-  }
-  if plugin_names.any(name => name.split("::").next() == Some("openrpc")) {
-    guard @rpc.loader().assemble().model is Some(protocols) else {
-      raise CliError("Could not load bundled JSON-RPC trait definitions", 2)
-    }
-    let _ = loader.add_defaults(protocols)
   }
   if plugin_names.any(name => name.split("::").next() == Some("openapi")) {
     let provider = @smithy.Loader::new()
@@ -769,7 +765,7 @@ fn run_build(
     }
     let _ = loader.add_defaults(protocols)
   }
-  let runner = @build.BuildRunner::new(config)
+  let runner = @build.BuildRunner::new(config, loader=() => @rpc.loader())
     .register_plugin("jsonSchema", json_schema_plugin)
     .register_plugin("openapi", openapi_plugin)
     .register_plugin("openrpc", openrpc_plugin)

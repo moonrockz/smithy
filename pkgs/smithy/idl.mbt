@@ -309,7 +309,7 @@ fn Assembly::add_idl(
   file : @syntax.IdlFile,
 ) -> Unit {
   let ns = file.namespace.map(n => n.namespace.value).unwrap_or("")
-  let source = location(name, span=file.span)
+  let source = self.location(name, span=file.span)
   let uses : Map[String, String] = Map([])
   let v2 = file
     .control_value("version")
