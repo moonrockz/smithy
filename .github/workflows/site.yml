@@ -61,6 +61,14 @@ jobs:
     name: Build and check both channels
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Builds that deploy run one at a time, and each one checks out main when it starts. A build therefore
+    # never finishes before an older one, so an older artifact cannot deploy after a newer one. A newer
+    # pending build replaces an older pending build, which would build the same or older content. This
+    # includes a pending call from release.yml: the newer build then deploys the new tag.
+    # A pull request uses a group of its own and cancels its superseded build.
+    concurrency:
+      group: ${{ github.event_name == 'pull_request' && format('site-pr-{0}', github.ref) || 'pages-build' }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
       # A pull request builds its own merge commit. Every other run builds main.
       - name: Checkout code
