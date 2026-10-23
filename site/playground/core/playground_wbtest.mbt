@@ -56,6 +56,17 @@ fn warnings_of(response : Response) -> Array[String] raise {
 }
 
 ///|
+fn service_of(response : Response) -> String? raise {
+  match response {
+    Transformed(service~, ..) => service
+    other =>
+      fail(
+        "I expected Transformed, but found \{@json.to_json(other).stringify()}",
+      )
+  }
+}
+
+///|
 fn files_of(response : Response) -> Array[(String, String)] raise {
   match response {
     Transformed(files~, ..) => files
@@ -816,25 +827,25 @@ test "wire: handle_json blocks a request that it cannot read" {
 test "transform: OpenAPI picks the first service that has a protocol trait" {
   let session = Session::new()
   for output in [OpenApi30, OpenApi31] {
-    let files = files_of(
-      handle(
-        session,
-        Transform(seq=1, model=mixed_model, output~, selector=None),
-      ),
+    let response = handle(
+      session,
+      Transform(seq=1, model=mixed_model, output~, selector=None),
     )
+    let files = files_of(response)
     // AlphaRpc sorts first, but it has no protocol trait for OpenAPI.
+    assert_eq(service_of(response), Some("example.mixed#Weather"))
     assert_eq(files.map(file => file.0), ["Weather.openapi.json"])
   }
 }
 
 ///|
 test "transform: OpenRPC keeps the rule of the CLI: the first service with jsonRpc 2.0" {
-  let files = files_of(
-    handle(
-      Session::new(),
-      Transform(seq=1, model=versions_model, output=OpenRpc, selector=None),
-    ),
+  let response = handle(
+    Session::new(),
+    Transform(seq=1, model=versions_model, output=OpenRpc, selector=None),
   )
+  assert_eq(service_of(response), Some("example.versions#NewRpc"))
+  let files = files_of(response)
   // OldRpc sorts first but speaks 1.0 only.
   assert_true(files[0].1.contains("\"ping\""))
   assert_true(files[0].1.contains("\"title\": \"NewRpc\""))
@@ -917,4 +928,20 @@ test "transform: converter warnings come as the CLI prints them" {
     ),
     [],
   )
+}
+
+///|
+test "transform: outputs that use no service report none" {
+  let session = Session::new()
+  for output in [JsonAst, Idl, JsonSchema] {
+    assert_eq(
+      service_of(
+        handle(
+          session,
+          Transform(seq=1, model=chat_model, output~, selector=None),
+        ),
+      ),
+      None,
+    )
+  }
 }

@@ -142,10 +142,13 @@ pub(all) enum Response {
   Diagnostics(seq~ : Int32, items~ : Array[Diagnostic], shapes~ : Int32)
   /// The files of a transform, as (name, text). `warnings` are the warnings
   /// of the converter, each as the CLI prints it: `WARNING: <shape>: <message>`.
+  /// `service` is the shape ID of the service that an OpenAPI or OpenRPC
+  /// output used; other outputs have `None`.
   Transformed(
     seq~ : Int32,
     files~ : Array[(String, String)],
-    warnings~ : Array[String]
+    warnings~ : Array[String],
+    service~ : String?
   )
   /// The request did not run. `reason` says why, in a sentence.
   Blocked(seq~ : Int32, reason~ : String, kind~ : BlockKind)

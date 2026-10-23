@@ -68,8 +68,13 @@ test("OpenAPI works for a restJson1 model that Validate marks, and shows the con
   await expect(page.locator(".pg-warning")).toHaveText(
     "WARNING: example.web#GetCity: OpenAPI omits unsupported HTTP method `CONNECT`",
   );
-  // The same model is blocked for an output that does not load the definitions.
+  // The hint names the service of the run, and it describes the shown output, not the picker.
+  const hint =
+    'CLI: smithy build --config smithy-build.json, with the plugin "openapi": {"service": "example.web#Weather", "version": "3.0.2"}';
+  await expect(page.locator(".pg-cli")).toHaveText(hint);
   await page.selectOption("#pg-output-kind", "json-ast");
+  await expect(page.locator(".pg-cli")).toHaveText(hint);
+  // The same model is blocked for an output that does not load the definitions.
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.locator(".pg-notices .pg-notice")).toHaveText(
     "The model has errors. Fix them in the Validate tab first.",

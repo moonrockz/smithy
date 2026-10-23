@@ -3,8 +3,11 @@
 priv struct Runtime {
   data : @workbench.PlaygroundData
   mut worker : Worker?
-  /// The files of the newest transform, as (name, text). The model holds the names only.
-  mut files : Array[(String, String)]
+  /// The files of each transform that the Worker answered, as (name, text), by request number.
+  /// The model holds the names only, and accepts an answer or drops it. An effect names the
+  /// request, so an answer that the model dropped is never shown, and `ShowFile` drops the files
+  /// of every other request.
+  files : Map[Int32, Array[(String, String)]]
   mut dispatch : (@workbench.Msg) -> Unit
 }
 
@@ -91,12 +94,16 @@ fn Runtime::reply_msg(self : Runtime, text : String) -> @workbench.Msg? {
           ),
         ),
       )
-    Transformed(seq~, files~, warnings~) => {
-      self.files = files
+    Transformed(seq~, files~, warnings~, service~) => {
+      self.files[seq] = files
       Some(
         Answered(
           seq~,
-          answer=Transformed(files=files.map(file => file.0), warnings~),
+          answer=Transformed(
+            files=files.map(file => file.0),
+            warnings~,
+            service~,
+          ),
         ),
       )
     }
@@ -113,6 +120,15 @@ fn Runtime::start_worker(self : Runtime) -> Unit {
       message => (self.dispatch)(WorkerFailed(message)),
     ),
   )
+}
+
+///|
+fn Runtime::file(
+  self : Runtime,
+  seq : Int32,
+  index : Int32,
+) -> (String, String)? {
+  self.files.get(seq).bind(files => files.get(index))
 }
 
 ///|
@@ -139,16 +155,22 @@ fn Runtime::run(self : Runtime, effect : @workbench.Effect) -> Unit {
         worker.post(@json.to_json(request).stringify())
       }
     }
-    ShowFile(index) =>
-      if self.files.get(index) is Some((name, text)) {
+    ShowFile(seq~, index~) => {
+      for key in self.files.keys().collect() {
+        if key != seq {
+          self.files.remove(key)
+        }
+      }
+      if self.file(seq, index) is Some((name, text)) {
         editor_show(@workbench.OUTPUT_ID, text, language_of(name))
       }
-    CopyFile(index) =>
-      if self.files.get(index) is Some((_, text)) {
+    }
+    CopyFile(seq~, index~) =>
+      if self.file(seq, index) is Some((_, text)) {
         copy_text(text, ok => (self.dispatch)(CopyDone(ok)))
       }
-    DownloadFile(index) =>
-      if self.files.get(index) is Some((name, text)) {
+    DownloadFile(seq~, index~) =>
+      if self.file(seq, index) is Some((name, text)) {
         download_text(name, text)
       }
     LoadText(text) => editor_load(@workbench.EDITOR_ID, text)
@@ -182,7 +204,7 @@ fn Runtime::perform(
 
 ///|
 fn app(data : @workbench.PlaygroundData) -> @rabbita.Val[@rabbita.Html] {
-  let runtime = { data, worker: None, files: [], dispatch: _ => (), }
+  let runtime = { data, worker: None, files: {}, dispatch: _ => (), }
   let (model, emit) = @rabbita.create_state_with_init(
     init=emit => {
       let (m, effects) = @workbench.Model::start(data)

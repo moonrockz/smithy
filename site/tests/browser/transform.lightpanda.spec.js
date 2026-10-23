@@ -63,7 +63,7 @@ test("another block shows the reason of the library, and OpenAPI has the protoco
     { timeout: 15_000 },
   );
   await expect(page.locator(".pg-note")).toContainText("loads the bundled OpenAPI protocol definitions");
-  await expect(page.locator(".pg-cli")).toContainText('"openapi" and "version": "3.0.2"');
+  await expect(page.locator(".pg-cli")).toContainText('"openapi": {"version": "3.0.2"}');
 });
 
 test("OpenRPC picks a service with jsonRpc 2.0", async ({ lightpanda: page }) => {

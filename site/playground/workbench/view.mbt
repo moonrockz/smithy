@@ -324,10 +324,32 @@ fn shell_quote(text : String) -> String {
 }
 
 ///|
+/// The build command with a plugin and its settings. The settings name the
+/// service that the run used, so that the same build gives the same file.
+fn plugin_hint(
+  plugin : String,
+  service : String?,
+  extra~ : Array[String] = [],
+) -> String {
+  let settings = match service {
+    Some(id) => ["\"service\": \"\{id}\"", ..extra]
+    None => extra
+  }
+  "smithy build --config smithy-build.json, with the plugin \"\{plugin}\": {" +
+  settings.join(", ") +
+  "}"
+}
+
+///|
 /// The CLI command that gives the same output. JSON Schema, OpenAPI and
 /// OpenRPC are plugins of `smithy build`, so the hint names the plugin and
-/// its settings. An IDL output with several files needs `--output-dir`.
-pub fn cli_hint(output : Output, selector : String, files : Int32) -> String {
+/// its settings, with the `service` that the run used. An IDL output with several files needs `--output-dir`.
+pub fn cli_hint(
+  output : Output,
+  selector : String,
+  files : Int32,
+  service : String?,
+) -> String {
   match output {
     JsonAst => "smithy convert --to json model.smithy"
     Idl =>
@@ -340,11 +362,10 @@ pub fn cli_hint(output : Output, selector : String, files : Int32) -> String {
     JsonSchema =>
       "smithy build --config smithy-build.json, with the plugin \"jsonSchema\""
     OpenApi30 =>
-      "smithy build --config smithy-build.json, with the plugin \"openapi\" and \"version\": \"3.0.2\""
+      plugin_hint("openapi", service, extra=["\"version\": \"3.0.2\""])
     OpenApi31 =>
-      "smithy build --config smithy-build.json, with the plugin \"openapi\" and \"version\": \"3.1.0\""
-    OpenRpc =>
-      "smithy build --config smithy-build.json, with the plugin \"openrpc\""
+      plugin_hint("openapi", service, extra=["\"version\": \"3.1.0\""])
+    OpenRpc => plugin_hint("openrpc", service)
   }
 }
 
@@ -529,15 +550,17 @@ fn warning_list(m : Model) -> Array[Html] {
 
 ///|
 fn transform_panel(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
-  let (output, files) = match m.tx {
-    TxDone(output~, files~, ..) => (output, files.length())
-    _ => (m.output, 0)
+  // The hint and the note describe the shown output: the run, not the picker.
+  let (output, selector, service, files) = match m.tx {
+    TxDone(output~, selector~, service~, files~, ..) =>
+      (output, selector, service, files.length())
+    _ => (m.output, m.selector, None, 0)
   }
   let has_output = match m.tx {
     TxDone(files~, ..) => !files.is_empty()
     _ => false
   }
-  let protocol_note = if m.output == OpenApi30 || m.output == OpenApi31 {
+  let protocol_note = if output == OpenApi30 || output == OpenApi31 {
     [
       @html.p(
         class="pg-hint pg-note",
@@ -553,7 +576,7 @@ fn transform_panel(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
     transform_controls(m, emit),
     @html.p(
       class="pg-hint pg-cli",
-      "CLI: " + cli_hint(output, m.selector, files),
+      "CLI: " + cli_hint(output, selector, files, service),
     ),
     @html.div(class="pg-notices", transform_notice(m)),
     @html.div(class="pg-warnings-slot", warning_list(m)),

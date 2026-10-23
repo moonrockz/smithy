@@ -134,7 +134,11 @@ pub extend Kind with @debug.Debug::{to_repr}
 /// the page script; the model holds the names only.
 pub(all) enum Answer {
   Validated(items~ : Array[Diagnostic], shapes~ : Int32)
-  Transformed(files~ : Array[String], warnings~ : Array[String])
+  Transformed(
+    files~ : Array[String],
+    warnings~ : Array[String],
+    service~ : String?
+  )
   NotRun(String, BlockedBy)
 } derive(Eq, Debug)
 
@@ -153,8 +157,14 @@ pub(all) enum Transformation {
   TxRunning
   /// The output. `file` is the index of the file that the editor shows.
   /// `edits` is the number of changes to the model when the run started.
+  /// `output`, `selector` and `service` are those of the run, so the page
+  /// describes the shown output and not the picker.
+  /// `seq` is the request that gave the files; the page script keeps their text by it.
   TxDone(
+    seq~ : Int32,
     output~ : Output,
+    selector~ : String,
+    service~ : String?,
     files~ : Array[String],
     warnings~ : Array[String],
     file~ : Int32,
@@ -217,6 +227,9 @@ pub(all) struct Model {
   selector : String
   /// The value of `edits` when the newest transform was sent.
   tx_edits : Int32
+  /// The output and the selector of the newest transform when it was sent.
+  tx_output : Output
+  tx_selector : String
   tx : Transformation
   copy : Copy
   /// The cursor, from 1.
@@ -271,12 +284,13 @@ pub(all) enum Effect {
   SendValidate(seq~ : Int32)
   /// Send the editor text to the Worker for a transform.
   SendTransform(seq~ : Int32, output~ : Output, selector~ : String?)
-  /// Show this file of the output in the output editor.
-  ShowFile(Int32)
-  /// Put this file of the output on the clipboard.
-  CopyFile(Int32)
-  /// Save this file of the output on the computer of the user.
-  DownloadFile(Int32)
+  /// Show this file of the output of the request `seq` in the output editor.
+  /// The page script drops the files of every other request.
+  ShowFile(seq~ : Int32, index~ : Int32)
+  /// Put this file of the output of the request `seq` on the clipboard.
+  CopyFile(seq~ : Int32, index~ : Int32)
+  /// Save this file of the output of the request `seq` on the computer of the user.
+  DownloadFile(seq~ : Int32, index~ : Int32)
   /// Replace the editor text.
   LoadText(String)
   /// Show these diagnostics in the editor.
@@ -328,6 +342,8 @@ pub fn Model::start(data : PlaygroundData) -> (Model, Array[Effect]) {
     output: JsonAst,
     selector: DEFAULT_SELECTOR,
     tx_edits: 0,
+    tx_output: JsonAst,
+    tx_selector: DEFAULT_SELECTOR,
     tx: TxIdle,
     copy: NotCopied,
     line: 1,
@@ -374,6 +390,8 @@ fn Model::send_transform(self : Model) -> (Model, Array[Effect]) {
       ..self,
       seq,
       tx_edits: self.edits,
+      tx_output: self.output,
+      tx_selector: self.selector,
       waiting: true,
       inflight: Transforming,
       run_pending: false,
@@ -417,8 +435,6 @@ fn Model::next(self : Model, effects : Array[Effect]) -> (Model, Array[Effect]) 
     (m, effects)
   }
 }
-
-///|
 
 ///|
 pub fn Model::errors(self : Model) -> Int32 {
@@ -475,17 +491,20 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
           }
         // The output shows even when the model changed after the run. The
         // tab then says so.
-        (Transforming, Transformed(files~, warnings~)) =>
+        (Transforming, Transformed(files~, warnings~, service~)) =>
           {
             ..m,
             tx: TxDone(
-              output=m.output,
+              seq~,
+              output=m.tx_output,
+              selector=m.tx_selector,
+              service~,
               files~,
               warnings~,
               file=0,
               edits=m.tx_edits,
             ),
-          }.next(if files.is_empty() { [] } else { [ShowFile(0)] })
+          }.next(if files.is_empty() { [] } else { [ShowFile(seq~, index=0)] })
         (Transforming, NotRun(reason, by)) =>
           { ..m, tx: TxBlocked(reason~, by~), }.next([])
         // An answer of the other kind cannot come; the request ends.
@@ -536,15 +555,33 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       }
     FileChosen(index) =>
       match m.tx {
-        TxDone(output~, files~, warnings~, edits~, ..) =>
+        TxDone(
+          seq~,
+          output~,
+          selector~,
+          service~,
+          files~,
+          warnings~,
+          edits~,
+          ..
+        ) =>
           if index >= 0 && index < files.length() {
             (
               {
                 ..m,
-                tx: TxDone(output~, files~, warnings~, file=index, edits~),
+                tx: TxDone(
+                  seq~,
+                  output~,
+                  selector~,
+                  service~,
+                  files~,
+                  warnings~,
+                  file=index,
+                  edits~,
+                ),
                 copy: NotCopied,
               },
-              [ShowFile(index)],
+              [ShowFile(seq~, index~)],
             )
           } else {
             (m, [])
@@ -553,13 +590,13 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       }
     CopyClicked =>
       match m.tx {
-        TxDone(file~, ..) => (m, [CopyFile(file)])
+        TxDone(seq~, file~, ..) => (m, [CopyFile(seq~, index=file)])
         _ => (m, [])
       }
     CopyDone(ok) => ({ ..m, copy: if ok { Copied } else { CopyFailed }, }, [])
     DownloadClicked =>
       match m.tx {
-        TxDone(file~, ..) => (m, [DownloadFile(file)])
+        TxDone(seq~, file~, ..) => (m, [DownloadFile(seq~, index=file)])
         _ => (m, [])
       }
   }

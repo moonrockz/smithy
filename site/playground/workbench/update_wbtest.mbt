@@ -358,7 +358,11 @@ test "stale: a result for older text does not move the cursor" {
 
 ///|
 fn done_files(names : Array[String]) -> Answer {
-  Transformed(files=names, warnings=["WARNING: a#S: OpenAPI omits something"])
+  Transformed(
+    files=names,
+    warnings=["WARNING: a#S: OpenAPI omits something"],
+    service=Some("a#Svc"),
+  )
 }
 
 ///|
@@ -387,11 +391,14 @@ test "transform: the answer shows the first file and keeps the warnings" {
     Answered(seq=2, answer=done_files(["a.smithy", "b.smithy"])),
   )
   assert_false(m.waiting)
-  assert_eq(effects, [ShowFile(0)])
+  assert_eq(effects, [ShowFile(seq=2, index=0)])
   assert_eq(
     m.tx,
     TxDone(
+      seq=2,
       output=JsonAst,
+      selector=DEFAULT_SELECTOR,
+      service=Some("a#Svc"),
       files=["a.smithy", "b.smithy"],
       warnings=["WARNING: a#S: OpenAPI omits something"],
       file=0,
@@ -400,9 +407,9 @@ test "transform: the answer shows the first file and keeps the warnings" {
   )
   // A second file shows on request, and Copy and Download name it.
   let (m, effects) = update(m, FileChosen(1))
-  assert_eq(effects, [ShowFile(1)])
-  assert_eq(update(m, CopyClicked).1, [CopyFile(1)])
-  assert_eq(update(m, DownloadClicked).1, [DownloadFile(1)])
+  assert_eq(effects, [ShowFile(seq=2, index=1)])
+  assert_eq(update(m, CopyClicked).1, [CopyFile(seq=2, index=1)])
+  assert_eq(update(m, DownloadClicked).1, [DownloadFile(seq=2, index=1)])
   assert_eq(update(m, FileChosen(5)).1, [])
   // The clipboard answer shows once, and a new run clears it.
   let (m, _) = update(m, CopyDone(true))
@@ -471,7 +478,7 @@ test "queue: Run while a check runs waits, and goes before the pending check" {
     Answered(seq=2, answer=done_files(["model.json"])),
   )
   assert_eq(effects, [
-    ShowFile(0),
+    ShowFile(seq=2, index=0),
     SendValidate(seq=3),
     Wait(ms=timeout_ms, then=TimedOut(seq=3)),
   ])
@@ -545,4 +552,41 @@ test "stale: the diagnostics stay current while a transform runs" {
   let (m, _) = update(answered(), RunClicked)
   assert_true(m.is_current())
   assert_false(m.checking())
+}
+
+///|
+test "transform: the output keeps the output, selector and service of its run" {
+  let (m, _) = run(answered(), [
+    OutputChosen(Selector),
+    SelectorEdited("string"),
+  ])
+  let (m, _) = update(m, RunClicked)
+  // The picker and the selector change while the run waits for its answer.
+  let (m, _) = run(m, [OutputChosen(OpenApi30), SelectorEdited("union")])
+  let (m, _) = update(m, Answered(seq=2, answer=done_files(["selector.txt"])))
+  match m.tx {
+    TxDone(seq~, output~, selector~, service~, ..) => {
+      assert_eq(seq, 2)
+      assert_eq(output, Selector)
+      assert_eq(selector, "string")
+      assert_eq(service, Some("a#Svc"))
+    }
+    _ => fail("I expected TxDone.")
+  }
+  // A change of the selector after the run does not change the shown output.
+  let (m, _) = update(m, SelectorEdited("enum"))
+  assert_true(m.tx is TxDone(selector="string", ..))
+}
+
+///|
+test "transform: an answer for an old request does not show" {
+  let (m, _) = update(answered(), RunClicked)
+  let (m, effects) = update(m, Answered(seq=1, answer=done_files(["old.json"])))
+  assert_eq(effects, [])
+  assert_eq(m.tx, TxRunning)
+  // Every file effect names the request, so the page script never shows
+  // the files of a dropped answer.
+  let (m, effects) = update(m, Answered(seq=2, answer=done_files(["a.json"])))
+  assert_eq(effects, [ShowFile(seq=2, index=0)])
+  assert_eq(update(m, CopyClicked).1, [CopyFile(seq=2, index=0)])
 }

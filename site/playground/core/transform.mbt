@@ -131,7 +131,7 @@ fn open_api_file(
   model : @smithy.Model,
   service : String,
   version : String,
-) -> Result[(Array[(String, String)], Array[String]), String] {
+) -> Result[(Array[(String, String)], Array[String], String?), String] {
   let settings : Json = { "service": service, "version": version }
   let config = @openapi.Config::from_json(settings) catch {
     error => return Err("OpenAPI conversion failed: " + error.message())
@@ -144,6 +144,7 @@ fn open_api_file(
     (
       [(name, result.document.stringify(indent=4) + "\n")],
       result.warnings.map(w => warning_line(w.shape, w.message)),
+      Some(service),
     ),
   )
 }
@@ -152,7 +153,7 @@ fn open_api_file(
 fn open_rpc_file(
   model : @smithy.Model,
   service : String,
-) -> Result[(Array[(String, String)], Array[String]), String] {
+) -> Result[(Array[(String, String)], Array[String], String?), String] {
   let settings : Json = { "service": service }
   let config = @openrpc.Config::from_json(settings) catch {
     error => return Err("OpenRPC conversion failed: " + error.message())
@@ -164,32 +165,33 @@ fn open_rpc_file(
     (
       [("openrpc.json", result.document.stringify(indent=2) + "\n")],
       result.warnings.map(w => warning_line(w.shape, w.message)),
+      Some(service),
     ),
   )
 }
 
 ///|
-/// The files of the output and the warnings of its converter.
+/// The files of the output, the warnings of its converter and the service it used.
 fn run_output(
   model : @smithy.Model,
   output : Output,
   selector : String?,
-) -> Result[(Array[(String, String)], Array[String]), String] {
+) -> Result[(Array[(String, String)], Array[String], String?), String] {
   match output {
     JsonAst =>
       try json_ast_file(model) catch {
         error => Err(error.to_string())
       } noraise {
-        files => Ok((files, []))
+        files => Ok((files, [], None))
       }
     Idl =>
       try idl_files(model) catch {
         error => Err(error.to_string())
       } noraise {
-        files => Ok((files, []))
+        files => Ok((files, [], None))
       }
-    Selector => selector_file(model, selector).map(files => (files, []))
-    JsonSchema => json_schema_file(model).map(files => (files, []))
+    Selector => selector_file(model, selector).map(files => (files, [], None))
+    JsonSchema => json_schema_file(model).map(files => (files, [], None))
     OpenApi30 | OpenApi31 | OpenRpc =>
       match pick_service(model, output) {
         Err(reason) => Err(reason)
@@ -222,7 +224,8 @@ fn transform(
     Err((reason, kind)) => Blocked(seq~, reason~, kind~)
     Ok(assembled) =>
       match run_output(assembled, output, selector) {
-        Ok((files, warnings)) => Transformed(seq~, files~, warnings~)
+        Ok((files, warnings, service)) =>
+          Transformed(seq~, files~, warnings~, service~)
         Err(reason) => blocked(seq~, reason~)
       }
   }
