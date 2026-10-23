@@ -8,7 +8,15 @@ import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/x@0.5.5",
   "moonrockz/smithy@0.0.0",
+  "moonrockz/smithy-syntax@0.0.0",
+  "moonrockz/smithy-validation@0.0.0",
+  "moonrockz/smithy-jsonschema@0.0.0",
+  "moonrockz/smithy-openapi@0.0.0",
+  "moonrockz/smithy-openrpc@0.0.0",
+  "moonbit-community/flate@0.2.0",
 }
+
+warnings = "-implicit_impl_as_method"
 
 license = "Apache-2.0"
 

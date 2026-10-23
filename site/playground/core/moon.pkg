@@ -1,0 +1,25 @@
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-syntax" @syntax,
+  "moonrockz/smithy-validation" @validation,
+  "moonrockz/smithy-validation/rpc",
+  "moonrockz/smithy-jsonschema" @jsonschema,
+  "moonrockz/smithy-openapi" @openapi,
+  "moonrockz/smithy-openrpc" @openrpc,
+  "moonbit-community/flate",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+}
+
+import {
+  "moonbitlang/x/fs",
+} for "wbtest"
+
+// The fs import serves examples_native_wbtest.mbt, which only the native target
+// compiles; the js check sees the import unused.
+
+warnings = "-unused_package"
+
+options(
+  targets: { "examples_native_wbtest.mbt": [ "native" ] },
+)

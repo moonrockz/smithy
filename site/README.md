@@ -12,7 +12,7 @@ The site is copied from the moonspec site (moonrockz/moonspec at commit
 it is not published, and `scripts/versions.mbtx` does not see it.
 
 `site/moon.work` lists the site (`.`) and the Smithy packages it needs from the same checkout
-(`../pkgs/smithy`, and the packages that one imports). `moon` finds this file first when you work inside
+(`../pkgs/smithy`, `../pkgs/smithy-validation`, the JSON Schema, OpenAPI and OpenRPC converters, and the packages that those import). `moon` finds this file first when you work inside
 `site/`, so an import of `moonrockz/smithy` resolves to the checkout and never to mooncakes.io.
 `site/moon.mod` imports `moonrockz/smithy@0.0.0`. A workspace member needs no real version, so a release
 does not change this line. To import another Smithy package, add its directory to `site/moon.work` and
@@ -102,6 +102,7 @@ changes, update the four files and the constants together.
 | `data` | site configuration and page data (JSON in `<meta name="smithy-data">`) |
 | `shell` | the rabbita component: model, update, views |
 | `app` | browser entry: hydrates the pre-rendered page |
+| `playground/core` | pure MoonBit core of the playground: requests, responses, transcript stepping and share links (native and js tests) |
 | `prerender` | native: renders every route, writes content copies and the search index |
 | `linkcheck` | native: checks links, routes and the search index of a build |
 
