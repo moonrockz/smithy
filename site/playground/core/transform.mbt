@@ -1,4 +1,10 @@
 ///|
+/// A response for a request that did not run for a reason other than model errors.
+fn blocked(seq~ : Int32, reason~ : String) -> Response {
+  Blocked(seq~, reason~, kind=Other)
+}
+
+///|
 /// The user services of the model, by shape ID.
 fn user_services(model : @smithy.Model) -> Array[@smithy.Shape] {
   let services = []
@@ -25,16 +31,32 @@ fn speaks_json_rpc_2(shape : @smithy.Shape) -> Bool {
 }
 
 ///|
-/// The first service by shape ID that the output can use.
+/// Whether the service has a protocol trait: a trait whose definition has
+/// `smithy.api#protocolDefinition`. The OpenAPI converter looks for the same.
+fn has_protocol_trait(model : @smithy.Model, shape : @smithy.Shape) -> Bool {
+  for id, _ in shape.traits {
+    if model.shapes.get(id) is Some(definition) &&
+      definition.trait_value("smithy.api#protocolDefinition") is Some(_) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// The first service by shape ID that the output can use. OpenRPC needs a
+/// `jsonRpc` trait for version 2.0, as the CLI does. OpenAPI needs a protocol
+/// trait.
 fn pick_service(
   model : @smithy.Model,
   output : Output,
 ) -> Result[String, String] {
   let services = user_services(model)
-  let usable = if output == OpenRpc {
-    services.filter(speaks_json_rpc_2)
-  } else {
-    services
+  let usable = match output {
+    OpenRpc => services.filter(speaks_json_rpc_2)
+    OpenApi30 | OpenApi31 =>
+      services.filter(service => has_protocol_trait(model, service))
+    _ => services
   }
   match usable {
     [first, ..] => Ok(first.id.to_string())
@@ -42,11 +64,19 @@ fn pick_service(
       Err(
         if output == OpenRpc {
           "I found no service with a jsonRpc trait for version 2.0 in the model."
-        } else {
+        } else if services.is_empty() {
           "I found no service in the model."
+        } else {
+          "I found no service with a protocol trait in the model."
         },
       )
   }
+}
+
+///|
+/// A warning of a converter, as the CLI prints it.
+fn warning_line(shape : @smithy.ShapeId, message : String) -> String {
+  "WARNING: " + shape.to_string() + ": " + message
 }
 
 ///|
@@ -101,7 +131,7 @@ fn open_api_file(
   model : @smithy.Model,
   service : String,
   version : String,
-) -> Result[Array[(String, String)], String] {
+) -> Result[(Array[(String, String)], Array[String]), String] {
   let settings : Json = { "service": service, "version": version }
   let config = @openapi.Config::from_json(settings) catch {
     error => return Err("OpenAPI conversion failed: " + error.message())
@@ -110,14 +140,19 @@ fn open_api_file(
     error => return Err("OpenAPI conversion failed: " + error.message())
   }
   let name = config.service().shape_id().name() + ".openapi.json"
-  Ok([(name, result.document.stringify(indent=4) + "\n")])
+  Ok(
+    (
+      [(name, result.document.stringify(indent=4) + "\n")],
+      result.warnings.map(w => warning_line(w.shape, w.message)),
+    ),
+  )
 }
 
 ///|
 fn open_rpc_file(
   model : @smithy.Model,
   service : String,
-) -> Result[Array[(String, String)], String] {
+) -> Result[(Array[(String, String)], Array[String]), String] {
   let settings : Json = { "service": service }
   let config = @openrpc.Config::from_json(settings) catch {
     error => return Err("OpenRPC conversion failed: " + error.message())
@@ -125,30 +160,36 @@ fn open_rpc_file(
   let result = @openrpc.convert_result(model, config) catch {
     error => return Err("OpenRPC conversion failed: " + error.message())
   }
-  Ok([("openrpc.json", result.document.stringify(indent=2) + "\n")])
+  Ok(
+    (
+      [("openrpc.json", result.document.stringify(indent=2) + "\n")],
+      result.warnings.map(w => warning_line(w.shape, w.message)),
+    ),
+  )
 }
 
 ///|
+/// The files of the output and the warnings of its converter.
 fn run_output(
   model : @smithy.Model,
   output : Output,
   selector : String?,
-) -> Result[Array[(String, String)], String] {
+) -> Result[(Array[(String, String)], Array[String]), String] {
   match output {
     JsonAst =>
       try json_ast_file(model) catch {
         error => Err(error.to_string())
       } noraise {
-        files => Ok(files)
+        files => Ok((files, []))
       }
     Idl =>
       try idl_files(model) catch {
         error => Err(error.to_string())
       } noraise {
-        files => Ok(files)
+        files => Ok((files, []))
       }
-    Selector => selector_file(model, selector)
-    JsonSchema => json_schema_file(model)
+    Selector => selector_file(model, selector).map(files => (files, []))
+    JsonSchema => json_schema_file(model).map(files => (files, []))
     OpenApi30 | OpenApi31 | OpenRpc =>
       match pick_service(model, output) {
         Err(reason) => Err(reason)
@@ -173,16 +214,16 @@ fn transform(
     OpenApi30 | OpenApi31 =>
       match load_with_http_protocols(model) {
         Ok(loaded) => loaded
-        Err(reason) => return Blocked(seq~, reason~)
+        Err(reason) => return blocked(seq~, reason~)
       }
     _ => load(model)
   }
   match clean_model(loaded) {
-    Err(reason) => Blocked(seq~, reason~)
+    Err((reason, kind)) => Blocked(seq~, reason~, kind~)
     Ok(assembled) =>
       match run_output(assembled, output, selector) {
-        Ok(files) => Transformed(seq~, files~)
-        Err(reason) => Blocked(seq~, reason~)
+        Ok((files, warnings)) => Transformed(seq~, files~, warnings~)
+        Err(reason) => blocked(seq~, reason~)
       }
   }
 }

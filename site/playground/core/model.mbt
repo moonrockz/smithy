@@ -48,22 +48,30 @@ fn error_count(loaded : @smithy.LoadResult) -> Int32 {
 }
 
 ///|
-/// The model of a load without errors, or the reason to stop.
-fn clean_model(loaded : @smithy.LoadResult) -> Result[@smithy.Model, String] {
+/// The model of a load without errors, or the reason to stop and its kind.
+fn clean_model(
+  loaded : @smithy.LoadResult,
+) -> Result[@smithy.Model, (String, BlockKind)] {
   let errors = error_count(loaded)
   match loaded.model {
     Some(model) if errors == 0 => Ok(model)
     None if errors == 0 =>
       Err(
-        "I could not build a model from the text, and I have no error to show.",
+        (
+          "I could not build a model from the text, and I have no error to show.",
+          Other,
+        ),
       )
     _ =>
       Err(
-        if errors == 1 {
-          "The model has 1 error. Fix it in the Validate tab, then run again."
-        } else {
-          "The model has \{errors} errors. Fix them in the Validate tab, then run again."
-        },
+        (
+          if errors == 1 {
+            "The model has 1 error. Fix it in the Validate tab, then run again."
+          } else {
+            "The model has \{errors} errors. Fix them in the Validate tab, then run again."
+          },
+          ModelErrors,
+        ),
       )
   }
 }

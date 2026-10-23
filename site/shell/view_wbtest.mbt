@@ -557,6 +557,14 @@ async test "the playground page has the empty workbench and its script" {
   }
   assert_true(html.contains("smithy 0.0.1 · no server"))
   assert_true(html.contains("The model is being checked."))
+  // The Transform tab is in the page, and its output editor has its element.
+  for
+    text in [
+      "id=\"pg-output\"", "id=\"pg-output-kind\"", "<option value=\"openapi-3.1.0\">OpenAPI 3.1.0</option>",
+      "CLI: smithy convert --to json model.smithy", "id=\"pg-run\"", "Choose an output, then select Run.",
+    ] {
+    assert_true(html.contains(text))
+  }
   assert_true(html.contains("src=\"/smithy/playground/ui.js\""))
   // The site nav is on the page.
   assert_true(html.contains("class=\"ms-nav\""))

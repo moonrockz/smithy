@@ -3,6 +3,8 @@
 priv struct Runtime {
   data : @workbench.PlaygroundData
   mut worker : Worker?
+  /// The files of the newest transform, as (name, text). The model holds the names only.
+  mut files : Array[(String, String)]
   mut dispatch : (@workbench.Msg) -> Unit
 }
 
@@ -36,9 +38,35 @@ fn mark_json(items : Array[@workbench.Diagnostic]) -> String {
 }
 
 ///|
+fn output_of(output : @workbench.Output) -> @core.Output {
+  match output {
+    JsonAst => JsonAst
+    Idl => Idl
+    Selector => Selector
+    JsonSchema => JsonSchema
+    OpenApi30 => OpenApi30
+    OpenApi31 => OpenApi31
+    OpenRpc => OpenRpc
+  }
+}
+
+///|
+/// The language of the output editor for a file.
+fn language_of(name : String) -> String {
+  if name.has_suffix(".json") {
+    "json"
+  } else if name.has_suffix(".smithy") {
+    "smithy"
+  } else {
+    "plain"
+  }
+}
+
+///|
 /// The message for a reply of the Worker. A reply that is not for the
-/// Validate tab, or that does not decode, gives `None`.
-fn reply_msg(text : String) -> @workbench.Msg? {
+/// Validate or Transform tab, or that does not decode, gives `None`. The files of a
+/// transform stay in `runtime`.
+fn Runtime::reply_msg(self : Runtime, text : String) -> @workbench.Msg? {
   let response : @core.Response = @json.from_json(@json.parse(text)) catch {
     _ => return None
   }
@@ -50,8 +78,29 @@ fn reply_msg(text : String) -> @workbench.Msg? {
           answer=Validated(items=items.map(diagnostic_of), shapes~),
         ),
       )
-    Blocked(seq~, reason~) => Some(Answered(seq~, answer=NotRun(reason)))
-    Transformed(..) | TranscriptProgress(..) => None
+    Blocked(seq~, reason~, kind~) =>
+      Some(
+        Answered(
+          seq~,
+          answer=NotRun(
+            reason,
+            match kind {
+              ModelErrors => ModelErrors
+              Other => Other
+            },
+          ),
+        ),
+      )
+    Transformed(seq~, files~, warnings~) => {
+      self.files = files
+      Some(
+        Answered(
+          seq~,
+          answer=Transformed(files=files.map(file => file.0), warnings~),
+        ),
+      )
+    }
+    TranscriptProgress(..) => None
   }
 }
 
@@ -60,7 +109,7 @@ fn Runtime::start_worker(self : Runtime) -> Unit {
   self.worker = Some(
     Worker::start(
       self.data.worker,
-      text => if reply_msg(text) is Some(msg) { (self.dispatch)(msg) },
+      text => if self.reply_msg(text) is Some(msg) { (self.dispatch)(msg) },
       message => (self.dispatch)(WorkerFailed(message)),
     ),
   )
@@ -79,6 +128,29 @@ fn Runtime::run(self : Runtime, effect : @workbench.Effect) -> Unit {
         worker.post(@json.to_json(request).stringify())
       }
     }
+    SendTransform(seq~, output~, selector~) => {
+      let request = @core.Transform(
+        seq~,
+        model=editor_text(@workbench.EDITOR_ID),
+        output=output_of(output),
+        selector~,
+      )
+      if self.worker is Some(worker) {
+        worker.post(@json.to_json(request).stringify())
+      }
+    }
+    ShowFile(index) =>
+      if self.files.get(index) is Some((name, text)) {
+        editor_show(@workbench.OUTPUT_ID, text, language_of(name))
+      }
+    CopyFile(index) =>
+      if self.files.get(index) is Some((_, text)) {
+        copy_text(text, ok => (self.dispatch)(CopyDone(ok)))
+      }
+    DownloadFile(index) =>
+      if self.files.get(index) is Some((name, text)) {
+        download_text(name, text)
+      }
     LoadText(text) => editor_load(@workbench.EDITOR_ID, text)
     Mark(items) => editor_mark(@workbench.EDITOR_ID, mark_json(items))
     MoveCursor(line~, column~) =>
@@ -110,7 +182,7 @@ fn Runtime::perform(
 
 ///|
 fn app(data : @workbench.PlaygroundData) -> @rabbita.Val[@rabbita.Html] {
-  let runtime = { data, worker: None, dispatch: _ => (), }
+  let runtime = { data, worker: None, files: [], dispatch: _ => (), }
   let (model, emit) = @rabbita.create_state_with_init(
     init=emit => {
       let (m, effects) = @workbench.Model::start(data)
@@ -124,6 +196,9 @@ fn app(data : @workbench.PlaygroundData) -> @rabbita.Val[@rabbita.Html] {
           () => (runtime.dispatch)(Edited),
           (line, column) => (runtime.dispatch)(CursorMoved(line~, column~)),
         )
+        editor_create(@workbench.OUTPUT_ID, "", "json", true, () => (), (_, _) => {
+          ()
+        })
         runtime.start_worker()
         for effect in effects {
           runtime.run(effect)

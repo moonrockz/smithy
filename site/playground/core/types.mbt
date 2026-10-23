@@ -129,12 +129,26 @@ pub(all) struct SummaryView {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+/// Why a request did not run, for the page to choose its copy.
+pub(all) enum BlockKind {
+  /// The model has errors, and a transform needs a model without them.
+  ModelErrors
+  /// Any other reason; the `reason` text of the response says it.
+  Other
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
 pub(all) enum Response {
   Diagnostics(seq~ : Int32, items~ : Array[Diagnostic], shapes~ : Int32)
-  /// The files of a transform, as (name, text).
-  Transformed(seq~ : Int32, files~ : Array[(String, String)])
+  /// The files of a transform, as (name, text). `warnings` are the warnings
+  /// of the converter, each as the CLI prints it: `WARNING: <shape>: <message>`.
+  Transformed(
+    seq~ : Int32,
+    files~ : Array[(String, String)],
+    warnings~ : Array[String]
+  )
   /// The request did not run. `reason` says why, in a sentence.
-  Blocked(seq~ : Int32, reason~ : String)
+  Blocked(seq~ : Int32, reason~ : String, kind~ : BlockKind)
   /// The state of the check after a start or a step. `entries` lists every
   /// entry of the transcript, and `findings` lists all findings so far.
   TranscriptProgress(

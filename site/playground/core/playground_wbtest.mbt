@@ -36,6 +36,26 @@ fn blocked_reason(response : Response) -> String raise {
 }
 
 ///|
+fn blocked_kind(response : Response) -> BlockKind raise {
+  match response {
+    Blocked(kind~, ..) => kind
+    other =>
+      fail("I expected Blocked, but found \{@json.to_json(other).stringify()}")
+  }
+}
+
+///|
+fn warnings_of(response : Response) -> Array[String] raise {
+  match response {
+    Transformed(warnings~, ..) => warnings
+    other =>
+      fail(
+        "I expected Transformed, but found \{@json.to_json(other).stringify()}",
+      )
+  }
+}
+
+///|
 fn files_of(response : Response) -> Array[(String, String)] raise {
   match response {
     Transformed(files~, ..) => files
@@ -785,9 +805,116 @@ test "wire: handle_json blocks a request that it cannot read" {
       @json.parse(handle_json(session, text)),
     )
     match response {
-      Blocked(seq=-1, reason~) =>
+      Blocked(seq=-1, reason~, ..) =>
         assert_true(reason.has_prefix("I could not read the request"))
       other => fail(@json.to_json(other).stringify())
     }
   }
+}
+
+///|
+test "transform: OpenAPI picks the first service that has a protocol trait" {
+  let session = Session::new()
+  for output in [OpenApi30, OpenApi31] {
+    let files = files_of(
+      handle(
+        session,
+        Transform(seq=1, model=mixed_model, output~, selector=None),
+      ),
+    )
+    // AlphaRpc sorts first, but it has no protocol trait for OpenAPI.
+    assert_eq(files.map(file => file.0), ["Weather.openapi.json"])
+  }
+}
+
+///|
+test "transform: OpenRPC keeps the rule of the CLI: the first service with jsonRpc 2.0" {
+  let files = files_of(
+    handle(
+      Session::new(),
+      Transform(seq=1, model=versions_model, output=OpenRpc, selector=None),
+    ),
+  )
+  // OldRpc sorts first but speaks 1.0 only.
+  assert_true(files[0].1.contains("\"ping\""))
+  assert_true(files[0].1.contains("\"title\": \"NewRpc\""))
+}
+
+///|
+test "transform: OpenAPI of a model with no protocol trait is blocked with its reason" {
+  let session = Session::new()
+  // peers.smithy has services, but none has a protocol trait.
+  let response = handle(
+    session,
+    Transform(seq=1, model=chat_model, output=OpenApi30, selector=None),
+  )
+  assert_eq(
+    blocked_reason(response),
+    "I found no service with a protocol trait in the model.",
+  )
+  assert_eq(blocked_kind(response), Other)
+  let empty = handle(
+    session,
+    Transform(seq=1, model="", output=OpenApi31, selector=None),
+  )
+  assert_eq(blocked_reason(empty), "I found no service in the model.")
+  assert_eq(blocked_kind(empty), Other)
+}
+
+///|
+test "transform: a model with errors is blocked with the kind ModelErrors" {
+  let session = Session::new()
+  for output in [JsonAst, OpenApi30, OpenRpc] {
+    assert_eq(
+      blocked_kind(
+        handle(
+          session,
+          Transform(seq=1, model=bad_model, output~, selector=None),
+        ),
+      ),
+      ModelErrors,
+    )
+  }
+  // A bad selector is not a model error.
+  assert_eq(
+    blocked_kind(
+      handle(
+        session,
+        Transform(seq=1, model=chat_model, output=Selector, selector=Some("")),
+      ),
+    ),
+    Other,
+  )
+}
+
+///|
+test "transform: converter warnings come as the CLI prints them" {
+  let session = Session::new()
+  let response = handle(
+    session,
+    Transform(seq=1, model=warning_model, output=OpenApi30, selector=None),
+  )
+  assert_eq(warnings_of(response), [
+    "WARNING: example.web#GetCity: OpenAPI omits unsupported HTTP method `CONNECT`",
+  ])
+  // A conversion with no warning has an empty list, and so has an output
+  // that does not convert.
+  assert_eq(
+    warnings_of(
+      handle(
+        session,
+        Transform(seq=1, model=web_model, output=OpenApi31, selector=None),
+      ),
+    ),
+    [],
+  )
+  assert_eq(
+    warnings_of(
+      handle(
+        session,
+        Transform(seq=1, model=chat_model, output=JsonAst, selector=None),
+      ),
+    ),
+    [],
+  )
 }

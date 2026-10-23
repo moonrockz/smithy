@@ -294,27 +294,27 @@ pub fn Session::start_transcript(
       match @rpc.ProtocolVersion::parse(text) {
         Some(parsed) => Some(parsed)
         None =>
-          return Blocked(seq~, reason="I expected 1.0 or 2.0 for the version.")
+          return blocked(seq~, reason="I expected 1.0 or 2.0 for the version.")
       }
   }
   if format == Jsonl && given is None {
-    return Blocked(
+    return blocked(
       seq~,
       reason="A JSONL log gives no JSON-RPC version. I need version 1.0 or 2.0.",
     )
   }
   let assembled = match clean_model(load(model)) {
     Ok(assembled) => assembled
-    Err(reason) => return Blocked(seq~, reason~)
+    Err((reason, kind)) => return Blocked(seq~, reason~, kind~)
   }
   guard @smithy.ShapeId::parse(protocol) is Some(id) else {
-    return Blocked(
+    return blocked(
       seq~,
       reason="I expected a shape ID for the protocol, but found '\{protocol}'.",
     )
   }
   guard assembled.shapes.get(id) is Some(_) else {
-    return Blocked(seq~, reason="I found no shape \{protocol} in the model.")
+    return blocked(seq~, reason="I found no shape \{protocol} in the model.")
   }
   let (document, read_findings) = match format {
     Markdown => {
@@ -335,7 +335,7 @@ pub fn Session::start_transcript(
       if read_findings.any(is_error) {
         return unread_document(seq, document.unwrap(), read_findings)
       }
-      return Blocked(
+      return blocked(
         seq~,
         reason="The transcript gives no JSON-RPC version. Add version: 1.0 or version: 2.0 to it.",
       )
@@ -344,7 +344,7 @@ pub fn Session::start_transcript(
   let description = @rpc.ProtocolDescription::from_smithy(
     assembled, id, version,
   ) catch {
-    error => return Blocked(seq~, reason=protocol_error(error))
+    error => return blocked(seq~, reason=protocol_error(error))
   }
   let active = match document {
     Some(document) => {
@@ -370,11 +370,11 @@ pub fn Session::start_transcript(
     None => {
       let mapping = match log_mapping(log_preset, description) {
         Ok(mapping) => mapping
-        Err(reason) => return Blocked(seq~, reason~)
+        Err(reason) => return blocked(seq~, reason~)
       }
       let reader = @rpc.LogReader::new(mapping) catch {
         @validation.ConfigurationError(message) =>
-          return Blocked(seq~, reason=message)
+          return blocked(seq~, reason=message)
       }
       let (entries, problems) = reader.push_text(text)
       let (more_entries, more_problems) = reader.end()
@@ -405,7 +405,7 @@ pub fn Session::start_transcript(
 ///|
 fn step_transcript(session : Session, seq : Int32, count : Int32) -> Response {
   guard session.active is Some(active) else {
-    return Blocked(
+    return blocked(
       seq~,
       reason="I have no transcript to check. Start one first.",
     )

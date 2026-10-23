@@ -129,7 +129,7 @@ test "answer: an answer to an older request never replaces a newer result" {
 ///|
 test "answer: a refused request shows the reason and clears the marks" {
   let (m, _) = Model::start(data())
-  let (m, effects) = update(m, Answered(seq=1, answer=NotRun("No.")))
+  let (m, effects) = update(m, Answered(seq=1, answer=NotRun("No.", Other)))
   assert_eq(m.check, Refused("No."))
   assert_eq(effects, [Mark([])])
 }
@@ -354,4 +354,195 @@ test "stale: a result for older text does not move the cursor" {
   // While the newest text is checked, the old rows stay stale.
   let (checking, _) = update(stale, Debounced(edits=1))
   assert_false(checking.is_current())
+}
+
+///|
+fn done_files(names : Array[String]) -> Answer {
+  Transformed(files=names, warnings=["WARNING: a#S: OpenAPI omits something"])
+}
+
+///|
+test "transform: Run sends the output and, for a selector, the selector" {
+  let m = answered()
+  let (m, effects) = update(m, RunClicked)
+  assert_eq(m.tx, TxRunning)
+  assert_eq(effects, [
+    SendTransform(seq=2, output=JsonAst, selector=None),
+    Wait(ms=timeout_ms, then=TimedOut(seq=2)),
+  ])
+  let m = answered()
+  let (m, _) = run(m, [OutputChosen(Selector), SelectorEdited("string")])
+  let (_, effects) = update(m, RunClicked)
+  assert_eq(
+    effects[0],
+    SendTransform(seq=2, output=Selector, selector=Some("string")),
+  )
+}
+
+///|
+test "transform: the answer shows the first file and keeps the warnings" {
+  let (m, _) = update(answered(), RunClicked)
+  let (m, effects) = update(
+    m,
+    Answered(seq=2, answer=done_files(["a.smithy", "b.smithy"])),
+  )
+  assert_false(m.waiting)
+  assert_eq(effects, [ShowFile(0)])
+  assert_eq(
+    m.tx,
+    TxDone(
+      output=JsonAst,
+      files=["a.smithy", "b.smithy"],
+      warnings=["WARNING: a#S: OpenAPI omits something"],
+      file=0,
+      edits=0,
+    ),
+  )
+  // A second file shows on request, and Copy and Download name it.
+  let (m, effects) = update(m, FileChosen(1))
+  assert_eq(effects, [ShowFile(1)])
+  assert_eq(update(m, CopyClicked).1, [CopyFile(1)])
+  assert_eq(update(m, DownloadClicked).1, [DownloadFile(1)])
+  assert_eq(update(m, FileChosen(5)).1, [])
+  // The clipboard answer shows once, and a new run clears it.
+  let (m, _) = update(m, CopyDone(true))
+  assert_eq(m.copy, Copied)
+  let (m, _) = update(m, RunClicked)
+  assert_eq(m.copy, NotCopied)
+}
+
+///|
+test "transform: Copy and Download do nothing before an output exists" {
+  let m = answered()
+  assert_eq(update(m, CopyClicked).1, [])
+  assert_eq(update(m, DownloadClicked).1, [])
+}
+
+///|
+test "transform: a blocked run keeps its kind, so the page chooses its copy" {
+  let (m, _) = update(answered(), RunClicked)
+  let (errors, _) = update(
+    m,
+    Answered(seq=2, answer=NotRun("The model has 1 error.", ModelErrors)),
+  )
+  assert_eq(
+    errors.tx,
+    TxBlocked(reason="The model has 1 error.", by=ModelErrors),
+  )
+  let (other, _) = update(
+    m,
+    Answered(seq=2, answer=NotRun("I found no service in the model.", Other)),
+  )
+  assert_eq(
+    other.tx,
+    TxBlocked(reason="I found no service in the model.", by=Other),
+  )
+  // The check of the Validate tab does not change.
+  assert_eq(other.check, answered().check)
+}
+
+///|
+test "queue: Run while a check runs waits, and goes before the pending check" {
+  // Start: the first check runs.
+  let (m, _) = Model::start(data())
+  let (m, effects) = update(m, RunClicked)
+  assert_eq(effects, [])
+  assert_true(m.run_pending)
+  assert_eq(m.tx, TxRunning)
+  // A change while the check runs also waits.
+  let (m, _) = update(m, Edited)
+  let (m, effects) = update(m, Debounced(edits=1))
+  assert_eq(effects, [])
+  assert_true(m.pending)
+  // The check ends: only the transform goes to the Worker.
+  let (m, effects) = update(
+    m,
+    Answered(seq=1, answer=Validated(items=[], shapes=1)),
+  )
+  // The answer is for older text, so it does not show.
+  assert_eq(effects.length(), 2)
+  assert_eq(effects[0], SendTransform(seq=2, output=JsonAst, selector=None))
+  assert_false(m.run_pending)
+  assert_true(m.pending)
+  assert_eq(m.inflight, Transforming)
+  // The transform ends: the newest text goes next, once.
+  let (m, effects) = update(
+    m,
+    Answered(seq=2, answer=done_files(["model.json"])),
+  )
+  assert_eq(effects, [
+    ShowFile(0),
+    SendValidate(seq=3),
+    Wait(ms=timeout_ms, then=TimedOut(seq=3)),
+  ])
+  assert_eq(m.inflight, Validating)
+  assert_false(m.pending)
+}
+
+///|
+test "queue: a change while a transform runs posts nothing until it ends" {
+  let (m, _) = update(answered(), RunClicked)
+  let (m, _) = update(m, Edited)
+  let (m, effects) = update(m, Debounced(edits=1))
+  assert_eq(effects, [])
+  // A second Run does not queue a second transform.
+  let (m, effects) = update(m, RunClicked)
+  assert_eq(effects, [])
+  assert_false(m.run_pending)
+  // The output shows for the old text, and the tab can see that.
+  let (m, _) = update(m, Answered(seq=2, answer=done_files(["model.json"])))
+  match m.tx {
+    TxDone(edits~, ..) => assert_eq(edits, 0)
+    _ => fail("I expected TxDone.")
+  }
+  assert_eq(m.edits, 1)
+  assert_eq(m.seq, 3)
+}
+
+///|
+test "queue: a transform that is stale at its answer still shows" {
+  let (m, _) = update(answered(), RunClicked)
+  let (m, _) = update(m, Edited)
+  let (m, _) = update(m, Answered(seq=2, answer=done_files(["model.json"])))
+  assert_true(m.tx is TxDone(..))
+}
+
+///|
+test "queue: a transform that times out restarts the Worker and keeps the check" {
+  let (m, _) = update(answered(), RunClicked)
+  let check = m.check
+  let (m, effects) = update(m, TimedOut(seq=2))
+  assert_eq(m.tx, TxStopped)
+  assert_eq(effects, [RestartWorker])
+  assert_eq(m.check, check)
+  assert_false(m.waiting)
+  // Run again works at once.
+  assert_eq(update(m, RunClicked).1.length(), 2)
+}
+
+///|
+test "queue: a Worker error during a transform shows in the tab only" {
+  let (m, _) = update(answered(), RunClicked)
+  let check = m.check
+  let (m, effects) = update(m, WorkerFailed("boom"))
+  assert_eq(m.tx, TxFailed("boom"))
+  assert_eq(effects, [RestartWorker])
+  assert_eq(m.check, check)
+}
+
+///|
+test "queue: a check that times out with a Run waiting sends the transform" {
+  let (m, _) = Model::start(data())
+  let (m, _) = update(m, RunClicked)
+  let (m, effects) = update(m, TimedOut(seq=1))
+  assert_eq(m.check, Stopped)
+  assert_eq(effects[0], RestartWorker)
+  assert_eq(effects[2], SendTransform(seq=2, output=JsonAst, selector=None))
+}
+
+///|
+test "stale: the diagnostics stay current while a transform runs" {
+  let (m, _) = update(answered(), RunClicked)
+  assert_true(m.is_current())
+  assert_false(m.checking())
 }

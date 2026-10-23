@@ -20,6 +20,10 @@ fn plural(n : Int32, one : String, many : String) -> String {
 pub const EDITOR_ID : String = "pg-editor"
 
 ///|
+/// The id of the element that the output editor mounts in.
+pub const OUTPUT_ID : String = "pg-output"
+
+///|
 /// The id of the element that the playground mounts in.
 pub const APP_ID : String = "pg-app"
 
@@ -58,7 +62,7 @@ fn toolbar(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
 
 ///|
 fn check_status(m : Model) -> Html {
-  let checking = if m.waiting {
+  let checking = if m.checking() {
     [@html.span(class="pg-hint", " · checking")]
   } else {
     []
@@ -271,16 +275,312 @@ fn validate_panel(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
 }
 
 ///|
+pub fn Output::label(self : Output) -> String {
+  match self {
+    JsonAst => "JSON AST"
+    Idl => "Formatted IDL"
+    Selector => "Selector query"
+    JsonSchema => "JSON Schema"
+    OpenApi30 => "OpenAPI 3.0.2"
+    OpenApi31 => "OpenAPI 3.1.0"
+    OpenRpc => "OpenRPC 1.3.2"
+  }
+}
+
+///|
+pub let outputs : Array[Output] = [
+  JsonAst,
+  Idl,
+  Selector,
+  JsonSchema,
+  OpenApi30,
+  OpenApi31,
+  OpenRpc,
+]
+
+///|
+/// The name of an output in the `value` of the picker.
+fn Output::key(self : Output) -> String {
+  match self {
+    JsonAst => "json-ast"
+    Idl => "idl"
+    Selector => "selector"
+    JsonSchema => "json-schema"
+    OpenApi30 => "openapi-3.0.2"
+    OpenApi31 => "openapi-3.1.0"
+    OpenRpc => "openrpc"
+  }
+}
+
+///|
+fn output_of_key(key : String) -> Output? {
+  outputs.iter().find_first(output => output.key() == key)
+}
+
+///|
+/// The text in single quotes for a POSIX shell.
+fn shell_quote(text : String) -> String {
+  "'" + text.replace_all(old="'", new="'\\''") + "'"
+}
+
+///|
+/// The CLI command that gives the same output. JSON Schema, OpenAPI and
+/// OpenRPC are plugins of `smithy build`, so the hint names the plugin and
+/// its settings. An IDL output with several files needs `--output-dir`.
+pub fn cli_hint(output : Output, selector : String, files : Int32) -> String {
+  match output {
+    JsonAst => "smithy convert --to json model.smithy"
+    Idl =>
+      if files > 1 {
+        "smithy convert --to idl --output-dir DIR model.smithy"
+      } else {
+        "smithy convert --to idl model.smithy"
+      }
+    Selector => "smithy select --selector \{shell_quote(selector)} model.smithy"
+    JsonSchema =>
+      "smithy build --config smithy-build.json, with the plugin \"jsonSchema\""
+    OpenApi30 =>
+      "smithy build --config smithy-build.json, with the plugin \"openapi\" and \"version\": \"3.0.2\""
+    OpenApi31 =>
+      "smithy build --config smithy-build.json, with the plugin \"openapi\" and \"version\": \"3.1.0\""
+    OpenRpc =>
+      "smithy build --config smithy-build.json, with the plugin \"openrpc\""
+  }
+}
+
+///|
+fn transform_controls(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
+  let options = outputs.map(output => {
+    @html.option(
+      value=output.key(),
+      selected=output == m.output,
+      output.label(),
+    )
+  })
+  let selector = if m.output == Selector {
+    [
+      @html.input(
+        id="pg-selector",
+        class="pg-input",
+        placeholder="structure > member",
+        value=m.selector,
+        on_input=emit.map(text => SelectorEdited(text)),
+        attrs=@html.Attrs::build().aria_label("Selector"),
+      ),
+    ]
+  } else {
+    []
+  }
+  let done = m.tx is TxDone(..)
+  @html.div(class="pg-rowctl", [
+    @html.label(class="pg-hint", for_="pg-output-kind", "Output"),
+    @html.select(
+      id="pg-output-kind",
+      class="pg-select",
+      on_change=emit.map(key => {
+        match output_of_key(key) {
+          Some(output) => OutputChosen(output)
+          None => OutputChosen(m.output)
+        }
+      }),
+      options,
+    ),
+    @html.div(class="pg-selector-slot", selector),
+    @html.button(
+      id="pg-run",
+      class="pg-btn pg-btn-primary",
+      disabled=m.tx == TxRunning,
+      on_click=emit(RunClicked),
+      if m.tx == TxRunning {
+        "Running"
+      } else {
+        "Run"
+      },
+    ),
+    @html.span(class="pg-spacer", ([] : Array[Html])),
+    @html.button(
+      id="pg-copy",
+      class="pg-btn",
+      disabled=!done,
+      on_click=emit(CopyClicked),
+      "Copy",
+    ),
+    @html.button(
+      id="pg-download-output",
+      class="pg-btn",
+      disabled=!done,
+      on_click=emit(DownloadClicked),
+      "Download",
+    ),
+  ])
+}
+
+///|
+fn transform_notice(m : Model) -> Array[Html] {
+  match m.tx {
+    TxIdle =>
+      [
+        @html.p(
+          class="pg-empty",
+          "Choose an output, then select Run. The playground converts the model in your browser.",
+        ),
+      ]
+    TxRunning =>
+      [@html.p(class="pg-empty", "The playground runs the transform.")]
+    TxBlocked(reason~, by~) =>
+      [
+        @html.p(
+          class="pg-notice",
+          match by {
+            ModelErrors =>
+              "The model has errors. Fix them in the Validate tab first."
+            Other => reason
+          },
+        ),
+      ]
+    TxStopped =>
+      [
+        @html.p(
+          class="pg-notice",
+          "The transform took more than 10 seconds, so the playground stopped it and started a new Worker. Select Run to try again.",
+        ),
+      ]
+    TxFailed(message) => {
+      let detail = if message == "" {
+        []
+      } else {
+        [@html.code(class="pg-detail", message)]
+      }
+      [
+        @html.div(
+          class="pg-notice",
+          [
+            @html.p(
+              "The transform failed because the Worker stopped with an error. The playground started a new Worker. Select Run to try again.",
+            ),
+            ..detail,
+          ],
+        ),
+      ]
+    }
+    TxDone(files~, edits~, ..) => {
+      let stale = if edits != m.edits {
+        [
+          @html.p(
+            class="pg-stale",
+            "The model changed after this run. Select Run to update the output.",
+          ),
+        ]
+      } else {
+        []
+      }
+      let copy = match m.copy {
+        NotCopied => []
+        Copied => [@html.p(class="pg-hint", "Copied to the clipboard.")]
+        CopyFailed =>
+          [
+            @html.p(
+              class="pg-stale",
+              "The browser did not let the playground copy. Select the text and copy it.",
+            ),
+          ]
+      }
+      let empty = if files.is_empty() {
+        [@html.p(class="pg-empty", "The transform gave no file.")]
+      } else {
+        []
+      }
+      [..stale, ..copy, ..empty]
+    }
+  }
+}
+
+///|
+fn file_picker(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
+  match m.tx {
+    TxDone(files~, file~, ..) if files.length() > 1 =>
+      files.mapi((i, name) => {
+        @html.button(
+          class=if i == file { "pg-file pg-file-on" } else { "pg-file" },
+          on_click=emit(FileChosen(i)),
+          name,
+        )
+      })
+    _ => []
+  }
+}
+
+///|
+fn warning_list(m : Model) -> Array[Html] {
+  match m.tx {
+    TxDone(warnings~, ..) if !warnings.is_empty() =>
+      [
+        @html.div(
+          class="pg-warnings",
+          [
+            @html.b(plural(warnings.length(), "warning", "warnings")),
+            ..warnings.map(line => @html.div(class="pg-warning", line)),
+          ],
+        ),
+      ]
+    _ => []
+  }
+}
+
+///|
+fn transform_panel(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
+  let (output, files) = match m.tx {
+    TxDone(output~, files~, ..) => (output, files.length())
+    _ => (m.output, 0)
+  }
+  let has_output = match m.tx {
+    TxDone(files~, ..) => !files.is_empty()
+    _ => false
+  }
+  let protocol_note = if m.output == OpenApi30 || m.output == OpenApi31 {
+    [
+      @html.p(
+        class="pg-hint pg-note",
+        "Note: the Validate tab can show errors for a model with @restJson1, and the OpenAPI output can still work. The OpenAPI transform loads the bundled OpenAPI protocol definitions. The Validate tab checks the model as smithy validate does.",
+      ),
+    ]
+  } else {
+    []
+  }
+  // The output editor owns the children of its element. Every slot stays at
+  // the same place in every render, so the editor keeps its element.
+  [
+    transform_controls(m, emit),
+    @html.p(
+      class="pg-hint pg-cli",
+      "CLI: " + cli_hint(output, m.selector, files),
+    ),
+    @html.div(class="pg-notices", transform_notice(m)),
+    @html.div(class="pg-warnings-slot", warning_list(m)),
+    @html.div(class="pg-files", file_picker(m, emit)),
+    @html.div(
+      class=if has_output { "pg-outwrap" } else { "pg-outwrap pg-off" },
+      [@html.div(id=OUTPUT_ID, class="pg-editor", ([] : Array[Html]))],
+    ),
+    @html.div(class="pg-notes", protocol_note),
+  ]
+}
+
+///|
+fn panel(on : Bool, extra : String, children : Array[Html]) -> Html {
+  @html.div(
+    class=if on { "pg-panel " + extra } else { "pg-panel pg-off " + extra },
+    attrs=@html.Attrs::build().role("tabpanel"),
+    children,
+  )
+}
+
+///|
 fn results_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   let count = if m.errors() > 0 {
     [@html.span(class="pg-count", m.errors().to_string())]
   } else {
     []
-  }
-  let panel = match m.tab {
-    ValidateTab => validate_panel(m, emit)
-    TransformTab | TranscriptTab =>
-      [@html.p(class="pg-empty", "This tab is not available yet.")]
   }
   @html.section(class="pg-pane pg-results", [
     @html.div(class="pg-tabs", attrs=@html.Attrs::build().role("tablist"), [
@@ -288,11 +588,11 @@ fn results_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       tab_button(m, emit, TransformTab, "Transform", []),
       tab_button(m, emit, TranscriptTab, "Transcript", []),
     ]),
-    @html.div(
-      class="pg-panel",
-      attrs=@html.Attrs::build().role("tabpanel"),
-      panel,
-    ),
+    panel(m.tab == ValidateTab, "pg-validate", validate_panel(m, emit)),
+    panel(m.tab == TransformTab, "pg-transform", transform_panel(m, emit)),
+    panel(m.tab == TranscriptTab, "pg-transcript", [
+      @html.p(class="pg-empty", "This tab is not available yet."),
+    ]),
   ])
 }
 

@@ -131,6 +131,53 @@ let web_model : String =
   #|structure CityOutput { name: String }
 
 ///|
+/// Two services. `AlphaRpc` sorts first and has no protocol trait for OpenAPI.
+/// The Validate tab marks `restJson1` here, as for `web_model`; the OpenAPI
+/// transform loads the bundled protocol definitions.
+let mixed_model : String =
+  #|$version: "2"
+  #|namespace example.mixed
+  #|use aws.protocols#restJson1
+  #|use smithy.rpc#jsonRpc
+  #|use smithy.rpc#method
+  #|@jsonRpc(versions: ["2.0"])
+  #|service AlphaRpc { version: "1", operations: [Ping] }
+  #|@method(name: "ping", params: "either", positional: [], nullResult: true)
+  #|operation Ping {}
+  #|@restJson1
+  #|service Weather { version: "1", operations: [GetCity] }
+  #|@readonly
+  #|@http(method: "GET", uri: "/city")
+  #|operation GetCity { output: CityOutput }
+  #|structure CityOutput { name: String }
+
+///|
+/// Two JSON-RPC services. `OldRpc` sorts first and speaks version 1.0 only.
+let versions_model : String =
+  #|$version: "2"
+  #|namespace example.versions
+  #|use smithy.rpc#jsonRpc
+  #|use smithy.rpc#method
+  #|@jsonRpc(versions: ["1.0"])
+  #|service OldRpc { version: "1", operations: [Ping] }
+  #|@jsonRpc(versions: ["2.0"])
+  #|service NewRpc { version: "1", operations: [Ping] }
+  #|@method(name: "ping", params: "either", positional: [], nullResult: true)
+  #|operation Ping {}
+
+///|
+/// A restJson1 service with an HTTP method that OpenAPI omits.
+let warning_model : String =
+  #|$version: "2"
+  #|namespace example.web
+  #|use aws.protocols#restJson1
+  #|@restJson1
+  #|service Weather { version: "1", operations: [GetCity] }
+  #|@http(method: "CONNECT", uri: "/city")
+  #|operation GetCity { output: CityOutput }
+  #|structure CityOutput { name: String }
+
+///|
 /// The chat transcript of the mockup as a JSON document.
 let chat_json : String =
   #|{

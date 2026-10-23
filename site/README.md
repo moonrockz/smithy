@@ -112,6 +112,12 @@ the new page, so that no other page runs the playground script.
 | `playground/ui` | js: mounts the workbench in `#pg-app`, runs the effects: the editor, the Worker and the timers |
 | `playground/worker` | js: the Web Worker. It reads a `Request` as JSON, calls `core.handle` and posts the `Response` |
 | `playground/core` | the Smithy calls, with no browser (see below) |
+
+The Worker runs one request at a time (a Validate or a Transform). A change or a Run while a request runs waits
+for it: the Run goes first, then the newest text. The Transform tab keeps its output editor in the page at all
+times (`#pg-output`), and the page text of the files stays in `ui`, not in the workbench model.
+A `Blocked` response has a `kind` (`ModelErrors` or `Other`), so that the tab shows its own copy only for model
+errors. `Transformed` has the converter `warnings`, each as the CLI prints it.
 | `playground/editor` | JavaScript: CodeMirror 6, the Smithy stream language (the token kinds of `highlight`) and bracket folding |
 
 `scripts/site-build.mbtx` builds the two bundles: `moon build --target js --release` compiles `ui` and

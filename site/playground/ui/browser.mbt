@@ -36,6 +36,38 @@ extern "js" fn editor_load(id : String, text : String) -> Unit =
   #|(id, text) => globalThis.smithyEditors.load(id, text)
 
 ///|
+extern "js" fn editor_show(
+  id : String,
+  text : String,
+  language : String,
+) -> Unit =
+  #|(id, text, language) => globalThis.smithyEditors.show(id, text, language)
+
+///|
+/// Put the text on the clipboard. `done` gets true when the clipboard took it.
+/// A browser with no clipboard API gets false.
+extern "js" fn copy_text(text : String, done : (Bool) -> Unit) -> Unit =
+  #|(text, done) => {
+  #|  if (!navigator.clipboard || !navigator.clipboard.writeText) { done(false); return }
+  #|  navigator.clipboard.writeText(text).then(() => done(true), () => done(false))
+  #|}
+
+///|
+/// Save the text as a file on the computer of the user. The text goes nowhere else.
+extern "js" fn download_text(name : String, text : String) -> Unit =
+  #|(name, text) => {
+  #|  const type = name.endsWith('.json') ? 'application/json' : 'text/plain'
+  #|  const url = URL.createObjectURL(new Blob([text], { type: type + ';charset=utf-8' }))
+  #|  const link = document.createElement('a')
+  #|  link.href = url
+  #|  link.download = name
+  #|  document.body.appendChild(link)
+  #|  link.click()
+  #|  link.remove()
+  #|  setTimeout(() => URL.revokeObjectURL(url), 0)
+  #|}
+
+///|
 extern "js" fn editor_mark(id : String, items : String) -> Unit =
   #|(id, items) => globalThis.smithyEditors.mark(id, items)
 

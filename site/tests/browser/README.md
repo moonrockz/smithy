@@ -34,8 +34,10 @@ project `chromium`.
 | `smoke`: the default sample shows one error, the diagnostic moves the cursor, the fix gives the valid state (both channels) | Lightpanda |
 | `half-typed`: an unbalanced brace, a deleted `$version`, an empty editor, a burst of edits (review focus 1) | Lightpanda |
 | `worker`: a Worker that does not answer in 10 seconds is ended and a new one starts; a Worker that stops with an error is replaced at once, once | Lightpanda |
+| `transform`: JSON AST of the valid sample (first line `{`, `"smithy": "2.0"`), a selector, the blocked copy for model errors, the reason of the library for another block, the OpenAPI note, OpenRPC | Lightpanda |
 | `typing`: key input fixes the model; Ctrl-Shift-[ and ] fold and unfold; token colors | Chromium |
 | `large`: a pasted 1 MB model, typing while the Worker runs, the stopped check (review focus 2); typing bursts on a 100 KB model end in its result | Chromium |
+| `transform` (Chromium): Copy through the clipboard API, Download, OpenAPI for a model that Validate marks with warnings shown, an old output after a change, no page scroll at 360 and 1440 px with an output | Chromium |
 | `layout`: no page scroll at 360 px, stacked and side-by-side panes, links into and out of the playground | Chromium |
 
 Why some checks run on Chromium:

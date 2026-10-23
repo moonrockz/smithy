@@ -183,6 +183,26 @@ button.pg-diag:hover, button.pg-diag:focus-visible { background: var(--soft); }
 .pg-notice p { margin: 0; }
 .pg-detail { display: block; margin-top: 6px; font-size: 0.75rem; overflow-wrap: anywhere; }
 .pg-diag-stale { opacity: 0.6; }
+.pg-off, .pg-panel.pg-off, .pg-outwrap.pg-off { display: none; }
+.pg-transform { display: flex; flex-direction: column; }
+.pg-rowctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 14px; }
+.pg-selector-slot { display: contents; }
+.pg-input { min-width: 0; flex: 1 1 10rem; padding: 5px 9px; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--surface); color: var(--fg); font-family: var(--mono); font-size: 0.8125rem; }
+.pg-btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+.pg-cli { margin: 0; padding: 0 14px 8px; font-family: var(--mono); overflow-wrap: anywhere; }
+.pg-note { margin: 0; padding: 8px 14px 12px; }
+.pg-notices .pg-empty { margin: 0 0 8px; }
+.pg-stale { margin: 0; padding: 4px 14px; color: var(--warn); font-size: 0.75rem; }
+.pg-warnings { margin: 0 14px 8px; padding: 8px 12px; border-radius: 8px; background: var(--warn-soft); color: var(--warn);
+  font-size: 0.75rem; }
+.pg-warning { font-family: var(--mono); overflow-wrap: anywhere; }
+.pg-files { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px; }
+.pg-files:not(:empty) { padding-bottom: 8px; }
+.pg-file { padding: 3px 10px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface); color: var(--muted);
+  font: inherit; font-family: var(--mono); font-size: 0.75rem; cursor: pointer; }
+.pg-file-on { color: var(--fg); border-color: var(--accent); }
+.pg-outwrap { display: flex; flex-direction: column; flex: 1; min-height: 16rem; border-top: 1px solid var(--border); }
 
 /* Docs */
 .ms-docs { display: grid; grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr) minmax(11rem, 15rem); gap: 2rem;
@@ -293,6 +313,7 @@ button.pg-diag:hover, button.pg-diag:focus-visible { background: var(--soft); }
   .pg-bench { grid-template-columns: minmax(0, 1fr); grid-template-rows: 55vh auto; }
   .pg-splitter, .pg-fold-hint { display: none; }
   .pg-results { min-height: 40vh; border-top: 1px solid var(--border); }
+  .pg-outwrap { flex: none; height: 60vh; }
 }
 
 @media (max-width: 559px) {

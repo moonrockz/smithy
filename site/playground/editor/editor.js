@@ -1,6 +1,6 @@
 // The editors of the playground. The MoonBit script of the page (site/playground/ui) calls these
 // functions through `globalThis.smithyEditors`; each editor has the id of the element it is in.
-import { EditorState } from "@codemirror/state";
+import { Compartment, EditorState } from "@codemirror/state";
 import {
   EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers,
 } from "@codemirror/view";
@@ -72,6 +72,8 @@ const languages = {
 };
 
 const views = new Map();
+// The compartment of the language of each editor, so that the output editor can change language.
+const languageSlots = new Map();
 
 // Line and column (both from 1) to a document position, kept inside the document.
 function position(doc, line, column) {
@@ -98,6 +100,7 @@ const editors = {
       if (changed) onChange();
       if (cursor) onCursor(cursor[0], cursor[1]);
     };
+    const slot = new Compartment();
     const view = new EditorView({
       parent,
       state: EditorState.create({
@@ -123,7 +126,7 @@ const editors = {
             ...searchKeymap,
             ...lintKeymap,
           ]),
-          (languages[language] ?? (() => []))(),
+          slot.of((languages[language] ?? (() => []))()),
           syntaxHighlighting(highlight),
           theme,
           EditorState.readOnly.of(readOnly),
@@ -143,6 +146,7 @@ const editors = {
       }),
     });
     views.set(id, view);
+    languageSlots.set(id, slot);
   },
   text(id) {
     return views.get(id)?.state.doc.toString() ?? "";
@@ -151,6 +155,17 @@ const editors = {
     const view = views.get(id);
     if (!view) return;
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, selection: { anchor: 0 } });
+  },
+  // Replace the text and the language together. A language that the editor does not know is plain text.
+  show(id, text, language) {
+    const view = views.get(id);
+    if (!view) return;
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: text },
+      selection: { anchor: 0 },
+      effects: languageSlots.get(id).reconfigure((languages[language] ?? (() => []))()),
+      scrollIntoView: true,
+    });
   },
   // `items` is a JSON array of diagnostics: severity, code, message and the 1-based start and end.
   // A diagnostic with line 0 has no place in the text and gets no mark.
