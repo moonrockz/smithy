@@ -61,17 +61,48 @@ test("a 1 MB model keeps typing and the status bar live, and a stopped check nam
   expect(page.errors).toEqual([]);
 });
 
-test("typing bursts on a 100 KB model end in its result, not in a stopped check", async ({ page, context }) => {
-  test.setTimeout(90_000);
+// The time of one check of `model` in a Worker of this page, in milliseconds.
+async function timeOneCheck(page, model) {
+  return page.evaluate(async (text) => {
+    const data = JSON.parse(document.querySelector('meta[name="smithy-data"]').getAttribute("content"));
+    const worker = new Worker(data.playground.worker);
+    const ask = (seq, model) =>
+      new Promise((resolve) => {
+        worker.onmessage = (event) => resolve(event.data);
+        worker.postMessage(JSON.stringify(["Validate", { seq, model }]));
+      });
+    await ask(1, "namespace a\n"); // the first answer includes the start of the Worker
+    const started = performance.now();
+    await ask(2, text);
+    const ms = performance.now() - started;
+    worker.terminate();
+    return ms;
+  }, model);
+}
+
+// A model whose check takes about `target` milliseconds on this machine. The time of a check grows
+// with the square of the shape count, so the size follows from one timed check.
+async function modelForCheckTime(page, target) {
+  const probe = 40_000;
+  const ms = await timeOneCheck(page, largeModel(probe));
+  const size = Math.round(probe * Math.sqrt(target / Math.max(ms, 1)));
+  return largeModel(Math.min(Math.max(size, 10_000), 200_000));
+}
+
+test("typing bursts during a long check end in its result, not in a stopped check", async ({ page, context }) => {
+  test.setTimeout(120_000);
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await openPlayground(page, siteUrl("playground/"));
-  await page.evaluate((text) => navigator.clipboard.writeText(text), largeModel(100_000));
+  // One check takes about 3 s here, whatever the speed of the machine. The page allows 10 s.
+  const model = await modelForCheckTime(page, 3_000);
+  await page.evaluate((text) => navigator.clipboard.writeText(text), model);
   await page.locator("#pg-editor .cm-content").click();
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.press("ControlOrMeta+v");
-  // Four bursts, each after the 250 ms wait, while a check of a few seconds runs. Each check starts
-  // only when the one before it ends, so no check waits behind others and passes the 10 s limit.
-  for (let i = 0; i < 4; i++) {
+  // Six bursts, each after the 250 ms wait, while the check of the pasted text runs. If each wait sent
+  // a request, the last of seven 3 s checks would wait behind the others for more than 10 s and stop.
+  // With one request at a time, the newest text goes when the running check ends: about two checks.
+  for (let i = 0; i < 6; i++) {
     await page.waitForTimeout(400);
     await page.keyboard.type(`// burst ${i}\n`);
   }

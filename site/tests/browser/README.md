@@ -21,7 +21,8 @@ serves `_site` under `/smithy/` as GitHub Pages does, and `lightpanda serve --lo
 where the mise shim finds the Lightpanda of `site/mise.toml`). Lightpanda
 does not run a Web Worker without `--load-resources worker`. Outside CI, a server that already runs on the same
 port is used. The environment variables `SITE_DIR`, `SITE_PORT` and `LIGHTPANDA_CDP` change the defaults
-(`_site`, 8091, `http://127.0.0.1:9222`).
+(`_site`, 8091, `http://127.0.0.1:9222`). `SITE_CPU_THROTTLE=4` slows the Chromium pages 4 times through CDP, to
+approximate a slower CI runner; the Worker threads keep their speed.
 
 A file `*.lightpanda.spec.js` runs in the project `lightpanda`, and a file `*.chromium.spec.js` runs in the
 project `chromium`.
@@ -44,12 +45,12 @@ test of the root and the share link from `/next/` to the root use this rule.
 |---|---|
 | `probe`: a Web Worker runs the Smithy library; CodeMirror renders its DOM and reads a change of it; the clipboard API | Lightpanda |
 | `smoke`: the default sample shows one error, the diagnostic moves the cursor, the fix gives the valid state (`/next/`, and the root when it is this checkout) | Lightpanda |
-| `half-typed`: an unbalanced brace, a deleted `$version`, an empty editor, a burst of edits (review focus 1) | Lightpanda |
+| `half-typed`: an unbalanced brace, a deleted `$version`, an empty editor, a burst of edits, the old result marked as checking right after a change (review focus 1) | Lightpanda |
 | `worker`: a Worker that does not answer in 10 seconds is ended and a new one starts; a Worker that stops with an error is replaced at once, once; a Worker of another build (`seq` -1) gives the reload message at once; the Worker URL has `?v=<ref>` | Lightpanda |
 | `transform`: JSON AST of the valid sample (first line `{`, `"smithy": "2.0"`), a selector, the blocked copy for model errors, the reason of the library for another block, the OpenAPI note, OpenRPC | Lightpanda |
 | `transcript`: the chat variant gives TypeMismatch, RequiredMember and MissingResponse under their entries; Step one entry at a time and Reset; the editor log with its version and preset (the summary of the README); the empty states for a model with errors and a model with no protocol; a change after the check | Lightpanda |
 | `typing`: key input fixes the model; Ctrl-Shift-[ and ] fold and unfold; token colors | Chromium |
-| `large`: a pasted 1 MB model, typing while the Worker runs, the stopped check (review focus 2); typing bursts on a 100 KB model end in its result | Chromium |
+| `large`: a pasted 1 MB model, typing while the Worker runs, the stopped check (review focus 2); typing bursts during a check of about 3 s (the model is sized by one timed check on the machine) end in its result | Chromium |
 | `transform` (Chromium): Copy through the clipboard API, Download, OpenAPI for a model that Validate marks with warnings shown, an old output after a change, no page scroll at 360 and 1440 px with an output | Chromium |
 | `transcript` (Chromium): a log of 20,000 lines with Run all while typing in the model editor (review focus 2: frame gaps, findings before the end, at most 200 rows, the page does not scroll); no page scroll at 360 and 1440 px with findings; a click on the line of an entry | Chromium |
 | `share` (Lightpanda): a share round trip restores the model, the tab and every Transcript setting, and the Transform output and selector; a protocol that the model lacks is fitted; a corrupt, foreign-format, over-long and over-size link each show a message and the default example (review focus 5); a link from `/next/` opens on the root (when the root is this checkout); the "Open in playground" link decodes to the model of the example, also after a move from `/examples/` with no page load. The clipboard is missing, so the page shows the link | Lightpanda |

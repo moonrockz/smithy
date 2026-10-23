@@ -23,8 +23,14 @@ export const test = base.extend({
     await use(page);
     await browser.close();
   },
-  // A page in Playwright's Chromium.
+  // A page in Playwright's Chromium. SITE_CPU_THROTTLE=4 slows the page 4 times through CDP, to
+  // approximate a slower CI runner (the Worker threads keep their speed).
   page: async ({ page }, use) => {
+    const rate = Number(process.env.SITE_CPU_THROTTLE ?? 1);
+    if (rate > 1) {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send("Emulation.setCPUThrottlingRate", { rate });
+    }
     page.errors = collectErrors(page);
     await use(page);
   },
