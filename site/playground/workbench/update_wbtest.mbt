@@ -242,6 +242,25 @@ test "errors: warnings do not count as errors" {
 }
 
 ///|
+test "warnings: NOTE and SUGGESTION are not counted, as smithy validate does not print them" {
+  let (m, _) = Model::start(data())
+  let at = (line, severity) => { ..error_at(line), severity, }
+  let items = [
+    at(1, "WARNING"),
+    at(2, "NOTE"),
+    at(3, "SUGGESTION"),
+    at(4, "WARNING"),
+    at(5, "DANGER"),
+  ]
+  let (m, _) = update(
+    m,
+    Answered(seq=1, answer=Validated(items~, shapes=1, protocols=[])),
+  )
+  assert_eq(m.warnings(), 2)
+  assert_eq(m.errors(), 1)
+}
+
+///|
 test "answer: an answer for text that changed after the request is dropped" {
   let (m, _) = Model::start(data())
   // The text changes while the first request runs; its wait has not ended.

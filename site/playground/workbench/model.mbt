@@ -636,9 +636,11 @@ pub fn Model::errors(self : Model) -> Int32 {
 }
 
 ///|
+/// The WARNING findings. DANGER counts as an error (see `Diagnostic::is_error`).
+/// NOTE and SUGGESTION are not counted: `smithy validate` does not print them.
 pub fn Model::warnings(self : Model) -> Int32 {
   match self.check {
-    Checked(items~, ..) => items.filter(d => !d.is_error()).length()
+    Checked(items~, ..) => items.filter(d => d.severity == "WARNING").length()
     _ => 0
   }
 }
