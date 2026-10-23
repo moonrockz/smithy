@@ -143,6 +143,9 @@ code, pre, kbd { font-family: var(--mono); }
 .pg-select, .pg-btn { max-width: 100%; padding: 5px 9px; border: 1px solid var(--border); border-radius: 7px;
   background: var(--surface); color: var(--fg); font: inherit; font-size: 0.8125rem; }
 .pg-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.pg-sharestatus { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 0 var(--gutter);
+  font-size: 0.8125rem; overflow-wrap: anywhere; }
+.pg-sharestatus:not(:empty) { padding-top: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 .pg-hint { color: var(--muted); font-size: 0.75rem; }
 .pg-spacer { flex: 1; }
 .pg-pill { padding: 2px 8px; border-radius: 99px; background: var(--soft); color: var(--accent); font-size: 0.6875rem;
@@ -269,6 +272,8 @@ button.pg-diag:hover, button.pg-diag:focus-visible { background: var(--soft); }
 .ms-example-files ul { padding-left: 1.1rem; }
 .ms-example-files li { overflow-wrap: anywhere; }
 .ms-example-links { margin-top: 1.5rem; font-size: 0.875rem; }
+.ms-example-playground { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 1rem 0; }
+.ms-example-playground .ms-hint { color: var(--muted); font-size: 0.875rem; }
 .ms-edit { display: inline-block; margin-top: 1rem; font-size: 0.875rem; }
 .ms-toc { position: sticky; top: calc(var(--nav-h) + 1rem); align-self: start; display: flex; flex-direction: column; gap: 4px;
   font-size: 0.875rem; max-height: calc(100vh - var(--nav-h) - 2rem); overflow-y: auto; }

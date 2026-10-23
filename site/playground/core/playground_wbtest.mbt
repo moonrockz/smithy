@@ -292,7 +292,7 @@ test "transform: OpenRPC uses the first service with jsonRpc 2.0" {
 ///|
 test "transform: OpenAPI 3.0.2 and 3.1.0 load the restJson1 definition" {
   let session = Session::new()
-  for pair in [(OpenApi30, "3.0.2"), (OpenApi31, "3.1.0")] {
+  for pair in [(Output::OpenApi30, "3.0.2"), (Output::OpenApi31, "3.1.0")] {
     let files = files_of(
       handle(
         session,
@@ -309,7 +309,7 @@ test "transform: OpenAPI 3.0.2 and 3.1.0 load the restJson1 definition" {
 ///|
 test "transform: a model with errors is blocked" {
   let session = Session::new()
-  for output in [JsonAst, Idl, JsonSchema, OpenApi30, OpenRpc] {
+  for output in [Output::JsonAst, Idl, JsonSchema, OpenApi30, OpenRpc] {
     assert_eq(
       blocked_reason(
         handle(
@@ -1019,6 +1019,14 @@ test "share: a corrupt fragment gives a message" {
   }
   assert_eq(
     message("v2.abc"),
+    "I cannot read this link: it has the format v2, and I know only v1. It may come from a newer version of the site.",
+  )
+  assert_eq(
+    message("v10.abc"),
+    "I cannot read this link: it has the format v10, and I know only v1. It may come from a newer version of the site.",
+  )
+  assert_eq(
+    message("v.abc"),
     "I expected the link to start with v1. so I cannot read it.",
   )
   assert_eq(
@@ -1046,7 +1054,7 @@ test "share: a corrupt fragment gives a message" {
   assert_eq(message(pack("not json")), "The link does not hold JSON.")
   assert_eq(
     message(pack("{\"model\": 1}")),
-    "The link holds JSON that is not a playground state.",
+    "The link holds JSON that is not a playground state. It may come from another version of the site.",
   )
   assert_eq(
     message("v1." + base64url_encode(@flate.deflate_all(b"\xff\xfe"))),
@@ -1060,7 +1068,11 @@ test "share: a fragment over 8000 characters is rejected" {
   assert_true(long.length() > MAX_SHARE_LENGTH)
   assert_eq(
     decode_share(long),
-    Err(
+    Err("The link has 8003 characters. A link can have 8000 at most."),
+  )
+  assert_eq(
+    share_length_problem(long),
+    Some(
       "The link has 8003 characters. A link can have 8000 at most. Use Download instead.",
     ),
   )
@@ -1073,6 +1085,35 @@ test "share: a fragment over 8000 characters is rejected" {
   }
   let text = encode_share({ ..sample_state(), model: noise.to_string(), })
   assert_true(share_length_problem(text) is Some(_))
+}
+
+///|
+test "share: a state that inflates above the limit is rejected" {
+  // 3 MB of one letter packs to a few KB, so the link is short.
+  let big = { ..sample_state(), model: "a".repeat(3000000), }
+  let link = encode_share(big)
+  assert_true(link.length() < 8000)
+  assert_eq(share_length_problem(link), None)
+  match decode_share(link) {
+    Err(message) =>
+      assert_true(
+        message.has_prefix(
+          "The link unpacks to more than \{MAX_STATE_BYTES} bytes.",
+        ),
+      )
+    Ok(_) => fail("I expected the state above the limit to be rejected")
+  }
+  assert_true(share_state_problem(big) is Some(_))
+}
+
+///|
+test "share: a model of a few hundred KB still fits when its link is short" {
+  let state = { ..sample_state(), model: "// line\n".repeat(50000), }
+  assert_true(state.model.length() >= 400000)
+  assert_eq(share_state_problem(state), None)
+  let link = encode_share(state)
+  assert_eq(share_length_problem(link), None)
+  assert_eq(decode_share(link), Ok(state))
 }
 
 ///|
@@ -1127,7 +1168,7 @@ test "wire: handle_json blocks a request that it cannot read" {
 ///|
 test "transform: OpenAPI picks the first service that has a protocol trait" {
   let session = Session::new()
-  for output in [OpenApi30, OpenApi31] {
+  for output in [Output::OpenApi30, OpenApi31] {
     let response = handle(
       session,
       Transform(seq=1, model=mixed_model, output~, selector=None),
@@ -1176,7 +1217,7 @@ test "transform: OpenAPI of a model with no protocol trait is blocked with its r
 ///|
 test "transform: a model with errors is blocked with the kind ModelErrors" {
   let session = Session::new()
-  for output in [JsonAst, OpenApi30, OpenRpc] {
+  for output in [Output::JsonAst, OpenApi30, OpenRpc] {
     assert_eq(
       blocked_kind(
         handle(
@@ -1234,7 +1275,7 @@ test "transform: converter warnings come as the CLI prints them" {
 ///|
 test "transform: outputs that use no service report none" {
   let session = Session::new()
-  for output in [JsonAst, Idl, JsonSchema] {
+  for output in [Output::JsonAst, Idl, JsonSchema] {
     assert_eq(
       service_of(
         handle(

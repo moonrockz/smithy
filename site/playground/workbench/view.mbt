@@ -43,21 +43,68 @@ fn toolbar(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       options,
     ),
     @html.button(
+      id="pg-share",
       class="pg-btn",
-      disabled=true,
-      title="Not available yet",
+      title="Copy a link to this page with your model",
+      on_click=emit(ShareClicked),
       "Share link",
     ),
     @html.button(
+      id="pg-save",
       class="pg-btn",
-      disabled=true,
-      title="Not available yet",
+      title="Save the model, and on the Transcript tab the transcript, as files",
+      on_click=emit(SaveClicked),
       "Download",
     ),
     @html.span(class="pg-spacer", ([] : Array[Html])),
     @html.span(class="pg-pill", "Runs in your browser"),
     @html.span(class="pg-hint", "smithy \{m.data.version} · no server"),
   ])
+}
+
+///|
+/// The line under the toolbar: what the share button did, or why the page
+/// did not open a link. The element is always there, so a screen reader
+/// reads each change.
+fn share_status(m : Model) -> Html {
+  let content : Array[Html] = match m.share {
+    NoShare => []
+    LinkCopied(_) =>
+      [
+        @html.span(
+          class="pg-ok",
+          "The link is in the address bar and on your clipboard.",
+        ),
+      ]
+    LinkShown(url) =>
+      [
+        @html.span(
+          class="pg-hint",
+          "Your browser cannot use the clipboard. Copy this link:",
+        ),
+        @html.input(
+          id="pg-share-url",
+          class="pg-input",
+          value=url,
+          read_only=true,
+          attrs=@html.Attrs::build().aria_label("Link to this page"),
+        ),
+      ]
+    LinkTooLong(reason) => [@html.span(class="pg-err", reason)]
+    LinkRefused(reason) =>
+      [
+        @html.span(
+          class="pg-err",
+          reason + " I opened the default example instead.",
+        ),
+      ]
+  }
+  @html.div(
+    id="pg-share-status",
+    class="pg-sharestatus",
+    attrs=@html.Attrs::build().role("status"),
+    content,
+  )
 }
 
 ///|
@@ -275,8 +322,8 @@ fn validate_panel(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
 }
 
 ///|
-pub fn Output::label(self : Output) -> String {
-  match self {
+pub fn output_label(output : Output) -> String {
+  match output {
     JsonAst => "JSON AST"
     Idl => "Formatted IDL"
     Selector => "Selector query"
@@ -375,7 +422,7 @@ fn transform_controls(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
     @html.option(
       value=output.key(),
       selected=output == m.output,
-      output.label(),
+      output_label(output),
     )
   })
   let selector = if m.output == Selector {
@@ -624,6 +671,7 @@ fn results_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
 pub fn view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   @html.div(class="pg", [
     toolbar(m, emit),
+    share_status(m),
     @html.div(class="pg-bench", [
       model_pane(m),
       @html.div(class="pg-splitter", ([] : Array[Html])),

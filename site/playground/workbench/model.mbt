@@ -55,17 +55,7 @@ pub fn Diagnostic::is_error(self : Diagnostic) -> Bool {
 }
 
 ///|
-pub(all) enum Tab {
-  ValidateTab
-  TransformTab
-  TranscriptTab
-} derive(Eq, Debug)
-
-///|
-pub extend Tab with Eq::{equal, not_equal}
-
-///|
-pub extend Tab with @debug.Debug::{to_repr}
+pub using @samples {type Tab, type Output}
 
 ///|
 /// The result of the newest check that the page shows.
@@ -86,24 +76,6 @@ pub extend Check with Eq::{equal, not_equal}
 
 ///|
 pub extend Check with @debug.Debug::{to_repr}
-
-///|
-/// The transform that the Transform tab runs.
-pub(all) enum Output {
-  JsonAst
-  Idl
-  Selector
-  JsonSchema
-  OpenApi30
-  OpenApi31
-  OpenRpc
-} derive(Eq, Debug)
-
-///|
-pub extend Output with Eq::{equal, not_equal}
-
-///|
-pub extend Output with @debug.Debug::{to_repr}
 
 ///|
 /// Why the Worker did not run a request.
@@ -218,6 +190,44 @@ pub extend Copy with Eq::{equal, not_equal}
 pub extend Copy with @debug.Debug::{to_repr}
 
 ///|
+/// What the share button did, or why the page opened without the link that
+/// it was given.
+pub(all) enum Share {
+  NoShare
+  /// The URL of the link, which the clipboard took.
+  LinkCopied(String)
+  /// The URL of the link. The browser has no clipboard, so the page shows it.
+  LinkShown(String)
+  /// The state does not fit in a link. The text says why.
+  LinkTooLong(String)
+  /// The page could not open the link that it was given. The text says why.
+  LinkRefused(String)
+} derive(Eq, Debug)
+
+///|
+pub extend Share with Eq::{equal, not_equal}
+
+///|
+pub extend Share with @debug.Debug::{to_repr}
+
+///|
+/// How the page was opened.
+pub(all) enum Opened {
+  /// With no link in the address.
+  Default
+  /// With the state of a link.
+  Shared(@samples.ShareState)
+  /// With a link that the page could not read. The text says why.
+  Refused(String)
+} derive(Eq, Debug)
+
+///|
+pub extend Opened with Eq::{equal, not_equal}
+
+///|
+pub extend Opened with @debug.Debug::{to_repr}
+
+///|
 pub(all) struct Model {
   data : PlaygroundData
   sample : Int32
@@ -272,6 +282,7 @@ pub(all) struct Model {
   /// The cursor, from 1.
   line : Int32
   column : Int32
+  share : Share
 } derive(Eq, Debug)
 
 ///|
@@ -300,6 +311,12 @@ pub(all) enum Msg {
   /// The clipboard took the text (true) or refused it (false).
   CopyDone(Bool)
   DownloadClicked
+  /// The Share link button.
+  ShareClicked
+  /// The link was made, or could not be made.
+  ShareDone(Share)
+  /// The Download button of the toolbar.
+  SaveClicked
   SampleChosen(Int32)
   TabChosen(Tab)
   DiagnosticChosen(line~ : Int32, column~ : Int32)
@@ -344,6 +361,17 @@ pub(all) enum Effect {
   CopyFile(seq~ : Int32, index~ : Int32)
   /// Save this file of the output of the request `seq` on the computer of the user.
   DownloadFile(seq~ : Int32, index~ : Int32)
+  /// Make the link of the editors and these settings, put it in the address
+  /// and on the clipboard. The page answers with `ShareDone`.
+  MakeShare(
+    tab~ : Tab,
+    output~ : Output,
+    selector~ : String,
+    settings~ : Settings
+  )
+  /// Save the model, and the transcript in this format, as files on the
+  /// computer of the user.
+  SaveFiles(transcript~ : @samples.TranscriptFormat?)
   /// Replace the editor text.
   LoadText(String)
   /// Show these diagnostics in the editor.
@@ -387,6 +415,42 @@ pub const DEFAULT_SELECTOR : String = "structure > member"
 ///|
 /// The model of a new page, and the check of the first sample.
 pub fn Model::start(data : PlaygroundData) -> (Model, Array[Effect]) {
+  Model::start_with(data, Default)
+}
+
+///|
+/// The model of a new page that was opened as `opened` says, and the check of
+/// its model. The state of a link joins the pickers as "Shared link", so the
+/// page opens with its texts. The settings stay as the link gives them until
+/// the first check lists the protocols; then they fit the model.
+pub fn Model::start_with(
+  data : PlaygroundData,
+  opened : Opened,
+) -> (Model, Array[Effect]) {
+  let data = match opened {
+    Shared(state) => {
+      let transcript : @samples.TranscriptSample = {
+        title: "Shared link",
+        path: "",
+        protocol: state.protocol,
+        format: state.format,
+        version: state.version,
+        preset: state.log_preset,
+        text: state.transcript,
+      }
+      {
+        ..data,
+        samples: [
+          ..data.samples,
+          { title: "Shared link", path: "", model: state.model, },
+        ],
+        selected: data.samples.length(),
+        transcripts: [..data.transcripts, transcript],
+        transcript: data.transcripts.length(),
+      }
+    }
+    _ => data
+  }
   let sample = if data.selected >= 0 && data.selected < data.samples.length() {
     data.selected
   } else {
@@ -398,8 +462,12 @@ pub fn Model::start(data : PlaygroundData) -> (Model, Array[Effect]) {
   } else {
     0
   }
+  let complete = match opened {
+    Shared(state) => state.complete
+    _ => false
+  }
   let settings : Settings = match data.transcripts.get(transcript) {
-    Some(sample) => Settings::of_sample(sample)
+    Some(sample) => { ..Settings::of_sample(sample), complete, }
     None =>
       {
         protocol: "",
@@ -409,10 +477,21 @@ pub fn Model::start(data : PlaygroundData) -> (Model, Array[Effect]) {
         preset: DirMessage([]),
       }
   }
+  let output : Output = match opened {
+    Shared(state) => state.output
+    _ => JsonAst
+  }
+  let selector = match opened {
+    Shared({ selector: Some(selector), .. }) => selector
+    _ => DEFAULT_SELECTOR
+  }
   let m = {
     data,
     sample,
-    tab: ValidateTab,
+    tab: match opened {
+      Shared(state) => state.tab
+      _ => ValidateTab
+    },
     edits: 0,
     seq: 0,
     sent_edits: 0,
@@ -422,11 +501,11 @@ pub fn Model::start(data : PlaygroundData) -> (Model, Array[Effect]) {
     pending: false,
     run_pending: false,
     check: Unchecked,
-    output: JsonAst,
-    selector: DEFAULT_SELECTOR,
+    output,
+    selector,
     tx_edits: 0,
-    tx_output: JsonAst,
-    tx_selector: DEFAULT_SELECTOR,
+    tx_output: output,
+    tx_selector: selector,
     tx: TxIdle,
     copy: NotCopied,
     transcript,
@@ -441,6 +520,10 @@ pub fn Model::start(data : PlaygroundData) -> (Model, Array[Effect]) {
     tr_request: Starting,
     line: 1,
     column: 1,
+    share: match opened {
+      Refused(reason) => LinkRefused(reason)
+      _ => NoShare
+    },
   }
   m.send_validate()
 }
@@ -736,6 +819,32 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         TxDone(seq~, file~, ..) => (m, [DownloadFile(seq~, index=file)])
         _ => (m, [])
       }
+    ShareClicked =>
+      (
+        m,
+        [
+          MakeShare(
+            tab=m.tab,
+            output=m.output,
+            selector=m.selector,
+            settings=m.settings,
+          ),
+        ],
+      )
+    ShareDone(share) => ({ ..m, share, }, [])
+    SaveClicked =>
+      (
+        m,
+        [
+          SaveFiles(
+            transcript=if m.tab == TranscriptTab {
+              Some(m.settings.format)
+            } else {
+              None
+            },
+          ),
+        ],
+      )
     _ => transcript_update(m, msg)
   }
 }

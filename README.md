@@ -3,6 +3,7 @@
 A [Smithy](https://smithy.io/) implementation for the MoonBit ecosystem, organized as a monorepo.
 
 The docs site is at <https://moonrockz.github.io/smithy/>. Its source is in [`site/`](site/README.md).
+The playground at <https://moonrockz.github.io/smithy/playground/> validates models, converts them and checks JSON-RPC transcripts in your browser. It sends nothing to a server.
 
 ## Status
 

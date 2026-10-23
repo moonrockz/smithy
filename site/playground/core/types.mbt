@@ -1,19 +1,14 @@
 ///|
-/// The transform that the Transform tab runs.
-pub(all) enum Output {
-  JsonAst
-  Idl
-  Selector
-  JsonSchema
-  OpenApi30
-  OpenApi31
-  OpenRpc
-} derive(Eq, Debug, ToJson, FromJson)
-
-///|
 /// The transcript format and the log preset of a request are the types of the
 /// samples of the picker, so the page sends them with no conversion.
-pub using @samples {type TranscriptFormat, type Direction, type LogPreset}
+pub using @samples {
+  type TranscriptFormat,
+  type Direction,
+  type LogPreset,
+  type Output,
+  type Tab,
+  type ShareState,
+}
 
 ///|
 /// A message from the page to the Worker. `seq` comes back unchanged in the
@@ -181,27 +176,4 @@ pub(all) enum Response {
     done~ : Bool,
     summary~ : SummaryView?
   )
-} derive(Eq, Debug, ToJson, FromJson)
-
-///|
-pub(all) enum Tab {
-  ValidateTab
-  TransformTab
-  TranscriptTab
-} derive(Eq, Debug, ToJson, FromJson)
-
-///|
-/// What a share link holds.
-pub(all) struct ShareState {
-  model : String
-  transcript : String
-  tab : Tab
-  output : Output
-  protocol : String
-  format : TranscriptFormat
-  complete : Bool
-  selector : String?
-  log_preset : LogPreset?
-  /// The JSON-RPC version of a log.
-  version : String?
 } derive(Eq, Debug, ToJson, FromJson)

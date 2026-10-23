@@ -44,3 +44,37 @@ test "the playground has a search entry that names its samples" {
   assert_true(entry.text.contains("Chat with three findings"))
   assert_true(entry.text.contains("in the browser"))
 }
+
+///|
+test "an example with a model in the picker gets a fragment that opens that model" {
+  guard playground_data("..", "/smithy/") is Ok(data) else {
+    fail("the samples did not load")
+  }
+  guard example_fragment("json-rpc", data) is Ok(Some(fragment)) else {
+    fail("json-rpc has a model in the picker")
+  }
+  guard @core.decode_share(fragment) is Ok(state) else {
+    fail("the fragment does not decode")
+  }
+  assert_eq(
+    state.model,
+    @fs.read_file_to_string("../examples/json-rpc/peers.smithy"),
+  )
+  assert_eq(state.tab, ValidateTab)
+  // The transcript is one under the example, with its own protocol.
+  assert_eq(
+    state.transcript,
+    @fs.read_file_to_string("../examples/json-rpc/transcripts/chat.md"),
+  )
+  assert_eq(state.protocol, "example.peers#EchoChat")
+  assert_true(fragment.length() <= @core.MAX_SHARE_LENGTH)
+}
+
+///|
+test "an example with no model in the picker has no fragment" {
+  guard playground_data("..", "/smithy/") is Ok(data) else {
+    fail("the samples did not load")
+  }
+  assert_eq(example_fragment("openrpc", data), Ok(None))
+  assert_eq(example_fragment("nope", data), Ok(None))
+}

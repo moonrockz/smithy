@@ -65,3 +65,26 @@ fn playground_entry(data : @workbench.PlaygroundData) -> @search.Entry {
     ".",
   }
 }
+
+///|
+/// The share fragment that "Open in playground" uses for the example `dir`:
+/// `None` when the picker has no model of that directory. A fragment that is
+/// too long is a broken build, because the button would open nothing.
+fn example_fragment(
+  dir : String,
+  data : @workbench.PlaygroundData,
+) -> Result[String?, String] {
+  match
+    @samples.example_state(dir, data.samples, data.transcripts, data.transcript) {
+    None => Ok(None)
+    Some(state) => {
+      let fragment = @core.encode_share(state)
+      match
+        (@core.share_state_problem(state), @core.share_length_problem(fragment)) {
+        (Some(problem), _) | (_, Some(problem)) =>
+          Err("The playground link of examples/\{dir} does not fit: \{problem}")
+        _ => Ok(Some(fragment))
+      }
+    }
+  }
+}

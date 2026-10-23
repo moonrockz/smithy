@@ -12,6 +12,27 @@ extern "js" fn read_playground_json() -> String =
   #|}
 
 ///|
+/// The fragment of the address, without the `#`; "" when there is none.
+extern "js" fn read_hash() -> String =
+  #|() => location.hash.startsWith('#') ? location.hash.slice(1) : location.hash
+
+///|
+/// Put the fragment in the address bar with no new history entry, and give the
+/// full URL of the page with it.
+extern "js" fn write_hash(fragment : String) -> String =
+  #|(fragment) => {
+  #|  try { history.replaceState(null, '', '#' + fragment) } catch (e) {}
+  #|  return location.origin + location.pathname + location.search + '#' + fragment
+  #|}
+
+///|
+/// Load the page again when the user opens another link in this tab. The
+/// browser changes the fragment only, so the page would keep its old state.
+/// The share button does not fire this event: it changes the address without it.
+extern "js" fn reload_on_hash_change() -> Unit =
+  #|() => { addEventListener('hashchange', () => location.reload()) }
+
+///|
 extern "js" fn set_timeout(ms : Int32, f : () -> Unit) -> Unit =
   #|(ms, f) => { setTimeout(f, ms) }
 

@@ -447,6 +447,30 @@ async test "an example without other files has no Files section" {
 
 ///|
 #cfg(not(target="js"))
+async test "an example with a playground state links to the playground with its fragment" {
+  let base = site_data(Example("json-rpc"), Some("# Validate JSON-RPC\n"))
+  let data = {
+    ..base,
+    examples: base.examples.map(e => {
+      if e.dir == "json-rpc" {
+        { ..e, playground: Some("v1.AbC-_9"), }
+      } else {
+        e
+      }
+    }),
+  }
+  let html = @rabbita.new(() => component(data, data.encode())).render(
+    url="http://localhost/smithy/examples/json-rpc/",
+  )
+  assert_true(html.contains("href=\"/smithy/playground/#v1.AbC-_9\""))
+  assert_true(html.contains("Open in playground"))
+  // The example without a state has no button.
+  let plain = render_route(Example("openrpc"), Some("# Export\n"))
+  assert_true(!plain.contains("Open in playground"))
+}
+
+///|
+#cfg(not(target="js"))
 async test "an unknown example renders the not-found view" {
   assert_true(render_route(Example("nope"), None).contains("Page not found"))
 }

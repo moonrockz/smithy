@@ -23,6 +23,10 @@ pub(all) struct Example {
   summary : String
   /// The files of the directory other than the README, sorted.
   files : Array[String]
+  /// The share fragment of the playground state of this example, or `None`
+  /// when the playground has no model of it. Only the page of this example
+  /// carries it, because it can have 8000 characters.
+  playground : String?
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -94,6 +98,7 @@ pub fn Example::build(dirs : Array[ExampleDir]) -> Array[Example] {
         title: d.title,
         summary: example_summary(d.dir),
         files,
+        playground: None,
       })
     }
   }

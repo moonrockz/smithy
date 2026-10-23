@@ -175,7 +175,6 @@ pub async fn build_site(args : Args) -> Unit {
     }
     routes.push(page.route.to_path())
   }
-  write_examples(args, config, manifest, examples, texts, entries, routes)
   let playground = match playground_data(args.content, config.base) {
     Ok(data) => data
     Err(message) => {
@@ -184,6 +183,9 @@ pub async fn build_site(args : Args) -> Unit {
       return
     }
   }
+  write_examples(
+    args, config, manifest, examples, playground, texts, entries, routes,
+  )
   write_file(
     args.out + "/" + page_path(@route.Playground),
     render_page({

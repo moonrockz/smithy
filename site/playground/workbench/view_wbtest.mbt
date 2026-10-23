@@ -52,7 +52,7 @@ test "picker: every output has its own key and label" {
     assert_eq(output_of_key(output.key()), Some(output))
   }
   assert_eq(output_of_key("nope"), None)
-  assert_eq(outputs.map(output => output.label()), [
+  assert_eq(outputs.map(output => output_label(output)), [
     "JSON AST", "Formatted IDL", "Selector query", "JSON Schema", "OpenAPI 3.0.2",
     "OpenAPI 3.1.0", "OpenRPC 1.3.2",
   ])

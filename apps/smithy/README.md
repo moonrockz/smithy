@@ -2,6 +2,8 @@
 
 Assemble, validate, select, diff, format, convert and build Smithy models.
 
+Playground: to try the library without an install, open <https://moonrockz.github.io/smithy/playground/>. It runs in your browser, and a share link holds your model.
+
 ## Run
 
 Run the CLI module from mooncakes.io:

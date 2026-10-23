@@ -3,6 +3,14 @@
 pub const MAX_SHARE_LENGTH : Int32 = 8000
 
 ///|
+/// The most bytes that the JSON of a state can have, in a link and after it
+/// unpacks. Deflate packs repeated text by about 1000 to 1, so a link of 8000
+/// characters can unpack to 6 MB; `decode_share` rejects such a state before
+/// it reads it. A model of a few hundred KB fits. The Smithy library needs
+/// minutes for a model of 1 MB, so a larger state is of no use.
+pub const MAX_STATE_BYTES : Int32 = 2097152
+
+///|
 const SHARE_PREFIX : String = "v1."
 
 ///|
@@ -81,10 +89,45 @@ fn base64url_decode(text : String) -> Result[Bytes, String] {
 ///|
 /// The reason a link is too long, or `None` when it fits.
 pub fn share_length_problem(fragment : String) -> String? {
+  length_reason(fragment).map(reason => reason + " Use Download instead.")
+}
+
+///|
+fn length_reason(fragment : String) -> String? {
   if fragment.length() > MAX_SHARE_LENGTH {
     Some(
-      "The link has \{fragment.length()} characters. A link can have \{MAX_SHARE_LENGTH} at most. Use Download instead.",
+      "The link has \{fragment.length()} characters. A link can have \{MAX_SHARE_LENGTH} at most.",
     )
+  } else {
+    None
+  }
+}
+
+///|
+/// The reason a state is too large for a link, or `None` when it fits. A link
+/// of a state that is too large would not open.
+pub fn share_state_problem(state : ShareState) -> String? {
+  let size = @utf8.encode(@json.to_json(state).stringify()).length()
+  if size > MAX_STATE_BYTES {
+    Some(
+      "The state has \{size} bytes. A link can hold \{MAX_STATE_BYTES} bytes at most. Use Download instead.",
+    )
+  } else {
+    None
+  }
+}
+
+///|
+/// The format number of a fragment that starts with `v`, digits and a dot,
+/// as text; `None` for any other fragment.
+fn format_of(text : String) -> String? {
+  guard text.has_prefix("v") else { return None }
+  let mut i = 1
+  while i < text.length() && text[i] >= '0' && text[i] <= '9' {
+    i += 1
+  }
+  if i > 1 && i < text.length() && text[i] == '.' {
+    Some(text[1:i].to_owned())
   } else {
     None
   }
@@ -101,10 +144,15 @@ pub fn encode_share(state : ShareState) -> String {
 
 ///|
 pub fn decode_share(text : String) -> Result[ShareState, String] {
-  if share_length_problem(text) is Some(problem) {
-    return Err(problem)
+  if length_reason(text) is Some(reason) {
+    return Err(reason)
   }
   guard text.has_prefix(SHARE_PREFIX) else {
+    if format_of(text) is Some(format) {
+      return Err(
+        "I cannot read this link: it has the format v\{format}, and I know only v1. It may come from a newer version of the site.",
+      )
+    }
     return Err("I expected the link to start with v1. so I cannot read it.")
   }
   let packed = match base64url_decode(text[SHARE_PREFIX.length():].to_owned()) {
@@ -115,6 +163,11 @@ pub fn decode_share(text : String) -> Result[ShareState, String] {
     @flate.InflateError(message) =>
       return Err("I could not unpack the link: \{message}")
   }
+  if inflated.length() > MAX_STATE_BYTES {
+    return Err(
+      "The link unpacks to more than \{MAX_STATE_BYTES} bytes. I do not open a state that large.",
+    )
+  }
   let json_text = @utf8.decode(inflated) catch {
     _ => return Err("The link does not hold UTF-8 text.")
   }
@@ -122,7 +175,10 @@ pub fn decode_share(text : String) -> Result[ShareState, String] {
     _ => return Err("The link does not hold JSON.")
   }
   try @json.from_json(json) catch {
-    _ => Err("The link holds JSON that is not a playground state.")
+    _ =>
+      Err(
+        "The link holds JSON that is not a playground state. It may come from another version of the site.",
+      )
   } noraise {
     state => Ok(state)
   }

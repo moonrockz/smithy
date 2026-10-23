@@ -41,15 +41,52 @@ fn mark_json(items : Array[@workbench.Diagnostic]) -> String {
 }
 
 ///|
-fn output_of(output : @workbench.Output) -> @core.Output {
-  match output {
-    JsonAst => JsonAst
-    Idl => Idl
-    Selector => Selector
-    JsonSchema => JsonSchema
-    OpenApi30 => OpenApi30
-    OpenApi31 => OpenApi31
-    OpenRpc => OpenRpc
+/// The state of a link for the editors and these settings.
+fn share_state_of(
+  tab : @samples.Tab,
+  output : @samples.Output,
+  selector : String,
+  settings : @workbench.Settings,
+) -> @core.ShareState {
+  {
+    model: editor_text(@workbench.EDITOR_ID),
+    transcript: editor_text(@workbench.TRANSCRIPT_ID),
+    tab,
+    output,
+    protocol: settings.protocol,
+    format: settings.format,
+    complete: settings.complete,
+    selector: Some(selector),
+    log_preset: Some(settings.preset),
+    version: if settings.version == "" {
+      None
+    } else {
+      Some(settings.version)
+    },
+  }
+}
+
+///|
+/// How the page opens for the fragment of its address. A fragment that the
+/// page cannot read gives the reason, and the page opens with its default
+/// example.
+fn opened_by(fragment : String) -> @workbench.Opened {
+  if fragment == "" {
+    return Default
+  }
+  match @core.decode_share(fragment) {
+    Ok(state) => Shared(state)
+    Err(reason) => Refused("I could not open this link. " + reason)
+  }
+}
+
+///|
+/// The file extension of a transcript format.
+fn transcript_extension(format : @samples.TranscriptFormat) -> String {
+  match format {
+    Markdown => "md"
+    Json => "json"
+    Jsonl => "jsonl"
   }
 }
 
@@ -238,7 +275,7 @@ fn Runtime::run(self : Runtime, effect : @workbench.Effect) -> Unit {
       let request = @core.Transform(
         seq~,
         model=editor_text(@workbench.EDITOR_ID),
-        output=output_of(output),
+        output~,
         selector~,
       )
       if self.worker is Some(worker) {
@@ -263,6 +300,33 @@ fn Runtime::run(self : Runtime, effect : @workbench.Effect) -> Unit {
       if self.file(seq, index) is Some((name, text)) {
         download_text(name, text)
       }
+    MakeShare(tab~, output~, selector~, settings~) => {
+      let state = share_state_of(tab, output, selector, settings)
+      if @core.share_state_problem(state) is Some(reason) {
+        (self.dispatch)(ShareDone(LinkTooLong(reason)))
+        return
+      }
+      let fragment = @core.encode_share(state)
+      if @core.share_length_problem(fragment) is Some(reason) {
+        (self.dispatch)(ShareDone(LinkTooLong(reason)))
+        return
+      }
+      let url = write_hash(fragment)
+      copy_text(url, ok => {
+        (self.dispatch)(
+          ShareDone(if ok { LinkCopied(url) } else { LinkShown(url) }),
+        )
+      })
+    }
+    SaveFiles(transcript~) => {
+      download_text("model.smithy", editor_text(@workbench.EDITOR_ID))
+      if transcript is Some(format) {
+        download_text(
+          "transcript." + transcript_extension(format),
+          editor_text(@workbench.TRANSCRIPT_ID),
+        )
+      }
+    }
     LoadText(text) => editor_load(@workbench.EDITOR_ID, text)
     Mark(items) => editor_mark(@workbench.EDITOR_ID, mark_json(items))
     MoveCursor(line~, column~) =>
@@ -315,11 +379,14 @@ fn Runtime::perform(
 }
 
 ///|
-fn app(data : @workbench.PlaygroundData) -> @rabbita.Val[@rabbita.Html] {
+fn app(
+  data : @workbench.PlaygroundData,
+  opened : @workbench.Opened,
+) -> @rabbita.Val[@rabbita.Html] {
   let runtime = { data, worker: None, files: {}, dispatch: _ => (), }
   let (model, emit) = @rabbita.create_state_with_init(
     init=emit => {
-      let (m, effects) = @workbench.Model::start(data)
+      let (m, effects) = @workbench.Model::start_with(data, opened)
       let start = @cmd.custom_cmd(scheduler => {
         runtime.dispatch = msg => scheduler.add((emit.0)(msg))
         editor_create(
@@ -370,5 +437,6 @@ fn main {
   let data : @workbench.PlaygroundData = @json.from_json(@json.parse(text)) catch {
     _ => return
   }
-  @rabbita.new(() => app(data)).mount(@workbench.APP_ID)
+  reload_on_hash_change()
+  @rabbita.new(() => app(data, opened_by(read_hash()))).mount(@workbench.APP_ID)
 }

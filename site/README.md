@@ -146,6 +146,39 @@ seconds, the page ends it, starts a new one and says so. When the Worker stops w
 new one at once and says that the check failed. The Smithy library needs minutes for a model of 1 MB
 (the time grows with the square of the shape count), so such a model stops at that limit.
 
+### Share links, Download and "Open in playground"
+
+Share link writes the state of the page in the URL fragment: `#v1.` and the base64url text of the deflated JSON of
+a `ShareState` (`playground/samples`): the model and the transcript texts, the tab, the output and selector of the
+Transform tab, and the Transcript settings (protocol, format, `--complete`, the log preset and the version). The
+state is in the fragment, so no server sees it. The page copies the full URL with the clipboard API and sets the
+address bar with `history.replaceState`. A browser without the clipboard API gets the URL in a box under the
+toolbar (`#pg-share-url`). Download saves `model.smithy`, and `transcript.md`, `.json` or `.jsonl` on the
+Transcript tab, as local files.
+
+Opening a link (`opened_by` in `playground/ui`) restores the state, and the pickers show it as "Shared link".
+Settings fit the model after the first check: a protocol that the model does not have gives the first protocol of
+the model with its version and peers. A fragment that the page cannot read shows a message in
+`#pg-share-status` and opens the default example. These fragments give that message:
+
+| Fragment | Reason |
+|---|---|
+| a format other than `v1` (for example `v2.`, from a newer `/next/` build) | "it has the format v2, and I know only v1" |
+| corrupt text, a character that is not base64url, a bad deflate stream, JSON that is no state | the reason of `decode_share` |
+| more than 8,000 characters (`MAX_SHARE_LENGTH`) | the length, and the limit |
+| a state that unpacks to more than 2,097,152 bytes (`MAX_STATE_BYTES`) | the limit; checked after the inflate |
+
+A state too large for a link (`share_state_problem`, or a link over 8,000 characters) shows the same reason on the
+Share link button and says to use Download. On the release channel, a build from before the playground has no
+`/playground/` page: the link then gives the 404 page of the site. A build with the playground but with an older
+format also shows the message of the table. The page loads again on `hashchange`, so a link pasted in the address
+bar of an open playground tab opens too.
+
+An example page (`/examples/<dir>`) shows "Open in playground" when `playground/samples` has a model under
+`examples/<dir>/` (`example_state`). The pre-render computes the fragment (`example_fragment` in `prerender`),
+puts it in the data of that page only, and the button is a plain link: `/playground/#v1...`. It needs no script.
+A fragment over the limit fails the build.
+
 ## Packages
 
 | Package | Job |
@@ -158,7 +191,7 @@ new one at once and says that the check failed. The Smithy library needs minutes
 | `data` | site configuration and page data (JSON in `<meta name="smithy-data">`) |
 | `shell` | the rabbita component: model, update, views |
 | `app` | browser entry: hydrates the pre-rendered page |
-| `playground/core` | pure MoonBit core of the playground: requests, responses, transcript stepping and share links (native and js tests) |
+| `playground/core` | pure MoonBit core of the playground: requests, responses, transcript stepping and share links (`encode_share`, `decode_share`; native and js tests) |
 | `playground/examples_check` | native: tests of the playground core against `examples/json-rpc/`, including the comparison with `run_transcript`, and of the samples of the picker |
 | `playground/samples`, `playground/workbench`, `playground/ui`, `playground/worker` | the playground page (see Playground) |
 | `prerender` | native: renders every route, writes content copies and the search index |

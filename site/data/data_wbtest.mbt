@@ -25,6 +25,7 @@ fn sample() -> SiteData {
         title: "Export a service as OpenRPC",
         summary: "S",
         files: ["model.smithy"],
+        playground: None,
       },
     ],
     route: Doc("smithy-syntax"),

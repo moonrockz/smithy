@@ -1,4 +1,6 @@
 // Steps on the playground page that the tests share.
+import { readFileSync } from "node:fs";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { expect } from "./fixtures.js";
 import { siteUrl } from "./site.js";
 
@@ -57,4 +59,50 @@ export async function openTranscript(page, sample) {
   }
   await page.locator(".pg-tab", { hasText: "Transcript" }).dispatchEvent("click");
   await expect(page.locator(".pg-trpanel")).not.toHaveClass(/pg-off/);
+}
+
+// The fragment of a share link for a state, as the playground writes it: `v1.` and the base64url text
+// of the raw deflate of the JSON. Used for states that the page cannot make itself, such as a model
+// that unpacks to a large size.
+export function shareFragment(state) {
+  return "v1." + deflateRawSync(Buffer.from(JSON.stringify(state))).toString("base64url");
+}
+
+// The state in a share fragment.
+export function stateOfFragment(fragment) {
+  return JSON.parse(inflateRawSync(Buffer.from(fragment.slice("v1.".length), "base64url")).toString("utf8"));
+}
+
+// The text of a file of the repository.
+export function repoFile(path) {
+  return readFileSync(new URL(`../../../${path}`, import.meta.url), "utf8");
+}
+
+// The minimal state of a link: the model, and the settings of the Validate tab.
+export function linkState(overrides = {}) {
+  return {
+    model: repoFile("examples/json-rpc/peers.smithy"),
+    transcript: "",
+    tab: "ValidateTab",
+    output: "JsonAst",
+    protocol: "example.peers#EchoChat",
+    format: "Markdown",
+    complete: false,
+    ...overrides,
+  };
+}
+
+// The page has opened a link that it could not read: it shows the reason and the default example.
+export async function expectDefaultWithMessage(page, ...texts) {
+  await expect(page.locator("#pg-editor .cm-content")).toBeVisible();
+  await settled(page);
+  const status = page.locator("#pg-share-status");
+  await expect(status).toContainText("I could not open this link.");
+  await expect(status).toContainText("I opened the default example instead.");
+  for (const text of texts) {
+    await expect(status).toContainText(text);
+  }
+  await expect(page.locator("#pg-example")).toHaveValue("1");
+  await expect(page.locator("#pg-editor .cm-content")).toContainText("structure");
+  await expect(page.locator(".pg-check")).toContainText("1 error");
 }
