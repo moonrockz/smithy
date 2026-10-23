@@ -9,6 +9,8 @@ pub(all) enum Route {
   Examples
   /// `/examples/<dir>`: the README of `examples/<dir>` and its files.
   Example(String)
+  /// `/playground/`: the workbench that runs Smithy in the browser.
+  Playground
   NotFound(String)
 } derive(Eq, Debug, ToJson, FromJson)
 
@@ -50,6 +52,7 @@ pub fn Route::parse(path : String) -> Route {
     ["docs", slug] => Doc(slug)
     ["examples"] => Examples
     ["examples", dir] => Example(dir)
+    ["playground"] => Playground
     _ => NotFound(segs.join("/"))
   }
 }
@@ -63,6 +66,7 @@ pub fn Route::to_path(self : Route) -> String {
     Doc(slug) => "docs/" + slug
     Examples => "examples"
     Example(dir) => "examples/" + dir
+    Playground => "playground"
     NotFound(path) => path
   }
 }

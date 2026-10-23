@@ -1,0 +1,12 @@
+import {
+  "moonbit-community/rabbita",
+  "moonbit-community/rabbita/html",
+  "moonrockz/smithy-site/playground/samples",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string",
+  "moonbitlang/core/debug",
+}
+
+warnings = "-alert_experimental"
+
+supported_targets = "js+native"

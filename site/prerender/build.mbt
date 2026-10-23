@@ -149,6 +149,7 @@ pub async fn build_site(args : Args) -> Unit {
       examples,
       route: Landing,
       markdown: None,
+      playground: None,
     }),
   )
   for page in manifest.pages {
@@ -161,6 +162,7 @@ pub async fn build_site(args : Args) -> Unit {
         examples,
         route: page.route,
         markdown: Some(text),
+        playground: None,
       }),
     )
     write_file(args.out + "/content/" + page.source, text)
@@ -174,6 +176,27 @@ pub async fn build_site(args : Args) -> Unit {
     routes.push(page.route.to_path())
   }
   write_examples(args, config, manifest, examples, texts, entries, routes)
+  let playground = match playground_data(args.content, config.base) {
+    Ok(data) => data
+    Err(message) => {
+      println("prerender: " + message)
+      @sys.exit(1)
+      return
+    }
+  }
+  write_file(
+    args.out + "/" + page_path(@route.Playground),
+    render_page({
+      config,
+      pages: manifest.pages,
+      examples,
+      route: Playground,
+      markdown: None,
+      playground: Some(playground),
+    }),
+  )
+  entries.push(playground_entry(playground))
+  routes.push(@route.Playground.to_path())
   // `/docs/` shows the default page; GitHub Pages needs a real file for it.
   let default_route = manifest.default_route()
   match manifest.find(default_route) {
@@ -186,6 +209,7 @@ pub async fn build_site(args : Args) -> Unit {
           examples,
           route: default_route,
           markdown: Some(texts.get(page.source).unwrap_or("")),
+          playground: None,
         }),
       )
       routes.push("docs")
@@ -200,6 +224,7 @@ pub async fn build_site(args : Args) -> Unit {
       examples,
       route: NotFound("404"),
       markdown: None,
+      playground: None,
     }),
   )
   write_file(args.out + "/search-index.json", Json(entries).stringify())

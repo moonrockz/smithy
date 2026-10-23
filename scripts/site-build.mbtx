@@ -1,11 +1,15 @@
 ///|
-/// Build one version of the site: the warren bundle and the pre-rendered pages.
+/// Build one version of the site: the warren bundle, the playground bundles and the pre-rendered pages.
 ///
 /// Usage: `mise run site:build -- --content <dir> --channel release|next --site-root /smithy/
 /// --release-version vX.Y.Z --ref <git ref> --out <dir>`, or `moonx scripts/site-build.mbtx <the same>`.
 /// `--content` defaults to `.` and `--out` to `site/dist`. The other arguments go to the `prerender`
 /// executable as they are. Both paths may be relative to the working directory; the build runs inside
 /// `site/`, so the script makes them absolute first.
+///
+/// The playground is two more bundles in `<out>/playground/`: `ui.js` (CodeMirror and the MoonBit page script)
+/// and `worker.js` (the Smithy library in a Web Worker). `moon build` compiles the MoonBit packages, and
+/// `bun build` bundles them with the npm packages that `site/bun.lock` pins.
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -66,9 +70,54 @@ fn spawn_failure_message(command : String, error : Error) -> String {
   let base = "site:build: cannot start `\{command}`: \{error}"
   if command == "warren" {
     base + "\nInstall it with `moon install moonbit-community/warren@0.4.5`."
+  } else if command == "bun" {
+    base + "\nInstall the pinned tools with `mise install`."
   } else {
     base
   }
+}
+
+///|
+/// The MoonBit packages of the playground, compiled to JavaScript before `bun build` bundles them.
+let playground_packages : Array[String] = ["playground/ui", "playground/worker"]
+
+///|
+/// Where `moon build --target js --release` writes the script of a package of the site module.
+fn moon_js_output(pkg : String) -> String {
+  let name = match pkg.rev_find("/") {
+    Some(i) => pkg[i + 1:].to_owned()
+    None => pkg
+  }
+  "_build/js/release/build/moonrockz/smithy-site/\{pkg}/\{name}.js"
+}
+
+///|
+/// The commands that build the playground into `<out>/playground`, run inside `site/`, in order.
+fn playground_commands(out : String) -> Array[(String, Array[String])] {
+  let dir = out + "/playground"
+  [
+    ("bun", ["install", "--frozen-lockfile"]),
+    ("moon", ["build", "--target", "js", "--release", ..playground_packages]),
+    (
+      "bun",
+      [
+        "build", "playground/editor/main.js", "--format", "esm", "--minify", "--outfile",
+        dir + "/ui.js",
+      ],
+    ),
+    (
+      "bun",
+      [
+        "build",
+        moon_js_output("playground/worker"),
+        "--format",
+        "iife",
+        "--minify",
+        "--outfile",
+        dir + "/worker.js",
+      ],
+    ),
+  ]
 }
 
 ///|
@@ -125,6 +174,9 @@ async fn main {
   run_checked("warren", ["build", "--browser-entry", "app", "--dist", ".bundle"])
   copy_tree("site/.bundle", out)
   @fs.rmdir("site/.bundle", recursive=true)
+  for command in playground_commands(out) {
+    run_checked(command.0, command.1)
+  }
   run_checked(
     "moon",
     [
@@ -185,4 +237,32 @@ test "another command that cannot start has no install hint" {
   let message = spawn_failure_message("moon", Failure("no such file"))
   assert_true(!message.contains("moon install"))
   assert_true(message.contains("`moon`"))
+}
+
+///|
+test "a bun that cannot start names the install command" {
+  let message = spawn_failure_message("bun", Failure("no such file"))
+  assert_true(message.contains("mise install"))
+}
+
+///|
+test "the playground is built into the playground directory of the output" {
+  let commands = playground_commands("/o")
+  assert_eq(commands[0], ("bun", ["install", "--frozen-lockfile"]))
+  assert_eq(commands[1], (
+    "moon",
+    ["build", "--target", "js", "--release", "playground/ui", "playground/worker"],
+  ))
+  assert_true(commands[2].1.contains("/o/playground/ui.js"))
+  assert_true(commands[2].1.contains("playground/editor/main.js"))
+  assert_true(commands[3].1.contains("/o/playground/worker.js"))
+  assert_true(commands[3].1.contains("iife"))
+}
+
+///|
+test "moon_js_output follows the build directory of moon" {
+  assert_eq(
+    moon_js_output("playground/worker"),
+    "_build/js/release/build/moonrockz/smithy-site/playground/worker/worker.js",
+  )
 }

@@ -1,0 +1,23 @@
+{
+  "name": "smithy-site",
+  "private": true,
+  "type": "module",
+  "description": "JavaScript tools of the smithy site: the CodeMirror bundle of the playground and the browser tests.",
+  "scripts": {
+    "test:browser": "playwright test --config tests/browser/playwright.config.js"
+  },
+  "dependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-json": "6.0.2",
+    "@codemirror/lang-markdown": "6.5.2",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/lint": "6.9.7",
+    "@codemirror/search": "6.7.2",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.14",
+    "@lezer/highlight": "1.2.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0"
+  }
+}

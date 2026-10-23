@@ -64,6 +64,8 @@ pub(all) struct SiteData {
   route : @route.Route
   /// Markdown of the current page; `None` for the landing page and 404.
   markdown : String?
+  /// The samples and the Worker of the playground page; `None` on every other page.
+  playground : @workbench.PlaygroundData?
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|

@@ -5,6 +5,10 @@
 /// workspace root. The build is the release channel of the working tree, in `site/dist`. A path
 /// that leaves `site/dist` gives 403, a directory serves its `index.html`, and a missing file
 /// serves `404.html` with the status 404, as GitHub Pages does.
+///
+/// `--serve <dir>` serves a directory that is already built and does no build, and `--base <path>`
+/// serves it below that path. The browser tests serve the output of `site:pages` with
+/// `--serve _site --base /smithy/`, as GitHub Pages serves it; a path outside the base gives 404.
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -18,6 +22,7 @@ import {
 }
 
 ///|
+/// The directory that the build writes and the server serves when `--serve` is not given.
 let dist : String = "site/dist"
 
 ///|
@@ -72,11 +77,14 @@ enum Route {
   /// Serve this path below the site directory. An empty path or a path that ends with `/` names a
   /// directory.
   Serve(String)
+  /// Answer 404: the path is not below the base.
+  Outside
 } derive(Eq, Debug)
 
 ///|
-/// The route of the request target. The query and the fragment are ignored.
-fn route(target : String) -> Route {
+/// The route of the request target below `base` (which starts and ends with `/`). The query and
+/// the fragment are ignored.
+fn route(target : String, base? : String = "/") -> Route {
   let path = match target.find("?") {
     Some(i) => target[:i].to_owned()
     None => target
@@ -87,7 +95,17 @@ fn route(target : String) -> Route {
   }
   guard percent_decode(path) is Some(path) else { return Forbidden }
   guard path.has_prefix("/") else { return Forbidden }
-  let rel = path[1:].to_owned()
+  let rel = if path.has_prefix(base) {
+    path[base.length():].to_owned()
+  } else if path + "/" == base {
+    ""
+  } else {
+    // Check the whole path first: a path that leaves the root is refused, not missing.
+    if path.split("/").any(segment => segment == ".." || segment == ".") {
+      return Forbidden
+    }
+    return Outside
+  }
   if rel.contains("\\") || rel.contains("\u{0}") {
     return Forbidden
   }
@@ -111,6 +129,9 @@ fn content_type(name : String) -> String {
     (".svg", "image/svg+xml"),
     (".png", "image/png"),
     (".woff2", "font/woff2"),
+    (".wasm", "application/wasm"),
+    (".map", "application/json"),
+    (".ico", "image/x-icon"),
   ]
   for entry in types {
     if name.has_suffix(entry.0) {
@@ -121,28 +142,59 @@ fn content_type(name : String) -> String {
 }
 
 ///|
-/// The port from the arguments (after the program name), or an error message.
-fn parse_port(args : ArrayView[String]) -> Result[Int32, String] {
-  match args {
-    [] => Ok(default_port)
-    ["--port", value] =>
-      if !value.is_empty() &&
-        value.iter().all(c => c >= '0' && c <= '9') &&
-        value.length() <= 5 {
-        let mut n = 0
-        for c in value {
-          n = n * 10 + (c.to_int() - '0'.to_int())
-        }
-        if n >= 1 && n <= 65535 {
-          Ok(n)
-        } else {
-          Err("the port must be 1 to 65535, got \{value}")
-        }
-      } else {
-        Err("the port must be 1 to 65535, got \{value}")
-      }
-    [arg, ..] => Err("unknown argument \{arg}")
+/// A port number from its text, or an error message.
+fn port_of(value : String) -> Result[Int32, String] {
+  if !value.is_empty() &&
+    value.iter().all(c => c >= '0' && c <= '9') &&
+    value.length() <= 5 {
+    let mut n = 0
+    for c in value {
+      n = n * 10 + (c.to_int() - '0'.to_int())
+    }
+    if n >= 1 && n <= 65535 {
+      return Ok(n)
+    }
   }
+  Err("the port must be 1 to 65535, got \{value}")
+}
+
+///|
+/// What the server does: the port, the built directory to serve (`None`: build `site/dist` first)
+/// and the path below which it serves the directory.
+struct Options {
+  port : Int32
+  serve : String?
+  base : String
+} derive(Eq, Debug)
+
+///|
+/// The options from the arguments (after the program name), or an error message.
+fn parse_options(args : ArrayView[String]) -> Result[Options, String] {
+  let mut options = { port: default_port, serve: None, base: "/" }
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    guard arg == "--port" || arg == "--serve" || arg == "--base" else {
+      return Err("unknown argument \{arg}")
+    }
+    guard i + 1 < args.length() else { return Err("missing value for \{arg}") }
+    let value = args[i + 1]
+    match arg {
+      "--port" =>
+        match port_of(value) {
+          Ok(port) => options = { ..options, port, }
+          Err(message) => return Err(message)
+        }
+      "--serve" => options = { ..options, serve: Some(value) }
+      _ => {
+        let base = if value.has_prefix("/") { value } else { "/" + value }
+        let base = if base.has_suffix("/") { base } else { base + "/" }
+        options = { ..options, base, }
+      }
+    }
+    i += 2
+  }
+  Ok(options)
 }
 
 ///|
@@ -165,9 +217,15 @@ async fn send_file(
 }
 
 ///|
-async fn answer(request : @http.Request, conn : @http.ServerConnection) -> Unit {
-  match route(request.path) {
+async fn answer(
+  request : @http.Request,
+  conn : @http.ServerConnection,
+  dist : String,
+  base : String,
+) -> Unit {
+  match route(request.path, base~) {
     Forbidden => conn..send_response(403, "Forbidden").write("Forbidden")
+    Outside => conn..send_response(404, "Not Found").write("Not found")
     Serve(rel) => {
       let mut file = "\{dist}/\{rel}"
       if rel == "" ||
@@ -206,13 +264,18 @@ async fn run_checked(command : String, args : Array[String]) -> Unit {
 
 ///|
 async fn main {
-  let port = match parse_port(@env.args()[1:]) {
-    Ok(port) => port
+  let options = match parse_options(@env.args()[1:]) {
+    Ok(options) => options
     Err(message) => {
       eprintln("site:dev: \{message}")
       @sys.exit(2)
       return
     }
+  }
+  let port = options.port
+  if options.serve is Some(dir) {
+    serve(dir, options.base, port)
+    return
   }
   let (status, output, errors) = @process.collect_output("moonx", [
     "scripts/site-latest-tag.mbtx",
@@ -227,13 +290,18 @@ async fn main {
     "scripts/site-build.mbtx", "--content", ".", "--channel", "release", "--site-root",
     "/", "--release-version", version, "--ref", "main", "--out", dist,
   ])
+  serve(dist, "/", port)
+}
+
+///|
+async fn serve(dir : String, base : String, port : Int32) -> Unit {
   let server = @http.Server(
     @socket.Addr::parse("127.0.0.1:\{port}"),
     reuse_addr=true,
   )
-  println("Site: http://localhost:\{port}/")
+  println("Site: http://localhost:\{port}\{base}")
   server.run_forever(allow_failure=true, (request, _body, conn) => {
-    answer(request, conn)
+    answer(request, conn, dir, base)
   })
 }
 
@@ -264,20 +332,68 @@ test "content types" {
 }
 
 ///|
-test "parse_port" {
-  assert_eq(parse_port([]), Ok(8080))
-  assert_eq(parse_port(["--port", "9000"]), Ok(9000))
+test "content types of wasm, source maps and icons" {
+  assert_eq(content_type("smithy.wasm"), "application/wasm")
+  assert_eq(content_type("playground/ui.js.map"), "application/json")
+  assert_eq(content_type("favicon.ico"), "image/x-icon")
+  // A source map is not served as JavaScript.
+  assert_eq(content_type("index.js.map"), "application/json")
+}
+
+///|
+test "parse_options reads the port" {
+  assert_eq(parse_options([]).map(o => o.port), Ok(8080))
+  assert_eq(parse_options(["--port", "9000"]).map(o => o.port), Ok(9000))
   assert_eq(
-    parse_port(["--port", "0"]),
+    parse_options(["--port", "0"]).map(o => o.port),
     Err("the port must be 1 to 65535, got 0"),
   )
   assert_eq(
-    parse_port(["--port", "70000"]),
+    parse_options(["--port", "70000"]).map(o => o.port),
     Err("the port must be 1 to 65535, got 70000"),
   )
   assert_eq(
-    parse_port(["--port", "x"]),
+    parse_options(["--port", "x"]).map(o => o.port),
     Err("the port must be 1 to 65535, got x"),
   )
-  assert_eq(parse_port(["--watch"]), Err("unknown argument --watch"))
+  assert_eq(parse_options(["--watch"]).map(o => o.port), Err("unknown argument --watch"))
+}
+
+///|
+test "parse_options builds and serves site/dist at / by default" {
+  assert_eq(parse_options([]), Ok({ port: 8080, serve: None, base: "/" }))
+  assert_eq(
+    parse_options(["--port", "9000"]),
+    Ok({ port: 9000, serve: None, base: "/" }),
+  )
+}
+
+///|
+test "parse_options serves a built directory under a base without a build" {
+  assert_eq(
+    parse_options(["--serve", "_site", "--base", "/smithy/", "--port", "8091"]),
+    Ok({ port: 8091, serve: Some("_site"), base: "/smithy/" }),
+  )
+  assert_eq(
+    parse_options(["--base", "smithy"]),
+    Ok({ port: 8080, serve: None, base: "/smithy/" }),
+  )
+  assert_eq(parse_options(["--serve"]), Err("missing value for --serve"))
+  assert_eq(parse_options(["--watch"]), Err("unknown argument --watch"))
+  assert_eq(
+    parse_options(["--port", "0"]),
+    Err("the port must be 1 to 65535, got 0"),
+  )
+}
+
+///|
+test "route under a base serves only the paths below it" {
+  assert_eq(route("/smithy/", base="/smithy/"), Serve(""))
+  assert_eq(route("/smithy", base="/smithy/"), Serve(""))
+  assert_eq(
+    route("/smithy/next/playground/", base="/smithy/"),
+    Serve("next/playground/"),
+  )
+  assert_eq(route("/other/", base="/smithy/"), Outside)
+  assert_eq(route("/smithy/../x", base="/smithy/"), Forbidden)
 }

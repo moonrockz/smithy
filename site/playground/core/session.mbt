@@ -37,3 +37,17 @@ pub fn handle(session : Session, request : Request) -> Response {
     }
   }
 }
+
+///|
+/// Run one request given as JSON and give the response as JSON. This is the
+/// message format of the Worker. A request that does not decode gives
+/// `Blocked` with `seq` -1.
+pub fn handle_json(session : Session, text : String) -> String {
+  let request : Request = @json.from_json(@json.parse(text)) catch {
+    error =>
+      return @json.to_json(
+        Blocked(seq=-1, reason="I could not read the request: \{error}"),
+      ).stringify()
+  }
+  @json.to_json(handle(session, request)).stringify()
+}

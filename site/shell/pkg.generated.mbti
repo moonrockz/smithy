@@ -11,6 +11,7 @@ import {
   "moonrockz/smithy-site/content",
   "moonrockz/smithy-site/data",
   "moonrockz/smithy-site/markdown",
+  "moonrockz/smithy-site/playground/workbench",
   "moonrockz/smithy-site/route",
   "moonrockz/smithy-site/search",
 }
@@ -91,6 +92,7 @@ pub(all) struct Model {
   menu_open : Bool
   counterpart : Counterpart
   pending_anchor : String?
+  playground : @workbench.PlaygroundData?
 } derive(Eq, @debug.Debug)
 pub fn Model::equal(Self, Self) -> Bool
 pub fn Model::init(@data.SiteData) -> Self

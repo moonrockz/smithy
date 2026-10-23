@@ -1,0 +1,60 @@
+# Browser tests of the site
+
+These tests load the built site in a headless browser. Playwright (pinned in `site/bun.lock`) drives
+[Lightpanda](https://github.com/lightpanda-io/browser) 1.0.1 (pinned in `.config/mise/config.toml`) through
+`chromium.connectOverCDP`. A check that Lightpanda cannot run uses Playwright's own Chromium. The table below
+lists each such check and why.
+
+## Run the tests
+
+```bash
+mise run site:pages -- --out _site   # build both channels, as GitHub Pages serves them
+cd site
+bun install --frozen-lockfile
+bunx playwright install chromium     # once, for the Chromium checks
+bun run test:browser                 # or, from the repository root: mise run site:test:browser
+```
+
+`playwright.config.js` starts two servers: `moonx scripts/site-dev.mbtx --serve _site --base /smithy/`, which
+serves `_site` under `/smithy/` as GitHub Pages does, and `lightpanda serve --load-resources worker`. Lightpanda
+does not run a Web Worker without `--load-resources worker`. Outside CI, a server that already runs on the same
+port is used. The environment variables `SITE_DIR`, `SITE_PORT` and `LIGHTPANDA_CDP` change the defaults
+(`_site`, 8091, `http://127.0.0.1:9222`).
+
+A file `*.lightpanda.spec.js` runs in the project `lightpanda`, and a file `*.chromium.spec.js` runs in the
+project `chromium`.
+
+## What runs where
+
+| Test | Browser |
+|---|---|
+| `probe`: a Web Worker runs the Smithy library; CodeMirror renders its DOM and reads a change of it; the clipboard API | Lightpanda |
+| `smoke`: the default sample shows one error, the diagnostic moves the cursor, the fix gives the valid state (both channels) | Lightpanda |
+| `half-typed`: an unbalanced brace, a deleted `$version`, an empty editor, a burst of edits (review focus 1) | Lightpanda |
+| `worker`: a Worker that does not answer in 10 seconds is ended and a new one starts | Lightpanda |
+| `typing`: key input fixes the model; Ctrl-Shift-[ and ] fold and unfold; token colors | Chromium |
+| `large`: a pasted 1 MB model, typing while the Worker runs, the stopped check (review focus 2) | Chromium |
+| `layout`: no page scroll at 360 px, stacked and side-by-side panes, links into and out of the playground | Chromium |
+
+Why some checks run on Chromium:
+
+- **Key input.** Lightpanda 1.0.1 sends no key input to a `contenteditable` element: `keyboard.type`,
+  `keyboard.insertText` and `press` do not change the CodeMirror document. The Lightpanda tests change the text
+  in the DOM of the editor instead, as a native text input does, and CodeMirror reads the change back. That
+  only reaches the lines that the editor shows. So the tests of typing, folding by key and a 1 MB paste run on
+  Chromium.
+- **Clipboard.** `navigator.clipboard` is undefined in Lightpanda 1.0.1. The `probe` test checks this, and it
+  fails when Lightpanda gets the API, so that the clipboard checks can move there. The 1 MB paste uses the
+  clipboard of Chromium.
+- **Layout.** Lightpanda has no layout engine: widths, scroll widths and element boxes are not real. The
+  360 px and 1440 px checks, and Playwright's `click` (which needs a box), run on Chromium. The Lightpanda tests
+  click with `dispatchEvent("click")`.
+- **Computed colors.** Lightpanda does not apply CodeMirror's style sheets to computed styles, so the token
+  colors are checked on Chromium.
+
+## A known Lightpanda quirk
+
+Lightpanda fires `selectionchange` at once when CodeMirror sets the DOM selection inside its own update.
+Browsers fire it later. CodeMirror then throws "Calls to EditorView.update are not allowed while an update is
+in progress". It happens only while the editor has focus, and the change still applies. The Lightpanda tests
+allow exactly this page error (`lightpandaQuirk` in `fixtures.js`); the Chromium tests allow no page error.

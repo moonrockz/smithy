@@ -29,6 +29,7 @@ fn sample() -> SiteData {
     ],
     route: Doc("smithy-syntax"),
     markdown: Some("# Configuration\n\nQuote \" < > & </script> done\n"),
+    playground: None,
   }
 }
 
@@ -114,4 +115,26 @@ test "link_context carries the given source" {
   )
   assert_eq(ctx.source, "docs/guide/x.md")
   assert_eq(ctx.git_ref, "abc123")
+}
+
+///|
+test "the playground page carries its samples and round-trips" {
+  let data : SiteData = {
+    ..sample(),
+    route: Playground,
+    markdown: None,
+    playground: Some({
+      version: "0.0.1",
+      worker: "/smithy/next/playground/worker.js",
+      samples: [
+        {
+          title: "Order",
+          path: "site/landing/sample/order.smithy",
+          model: "namespace a // \" < > & </script>\n",
+        },
+      ],
+      selected: 0,
+    }),
+  }
+  assert_eq(SiteData::decode(data.encode()), Some(data))
 }

@@ -20,6 +20,7 @@ pub(all) enum Route {
   Doc(String)
   Examples
   Example(String)
+  Playground
   NotFound(String)
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn Route::equal(Self, Self) -> Bool

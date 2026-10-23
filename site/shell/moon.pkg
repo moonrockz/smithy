@@ -7,6 +7,7 @@ import {
   "moonbit-community/rabbita/url",
   "moonbit-community/rabbita/http",
   "moonbit-community/rabbita/common",
+  "moonbit-community/rabbita/cmd",
   "moonrockz/smithy",
   "moonrockz/smithy-site/route",
   "moonrockz/smithy-site/content",
@@ -14,6 +15,7 @@ import {
   "moonrockz/smithy-site/search",
   "moonrockz/smithy-site/highlight",
   "moonrockz/smithy-site/data",
+  "moonrockz/smithy-site/playground/workbench",
   "moonbitlang/core/json",
   "moonbitlang/core/debug",
 }
@@ -23,6 +25,5 @@ warnings = "-alert_experimental-unused_package"
 supported_targets = "js+native"
 
 import {
-  "moonbit-community/rabbita/cmd",
   "moonbitlang/async",
 } for "wbtest"

@@ -26,7 +26,12 @@ moon install moonbit-community/warren@0.4.5   # once
 mise run site:dev     # build at base / and serve on http://localhost:8080
 mise run site:check   # unit tests, build both channels as Pages does, link check
 mise run site:pages -- --out _site   # only the two channel builds and their link checks
+mise run site:test:browser           # browser tests against _site (tests/browser/README.md)
 ```
+
+The site needs the npm packages of `package.json`, as `bun.lock` pins them: CodeMirror for the playground and
+Playwright for the browser tests. `site:build` runs `bun install --frozen-lockfile` itself. Bun and Lightpanda
+are pinned in `.config/mise/config.toml`.
 
 `mise run site:build -- --content <repo dir> --channel release|next --site-root /smithy/ --release-version vX.Y.Z --ref <git ref> --out <dir>`
 builds one version. The scripts are `scripts/site-*.mbtx`.
@@ -63,7 +68,9 @@ shows on the commit and does not block a merge.
 | `workflow_call` from `release.yml` (real release only) | yes | yes |
 
 A site input is `site/**`, `docs/**`, `examples/**`, `apps/smithy/README.md`, `pkgs/**/README.mbt.md`,
-`scripts/site-*.mbtx` or `.github/workflows/site.yml`. `release.yml` calls `site.yml` after the `release` job
+`scripts/site-*.mbtx`, `.github/workflows/site.yml`, the mise configuration, the setup action, or a Smithy package
+that the site compiles (the members of `site/moon.work`). After the build, the workflow runs the browser tests.
+`release.yml` calls `site.yml` after the `release` job
 and never on a dry run, a pull request or the nightly run. The tag that the release job creates comes from
 `GITHUB_TOKEN`, which starts no workflow, so the call is how a release reaches Pages.
 
@@ -90,6 +97,31 @@ in `shell/landing_sample.mbt` must equal these files (a `prerender` test checks 
 `scripts/test-cli.mbtx` runs the command with the built CLI and requires `output.txt`. When the CLI output
 changes, update the four files and the constants together.
 
+## Playground
+
+`/playground/` runs Smithy in the browser. The page is pre-rendered with the site nav and an empty
+workbench, and it is the only page that loads `playground/ui.js`. A link into or out of the playground loads
+the new page, so that no other page runs the playground script.
+
+| Part | Job |
+|---|---|
+| `playground/samples` | the example picker: titles and repository paths (`manifest`), and `chat-error.smithy` |
+| `playground/workbench` | the state of the page (`Model`, `update`, which returns `Effect`s) and its view; the pre-render and `ui` share the view |
+| `playground/ui` | js: mounts the workbench in `#pg-app`, runs the effects: the editor, the Worker and the timers |
+| `playground/worker` | js: the Web Worker. It reads a `Request` as JSON, calls `core.handle` and posts the `Response` |
+| `playground/core` | the Smithy calls, with no browser (see below) |
+| `playground/editor` | JavaScript: CodeMirror 6, the Smithy stream language (the token kinds of `highlight`) and bracket folding |
+
+`scripts/site-build.mbtx` builds the two bundles: `moon build --target js --release` compiles `ui` and
+`worker`, then `bun build` writes `<out>/playground/ui.js` (from `playground/editor/main.js`, which imports the
+editor and then the MoonBit script) and `<out>/playground/worker.js`. The pre-render reads the samples from
+`--content` and puts them in the site data of the playground page.
+
+The page sends Validate 250 ms after the last change. Each request has a new `seq`. The page uses only the answer
+to its newest request, and only while the text is the text that it checked. When the Worker gives no answer in
+10 seconds, the page ends it, starts a new one and says so. The Smithy library needs minutes for a model of 1 MB
+(the time grows with the square of the shape count), so such a model stops at that limit.
+
 ## Packages
 
 | Package | Job |
@@ -103,7 +135,8 @@ changes, update the four files and the constants together.
 | `shell` | the rabbita component: model, update, views |
 | `app` | browser entry: hydrates the pre-rendered page |
 | `playground/core` | pure MoonBit core of the playground: requests, responses, transcript stepping and share links (native and js tests) |
-| `playground/examples_check` | native: tests of the playground core against `examples/json-rpc/`, including the comparison with `run_transcript` |
+| `playground/examples_check` | native: tests of the playground core against `examples/json-rpc/`, including the comparison with `run_transcript`, and of the samples of the picker |
+| `playground/samples`, `playground/workbench`, `playground/ui`, `playground/worker` | the playground page (see Playground) |
 | `prerender` | native: renders every route, writes content copies and the search index |
 | `linkcheck` | native: checks links, routes and the search index of a build |
 

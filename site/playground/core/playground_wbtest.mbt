@@ -766,3 +766,28 @@ test "share: a state without selector and log preset still decodes" {
   let link = "v1." + base64url_encode(@flate.deflate_all(@utf8.encode(old)))
   assert_eq(decode_share(link), Ok(state))
 }
+
+///|
+test "wire: handle_json answers a request with the response in JSON" {
+  let session = Session::new()
+  let request = @json.to_json(Validate(seq=4, model="")).stringify()
+  let response : Response = @json.from_json(
+    @json.parse(handle_json(session, request)),
+  )
+  assert_eq(response, Diagnostics(seq=4, items=[], shapes=0))
+}
+
+///|
+test "wire: handle_json blocks a request that it cannot read" {
+  let session = Session::new()
+  for text in ["", "not json", "{\"seq\": 1}", "[\"Validate\"]"] {
+    let response : Response = @json.from_json(
+      @json.parse(handle_json(session, text)),
+    )
+    match response {
+      Blocked(seq=-1, reason~) =>
+        assert_true(reason.has_prefix("I could not read the request"))
+      other => fail(@json.to_json(other).stringify())
+    }
+  }
+}

@@ -21,6 +21,7 @@ let theme_script : String =
 fn page_title(m : Model) -> String {
   match (m.route, m.manifest.find(m.route)) {
     (Landing, _) => "Smithy for MoonBit"
+    (Playground, _) => "Playground — smithy"
     (Examples, _) => "Examples — smithy"
     (Example(dir), _) =>
       match @content.Example::find(m.examples, dir) {
@@ -56,6 +57,17 @@ pub fn view(m : Model, emit : @rabbita.Emit[Msg], site_json : String) -> Html {
       link(rel="stylesheet", href=base + "styles.css"),
       meta(name="smithy-data", content=site_json),
       script(src=base + "index.js", type_="module", ([] : Array[Html])),
+      // Only the playground page loads the playground. It runs after
+      // index.js, which hydrates the page first.
+      if m.route == Playground {
+        script(
+          src=base + "playground/ui.js",
+          type_="module",
+          ([] : Array[Html]),
+        )
+      } else {
+        @html.nothing
+      },
     ]),
     body([
       nav_bar(m, emit),
@@ -70,6 +82,7 @@ pub fn view(m : Model, emit : @rabbita.Emit[Msg], site_json : String) -> Html {
 fn content_view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   match (m.route, m.manifest.find(m.route)) {
     (Landing, _) => landing_view(m, emit)
+    (Playground, _) => playground_view(m)
     (Examples, _) => examples_index_view(m)
     (Example(dir), _) =>
       match @content.Example::find(m.examples, dir) {

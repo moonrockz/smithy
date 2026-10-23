@@ -12,6 +12,10 @@
 # is not part of ci-ok.
 #
 # The repository needs Settings > Pages > Source "GitHub Actions". No workflow changes that setting.
+#
+# After the build, the browser tests (site/tests/browser) load the playground of both channels in
+# Lightpanda and, for the checks that Lightpanda cannot run, in Playwright's Chromium. Lightpanda has no
+# Windows build, so this workflow runs on Linux only.
 
 name: Site
 
@@ -31,6 +35,10 @@ on:
       - pkgs/jmespath/**
       - pkgs/smithy-syntax/**
       - pkgs/smithy/**
+      - pkgs/smithy-validation/**
+      - pkgs/smithy-jsonschema/**
+      - pkgs/smithy-openapi/**
+      - pkgs/smithy-openrpc/**
   push:
     branches: [main]
     paths:
@@ -47,6 +55,10 @@ on:
       - pkgs/jmespath/**
       - pkgs/smithy-syntax/**
       - pkgs/smithy/**
+      - pkgs/smithy-validation/**
+      - pkgs/smithy-jsonschema/**
+      - pkgs/smithy-openapi/**
+      - pkgs/smithy-openrpc/**
   workflow_dispatch:
   workflow_call:
 
@@ -86,12 +98,26 @@ jobs:
       - name: Install warren
         run: moon install moonbit-community/warren@0.4.5
 
+      # CodeMirror for the playground bundle and Playwright for the browser tests, as site/bun.lock pins them.
+      - name: Install the site's npm packages
+        working-directory: site
+        run: bun install --frozen-lockfile
+
       # site/ is outside moon.work, so ci.yml and `mise run check` skip it. --no-build: the next step builds.
       - name: Test the site packages
         run: moonx scripts/site-check.mbtx --no-build
 
       - name: Build both channels and check the links of each
         run: mise run site:pages -- --out _site
+
+      # The Chromium of the pinned Playwright, for the checks that Lightpanda cannot run.
+      - name: Install Playwright's Chromium
+        working-directory: site
+        run: bunx playwright install --with-deps chromium
+
+      # Playwright starts the site server and Lightpanda (site/tests/browser/playwright.config.js).
+      - name: Run the browser tests
+        run: mise run site:test:browser
 
       - name: Upload the Pages artifact
         if: github.event_name != 'pull_request'

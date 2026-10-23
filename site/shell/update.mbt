@@ -60,6 +60,30 @@ fn site_path(config : @data.SiteConfig, path : String) -> String? {
 }
 
 ///|
+/// How the page follows a link to a path of the site.
+priv enum LinkAction {
+  /// Show the route in this page.
+  Push
+  /// Load the URL as a new page.
+  Load
+}
+
+///|
+/// The playground page loads its own script, so a link into or out of it
+/// loads the new page. A link into the other channel loads it too.
+fn link_action(m : Model, path : String) -> LinkAction {
+  match site_path(m.config, path) {
+    None => Load
+    Some(rest) =>
+      if m.route == Playground || @route.Route::parse(rest) == Playground {
+        Load
+      } else {
+        Push
+      }
+  }
+}
+
+///|
 fn fetch_page(
   config : @data.SiteConfig,
   route : @route.Route,
@@ -198,11 +222,9 @@ pub fn update(
   match msg {
     UrlChanged(url) => on_url_changed(m, url, emit)
     UrlRequested(Internal(url)) =>
-      if site_path(m.config, url.path) is Some(_) {
-        (m, @nav.push_url(url_href(url)))
-      } else {
-        // Another version of the site: a full page load.
-        (m, @nav.load(url_href(url)))
+      match link_action(m, url.path) {
+        Push => (m, @nav.push_url(url_href(url)))
+        Load => (m, @nav.load(url_href(url)))
       }
     UrlRequested(External(href)) => (m, @nav.load(href))
     ContentLoaded(route, result) => {
@@ -249,11 +271,14 @@ pub fn update(
     }
     OpenSelected =>
       match flat_results(m).get(m.search.selected) {
-        Some(hit) =>
-          (
-            { ..m, search: { ..m.search, open: false, }, },
-            @nav.push_url(entry_href(m.config, hit.entry)),
-          )
+        Some(hit) => {
+          let href = entry_href(m.config, hit.entry)
+          let closed = { ..m, search: { ..m.search, open: false, }, }
+          match link_action(m, href) {
+            Push => (closed, @nav.push_url(href))
+            Load => (closed, @nav.load(href))
+          }
+        }
         None => (m, @rabbita.none)
       }
     KeyDown(key) => on_key(m, key, emit)
