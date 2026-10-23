@@ -25,7 +25,7 @@ test("Share link copies the URL, puts it in the address bar, and the link opens 
   await expect(page.locator("#pg-share-status")).toContainText("The link is in the address bar and on your clipboard.");
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toBe(page.url());
-  expect(copied).toMatch(/\/smithy\/playground\/#v1\./);
+  expect(copied).toMatch(/\/smithy\/next\/playground\/#v1\./);
   expect(stateOfFragment(copied.slice(copied.indexOf("#") + 1))).toMatchObject({ tab: "TransformTab", output: "Idl" });
   // Making a link sends nothing to a server.
   expect(requests.slice(before).filter((url) => !url.startsWith("blob:"))).toEqual([]);

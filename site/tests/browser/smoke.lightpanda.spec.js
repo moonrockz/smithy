@@ -1,10 +1,14 @@
 // The smoke test of the playground: one error in the default sample, then the fix and the valid state.
 import { expect, lightpandaQuirk, test } from "./fixtures.js";
 import { openPlayground, replaceInEditor, settled } from "./playground.js";
-import { siteUrl } from "./site.js";
+import { rootChannel, siteUrl } from "./site.js";
 
-for (const channel of ["", "next/"]) {
+const root = rootChannel();
+
+for (const channel of ["next/", ""]) {
   test(`the playground at /smithy/${channel} shows one error and then the valid state`, async ({ lightpanda: page }) => {
+    // The root is checked only when it is this checkout (README.md).
+    test.skip(channel === "" && !root.thisCheckout, root.reason);
     await openPlayground(page, siteUrl("playground/", channel));
     await expect(page.locator("#pg-example option:checked")).toHaveText("JSON-RPC chat protocol (with a mistake)");
     const diagnostic = page.locator(".pg-diag");

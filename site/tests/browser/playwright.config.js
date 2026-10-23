@@ -2,12 +2,11 @@
 // after a build of both channels into _site (`mise run site:pages -- --out _site`). See README.md.
 import { defineConfig } from "@playwright/test";
 import { fileURLToPath } from "node:url";
-import { cdpUrl, sitePort, siteUrl } from "./site.js";
+import { cdpUrl, siteDir, sitePort, siteUrl } from "./site.js";
 
 const repo = fileURLToPath(new URL("../../..", import.meta.url));
 // site/mise.toml pins Lightpanda, so the mise shim finds it only in site/.
 const site = fileURLToPath(new URL("../..", import.meta.url));
-const siteDir = process.env.SITE_DIR ?? "_site";
 const cdpPort = new URL(cdpUrl).port;
 
 export default defineConfig({
@@ -29,7 +28,9 @@ export default defineConfig({
       // The output of site:pages, served under /smithy/ as GitHub Pages serves it.
       command: `moonx scripts/site-dev.mbtx --serve ${siteDir} --base /smithy/ --port ${sitePort}`,
       cwd: repo,
-      url: siteUrl("playground/"),
+      // /smithy/next/ is always this checkout, so its playground exists. The root can be a release
+      // build with no playground.
+      url: siteUrl("playground/", "next/"),
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,
     },

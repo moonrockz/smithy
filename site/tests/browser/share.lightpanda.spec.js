@@ -13,7 +13,7 @@ import {
   shareFragment,
   stateOfFragment,
 } from "./playground.js";
-import { siteUrl } from "./site.js";
+import { rootChannel, siteUrl } from "./site.js";
 
 const valid = "JSON-RPC chat protocol";
 
@@ -126,34 +126,45 @@ test("a link that the page cannot read shows a message and the default example",
   expect(page.errors.filter((e) => e !== lightpandaQuirk)).toEqual([]);
 });
 
-test("a link made on /next/ opens on the release channel, and a future format shows the message", async ({ lightpanda: page }) => {
+test("a link made on /next/ opens on the root, and a future format shows the message", async ({ lightpanda: page }) => {
+  // The root is checked only when it is this checkout (README.md).
+  const rootBuild = rootChannel();
+  test.skip(!rootBuild.thisCheckout, rootBuild.reason);
   await openPlayground(page, siteUrl("playground/", "next/"));
   await chooseSample(page, valid);
   await settled(page);
   const url = await sharedUrl(page);
   expect(url).toContain("/smithy/next/playground/#v1.");
   const root = url.replace("/smithy/next/playground/", "/smithy/playground/");
+  expect(root.startsWith(siteUrl("playground/", ""))).toBe(true);
   await page.goto(root);
   await expect(page.locator("#pg-editor .cm-content")).toContainText("namespace example.peers");
   await settled(page);
   await expect(page.locator("#pg-share-status")).toBeEmpty();
   // A fragment of a format that the page does not know: the message, never a blank page.
-  await page.goto(siteUrl("playground/") + "#v2." + url.split("#v1.")[1]);
+  await page.goto(siteUrl("playground/", "") + "#v2." + url.split("#v1.")[1]);
   await expectDefaultWithMessage(page, "it has the format v2");
 });
 
-test("Open in playground links to a state that decodes to the model of the example", async ({ lightpanda: page }) => {
-  await page.goto(siteUrl("examples/json-rpc/"));
+// The link of the "Open in playground" button of the json-rpc example: it opens the playground of the
+// same channel, with a state that decodes to the model of the example.
+async function expectJsonRpcButton(page) {
   const button = page.locator("#ms-open-playground");
   await expect(button).toHaveText("Open in playground");
   const href = await button.getAttribute("href");
-  expect(href).toMatch(/^\/smithy\/playground\/#v1\./);
-  // The pre-render writes the link: the page text from the server has it.
-  const html = await page.evaluate(() => fetch(location.href).then((r) => r.text()));
-  expect(html).toContain(`href="${href}"`);
+  expect(href).toMatch(/^\/smithy\/next\/playground\/#v1\./);
   const state = stateOfFragment(href.slice(href.indexOf("#") + 1));
   expect(state.model).toBe(repoFile("examples/json-rpc/peers.smithy"));
   expect(state.tab).toBe("ValidateTab");
+  return href;
+}
+
+test("Open in playground links to a state that decodes to the model of the example", async ({ lightpanda: page }) => {
+  await page.goto(siteUrl("examples/json-rpc/"));
+  const href = await expectJsonRpcButton(page);
+  // The pre-render writes the link: the page text from the server has it.
+  const html = await page.evaluate(() => fetch(location.href).then((r) => r.text()));
+  expect(html).toContain(`href="${href}"`);
   await page.goto(`http://127.0.0.1:${new URL(page.url()).port}${href}`);
   await expect(page.locator("#pg-editor .cm-content")).toContainText("namespace example.peers");
   await settled(page);

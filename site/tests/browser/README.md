@@ -26,12 +26,24 @@ port is used. The environment variables `SITE_DIR`, `SITE_PORT` and `LIGHTPANDA_
 A file `*.lightpanda.spec.js` runs in the project `lightpanda`, and a file `*.chromium.spec.js` runs in the
 project `chromium`.
 
+## Which channel the tests load
+
+The tests load `/smithy/next/` (`siteUrl` in `site.js`), and the server is ready when
+`/smithy/next/playground/` answers. `site:pages` always builds `/smithy/next/` from this checkout. The root
+(`/smithy/`) is the build of the newest release tag that contains `site/`, when there is one. That build can be
+older than the tests, or have no playground.
+
+A test of the root runs only when the root is this checkout: when the site data of `_site/index.html` has the
+channel `Next` (`rootChannel` in `site.js`). `site:pages` gives the root that channel only while no release tag
+contains `site/`. Otherwise the test is skipped, and the skip reason names the ref of the root build. The smoke
+test of the root and the share link from `/next/` to the root use this rule.
+
 ## What runs where
 
 | Test | Browser |
 |---|---|
 | `probe`: a Web Worker runs the Smithy library; CodeMirror renders its DOM and reads a change of it; the clipboard API | Lightpanda |
-| `smoke`: the default sample shows one error, the diagnostic moves the cursor, the fix gives the valid state (both channels) | Lightpanda |
+| `smoke`: the default sample shows one error, the diagnostic moves the cursor, the fix gives the valid state (`/next/`, and the root when it is this checkout) | Lightpanda |
 | `half-typed`: an unbalanced brace, a deleted `$version`, an empty editor, a burst of edits (review focus 1) | Lightpanda |
 | `worker`: a Worker that does not answer in 10 seconds is ended and a new one starts; a Worker that stops with an error is replaced at once, once | Lightpanda |
 | `transform`: JSON AST of the valid sample (first line `{`, `"smithy": "2.0"`), a selector, the blocked copy for model errors, the reason of the library for another block, the OpenAPI note, OpenRPC | Lightpanda |
@@ -40,7 +52,7 @@ project `chromium`.
 | `large`: a pasted 1 MB model, typing while the Worker runs, the stopped check (review focus 2); typing bursts on a 100 KB model end in its result | Chromium |
 | `transform` (Chromium): Copy through the clipboard API, Download, OpenAPI for a model that Validate marks with warnings shown, an old output after a change, no page scroll at 360 and 1440 px with an output | Chromium |
 | `transcript` (Chromium): a log of 20,000 lines with Run all while typing in the model editor (review focus 2: frame gaps, findings before the end, at most 200 rows, the page does not scroll); no page scroll at 360 and 1440 px with findings; a click on the line of an entry | Chromium |
-| `share` (Lightpanda): a share round trip restores the model, the tab and every Transcript setting, and the Transform output and selector; a protocol that the model lacks is fitted; a corrupt, foreign-format, over-long and over-size link each show a message and the default example (review focus 5); a link from `/next/` opens on the root; the "Open in playground" link decodes to the model of the example. The clipboard is missing, so the page shows the link | Lightpanda |
+| `share` (Lightpanda): a share round trip restores the model, the tab and every Transcript setting, and the Transform output and selector; a protocol that the model lacks is fitted; a corrupt, foreign-format, over-long and over-size link each show a message and the default example (review focus 5); a link from `/next/` opens on the root (when the root is this checkout); the "Open in playground" link decodes to the model of the example, also after a move from `/examples/` with no page load. The clipboard is missing, so the page shows the link | Lightpanda |
 | `share` (Chromium): Share link copies the URL through the clipboard API and sets the address; a pasted link opens in place, asks after an edit (Keep my changes, Open) and a bad link keeps the page; the box without a clipboard; Download of the model and the transcript; no page scroll at 360 px with a message, a box and the example button | Chromium |
 | `layout`: no page scroll at 360 px, stacked and side-by-side panes, links into and out of the playground | Chromium |
 
