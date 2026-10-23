@@ -33,7 +33,17 @@ fn md_inline(base : String, x : @markdown.Inline) -> Html {
 ///|
 /// A highlighted code block.
 pub fn code_view(lang : String, code : String) -> Html {
-  let spans = @highlight.highlight(lang, code).map(t => {
+  @html.pre(
+    class="ms-code",
+    attrs=@html.Attrs::build().data_set("lang", lang),
+    [@html.code(highlighted(lang, code))],
+  )
+}
+
+///|
+/// The highlighted tokens of `code` as inline nodes.
+fn highlighted(lang : String, code : String) -> Array[Html] {
+  @highlight.highlight(lang, code).map(t => {
     match t.kind {
       Plain => @html.text(t.text)
       Keyword => @html.span(class="tk-kw", t.text)
@@ -45,11 +55,6 @@ pub fn code_view(lang : String, code : String) -> Html {
       DocComment => @html.span(class="tk-doc", t.text)
     }
   })
-  @html.pre(
-    class="ms-code",
-    attrs=@html.Attrs::build().data_set("lang", lang),
-    [@html.code(spans)],
-  )
 }
 
 ///|

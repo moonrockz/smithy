@@ -30,6 +30,13 @@ mise run site:check   # unit tests, build release + next, link check
 `mise run site:build -- --content <repo dir> --channel release|next --site-root /smithy/ --release-version vX.Y.Z --ref <git ref> --out <dir>`
 builds one version. The scripts are `scripts/site-*.mbtx`.
 
+## Landing sample
+
+`landing/sample/` holds the hero example: `order.smithy`, `order.json`, `command.txt` and `output.txt`. The page text
+in `shell/landing_sample.mbt` must equal these files (a `prerender` test checks it), and
+`scripts/test-cli.mbtx` runs the command with the built CLI and requires `output.txt`. When the CLI output
+changes, update the four files and the constants together.
+
 ## Packages
 
 | Package | Job |

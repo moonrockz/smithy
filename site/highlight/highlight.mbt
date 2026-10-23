@@ -277,8 +277,8 @@ fn scan_smithy(s : Array[Char], out : Out) -> Unit {
       while k < s.length() && is_space(s[k]) {
         k = k + 1
       }
-      // `list: String` names a member, not a shape.
-      let is_member = k < s.length() && s[k] == ':'
+      // `list: String` and `string = "x"` name a member, not a shape.
+      let is_member = k < s.length() && (s[k] == ':' || s[k] == '=')
       if is_member {
         out.push(Plain, word)
       } else if at_start && smithy_shape_keywords.contains(word) {

@@ -19,17 +19,17 @@ fn sidebar(m : Model) -> Html {
       @html.a(
         class="ms-side-link",
         href=@data.api_docs_url,
-        "API on mooncakes.io ↗",
+        "API on mooncakes.io",
       ),
       @html.a(
         class="ms-side-link",
         href=@data.github_repo + "/releases",
-        "Releases ↗",
+        "Releases",
       ),
       @html.a(
         class="ms-side-link",
         href=@data.github_repo + "/blob/main/CHANGELOG.md",
-        "Changelog ↗",
+        "Changelog",
       ),
     ],
   )
@@ -106,7 +106,7 @@ fn docs_view(
       (
         @html.div(class="ms-error", [
           @html.p("This page could not be loaded."),
-          @html.a(href=source_url, "Read it on GitHub ↗"),
+          @html.a(href=source_url, "Read it on GitHub"),
         ]),
         [],
       )
@@ -142,7 +142,7 @@ fn docs_view(
       @html.a(
         class="ms-edit",
         href=@data.github_repo + "/edit/main/" + page.source,
-        "Edit this page on GitHub ↗",
+        "Edit this page on GitHub",
       ),
     ]),
     @html.aside(

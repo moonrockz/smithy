@@ -11,13 +11,74 @@ async fn render_route(route : @route.Route, markdown : String?) -> String {
 
 ///|
 #cfg(not(target="js"))
-async test "landing page renders hero, tiles and install tabs" {
+async test "landing page renders hero, sections and install tabs" {
   let html = render_route(Landing, None)
-  assert_true(html.contains("Smithy for MoonBit"))
-  assert_true(html.contains("Why smithy"))
-  assert_true(html.contains("moon install moonrockz/smithy"))
+  assert_true(html.contains("Smithy IDL 2.0 for MoonBit"))
+  assert_true(html.contains("<em>validated</em>"))
+  assert_true(html.contains("mise use -g github:moonrockz/smithy"))
   assert_true(html.contains("name=\"smithy-data\""))
   assert_true(html.contains("/smithy/index.js"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "landing page has every section heading and both buttons" {
+  let html = render_route(Landing, None)
+  for
+    heading in [
+      "Pick the job you came for", "One toolchain, every target", "Get the CLI or the library",
+      "Start from a working project",
+    ] {
+    assert_true(html.contains("<h2>" + heading + "</h2>"))
+  }
+  assert_true(html.contains(">Get started</a>"))
+  assert_true(html.contains(">Browse examples</a>"))
+  assert_true(html.contains("href=\"/smithy/docs/\""))
+  assert_true(html.contains("href=\"/smithy/docs/smithy-syntax/\""))
+  assert_true(html.contains("href=\"/smithy/docs/smithy-validation/\""))
+  assert_true(
+    html.contains(
+      "Smithy is an open source project by AWS. This is an independent MoonBit implementation.",
+    ),
+  )
+}
+
+///|
+#cfg(not(target="js"))
+async test "the nav names Docs, Examples and API and has the GitHub icon button" {
+  let html = render_route(Landing, None)
+  assert_true(html.contains(">Docs</a>"))
+  assert_true(html.contains(">Examples</a>"))
+  assert_true(html.contains("https://mooncakes.io/docs/moonrockz/smithy"))
+  assert_true(html.contains("aria-label=\"GitHub\""))
+  assert_true(html.contains("smithy<span class=\"ms-accent\">.mbt</span>"))
+  assert_true(!html.contains("moon<span"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "no page shows the arrow character" {
+  assert_true(!render_route(Landing, None).contains("↗"))
+  assert_true(
+    !render_route(Doc("smithy-syntax"), Some("# S\n")).contains("↗"),
+  )
+  assert_true(!render_route(Doc("nope"), None).contains("↗"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "the hero shows the sample model, command and finding" {
+  let html = render_route(Landing, None)
+  let sample = hero_sample()
+  assert_true(html.contains("order.smithy"))
+  assert_true(html.contains("smithy validate value --shape example#Order"))
+  assert_true(
+    html.contains("<span class=\"ms-term-error\">error[Range]</span>"),
+  )
+  assert_true(
+    html.contains("I expected the number to satisfy the modeled range."),
+  )
+  assert_eq(sample.output.trim_end().to_owned().split("\n").count(), 1)
 }
 
 ///|
@@ -205,14 +266,20 @@ async test "loading and failed pages render their texts" {
 
 ///|
 #cfg(not(target="js"))
-async test "the moonx install tab shows the moonx commands" {
+async test "each install tab shows its own commands" {
   let m = Model::init(site_data(Landing, None))
+  let moonx = "moonx moonrockz/smithy-cli@latest --help"
+  assert_true(!render_model(m).contains(moonx))
+  assert_true(render_model({ ..m, install_tab: Moonx, }).contains(moonx))
   assert_true(
-    !render_model(m).contains("moonx moonrockz/smithy/apps/smithy@latest"),
+    render_model({ ..m, install_tab: Library, }).contains(
+      "moon add moonrockz/smithy-syntax",
+    ),
   )
-  let html = render_model({ ..m, install_tab: Moonx, })
   assert_true(
-    html.contains("moonx moonrockz/smithy/apps/smithy@latest validate"),
+    render_model({ ..m, install_tab: Download, }).contains(
+      "releases/latest/download/smithy-linux-x64.tar.gz",
+    ),
   )
 }
 

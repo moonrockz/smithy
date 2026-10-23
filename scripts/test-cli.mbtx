@@ -1226,6 +1226,27 @@ async fn exercise_rpc_log_files(runner : Runner, root : String) -> Unit {
 }
 
 ///|
+/// The landing page shows `site/landing/sample/`. This runs the command of
+/// `command.txt` on the sample model and value and requires the shown output.
+async fn exercise_landing_sample(runner : Runner, root : String) -> Unit {
+  let sample = "\{root}/site/landing/sample"
+  for name in ["order.smithy", "order.json"] {
+    @fs.write_file(
+      "\{runner.dir}/\{name}",
+      @fs.read_file("\{sample}/\{name}").binary(),
+    )
+  }
+  let command = @fs.read_file("\{sample}/command.txt").text().trim().to_owned()
+  let words = command.split(" ").map(w => w.to_owned()).collect()
+  guard words.length() > 1 && words[0] == "smithy" else {
+    fail("command.txt must start with smithy: \{command}")
+  }
+  let (_, err) = runner.command(words[1:].to_owned(), 1)
+  let shown = @fs.read_file("\{sample}/output.txt").text()
+  assert_eq(err.replace_all(old="\r\n", new="\n"), shown)
+}
+
+///|
 async fn exercise(
   root : String,
   target : String,
@@ -1261,6 +1282,7 @@ async fn exercise(
   let runner : Runner = { target, executable, prefix, dir, }
   let input = "$version: \"2\"\nmetadata values = [9007199254740993]\nnamespace example\n// comment\nstructure  Example {\nname : String\n}\n"
   @fs.write_file("\{dir}/input.smithy", input)
+  exercise_landing_sample(runner, root)
   exercise_rpc(runner, root, skip_stdin)
   exercise_rpc_responses(runner, root, skip_stdin)
   exercise_rpc_batches(runner, root, skip_stdin)

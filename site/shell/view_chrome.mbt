@@ -66,23 +66,27 @@ fn nav_bar(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       @html.nothing
     },
     @html.a(class="ms-brand", href=base, [
-      @html.img(
-        class="ms-avatar",
-        src=base + "moonrockz.png",
-        alt="moonrockz",
-        width=28,
-        height=28,
-      ),
+      @html.span(class="ms-logo", ([] : Array[Html])),
       @html.span(class="ms-word", [
-        @html.text("moon"),
-        @html.span(class="ms-accent", "spec"),
+        @html.text("smithy"),
+        @html.span(class="ms-accent", ".mbt"),
       ]),
     ]),
     @html.nav(class="ms-links", [
       @html.a(href=@route.href(base, DocsIndex), "Docs"),
-      @html.a(href=@data.api_docs_url, "API ↗"),
-      @html.a(href=@data.github_repo, "GitHub ↗"),
+      @html.a(href=examples_url, "Examples"),
+      @html.a(class="ms-extlink", href=@data.api_docs_url, [
+        @html.text("API"),
+        icon_external(),
+      ]),
     ]),
+    @html.a(
+      class="ms-iconbtn",
+      href=@data.github_repo,
+      title="GitHub",
+      attrs=@html.Attrs::build().aria_label("GitHub"),
+      [icon_github()],
+    ),
     @html.button(
       id="ms-search-btn",
       class="ms-search-btn",
@@ -100,15 +104,43 @@ fn nav_bar(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
 }
 
 ///|
-fn footer_view(m : Model) -> Html {
-  let base = m.config.base
+/// An inline icon, hidden from assistive technology: the link names it.
+fn icon(width : Int32, d : String, class~ : String = "ms-icon") -> Html {
+  @html.span(class~, attrs=@html.Attrs::build().aria_hidden("true"), [
+    @svg.svg(width~, height=width, view_box="0 0 16 16", [
+      @svg.path(d~, fill="currentColor"),
+    ]),
+  ])
+}
+
+///|
+fn icon_external() -> Html {
+  icon(
+    12,
+    "M9 2h5v5h-1.5V4.56L7.53 9.53 6.47 8.47l4.97-4.97H9V2ZM3.5 4A1.5 1.5 0 0 0 2 5.5v7A1.5 1.5 0 0 0 3.5 14h7a1.5 1.5 0 0 0 1.5-1.5V9h-1.5v3.5h-7v-7H7V4H3.5Z",
+    class="ms-ext",
+  )
+}
+
+///|
+fn icon_github() -> Html {
+  icon(
+    18, "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z",
+  )
+}
+
+///|
+fn footer_view(_m : Model) -> Html {
   @html.footer(class="ms-footer", [
-    @html.img(src=base + "moonrockz.png", alt="moonrockz", width=56, height=56),
+    @html.span("smithy.mbt · moonrockz · smithy " + @smithy.version()),
+    @html.span("Apache-2.0"),
+    @html.a(href=@data.github_repo, "GitHub"),
+    @html.a(href=@data.api_docs_url, "mooncakes.io"),
+    @html.a(href=changelog_url, "Changelog"),
     @html.span(
-      "A moonrockz project · Apache-2.0 · smithy " + @smithy.version(),
+      class="ms-footer-note",
+      "Smithy is an open source project by AWS. This is an independent MoonBit implementation.",
     ),
-    @html.a(href=@data.api_docs_url, "mooncakes.io ↗"),
-    @html.a(href=@data.github_repo, "GitHub ↗"),
   ])
 }
 

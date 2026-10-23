@@ -73,6 +73,19 @@ test "smithy: shape keywords are contextual, names are types" {
 }
 
 ///|
+test "smithy: a word before = is an enum member, not a shape keyword" {
+  let src = "enum E {\n    string = \"x\"\n    NAME = \"y\"\n}\n"
+  let tokens = highlight("smithy", src)
+  assert_eq(joined(tokens), src)
+  inspect(
+    kinds(tokens),
+    content=(
+      #|kw:enum type:E str:"x" str:"y"
+    ),
+  )
+}
+
+///|
 test "smithy: text blocks, numbers, comments, traits" {
   let src = "@documentation(\"\"\"\n  two\n  \"\"\")\n@range(min: -1.5e3, max: 20)\n// plain\nstring S\n"
   let tokens = highlight("smithy", src)

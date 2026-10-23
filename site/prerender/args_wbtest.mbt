@@ -64,3 +64,41 @@ test "check_manifest accepts a manifest with only the CLI page" {
   }
   assert_eq(check_manifest(m, "."), Ok(()))
 }
+
+///|
+test "missing_sources names each fixed source that is not there" {
+  let missing = missing_sources("/nonexistent-smithy-content", [
+    "README.md", "docs/a.md",
+  ])
+  assert_eq(missing, ["README.md", "docs/a.md"])
+}
+
+///|
+/// The landing page shows `site/landing/sample/`; the page text must equal the files.
+test "the hero sample equals the files in landing/sample" {
+  let sample = @shell.hero_sample()
+  let read = path => {
+    @fs.read_file_to_string("landing/sample/" + path) catch {
+      _ => fail("I could not read landing/sample/\{path}")
+    }
+  }
+  assert_eq(sample.model, read("order.smithy"))
+  assert_eq(sample.value, read("order.json"))
+  assert_eq(sample.command, read("command.txt"))
+  assert_eq(sample.output, read("output.txt"))
+}
+
+///|
+test "plan_sources fails on the next channel and skips on a release" {
+  let all = @content.fixed_sources()
+  assert_eq(plan_sources(Next, "/c", []), Ok(all))
+  assert_eq(
+    plan_sources(Next, "/c", ["README.md"]),
+    Err("I could not find these source files under /c: README.md"),
+  )
+  let first = all[0]
+  match plan_sources(Release, "/c", [first]) {
+    Ok(kept) => assert_eq(kept.length(), all.length() - 1)
+    Err(_) => fail("a release leaves a missing page out")
+  }
+}

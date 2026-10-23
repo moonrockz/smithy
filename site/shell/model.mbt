@@ -60,8 +60,10 @@ pub extend IndexState with @debug.Debug::{to_repr}
 
 ///|
 pub(all) enum InstallTab {
-  Installed
+  Mise
   Moonx
+  Library
+  Download
 } derive(Eq, Debug)
 
 ///|
@@ -159,7 +161,7 @@ pub fn Model::init(data : @data.SiteData) -> Model {
     page,
     theme: Auto,
     search: closed_search,
-    install_tab: Installed,
+    install_tab: Mise,
     menu_open: false,
     pending_anchor: None,
   }

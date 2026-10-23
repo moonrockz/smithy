@@ -45,16 +45,40 @@ fn read_markdown_dir(
 }
 
 ///|
-/// The files among `paths` that exist under `content`, as (repository path, text).
+/// The files among `paths` that do not exist under `content`.
+fn missing_sources(content : String, paths : Array[String]) -> Array[String] {
+  paths.filter(path => !@fs.path_exists(content + "/" + path))
+}
+
+///|
+/// The fixed sources to read. The `next` channel builds the working tree, which
+/// must have every source. A release built from an older tag can lack pages
+/// that were added later: those are named and left out.
+fn plan_sources(
+  channel : @data.Channel,
+  content : String,
+  missing : Array[String],
+) -> Result[Array[String], String] {
+  if missing.is_empty() {
+    return Ok(@content.fixed_sources())
+  }
+  let names = missing.join(", ")
+  match channel {
+    Next =>
+      Err("I could not find these source files under \{content}: \{names}")
+    Release => Ok(@content.fixed_sources().filter(p => !missing.contains(p)))
+  }
+}
+
+///|
+/// The files `paths` under `content`, as (repository path, text). Each file must exist.
 fn read_markdown_files(
   content : String,
   paths : Array[String],
 ) -> Array[(String, String)] raise {
   let out : Array[(String, String)] = []
   for path in paths {
-    if @fs.path_exists(content + "/" + path) {
-      out.push((path, @fs.read_file_to_string(content + "/" + path)))
-    }
+    out.push((path, @fs.read_file_to_string(content + "/" + path)))
   }
   out
 }
@@ -85,9 +109,25 @@ fn check_manifest(
 /// Builds one version of the site into `args.out`.
 pub async fn build_site(args : Args) -> Unit {
   let config = config_of(args)
+  let missing = missing_sources(args.content, @content.fixed_sources())
+  let sources = match plan_sources(args.channel, args.content, missing) {
+    Ok(sources) => {
+      if !missing.is_empty() {
+        println(
+          "prerender: this release has no \{missing.join(", ")}. I leave those pages out.",
+        )
+      }
+      sources
+    }
+    Err(message) => {
+      println("prerender: " + message)
+      @sys.exit(1)
+      return
+    }
+  }
   let files = [
     ..read_markdown_dir(args.content, "docs/guide"),
-    ..read_markdown_files(args.content, @content.fixed_sources()),
+    ..read_markdown_files(args.content, sources),
   ]
   let manifest = @content.Manifest::build(
     files.map(f => { path: f.0, title: @markdown.title_of(f.1), }),

@@ -24,6 +24,8 @@ pub fn current_results(Model) -> Array[(String, Array[@search.Match])]
 
 pub fn entry_href(@data.SiteConfig, @search.Entry) -> String
 
+pub fn hero_sample() -> HeroSample
+
 pub fn md_view(String, Array[@markdown.Block]) -> @html.Html
 
 pub fn read_theme() -> Theme
@@ -37,6 +39,13 @@ pub fn view(Model, @cmd.Emit[Msg], String) -> @html.Html
 // Errors
 
 // Types and methods
+pub struct HeroSample {
+  model : String
+  value : String
+  command : String
+  output : String
+}
+
 pub(all) enum IndexState {
   NotLoaded
   LoadingIndex
@@ -48,8 +57,10 @@ pub fn IndexState::not_equal(Self, Self) -> Bool
 pub fn IndexState::to_repr(Self) -> @debug.Repr
 
 pub(all) enum InstallTab {
-  Installed
+  Mise
   Moonx
+  Library
+  Download
 } derive(Eq, @debug.Debug)
 pub fn InstallTab::equal(Self, Self) -> Bool
 pub fn InstallTab::not_equal(Self, Self) -> Bool
