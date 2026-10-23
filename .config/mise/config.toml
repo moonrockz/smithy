@@ -155,6 +155,10 @@ run = "moonx scripts/vendor-jmespath.mbtx"
 description = "Run the tests of the task scripts (scripts/*.mbtx that have a scripts/features/*.feature)"
 run = "moonx scripts/test-scripts.mbtx"
 
+[tasks."bench:validate"]
+description = "Time smithy validate on generated models and fail over the bounds (args: --sizes, --max-seconds, --max-ratio, --cutoff, --no-build)"
+run = "moonx scripts/bench-validate.mbtx"
+
 [tasks."test:bdd"]
 description = "Run the moonspec acceptance features (tests/bdd, js target)"
 run = "moon test tests/bdd --target js"

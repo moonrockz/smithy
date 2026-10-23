@@ -1,0 +1,371 @@
+///|
+/// Time `smithy validate` on generated models of growing size, and fail when
+/// validation is too slow or grows faster than the bounds allow.
+///
+/// The models are the ones of `scale_model` in
+/// `pkgs/smithy/validation_scale_test.mbt`: for each operation an input, an
+/// output and a nested structure, with traits that exercise trait targets,
+/// a neighbor selector, trait validators, idRef and configured validators.
+/// A size counts the operations and their three structures, so 4,000 shapes
+/// is 1,000 operations. Models go to `.dev/out/bench/`.
+///
+/// Usage: `mise run bench:validate -- [options]`
+///
+/// - `--sizes 1000,2000,4000`: the shape counts, in ascending order.
+/// - `--max-seconds 2`: the bound for the largest size.
+/// - `--max-ratio 2.5`: the bound for the time of a size over the time of the size before it.
+/// - `--cutoff 120`: stop a run after this many seconds; the run fails.
+/// - `--no-build`: use the CLI that is built, do not build it first.
+///
+/// It exits with 0 when every run passes and the bounds hold, else with 1.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let cli : String = "_build/native/release/build/moonrockz/smithy-cli/smithy-cli.exe"
+
+///|
+let out_dir : String = ".dev/out/bench"
+
+///|
+struct Options {
+  sizes : Array[Int32]
+  max_seconds : Double
+  max_ratio : Double
+  cutoff : Int32
+  build : Bool
+} derive(Debug, Eq)
+
+///|
+/// Parse the options. `args` has the script binary at index 0.
+fn parse_options(args : ArrayView[String]) -> Options raise {
+  let mut sizes = [1000, 2000, 4000]
+  let mut max_seconds = 2.0
+  let mut max_ratio = 2.5
+  let mut cutoff = 120
+  let mut build = true
+  let mut i = 1
+  fn value(i : Int32) -> String raise {
+    guard i < args.length() else { fail("\{args[i - 1]} needs a value") }
+    args[i]
+  }
+  while i < args.length() {
+    match args[i] {
+      "--sizes" => {
+        sizes = []
+        for size in value(i + 1).split(",") {
+          sizes.push(@string.parse_int(size.trim()))
+        }
+        i += 1
+      }
+      "--max-seconds" => {
+        max_seconds = @string.parse_double(value(i + 1))
+        i += 1
+      }
+      "--max-ratio" => {
+        max_ratio = @string.parse_double(value(i + 1))
+        i += 1
+      }
+      "--cutoff" => {
+        cutoff = @string.parse_int(value(i + 1))
+        i += 1
+      }
+      "--no-build" => build = false
+      other => fail("unknown argument \{other}")
+    }
+    i += 1
+  }
+  guard !sizes.is_empty() else { fail("--sizes needs at least one size") }
+  for j in 0..<sizes.length() {
+    guard sizes[j] >= 4 else { fail("a size must be at least 4") }
+    guard j == 0 || sizes[j] > sizes[j - 1] else {
+      fail("--sizes must be in ascending order")
+    }
+  }
+  { sizes, max_seconds, max_ratio, cutoff, build, }
+}
+
+///|
+/// The same text as `scale_model` in `pkgs/smithy/validation_scale_test.mbt`.
+fn scale_model(units : Int32) -> String {
+  let out = StringBuilder()
+  out.write_string(
+    (
+      #|$version: "2.0"
+      #|metadata validators = [
+      #|  {name: "EmitEachSelector", id: "Documented", severity: "NOTE", configuration: {selector: "structure > member [trait|documentation]"}}
+      #|  {name: "EmitEachSelector", id: "Ranged", severity: "WARNING", selector: "member", configuration: {selector: "structure > member [trait|range]"}}
+      #|  {name: "EmitEachSelector", id: "ReadOnly", namespaces: ["example.bench"], configuration: {selector: "operation [trait|readonly]"}}
+      #|]
+      #|namespace example.bench
+      #|
+      #|blob Payload
+      #|
+      #|@trait(selector: "operation -[input]-> structure")
+      #|structure inputMarker {}
+      #|
+      #|@trait(selector: "structure")
+      #|@traitValidators("Marked.NoBlob": {selector: "~> blob", message: "no blobs", severity: "WARNING"})
+      #|structure marked {}
+      #|
+      #|@trait(selector: "structure")
+      #|@idRef(selector: "operation", failWhenMissing: true)
+      #|string opRef
+      #|
+      #|service Bench {
+      #|  version: "1"
+      #|  operations: [
+    ),
+  )
+  for i in 0..<units {
+    out.write_string("\n    Op\{i}")
+  }
+  out.write_string("\n  ]\n}\n")
+  for i in 0..<units {
+    let blob = if i % 10 == 0 { "  c: Payload\n" } else { "" }
+    out.write_string(
+      (
+        $|
+        $|@readonly
+        $|@http(method: "GET", uri: "/op\{i}")
+        $|operation Op\{i} {
+        $|  input: Op\{i}Input
+        $|  output: Op\{i}Output
+        $|}
+        $|
+        $|@input
+        $|@inputMarker
+        $|structure Op\{i}Input {
+        $|  @required
+        $|  @httpQuery("q")
+        $|  @length(min: 1)
+        $|  q: String
+        $|}
+        $|
+        $|@output
+        $|@marked
+        $|structure Op\{i}Output {
+        $|  @documentation("Value \{i}")
+        $|  v: Rec\{i}
+        $|}
+        $|
+        $|@opRef("example.bench#Op\{i}")
+        $|structure Rec\{i} {
+        $|  @range(min: 0)
+        $|  a: Integer
+        $|  b: String
+        $|\{blob}}
+        $|
+      ),
+    )
+  }
+  out.to_string()
+}
+
+///|
+/// The time of one size. `None` is a run that the cutoff stopped.
+struct Run {
+  size : Int32
+  seconds : Double?
+}
+
+///|
+/// The problems of the runs against the bounds; an empty array passes.
+fn check_runs(runs : Array[Run], options : Options) -> Array[String] {
+  let problems = []
+  for j, run in runs {
+    guard run.seconds is Some(seconds) else {
+      problems.push(
+        "\{run.size} shapes: stopped after the cutoff of \{options.cutoff} s",
+      )
+      continue
+    }
+    if j == runs.length() - 1 && seconds > options.max_seconds {
+      problems.push(
+        "\{run.size} shapes: \{format_seconds(seconds)} s is over the bound of \{options.max_seconds} s",
+      )
+    }
+    if j > 0 && runs[j - 1].seconds is Some(before) && before > 0.0 {
+      let ratio = seconds / before
+      if ratio > options.max_ratio {
+        problems.push(
+          "\{runs[j - 1].size} -> \{run.size} shapes: x\{format_seconds(ratio)} is over the bound of x\{options.max_ratio}",
+        )
+      }
+    }
+  }
+  problems
+}
+
+///|
+/// A number with two decimals.
+fn format_seconds(value : Double) -> String {
+  let hundredths = (value * 100.0).round().to_int64()
+  let fraction = (hundredths % 100L).to_string()
+  let fraction = if fraction.length() == 1 { "0" + fraction } else { fraction }
+  "\{hundredths / 100L}.\{fraction}"
+}
+
+///|
+/// Time one validation. `None` when the cutoff stopped it. The models have
+/// DANGER events, so `smithy validate` exits with 1; an ERROR event or another
+/// exit code means that the model or the CLI is broken.
+async fn time_validate(path : String, cutoff : Int32) -> Double? {
+  let report = path + ".out"
+  let start = @async.now()
+  let code = @async.with_timeout_opt(cutoff * 1000, () => {
+    @process.run(
+      cli,
+      ["validate", path],
+      stdout=@process.redirect_to_file(report),
+      stderr=@process.redirect_to_file(report, append=true),
+      cancel_handler=@process.hard_cancel(),
+    )
+  })
+  let elapsed = (@async.now() - start).to_double() / 1000.0
+  guard code is Some(code) else { return None }
+  guard code == 0 || code == 1 else {
+    fail("smithy validate \{path} exited with \{code}")
+  }
+  guard !@fs.read_file(report).text().contains("[ERROR]") else {
+    fail("smithy validate \{path} reported errors; see \{report}")
+  }
+  Some(elapsed)
+}
+
+///|
+async fn main {
+  let options = parse_options(@env.args()[:]) catch {
+    error => {
+      eprintln("bench:validate: \{error}")
+      @sys.exit(2)
+      return
+    }
+  }
+  let code = run(options) catch {
+    error => {
+      eprintln("bench:validate: \{error}")
+      1
+    }
+  }
+  @sys.exit(code)
+}
+
+///|
+async fn run(options : Options) -> Int32 {
+  if options.build {
+    let code = @process.run("moon", ["build", "--target", "native", "--release"])
+    guard code == 0 else { fail("moon build exited with \{code}") }
+  }
+  guard @fs.exists(cli) else { fail("\{cli} does not exist; build it first") }
+  @fs.mkdir(out_dir, recursive=true) catch {
+    _ => ()
+  }
+  let runs : Array[Run] = []
+  println("shapes  seconds  ratio")
+  for size in options.sizes {
+    let path = "\{out_dir}/scale-\{size}.smithy"
+    @fs.write_file(path, scale_model(size / 4))
+    let seconds = time_validate(path, options.cutoff)
+    let shown = seconds.map(format_seconds).unwrap_or("> \{options.cutoff}")
+    let before = runs.last().bind(run => run.seconds)
+    let ratio = match (before, seconds) {
+      (Some(before), Some(now)) if before > 0.0 =>
+        "x" + format_seconds(now / before)
+      _ => "-"
+    }
+    println("\{size}  \{shown}  \{ratio}")
+    runs.push({ size, seconds, })
+    if seconds is None {
+      break
+    }
+  }
+  let problems = check_runs(runs, options)
+  for problem in problems {
+    eprintln("bench:validate: \{problem}")
+  }
+  if problems.is_empty() {
+    println("bench:validate: OK")
+    0
+  } else {
+    1
+  }
+}
+
+///|
+test "parse_options has defaults and reads every option" {
+  assert_eq(parse_options(["bench"]), {
+    sizes: [1000, 2000, 4000],
+    max_seconds: 2.0,
+    max_ratio: 2.5,
+    cutoff: 120,
+    build: true,
+  })
+  assert_eq(
+    parse_options([
+      "bench", "--sizes", "100, 200", "--max-seconds", "0.5", "--max-ratio", "3",
+      "--cutoff", "9", "--no-build",
+    ]),
+    {
+      sizes: [100, 200],
+      max_seconds: 0.5,
+      max_ratio: 3.0,
+      cutoff: 9,
+      build: false,
+    },
+  )
+}
+
+///|
+test "parse_options rejects sizes out of order and unknown arguments" {
+  for
+    args in [
+      ["bench", "--sizes", "200,100"],
+      ["bench", "--fast"],
+      ["bench", "--cutoff"],
+    ] {
+    try parse_options(args) catch {
+      _ => continue
+    } noraise {
+      _ => fail("expected \{args.join(" ")} to be rejected")
+    }
+  }
+}
+
+///|
+test "check_runs applies the bound of the largest size and the ratio" {
+  let options = parse_options(["bench"])
+  let passing = [
+    { size: 1000, seconds: Some(0.4), },
+    { size: 2000, seconds: Some(0.8), },
+    { size: 4000, seconds: Some(1.6), },
+  ]
+  assert_eq(check_runs(passing, options), [])
+  let failing = [
+    { size: 1000, seconds: Some(0.4), },
+    { size: 2000, seconds: Some(1.6), },
+    { size: 4000, seconds: Some(3.2), },
+  ]
+  assert_eq(check_runs(failing, options), [
+    "1000 -> 2000 shapes: x4.00 is over the bound of x2.5", "4000 shapes: 3.20 s is over the bound of 2 s",
+  ])
+  let stopped = [{ size: 1000, seconds: None, }]
+  assert_eq(check_runs(stopped, options), [
+    "1000 shapes: stopped after the cutoff of 120 s",
+  ])
+}
+
+///|
+test "scale_model has an operation and three structures for each unit" {
+  let model = scale_model(20)
+  assert_eq(model.split("\noperation Op").count(), 21)
+  assert_eq(model.split("\nstructure Op").count(), 41)
+  assert_eq(model.split("\nstructure Rec").count(), 21)
+  assert_eq(model.split("c: Payload").count(), 3)
+}
