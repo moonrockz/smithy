@@ -30,6 +30,35 @@ test "internal_path keeps only links under the base and not ignored" {
 }
 
 ///|
+test "stray_root_link flags root-relative links outside the site" {
+  // Such a link would 404 on the deployed site: it lacks the build's base.
+  assert_true(stray_root_link("/smithy/", [], "/docs/x"))
+  assert_true(stray_root_link("/smithy/next/", [], "/docs/x"))
+  assert_true(stray_root_link("/smithy/", [], "/smithy-other/x"))
+  assert_false(stray_root_link("/smithy/", [], "//cdn.example.com/a.js"))
+  assert_false(stray_root_link("/smithy/", [], "https://e.com/docs/x"))
+  assert_false(stray_root_link("/smithy/", [], "#top"))
+  assert_false(stray_root_link("/smithy/", [], "/smithy/docs/x"))
+  assert_false(stray_root_link("/smithy/", ["/smithy/next/"], "/smithy/next/x"))
+  // The other channel's base is part of the same site.
+  assert_false(stray_root_link("/smithy/next/", [], "/smithy/docs/x"))
+  assert_false(stray_root_link("/", [], "/docs/x"))
+}
+
+///|
+test "check reports a root-relative link that lacks the base" {
+  let root = fixture(
+    "stray",
+    ["", "docs/x"],
+    ["docs/x/index.html"],
+    "<a href=\"/docs/x\">x</a>",
+  )
+  let problems = check(root, "/b/", [])
+  rm_rf(root)
+  assert_eq(problems, ["index.html: broken link /docs/x"])
+}
+
+///|
 test "target_file treats dotted routes as directories" {
   assert_eq(target_file("docs/a.b"), "docs/a.b/index.html")
   assert_eq(

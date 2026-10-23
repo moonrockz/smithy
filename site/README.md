@@ -100,3 +100,9 @@ changes, update the four files and the constants together.
 | `app` | browser entry: hydrates the pre-rendered page |
 | `prerender` | native: renders every route, writes content copies and the search index |
 | `linkcheck` | native: checks links, routes and the search index of a build |
+
+## Build arguments are a contract
+
+`scripts/site-pages.mbtx` on main builds the release channel by running the tag's own `scripts/site-build.mbtx`
+in a worktree of that tag. A new main therefore calls an old `site-build`. Keep the arguments of `site-build`
+backward-compatible: add optional flags, and never rename or remove one.

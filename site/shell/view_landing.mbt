@@ -95,9 +95,8 @@ let tiles : Array[(String, String)] = [
   (
     "Library first", "Every CLI command is a library API you can call from your own MoonBit code.",
   ),
-  (
-    "Runs in the browser", "The playground runs the same packages client-side. Nothing is uploaded.",
-  ),
+  // Task 8 restores the "Runs in the browser" tile together with the Playground nav item, the playground
+  // teaser and the "Try the playground" button, when the playground exists.
 ]
 
 ///|

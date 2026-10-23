@@ -61,6 +61,32 @@ pub fn internal_path(
 }
 
 ///|
+/// The first path segment of `base` with its slashes: `/smithy/` for `/smithy/next/`, `/` for `/`.
+fn site_root(base : String) -> String {
+  match base[1:].find("/") {
+    Some(k) => base[:k + 2].to_owned()
+    None => base
+  }
+}
+
+///|
+/// Whether `link` is root-relative (`/x`, not `//host`), lies outside the site that holds `base` and is
+/// not under an ignored prefix. The deployed site would answer such a link with 404.
+pub fn stray_root_link(
+  base : String,
+  ignore : Array[String],
+  link : String,
+) -> Bool {
+  if !link.has_prefix("/") || link.has_prefix("//") {
+    return false
+  }
+  if link.has_prefix(site_root(base)) {
+    return false
+  }
+  !ignore.iter().any(prefix => link.has_prefix(prefix))
+}
+
+///|
 /// The file, relative to `dist`, that serves the site path `path`.
 pub fn target_file(path : String) -> String {
   if path == "" {
@@ -136,6 +162,10 @@ pub fn check(
     }
     let html = @fs.read_file_to_string(dist + "/" + page)
     for link in extract_links(html) {
+      if stray_root_link(base, ignore, link) {
+        problems.push("\{page}: broken link \{link}")
+        continue
+      }
       match internal_path(base, ignore, link) {
         Some(path) =>
           if !@fs.path_exists(dist + "/" + target_file(path)) {

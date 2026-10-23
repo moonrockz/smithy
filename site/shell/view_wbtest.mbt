@@ -45,6 +45,15 @@ async test "landing page has every section heading and both buttons" {
 
 ///|
 #cfg(not(target="js"))
+async test "landing page has five feature tiles and no playground claim" {
+  let html = render_route(Landing, None)
+  assert_eq(html.split("class=\"ms-tile\"").count(), 6)
+  assert_false(html.contains("Runs in the browser"))
+  assert_false(html.contains("playground"))
+}
+
+///|
+#cfg(not(target="js"))
 async test "the nav names Docs, Examples and API and has the GitHub icon button" {
   let html = render_route(Landing, None)
   assert_true(html.contains(">Docs</a>"))
