@@ -1,0 +1,189 @@
+///|
+/// Test the site packages, build the release and next versions of the site, and check their links.
+///
+/// Usage: `mise run site:check`, or `moonx scripts/site-check.mbtx`.
+/// The release version is built from the newest stable tag, in a temporary git worktree, as the Pages
+/// workflow does. With no stable tag it is built from the working tree. The builds go to a temporary
+/// directory, which the script removes at the end.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let site_root : String = "/smithy/"
+
+///|
+/// The commands that test the site packages, run inside `site/`.
+let test_commands : Array[Array[String]] = [
+  ["moon", "fmt", "--check"],
+  ["moon", "test", "--target", "native"],
+  ["moon", "test", "--target", "js"],
+  ["moon", "check", "--target", "native"],
+  ["moon", "check", "--target", "js"],
+]
+
+///|
+/// The arguments of `site-build.mbtx` for one channel.
+fn build_args(
+  content : String,
+  channel : String,
+  version : String,
+  git_ref : String,
+  out : String,
+) -> Array[String] {
+  [
+    "scripts/site-build.mbtx", "--content", content, "--channel", channel, "--site-root",
+    site_root, "--release-version", version, "--ref", git_ref, "--out", out,
+  ]
+}
+
+///|
+/// The arguments of `site-linkcheck.mbtx`: the release site ignores the `next/` site below it.
+fn linkcheck_args(
+  dist : String,
+  base : String,
+  ignore? : String,
+) -> Array[String] {
+  let args = ["scripts/site-linkcheck.mbtx", "--dist", dist, "--base", base]
+  if ignore is Some(prefix) {
+    args.push("--ignore")
+    args.push(prefix)
+  }
+  args
+}
+
+///|
+/// Run a command; return its exit code, 1 for a command that did not run.
+async fn run(
+  command : String,
+  args : Array[String],
+  cwd? : StringView,
+) -> Int32 {
+  let code = @process.run(
+    command,
+    args,
+    cwd?,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  ) catch {
+    error => {
+      eprintln("site:check: `\{command}` did not run: \{error}")
+      return 1
+    }
+  }
+  if code > 0 {
+    code
+  } else if code < 0 {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+/// Run the steps in order; return the first non-zero code.
+async fn steps(tmp : String) -> Int32 {
+  for command in test_commands {
+    let code = run(command[0], command[1:].to_owned(), cwd="site")
+    if code != 0 {
+      return code
+    }
+  }
+  let (status, output, errors) = @process.collect_output("moonx", [
+    "scripts/site-latest-tag.mbtx",
+  ])
+  if status != 0 {
+    eprintln("site:check: cannot find the latest tag: \{errors.text()}")
+    return 1
+  }
+  let tag = output.text().trim().to_owned()
+  let version = if tag.is_empty() { "v0.0.0" } else { tag }
+  // The release channel is built from the latest stable tag, as CI does.
+  let mut release_content = "."
+  if tag.is_empty() {
+    println(
+      "site:check: no stable release tag found; building the release channel from the working tree",
+    )
+  } else {
+    release_content = tmp + "/release"
+    let code = run("git", [
+      "-c", "core.hooksPath=/dev/null", "worktree", "add", "--detach", release_content,
+      tag,
+    ])
+    if code != 0 {
+      return code
+    }
+  }
+  let dist = tmp + "/site"
+  let builds = [
+    build_args(release_content, "release", version, version, dist),
+    build_args(".", "next", version, "main", dist + "/next"),
+  ]
+  for args in builds {
+    let code = run("moonx", args)
+    if code != 0 {
+      return code
+    }
+  }
+  let checks = [
+    linkcheck_args(dist, site_root, ignore=site_root + "next/"),
+    linkcheck_args(dist + "/next", site_root + "next/"),
+  ]
+  for args in checks {
+    let code = run("moonx", args)
+    if code != 0 {
+      return code
+    }
+  }
+  0
+}
+
+///|
+async fn cleanup(tmp : String) -> Unit {
+  // Ignore failures: the worktree exists only when a release tag was found.
+  let _ = run("git", [
+    "-c",
+    "core.hooksPath=/dev/null",
+    "worktree",
+    "remove",
+    "--force",
+    tmp + "/release",
+  ])
+  let _ = run("git", ["-c", "core.hooksPath=/dev/null", "worktree", "prune"])
+  @fs.rmdir(tmp, recursive=true)
+}
+
+///|
+async fn main {
+  let tmp = @fs.tmpdir(prefix="site-check")
+  let code = steps(tmp)
+  cleanup(tmp)
+  if code != 0 {
+    eprintln("site:check: failed")
+    @sys.exit(code)
+  }
+  println("site:check: OK")
+}
+
+///|
+test "build_args names every argument of site-build" {
+  assert_eq(build_args("/r", "release", "v1.0.0", "v1.0.0", "/o"), [
+    "scripts/site-build.mbtx", "--content", "/r", "--channel", "release", "--site-root",
+    "/smithy/", "--release-version", "v1.0.0", "--ref", "v1.0.0", "--out", "/o",
+  ])
+}
+
+///|
+test "linkcheck_args adds --ignore only when given" {
+  assert_eq(linkcheck_args("/d", "/smithy/", ignore="/smithy/next/"), [
+    "scripts/site-linkcheck.mbtx", "--dist", "/d", "--base", "/smithy/", "--ignore",
+    "/smithy/next/",
+  ])
+  assert_eq(linkcheck_args("/d", "/smithy/next/"), [
+    "scripts/site-linkcheck.mbtx", "--dist", "/d", "--base", "/smithy/next/",
+  ])
+}

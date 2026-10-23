@@ -1,0 +1,92 @@
+///|
+/// Check the links, the routes and the search index of a built site.
+///
+/// Usage: `mise run site:linkcheck -- --dist <dir> --base /smithy/ [--ignore /smithy/next/]`, or
+/// `moonx scripts/site-linkcheck.mbtx <the same>`. The check runs inside `site/`, so the script makes
+/// the `--dist` path absolute first.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+/// The value after the last `--dist`, or `None` when the flag is missing or has no value.
+fn dist_of(args : ArrayView[String]) -> String? {
+  let mut dist = None
+  let mut i = 0
+  while i + 1 < args.length() {
+    if args[i] == "--dist" {
+      dist = Some(args[i + 1])
+    }
+    i += 2
+  }
+  dist
+}
+
+///|
+/// The arguments with the value of each `--dist` replaced by `dist`.
+fn with_dist(args : ArrayView[String], dist : String) -> Array[String] {
+  let out = []
+  let mut i = 0
+  while i < args.length() {
+    if args[i] == "--dist" && i + 1 < args.length() {
+      out.push("--dist")
+      out.push(dist)
+      i += 2
+    } else {
+      out.push(args[i])
+      i += 1
+    }
+  }
+  out
+}
+
+///|
+async fn main {
+  let args = @env.args()[1:]
+  let args = match dist_of(args) {
+    Some(dist) => {
+      let abs = @fs.realpath(dist) catch {
+        _ => {
+          eprintln("site:linkcheck: --dist \{dist} does not exist")
+          @sys.exit(2)
+          return
+        }
+      }
+      with_dist(args, abs)
+    }
+    None => args.to_owned()
+  }
+  let code = @process.run(
+    "moon",
+    ["run", "--target", "native", "linkcheck", "--", ..args],
+    cwd="site",
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  if code != 0 {
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+}
+
+///|
+test "dist_of reads the --dist value" {
+  assert_eq(dist_of(["--dist", "_site", "--base", "/x/"]), Some("_site"))
+  assert_eq(dist_of(["--base", "/x/"]), None)
+  assert_eq(dist_of(["--dist"]), None)
+}
+
+///|
+test "with_dist replaces only the dist value" {
+  assert_eq(
+    with_dist(
+      ["--dist", "_site", "--base", "/x/", "--ignore", "/x/next/"],
+      "/abs",
+    ),
+    ["--dist", "/abs", "--base", "/x/", "--ignore", "/x/next/"],
+  )
+}

@@ -1,0 +1,81 @@
+///|
+fn kinds(tokens : Array[Token]) -> String {
+  tokens
+  .filter(t => t.kind != Plain)
+  .map(t => {
+    let k = match t.kind {
+      Keyword => "kw"
+      Str => "str"
+      Comment => "com"
+      Number => "num"
+      Tag => "tag"
+      Plain => "plain"
+    }
+    k + ":" + t.text
+  })
+  .join(" ")
+}
+
+///|
+fn joined(tokens : Array[Token]) -> String {
+  tokens.map(t => t.text).join("")
+}
+
+///|
+test "gherkin keywords, strings, numbers, tags, comments" {
+  let src = "@smoke\nFeature: Calculator\n  # note\n  Scenario: Add\n    Given a calculator\n    When I add 2 and \"x\"\n"
+  let tokens = highlight("gherkin", src)
+  assert_eq(joined(tokens), src)
+  inspect(
+    kinds(tokens),
+    content="tag:@smoke kw:Feature: com:# note kw:Scenario: kw:Given kw:When num:2 str:\"x\"",
+  )
+}
+
+///|
+test "moonbit keywords, attributes, strings, comments" {
+  let src = "#smithy.given(\"a {int}\")\nfn f(w : W) -> Unit { // hi\n  let n = 42\n}"
+  let tokens = highlight("moonbit", src)
+  assert_eq(joined(tokens), src)
+  inspect(
+    kinds(tokens),
+    content="tag:#smithy.given str:\"a {int}\" kw:fn com:// hi kw:let num:42",
+  )
+}
+
+///|
+test "shell comments and strings; unknown languages are plain" {
+  let src = "# 1. add\nmoon add \"moonrockz/smithy\"\n"
+  assert_eq(
+    kinds(highlight("bash", src)),
+    "com:# 1. add str:\"moonrockz/smithy\"",
+  )
+  let plain = highlight("text", "anything 42")
+  assert_eq(plain, [{ kind: Plain, text: "anything 42", }])
+  assert_eq(highlight("moonbit", ""), [])
+}
+
+///|
+test "unterminated strings run to the end of the line" {
+  let src = "let s = \"open\nnext"
+  let tokens = highlight("moonbit", src)
+  assert_eq(joined(tokens), src)
+  inspect(kinds(tokens), content="kw:let str:\"open")
+}
+
+///|
+test "every language reproduces its source exactly" {
+  let langs = [
+    "moonbit", "mbt", "gherkin", "feature", "cucumber", "bash", "sh", "shell", "console",
+    "zsh", "json", "json5", "jsonc", "text",
+  ]
+  let samples = [
+    "", "\n", "\r\n", "\"", "a \"b\" # c // d", "@t\nFeature: X\n  Given 1 and \"s\"\n  | a | b |\n",
+    "@t\nFeature: X\n  Given 1 and \"s\"\n  | a | b |",
+  ]
+  for lang in langs {
+    for src in samples {
+      assert_eq(joined(highlight(lang, src)), src)
+    }
+  }
+}

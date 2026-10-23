@@ -1,0 +1,283 @@
+///|
+/// Build the site at base `/` and serve it on http://localhost:8080.
+///
+/// Usage: `mise run site:dev`, or `moonx scripts/site-dev.mbtx [--port <n>]`. Run it from the
+/// workspace root. The build is the release channel of the working tree, in `site/dist`. A path
+/// that leaves `site/dist` gives 403, a directory serves its `index.html`, and a missing file
+/// serves `404.html` with the status 404, as GitHub Pages does.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/http",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/socket",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let dist : String = "site/dist"
+
+///|
+let default_port : Int32 = 8080
+
+///|
+fn hex_value(c : Int32) -> Int32? {
+  if c >= '0'.to_int() && c <= '9'.to_int() {
+    Some(c - '0'.to_int())
+  } else if c >= 'a'.to_int() && c <= 'f'.to_int() {
+    Some(c - 'a'.to_int() + 10)
+  } else if c >= 'A'.to_int() && c <= 'F'.to_int() {
+    Some(c - 'A'.to_int() + 10)
+  } else {
+    None
+  }
+}
+
+///|
+/// Decode the `%XX` escapes of a URL path as UTF-8. Returns `None` for a bad escape or bad UTF-8.
+fn percent_decode(path : String) -> String? {
+  let utf8 = @utf8.encode(path)
+  let out = Array(capacity=utf8.length())
+  let mut i = 0
+  while i < utf8.length() {
+    let b = utf8[i]
+    if b == b'%' {
+      guard i + 2 < utf8.length() &&
+        hex_value(utf8[i + 1].to_int()) is Some(hi) &&
+        hex_value(utf8[i + 2].to_int()) is Some(lo) else {
+        return None
+      }
+      out.push((hi * 16 + lo).to_byte())
+      i += 3
+    } else {
+      out.push(b)
+      i += 1
+    }
+  }
+  try @utf8.decode(Bytes::from_array(out)) catch {
+    _ => None
+  } noraise {
+    text => Some(text)
+  }
+}
+
+///|
+/// What the server does with one request path.
+enum Route {
+  /// Answer 403: the path leaves the site directory or cannot be decoded.
+  Forbidden
+  /// Serve this path below the site directory. An empty path or a path that ends with `/` names a
+  /// directory.
+  Serve(String)
+} derive(Eq, Debug)
+
+///|
+/// The route of the request target. The query and the fragment are ignored.
+fn route(target : String) -> Route {
+  let path = match target.find("?") {
+    Some(i) => target[:i].to_owned()
+    None => target
+  }
+  let path = match path.find("#") {
+    Some(i) => path[:i].to_owned()
+    None => path
+  }
+  guard percent_decode(path) is Some(path) else { return Forbidden }
+  guard path.has_prefix("/") else { return Forbidden }
+  let rel = path[1:].to_owned()
+  if rel.contains("\\") || rel.contains("\u{0}") {
+    return Forbidden
+  }
+  for segment in rel.split("/") {
+    if segment == ".." || segment == "." {
+      return Forbidden
+    }
+  }
+  Serve(rel)
+}
+
+///|
+/// The content type of a file name.
+fn content_type(name : String) -> String {
+  let types = [
+    (".html", "text/html; charset=utf-8"),
+    (".css", "text/css; charset=utf-8"),
+    (".js", "text/javascript; charset=utf-8"),
+    (".json", "application/json"),
+    (".md", "text/markdown; charset=utf-8"),
+    (".svg", "image/svg+xml"),
+    (".png", "image/png"),
+    (".woff2", "font/woff2"),
+  ]
+  for entry in types {
+    if name.has_suffix(entry.0) {
+      return entry.1
+    }
+  }
+  "application/octet-stream"
+}
+
+///|
+/// The port from the arguments (after the program name), or an error message.
+fn parse_port(args : ArrayView[String]) -> Result[Int32, String] {
+  match args {
+    [] => Ok(default_port)
+    ["--port", value] =>
+      if !value.is_empty() &&
+        value.iter().all(c => c >= '0' && c <= '9') &&
+        value.length() <= 5 {
+        let mut n = 0
+        for c in value {
+          n = n * 10 + (c.to_int() - '0'.to_int())
+        }
+        if n >= 1 && n <= 65535 {
+          Ok(n)
+        } else {
+          Err("the port must be 1 to 65535, got \{value}")
+        }
+      } else {
+        Err("the port must be 1 to 65535, got \{value}")
+      }
+    [arg, ..] => Err("unknown argument \{arg}")
+  }
+}
+
+///|
+async fn send_file(
+  conn : @http.ServerConnection,
+  file : String,
+  status : Int32,
+  reason : String,
+) -> Unit {
+  let data = @fs.read_file(file).binary()
+  conn
+  ..send_response(
+    status,
+    reason,
+    extra_headers=Map::from_array([
+      (@http.CaseInsensitiveString("Content-Type"), content_type(file)),
+    ]),
+  )
+  .write(data)
+}
+
+///|
+async fn answer(request : @http.Request, conn : @http.ServerConnection) -> Unit {
+  match route(request.path) {
+    Forbidden => conn..send_response(403, "Forbidden").write("Forbidden")
+    Serve(rel) => {
+      let mut file = "\{dist}/\{rel}"
+      if rel == "" ||
+        rel.has_suffix("/") ||
+        (@fs.exists(file) && @fs.kind(file) is Directory) {
+        file = if file.has_suffix("/") {
+          "\{file}index.html"
+        } else {
+          "\{file}/index.html"
+        }
+      }
+      if @fs.exists(file) && @fs.kind(file) is Regular {
+        send_file(conn, file, 200, "OK")
+      } else if @fs.exists("\{dist}/404.html") {
+        send_file(conn, "\{dist}/404.html", 404, "Not Found")
+      } else {
+        conn..send_response(404, "Not Found").write("Not found")
+      }
+    }
+  }
+}
+
+///|
+async fn run_checked(command : String, args : Array[String]) -> Unit {
+  let code = @process.run(
+    command,
+    args,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  if code != 0 {
+    eprintln("site:dev: `\{command}` failed")
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+}
+
+///|
+async fn main {
+  let port = match parse_port(@env.args()[1:]) {
+    Ok(port) => port
+    Err(message) => {
+      eprintln("site:dev: \{message}")
+      @sys.exit(2)
+      return
+    }
+  }
+  let (status, output, errors) = @process.collect_output("moonx", [
+    "scripts/site-latest-tag.mbtx",
+  ])
+  if status != 0 {
+    eprintln("site:dev: cannot find the latest tag: \{errors.text()}")
+    @sys.exit(1)
+  }
+  let tag = output.text().trim().to_owned()
+  let version = if tag.is_empty() { "v0.0.0" } else { tag }
+  run_checked("moonx", [
+    "scripts/site-build.mbtx", "--content", ".", "--channel", "release", "--site-root",
+    "/", "--release-version", version, "--ref", "main", "--out", dist,
+  ])
+  let server = @http.Server(
+    @socket.Addr::parse("127.0.0.1:\{port}"),
+    reuse_addr=true,
+  )
+  println("Site: http://localhost:\{port}/")
+  server.run_forever(allow_failure=true, (request, _body, conn) => {
+    answer(request, conn)
+  })
+}
+
+///|
+test "route serves paths below the root" {
+  assert_eq(route("/"), Serve(""))
+  assert_eq(route("/docs/"), Serve("docs/"))
+  assert_eq(route("/docs/cli?x=1#a"), Serve("docs/cli"))
+  assert_eq(route("/a%20b/c.css"), Serve("a b/c.css"))
+}
+
+///|
+test "route refuses a path that leaves the directory" {
+  assert_eq(route("/../secret"), Forbidden)
+  assert_eq(route("/%2e%2e/secret"), Forbidden)
+  assert_eq(route("/docs/./x"), Forbidden)
+  assert_eq(route("/..%5csecret"), Forbidden)
+  assert_eq(route("/%zz"), Forbidden)
+  assert_eq(route("/%FF"), Forbidden)
+  assert_eq(route("no-slash"), Forbidden)
+}
+
+///|
+test "content types" {
+  assert_eq(content_type("index.html"), "text/html; charset=utf-8")
+  assert_eq(content_type("index.js"), "text/javascript; charset=utf-8")
+  assert_eq(content_type("a.bin"), "application/octet-stream")
+}
+
+///|
+test "parse_port" {
+  assert_eq(parse_port([]), Ok(8080))
+  assert_eq(parse_port(["--port", "9000"]), Ok(9000))
+  assert_eq(
+    parse_port(["--port", "0"]),
+    Err("the port must be 1 to 65535, got 0"),
+  )
+  assert_eq(
+    parse_port(["--port", "70000"]),
+    Err("the port must be 1 to 65535, got 70000"),
+  )
+  assert_eq(
+    parse_port(["--port", "x"]),
+    Err("the port must be 1 to 65535, got x"),
+  )
+  assert_eq(parse_port(["--watch"]), Err("unknown argument --watch"))
+}

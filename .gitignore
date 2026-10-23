@@ -79,3 +79,14 @@ dist/
 
 # Verified remote artifact cache, relative to a build configuration.
 .smithy/
+
+# Site
+
+site/dist
+site/.bundle
+site/node_modules
+
+# AI tool state
+
+.superpowers/
+.playwright-mcp/
