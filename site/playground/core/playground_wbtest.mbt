@@ -733,11 +733,29 @@ test "transcript: step with no transcript, and reset, are blocked or empty" {
 ///|
 test "transcript: a problem of the document comes before the entries" {
   let session = Session::new()
-  let text = "---\nversion: 1.0\nbad: 1\n---\n```jsonrpc client -> server\n{}\n```\n"
-  let (entries, findings, done, _) = progress_of(start(session, text))
+  // The value of complete is a problem of the document, not of an entry. The
+  // version is good, so the entries are still checked after it.
+  let text = "---\nversion: 1.0\ncomplete: maybe\n---\n```jsonrpc client -> server\n{}\n```\n"
+  let (entries, first, done, _) = progress_of(start(session, text))
   assert_eq(entries.length(), 1)
   assert_false(done)
-  assert_true(findings.length() <= 1)
+  assert_eq(codes(first), ["InvalidTranscript"])
+  assert_eq(first[0].entry, None)
+  assert_eq(first[0].line, Some(3))
+  let (_, more, _, _) = progress_of(
+    handle(session, TranscriptStep(seq=2, count=1)),
+  )
+  let findings = [..first, ..more]
+  assert_eq(codes(findings), [
+    "InvalidTranscript", "UnsolicitedResponse", "InvalidId", "InvalidEnvelope", "InvalidEnvelope",
+  ])
+  assert_eq(findings.map(finding => finding.entry), [
+    None,
+    Some(0),
+    Some(0),
+    Some(0),
+    Some(0),
+  ])
 }
 
 ///|
