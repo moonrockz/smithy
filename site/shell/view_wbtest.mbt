@@ -32,7 +32,7 @@ async test "landing page has every section heading and both buttons" {
     assert_true(html.contains("<h2>" + heading + "</h2>"))
   }
   assert_true(html.contains(">Get started</a>"))
-  assert_true(html.contains(">Browse examples</a>"))
+  assert_true(html.contains(">Try the playground</a>"))
   assert_true(html.contains("href=\"/smithy/docs/\""))
   assert_true(html.contains("href=\"/smithy/docs/smithy-syntax/\""))
   assert_true(html.contains("href=\"/smithy/docs/smithy-validation/\""))
@@ -45,11 +45,49 @@ async test "landing page has every section heading and both buttons" {
 
 ///|
 #cfg(not(target="js"))
-async test "landing page has five feature tiles and no playground claim" {
+async test "landing page has six feature tiles, one for the playground" {
   let html = render_route(Landing, None)
-  assert_eq(html.split("class=\"ms-tile\"").count(), 6)
-  assert_false(html.contains("Runs in the browser"))
-  assert_false(html.contains("playground"))
+  assert_eq(html.split("class=\"ms-tile\"").count(), 7)
+  assert_true(
+    html.contains(
+      "<h3>Runs in the browser</h3><p>The playground runs the same packages client-side. Nothing goes to a server.</p>",
+    ),
+  )
+}
+
+///|
+#cfg(not(target="js"))
+async test "landing page has the playground teaser before the examples" {
+  let html = render_route(Landing, None)
+  guard html.find("<h2>Try it without installing</h2>") is Some(teaser) else {
+    fail("no playground teaser")
+  }
+  guard html.find("<h2>Start from a working project</h2>") is Some(examples) else {
+    fail("no examples section")
+  }
+  assert_true(teaser < examples)
+  assert_true(
+    html.contains(
+      "href=\"/smithy/playground/\" target=\"_self\" class=\"ms-btn ms-btn-primary\">Open the playground →</a>",
+    ),
+  )
+  assert_true(html.contains("example.peers#Intger"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "the nav and the hero button link to the playground" {
+  let html = render_route(Landing, None)
+  assert_true(
+    html.contains(
+      "<a href=\"/smithy/playground/\" target=\"_self\">Playground</a>",
+    ),
+  )
+  assert_true(
+    html.contains(
+      "href=\"/smithy/playground/\" target=\"_self\" class=\"ms-btn\">Try the playground</a>",
+    ),
+  )
 }
 
 ///|
@@ -409,6 +447,30 @@ async test "an example without other files has no Files section" {
 
 ///|
 #cfg(not(target="js"))
+async test "an example with a playground state links to the playground with its fragment" {
+  let base = site_data(Example("json-rpc"), Some("# Validate JSON-RPC\n"))
+  let data = {
+    ..base,
+    examples: base.examples.map(e => {
+      if e.dir == "json-rpc" {
+        { ..e, playground: Some("v1.AbC-_9"), }
+      } else {
+        e
+      }
+    }),
+  }
+  let html = @rabbita.new(() => component(data, data.encode())).render(
+    url="http://localhost/smithy/examples/json-rpc/",
+  )
+  assert_true(html.contains("href=\"/smithy/playground/#v1.AbC-_9\""))
+  assert_true(html.contains("Open in playground"))
+  // The example without a state has no button.
+  let plain = render_route(Example("openrpc"), Some("# Export\n"))
+  assert_true(!plain.contains("Open in playground"))
+}
+
+///|
+#cfg(not(target="js"))
 async test "an unknown example renders the not-found view" {
   assert_true(render_route(Example("nope"), None).contains("Page not found"))
 }
@@ -419,11 +481,6 @@ async test "the nav, the hero button and the cards use the examples routes" {
   let html = render_route(Landing, None)
   assert_true(
     html.contains("<a href=\"/smithy/examples/\" target=\"_self\">Examples</a>"),
-  )
-  assert_true(
-    html.contains(
-      "href=\"/smithy/examples/\" target=\"_self\" class=\"ms-btn\">Browse examples</a>",
-    ),
   )
   assert_true(html.contains("href=\"/smithy/examples/openrpc/\""))
   assert_true(html.contains("href=\"/smithy/examples/json-rpc/\""))
@@ -464,6 +521,32 @@ async fn next_view(
 
 ///|
 #cfg(not(target="js"))
+async fn render_playground() -> String {
+  let data = {
+    ..site_data(Playground, None),
+    playground: Some({
+      version: "0.0.1",
+      worker: "/smithy/playground/worker.js",
+      samples: [
+        { title: "Good", path: "a.smithy", model: "namespace a\n", },
+        {
+          title: "With a mistake",
+          path: "b.smithy",
+          model: "namespace b\nstructure S {",
+        },
+      ],
+      selected: 1,
+      transcripts: [],
+      transcript: 0,
+    }),
+  }
+  @rabbita.new(() => component(data, data.encode())).render(
+    url="http://localhost/smithy/playground/",
+  )
+}
+
+///|
+#cfg(not(target="js"))
 async test "a next page the release lacks links the release to its docs index" {
   let html = next_view(
     Doc("smithy-syntax"),
@@ -483,6 +566,37 @@ async test "a next page the release lacks links the release to its docs index" {
   assert_true(!html.contains("href=\"/smithy/docs/smithy-syntax/\""))
   // The current channel still links to itself.
   assert_true(html.contains("href=\"/smithy/next/docs/smithy-syntax/\""))
+}
+
+///|
+#cfg(not(target="js"))
+async test "the playground page has the empty workbench and its script" {
+  let html = render_playground()
+  assert_true(html.contains("<title>Playground — smithy</title>"))
+  assert_true(html.contains("id=\"pg-app\""))
+  assert_true(html.contains("id=\"pg-editor\""))
+  // The element of the message for a Worker of another build is empty.
+  assert_true(html.contains("id=\"pg-mismatch\""))
+  assert_true(
+    html.contains("<option value=\"1\" selected>With a mistake</option>"),
+  )
+  for label in ["Validate", "Transform", "Transcript", "Runs in your browser"] {
+    assert_true(html.contains(label))
+  }
+  assert_true(html.contains("smithy 0.0.1 · no server"))
+  assert_true(html.contains("The playground checks the model."))
+  // The Transform tab is in the page, and its output editor has its element.
+  for
+    text in [
+      "id=\"pg-output\"", "id=\"pg-output-kind\"", "<option value=\"openapi-3.1.0\">OpenAPI 3.1.0</option>",
+      "CLI: smithy convert --to json model.smithy", "id=\"pg-run\"", "Choose an output, then select Run.",
+    ] {
+    assert_true(html.contains(text))
+  }
+  // The query names the build, so that a cached ui.js of another build does not run.
+  assert_true(html.contains("src=\"/smithy/playground/ui.js?v=v0.5.0\""))
+  // The site nav is on the page.
+  assert_true(html.contains("class=\"ms-nav\""))
 }
 
 ///|
@@ -517,6 +631,21 @@ async test "unknown, present or stale results link page for page" {
 
 ///|
 #cfg(not(target="js"))
+async test "no other page loads the playground script" {
+  for
+    page in [
+      render_route(Landing, None),
+      render_route(Doc("smithy-syntax"), Some("# S\n")),
+      render_route(Examples, None),
+      render_route(Doc("nope"), None),
+    ] {
+    assert_false(page.contains("playground/ui.js"))
+    assert_false(page.contains("id=\"pg-app\""))
+  }
+}
+
+///|
+#cfg(not(target="js"))
 async test "a release page the next lacks links next to its docs index" {
   let m = Model::init(site_data(Doc("cli"), Some("# C\n")))
   let html = render_model({ ..m, counterpart: Missing(Doc("cli")), })
@@ -525,4 +654,11 @@ async test "a release page the next lacks links next to its docs index" {
       "href=\"/smithy/next/docs/\" target=\"_self\" class=\"ms-version-link\">next</a>",
     ),
   )
+}
+
+///|
+#cfg(not(target="js"))
+async test "the playground page without its data shows a message" {
+  let html = render_route(Playground, None)
+  assert_true(html.contains("The playground could not start"))
 }

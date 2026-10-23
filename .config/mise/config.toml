@@ -290,6 +290,11 @@ run = "moonx scripts/site-check.mbtx"
 description = "Build both channels as GitHub Pages serves them and check their links (args: --out)"
 run = "moonx scripts/site-pages.mbtx"
 
+[tasks."site:test:browser"]
+description = "Run the browser tests of the site against _site, the output of site:pages (Lightpanda, and Chromium where README says)"
+dir = "site"
+run = "bun run test:browser"
+
 [tasks."site:linkcheck"]
 description = "Check links, routes and the search index of a built site (args: --dist --base --ignore)"
 run = "moonx scripts/site-linkcheck.mbtx"

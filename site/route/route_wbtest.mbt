@@ -89,3 +89,13 @@ test "examples routes: to_path, href and JSON round trip" {
     assert_eq(@json.from_json(Json(r)), r)
   }
 }
+
+///|
+test "parse and href: the playground" {
+  assert_eq(Route::parse("playground"), Playground)
+  assert_eq(Route::parse("/playground/"), Playground)
+  assert_eq(Route::parse("playground/index.html"), Playground)
+  assert_eq(Route::parse("playground/x"), NotFound("playground/x"))
+  assert_eq(Playground.to_path(), "playground")
+  assert_eq(href("/smithy/next/", Playground), "/smithy/next/playground/")
+}

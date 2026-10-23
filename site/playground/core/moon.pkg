@@ -1,0 +1,14 @@
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-syntax" @syntax,
+  "moonrockz/smithy-validation" @validation,
+  "moonrockz/smithy-validation/rpc",
+  "moonrockz/smithy-site/playground/samples",
+  "moonrockz/smithy-jsonschema" @jsonschema,
+  "moonrockz/smithy-openapi" @openapi,
+  "moonrockz/smithy-openrpc" @openrpc,
+  "moonbit-community/flate",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/lazy",
+}

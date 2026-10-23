@@ -6,6 +6,7 @@ import {
   "moonbitlang/core/json",
   "moonrockz/smithy-site/content",
   "moonrockz/smithy-site/markdown",
+  "moonrockz/smithy-site/playground/workbench",
   "moonrockz/smithy-site/route",
 }
 
@@ -51,6 +52,7 @@ pub(all) struct SiteData {
   examples : Array[@content.Example]
   route : @route.Route
   markdown : String?
+  playground : @workbench.PlaygroundData?
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn SiteData::decode(String) -> Self?
 pub fn SiteData::encode(Self) -> String

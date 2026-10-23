@@ -77,7 +77,15 @@ fn plan(
       ]
     _ =>
       [
-        { checkout: None, channel: "next", base: Some(site_root), has_release: false, version, git_ref: head, sub: "", },
+        {
+          checkout: None,
+          channel: "next",
+          base: Some(site_root),
+          has_release: false,
+          version,
+          git_ref: head,
+          sub: "",
+        },
         next,
       ]
   }
@@ -101,8 +109,19 @@ fn out_of(args : ArrayView[String]) -> String {
 /// The arguments of `site-build.mbtx` for one build. `out` is absolute: the build may run in a worktree.
 fn build_args(build : Build, out : String) -> Array[String] {
   let args = [
-    "scripts/site-build.mbtx", "--content", ".", "--channel", build.channel, "--site-root",
-    site_root, "--release-version", build.version, "--ref", build.git_ref, "--out", out,
+    "scripts/site-build.mbtx",
+    "--content",
+    ".",
+    "--channel",
+    build.channel,
+    "--site-root",
+    site_root,
+    "--release-version",
+    build.version,
+    "--ref",
+    build.git_ref,
+    "--out",
+    out,
   ]
   if build.base is Some(base) {
     args.push("--base")
@@ -131,12 +150,31 @@ fn linkcheck_args(build : Build, out : String) -> Array[String] {
 }
 
 ///|
+/// A command and its working directory (`None`: the working directory of this script).
+struct Command {
+  command : String
+  args : Array[String]
+  cwd : String?
+} derive(Eq, Debug)
+
+///|
+/// The commands that prepare the worktree of a release tag for its build. mise refuses the config files
+/// of a directory that it does not trust, and every mise shim (moon, moonx, bun) then fails in the
+/// worktree. A tag whose `site/mise.toml` pins the site tools gets them installed, because an older tag
+/// can pin another bun.
+fn trust_commands(release_dir : String, has_site_mise : Bool) -> Array[Command] {
+  let commands = [{ command: "mise", args: ["trust", release_dir], cwd: None, }]
+  if has_site_mise {
+    let site = release_dir + "/site"
+    commands.push({ command: "mise", args: ["trust", site], cwd: None, })
+    commands.push({ command: "mise", args: ["install"], cwd: Some(site), })
+  }
+  commands
+}
+
+///|
 /// Run a command; return its exit code, 1 for a command that did not run.
-async fn run(
-  command : String,
-  args : Array[String],
-  cwd? : String,
-) -> Int32 {
+async fn run(command : String, args : Array[String], cwd? : String) -> Int32 {
   let dir : StringView? = match cwd {
     Some(d) => Some(d[:])
     None => None
@@ -153,7 +191,11 @@ async fn run(
       return 1
     }
   }
-  if code >= 0 { code } else { 1 }
+  if code >= 0 {
+    code
+  } else {
+    1
+  }
 }
 
 ///|
@@ -221,13 +263,25 @@ async fn steps(out_root : String, release_dir : String) -> Int32 {
   }
   match tag {
     Some(tag) if has_site => {
-      println("site:pages: \{tag} has site/: the root is the release build of \{tag}")
+      println(
+        "site:pages: \{tag} has site/: the root is the release build of \{tag}",
+      )
       let code = run("git", [
         "-c", "core.hooksPath=/dev/null", "worktree", "add", "--detach", release_dir,
         tag,
       ])
       if code != 0 {
         return code
+      }
+      let has_site_mise = @fs.exists(release_dir + "/site/mise.toml")
+      for step in trust_commands(release_dir, has_site_mise) {
+        let code = run(step.command, step.args, cwd?=step.cwd)
+        if code != 0 {
+          eprintln(
+            "site:pages: `\{step.command} \{step.args.join(" ")}` failed for the worktree of \{tag}",
+          )
+          return code
+        }
       }
     }
     _ =>
@@ -256,8 +310,8 @@ async fn cleanup(tmp : String) -> Unit {
 ///|
 /// Run `body`, then `after` on every exit path, also when `body` raises.
 async fn with_cleanup(
-  body : async () -> Int32 raise,
-  after : async () -> Unit raise,
+  body : async () -> Int32,
+  after : async () -> Unit,
 ) -> Int32 {
   let code = body() catch {
     error => {
@@ -277,10 +331,9 @@ async fn main {
   @fs.mkdir(out_arg, recursive=true, allow_exist=true)
   let out_root = @fs.realpath(out_arg)
   let tmp = @fs.tmpdir(prefix="site-pages")
-  let code = with_cleanup(
-    () => steps(out_root, tmp + "/release"),
-    () => cleanup(tmp),
-  )
+  let code = with_cleanup(() => steps(out_root, tmp + "/release"), () => {
+    cleanup(tmp)
+  })
   if code != 0 {
     eprintln("site:pages: failed")
     @sys.exit(code)
@@ -385,4 +438,16 @@ test "a missing tag never uses the worktree even when told the tag has site/" {
   let builds = plan(None, true, "abc", "/w/release")
   assert_eq(builds[0].checkout, None)
   assert_eq(builds[0].channel, "next")
+}
+
+///|
+test "the release worktree trusts its mise config, and its site tools when it pins them" {
+  assert_eq(trust_commands("/w", false), [
+    { command: "mise", args: ["trust", "/w"], cwd: None, },
+  ])
+  assert_eq(trust_commands("/w", true), [
+    { command: "mise", args: ["trust", "/w"], cwd: None, },
+    { command: "mise", args: ["trust", "/w/site"], cwd: None, },
+    { command: "mise", args: ["install"], cwd: Some("/w/site"), },
+  ])
 }

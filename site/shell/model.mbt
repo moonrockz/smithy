@@ -129,6 +129,8 @@ pub(all) struct Model {
   counterpart : Counterpart
   // Fragment to scroll to once the page being loaded is ready.
   pending_anchor : String?
+  /// The data of the playground page; `None` on every other page.
+  playground : @workbench.PlaygroundData?
 } derive(Eq, Debug)
 
 ///|
@@ -214,5 +216,6 @@ pub fn Model::init(data : @data.SiteData) -> Model {
     menu_open: false,
     counterpart: Unknown,
     pending_anchor: None,
+    playground: data.playground,
   }
 }

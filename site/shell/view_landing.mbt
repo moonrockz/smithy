@@ -95,8 +95,9 @@ let tiles : Array[(String, String)] = [
   (
     "Library first", "Every CLI command is a library API you can call from your own MoonBit code.",
   ),
-  // Task 8 restores the "Runs in the browser" tile together with the Playground nav item, the playground
-  // teaser and the "Try the playground" button, when the playground exists.
+  (
+    "Runs in the browser", "The playground runs the same packages client-side. Nothing goes to a server.",
+  ),
 ]
 
 ///|
@@ -218,8 +219,8 @@ fn hero_view(base : String) -> Html {
         ),
         @html.a(
           class="ms-btn",
-          href=@route.href(base, Examples),
-          "Browse examples",
+          href=@route.href(base, Playground),
+          "Try the playground",
         ),
       ]),
       @html.div(class="ms-facts", [
@@ -324,6 +325,51 @@ fn examples_view(m : Model) -> Html {
 }
 
 ///|
+/// A static preview of the playground: a model with a mistake, its
+/// diagnostic and transcript findings.
+fn playground_preview() -> Html {
+  @html.div(class="ms-mini", attrs=@html.Attrs::build().aria_hidden("true"), [
+    @html.div([
+      @html.span(class="tk-kw", "structure"),
+      @html.text(" "),
+      @html.span(class="tk-type", "PostMessageOutput"),
+      @html.text(" {\n    count: "),
+      @html.span(class="ms-mini-wavy", "Intger"),
+      @html.text("\n}"),
+    ]),
+    @html.div(class="ms-mini-r", [
+      @html.span(class="ms-mini-err", "ERROR"),
+      @html.text(" I could not resolve shape example.peers#Intger …\n\n"),
+      @html.span(class="ms-mini-ok", "#0 client → server ✓\n"),
+      @html.span(class="ms-mini-ok", "#1 server → client ✓\n"),
+      @html.span(class="ms-mini-err", "#2 TypeMismatch"),
+    ]),
+  ])
+}
+
+///|
+fn playground_teaser(base : String) -> Html {
+  @html.section(class="ms-section", [
+    @html.div(class="ms-play", [
+      @html.div([
+        @html.p(class="ms-eyebrow", "Playground"),
+        @html.h2("Try it without installing"),
+        @html.p(
+          class="ms-play-text",
+          "Paste a model and see diagnostics as you type. Convert it, query it, or step through a JSON-RPC transcript against it.",
+        ),
+        @html.a(
+          class="ms-btn ms-btn-primary",
+          href=@route.href(base, Playground),
+          "Open the playground →",
+        ),
+      ]),
+      playground_preview(),
+    ]),
+  ])
+}
+
+///|
 fn landing_view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   let base = m.config.base
   @html.div(class="ms-landing", [
@@ -331,6 +377,7 @@ fn landing_view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
     paths_view(base),
     why_view(),
     install_view(m, emit),
+    playground_teaser(base),
     examples_view(m),
   ])
 }

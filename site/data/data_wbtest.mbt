@@ -25,10 +25,12 @@ fn sample() -> SiteData {
         title: "Export a service as OpenRPC",
         summary: "S",
         files: ["model.smithy"],
+        playground: None,
       },
     ],
     route: Doc("smithy-syntax"),
     markdown: Some("# Configuration\n\nQuote \" < > & </script> done\n"),
+    playground: None,
   }
 }
 
@@ -114,4 +116,51 @@ test "link_context carries the given source" {
   )
   assert_eq(ctx.source, "docs/guide/x.md")
   assert_eq(ctx.git_ref, "abc123")
+}
+
+///|
+test "the playground page carries its samples and round-trips" {
+  let data : SiteData = {
+    ..sample(),
+    route: Playground,
+    markdown: None,
+    playground: Some({
+      version: "0.0.1",
+      worker: "/smithy/next/playground/worker.js",
+      samples: [
+        {
+          title: "Order",
+          path: "site/landing/sample/order.smithy",
+          model: "namespace a // \" < > & </script>\n",
+        },
+      ],
+      selected: 0,
+      transcripts: [
+        {
+          title: "Log",
+          path: "examples/json-rpc/transcripts/editor.jsonl",
+          protocol: "example.peers#Editor",
+          format: Jsonl,
+          version: Some("2.0"),
+          preset: Some(DirMessage([{ value: "in", peer: "client", }])),
+          text: "{\"dir\": \"in\"} </script>\n",
+        },
+      ],
+      transcript: 0,
+    }),
+  }
+  assert_eq(SiteData::decode(data.encode()), Some(data))
+}
+
+///|
+test "versioned adds the git ref of the build as the query" {
+  let config = sample().config
+  assert_eq(
+    config.versioned("/smithy/next/playground/ui.js"),
+    "/smithy/next/playground/ui.js?v=abc123",
+  )
+  let tagged = { ..config, git_ref: "v0.5.0", }
+  assert_eq(tagged.versioned("/a.js"), "/a.js?v=v0.5.0")
+  let odd = { ..config, git_ref: "refs/heads/a b&c", }
+  assert_eq(odd.versioned("/a.js"), "/a.js?v=refs%2Fheads%2Fa%20b%26c")
 }

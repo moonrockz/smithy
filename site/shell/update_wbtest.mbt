@@ -36,11 +36,19 @@ fn site_data(route : @route.Route, markdown : String?) -> @data.SiteData {
         title: "Export a service as OpenRPC",
         summary: "Generate an OpenRPC 1.3.2 document from a service.",
         files: ["model.smithy", "smithy-build.json"],
+        playground: None,
       },
-      { dir: "json-rpc", title: "Validate JSON-RPC", summary: "S", files: [], },
+      {
+        dir: "json-rpc",
+        title: "Validate JSON-RPC",
+        summary: "S",
+        files: [],
+        playground: None,
+      },
     ],
     route,
     markdown,
+    playground: None,
   }
 }
 
@@ -490,4 +498,20 @@ test "counterpart: no request without a release or for a missing page" {
   assert_eq(repr(check_counterpart(no_release, noop_emit())), none)
   let missing = { ..m, route: NotFound("/x/"), }
   assert_eq(repr(check_counterpart(missing, noop_emit())), none)
+}
+
+///|
+test "a link into or out of the playground is a full page load" {
+  let landing = Model::init(site_data(Landing, None))
+  let playground = Model::init(site_data(Playground, None))
+  assert_true(link_action(landing, "/smithy/playground/") is Load)
+  assert_true(link_action(landing, "/smithy/docs/cli/") is Push)
+  assert_true(link_action(playground, "/smithy/docs/cli/") is Load)
+  assert_true(link_action(playground, "/smithy/") is Load)
+  assert_true(link_action(landing, "/smithy/next/docs/cli/") is Load)
+  // The request keeps the model: the page loads the URL.
+  let req = UrlRequested(
+    Internal(@url.parse("http://localhost/smithy/playground/")),
+  )
+  assert_eq(step(landing, req), landing)
 }

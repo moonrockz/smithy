@@ -12,7 +12,7 @@ The site is copied from the moonspec site (moonrockz/moonspec at commit
 it is not published, and `scripts/versions.mbtx` does not see it.
 
 `site/moon.work` lists the site (`.`) and the Smithy packages it needs from the same checkout
-(`../pkgs/smithy`, and the packages that one imports). `moon` finds this file first when you work inside
+(`../pkgs/smithy`, `../pkgs/smithy-validation`, the JSON Schema, OpenAPI and OpenRPC converters, and the packages that those import). `moon` finds this file first when you work inside
 `site/`, so an import of `moonrockz/smithy` resolves to the checkout and never to mooncakes.io.
 `site/moon.mod` imports `moonrockz/smithy@0.0.0`. A workspace member needs no real version, so a release
 does not change this line. To import another Smithy package, add its directory to `site/moon.work` and
@@ -26,7 +26,14 @@ moon install moonbit-community/warren@0.4.5   # once
 mise run site:dev     # build at base / and serve on http://localhost:8080
 mise run site:check   # unit tests, build both channels as Pages does, link check
 mise run site:pages -- --out _site   # only the two channel builds and their link checks
+mise run site:test:browser           # browser tests against _site (tests/browser/README.md)
 ```
+
+The site needs the npm packages of `package.json`, as `bun.lock` pins them: CodeMirror for the playground and
+Playwright for the browser tests. `site:build` runs `bun install --frozen-lockfile` itself. Bun and Lightpanda
+are pinned in `site/mise.toml`, which mise reads only in `site/`, so the other CI jobs do not install them. The
+site scripts run bun and Lightpanda with `site/` as the working directory. Run `mise trust` and `mise install`
+in `site/` once.
 
 `mise run site:build -- --content <repo dir> --channel release|next --site-root /smithy/ --release-version vX.Y.Z --ref <git ref> --out <dir>`
 builds one version. The scripts are `scripts/site-*.mbtx`.
@@ -63,7 +70,9 @@ shows on the commit and does not block a merge.
 | `workflow_call` from `release.yml` (real release only) | yes | yes |
 
 A site input is `site/**`, `docs/**`, `examples/**`, `apps/smithy/README.md`, `pkgs/**/README.mbt.md`,
-`scripts/site-*.mbtx` or `.github/workflows/site.yml`. `release.yml` calls `site.yml` after the `release` job
+`scripts/site-*.mbtx`, `.github/workflows/site.yml`, the mise configuration, the setup action, or a Smithy package
+that the site compiles (the members of `site/moon.work`). After the build, the workflow runs the browser tests.
+`release.yml` calls `site.yml` after the `release` job
 and never on a dry run, a pull request or the nightly run. The tag that the release job creates comes from
 `GITHUB_TOKEN`, which starts no workflow, so the call is how a release reaches Pages.
 
@@ -90,6 +99,94 @@ in `shell/landing_sample.mbt` must equal these files (a `prerender` test checks 
 `scripts/test-cli.mbtx` runs the command with the built CLI and requires `output.txt`. When the CLI output
 changes, update the four files and the constants together.
 
+## Playground
+
+`/playground/` runs Smithy in the browser. The page is pre-rendered with the site nav and an empty
+workbench, and it is the only page that loads `playground/ui.js`. A link into or out of the playground loads
+the new page, so that no other page runs the playground script.
+
+| Part | Job |
+|---|---|
+| `playground/samples` | the example pickers: the models (`manifest`, with `chat-error.smithy`) and the transcripts (`transcript_manifest`, with `chat-findings.md`, the chat with the three findings of the mockup), and the typed transcript format and log preset |
+| `playground/workbench` | the state of the page (`Model`, `update`, which returns `Effect`s) and its view; the pre-render and `ui` share the view |
+| `playground/ui` | js: mounts the workbench in `#pg-app`, runs the effects: the editor, the Worker and the timers |
+| `playground/worker` | js: the Web Worker. It reads a `Request` as JSON, calls `core.handle` and posts the `Response` |
+| `playground/core` | the Smithy calls, with no browser (see below) |
+| `playground/editor` | JavaScript: CodeMirror 6, the Smithy stream language (the token kinds of `highlight`) and bracket folding |
+
+The Worker runs one request at a time (a Validate, a Transform or a transcript request). A change or a button
+while a request runs waits for it. When it ends, a Run of the Transform tab goes first, then a Step, Run all or
+Reset of the Transcript tab, then the newest text, then the next group of a Run all. So a long Run all does not
+stop the Validate tab. The Transform tab keeps its output editor in the page at all times (`#pg-output`), and the
+page text of the files stays in `ui`, not in the workbench model.
+A `Blocked` response has a `kind` (`ModelErrors` or `Other`), so that the tab shows its own copy only for model
+errors. `Transformed` has the converter `warnings`, each as the CLI prints it.
+
+The Transcript tab lists the `@jsonRpcProtocol` structures that `Diagnostics` gives (a model with errors keeps
+the list of the last model that assembled). Step sends `TranscriptStart`, then `TranscriptStep` of one entry; Run
+all sends `TranscriptStep` in groups of 250 entries (`RUN_GROUP`), so the list fills as the findings come. Each
+`TranscriptProgress` gives only what is new: every entry at the start, then the new findings and the number of
+checked entries, and the workbench appends them. A JSONL log needs a version (the CLI `--version`) and a log
+preset (`LogPreset`: `DirMessage` with a `dir` value for each peer, or `Raw` with a sender, the CLI
+`--log-preset`, `--direction` and `--sender`). A change of the model, the transcript or a setting after the
+start makes the check old, and the next Step or Run all starts again. A list of more than 200 entries shows the
+150 entries near the last checked entry and the first 50 entries with findings, so a log of 20,000 lines does not
+stop the page. The workbench compares a `Log` of entries by its revision only.
+
+`scripts/site-build.mbtx` builds the two bundles: `moon build --target js --release` compiles `ui` and
+`worker`, then `bun build` writes `<out>/playground/ui.js` (from `playground/editor/main.js`, which imports the
+editor and then the MoonBit script) and `<out>/playground/worker.js`. The pre-render reads the samples from
+`--content` and puts them in the site data of the playground page: the models and the transcripts of the pickers.
+
+The page sends Validate 250 ms after the last change. Only one request runs at a time: a change while one runs
+waits, and the newest text goes when that request ends. Each request has a new `seq`. The page uses only the
+answer to its newest request, and only while the text is the text that it checked; until then the previous
+result stays, marked as checking, and its rows do not move the cursor. When the Worker gives no answer in 10
+seconds, the page ends it, starts a new one and says so. When the Worker stops with an error, the page starts a
+new one at once and says that the check failed. The page loads `ui.js` and the Worker with the git ref of the build as the query
+(`?v=<ref>`, `SiteConfig::versioned`): Pages caches each file for 600 seconds, and a new page must not run an old
+Worker. A Worker that cannot read a request answers `Blocked` with `seq` -1; that answer, or an answer that the
+page cannot read, shows at once "The page and its checker do not match. Reload the page." (`#pg-mismatch`), and no
+new Worker starts. The Smithy library needs minutes for a model of 1 MB
+(the time grows with the square of the shape count), so such a model stops at that limit.
+
+### Share links, Download and "Open in playground"
+
+Share link writes the state of the page in the URL fragment: `#v1.` and the base64url text of the deflated JSON of
+a `ShareState` (`playground/samples`): the model and the transcript texts, the tab, the output and selector of the
+Transform tab, and the Transcript settings (protocol, format, `--complete`, the log preset and the version). The
+state is in the fragment, so no server sees it. The page copies the full URL with the clipboard API and sets the
+address bar with `history.replaceState`. A browser without the clipboard API gets the URL in a box under the
+toolbar (`#pg-share-url`). Download saves `model.smithy`, and `transcript.md`, `.json` or `.jsonl` on the
+Transcript tab, as local files.
+
+Opening a link (`opened_by` in `playground/ui`) restores the state, and the pickers show it as "Shared link".
+Settings fit the model after the first check: a protocol that the model does not have gives the first protocol of
+the model with its version and peers. A fragment that the page cannot read shows a message in
+`#pg-share-status` and opens the default example. These fragments give that message:
+
+| Fragment | Reason |
+|---|---|
+| a format other than `v1` (for example `v2.`, from a newer `/next/` build) | "it has the format v2, and I know only v1" |
+| corrupt text, a character that is not base64url, a bad deflate stream, JSON that is no state | the reason of `decode_share` |
+| more than 8,000 characters (`MAX_SHARE_LENGTH`) | the length, and the limit |
+| a state that unpacks to more than 2,097,152 bytes (`MAX_STATE_BYTES`) | the limit; checked while the inflate runs |
+
+A state too large for a link (`share_state_problem`, or a link over 8,000 characters) shows the same reason on the
+Share link button and says to use Download. On the release channel, a build from before the playground has no
+`/playground/` page: the link then gives the 404 page of the site. A build with the playground but with an older
+format also shows the message of the table. A link pasted in the address bar of an open playground tab (a
+`hashchange`) opens in place with no page load (`Model::reopen`). When an editor differs from the text that the page
+loaded or shared last, a bar asks "Open the new link? You will lose your changes." (`Open`, `Keep my changes`). A link
+that cannot be read keeps the page and shows the message. The fragment that the page wrote itself is ignored. The
+inflate stops at `MAX_STATE_BYTES` (`bounded_inflate`, `Inflater::step` with a 64 KB buffer).
+
+An example page (`/examples/<dir>`) shows "Open in playground" when `playground/samples` has a model under
+`examples/<dir>/` (`example_state`). The pre-render computes the fragment of each example once
+(`with_playground_links` in `prerender`) and puts all of them in the site data of every page: a click from
+`/examples/` to an example page loads no new page, so the first page must have them. The button is a plain link:
+`/playground/#v1...`. It needs no script. A fragment over the limit fails the build.
+
 ## Packages
 
 | Package | Job |
@@ -102,6 +199,9 @@ changes, update the four files and the constants together.
 | `data` | site configuration and page data (JSON in `<meta name="smithy-data">`) |
 | `shell` | the rabbita component: model, update, views |
 | `app` | browser entry: hydrates the pre-rendered page |
+| `playground/core` | pure MoonBit core of the playground: requests, responses, transcript stepping and share links (`encode_share`, `decode_share`; native and js tests) |
+| `playground/examples_check` | native: tests of the playground core against `examples/json-rpc/`, including the comparison with `run_transcript`, and of the samples of the picker |
+| `playground/samples`, `playground/workbench`, `playground/ui`, `playground/worker` | the playground page (see Playground) |
 | `prerender` | native: renders every route, writes content copies and the search index |
 | `linkcheck` | native: checks links, routes and the search index of a build |
 

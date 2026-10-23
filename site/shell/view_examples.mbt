@@ -62,6 +62,28 @@ fn examples_index_view(m : Model) -> Html {
 }
 
 ///|
+/// The link into the playground with the state of the example. It is a plain
+/// link, so it works with no script: the pre-render knows the fragment.
+fn playground_button(m : Model, e : @content.Example) -> Html {
+  match e.playground {
+    Some(fragment) =>
+      @html.p(class="ms-example-playground", [
+        @html.a(
+          id="ms-open-playground",
+          class="ms-btn ms-btn-primary",
+          href=@route.href(m.config.base, Playground) + "#" + fragment,
+          "Open in playground",
+        ),
+        @html.span(
+          class="ms-hint",
+          " Validate the model of this example in your browser. Nothing goes to a server.",
+        ),
+      ])
+    None => @html.nothing
+  }
+}
+
+///|
 fn example_files_view(m : Model, e : @content.Example) -> Html {
   if e.files.is_empty() {
     return @html.nothing
@@ -97,6 +119,7 @@ fn example_view(m : Model, e : @content.Example) -> Html {
       @html.a(href=@route.href(base, Examples), "Examples"),
       @html.text(" / " + e.title),
     ]),
+    playground_button(m, e),
     body,
     example_files_view(m, e),
     @html.p(class="ms-example-links", [

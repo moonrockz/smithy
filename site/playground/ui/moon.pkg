@@ -1,0 +1,18 @@
+import {
+  "moonbit-community/rabbita",
+  "moonbit-community/rabbita/cmd",
+  "moonrockz/smithy-site/playground/core",
+  "moonrockz/smithy-site/playground/workbench",
+  "moonrockz/smithy-site/playground/samples",
+  "moonbitlang/core/json",
+}
+
+warnings = "-alert_experimental"
+
+supported_targets = "js"
+
+options(
+  link: { "js": { "format": "esm" } },
+)
+
+pkgtype(kind: "executable")

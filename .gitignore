@@ -87,6 +87,8 @@ dist/
 site/dist
 site/.bundle
 site/node_modules
+site/test-results
+site/playwright-report
 
 # AI tool state
 

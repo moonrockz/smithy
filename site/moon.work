@@ -4,4 +4,8 @@ members = [
   "../pkgs/jmespath",
   "../pkgs/smithy-syntax",
   "../pkgs/smithy",
+  "../pkgs/smithy-validation",
+  "../pkgs/smithy-jsonschema",
+  "../pkgs/smithy-openapi",
+  "../pkgs/smithy-openrpc",
 ]

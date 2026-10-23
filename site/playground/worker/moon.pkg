@@ -1,0 +1,11 @@
+import {
+  "moonrockz/smithy-site/playground/core",
+}
+
+supported_targets = "js"
+
+options(
+  link: { "js": { "format": "esm" } },
+)
+
+pkgtype(kind: "executable")

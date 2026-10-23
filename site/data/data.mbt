@@ -64,6 +64,8 @@ pub(all) struct SiteData {
   route : @route.Route
   /// Markdown of the current page; `None` for the landing page and 404.
   markdown : String?
+  /// The samples and the Worker of the playground page; `None` on every other page.
+  playground : @workbench.PlaygroundData?
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -115,4 +117,37 @@ pub fn link_context(
     repo_url: github_repo,
     git_ref: config.git_ref,
   }
+}
+
+///|
+/// `path` with the git ref of this build as its query. Pages caches each file
+/// for some minutes, so a page of a new build could otherwise run a script of
+/// the build before it.
+pub fn SiteConfig::versioned(self : SiteConfig, path : String) -> String {
+  path + "?v=" + query_value(self.git_ref)
+}
+
+///|
+/// `text` with each character outside the unreserved set of RFC 3986 written
+/// as `%XX` of its UTF-8 bytes.
+fn query_value(text : String) -> String {
+  let out = StringBuilder()
+  for byte in @utf8.encode(text) {
+    let c = byte.to_int()
+    if (c >= 'A'.to_int() && c <= 'Z'.to_int()) ||
+      (c >= 'a'.to_int() && c <= 'z'.to_int()) ||
+      (c >= '0'.to_int() && c <= '9'.to_int()) ||
+      c == '-'.to_int() ||
+      c == '.'.to_int() ||
+      c == '_'.to_int() ||
+      c == '~'.to_int() {
+      out.write_char(c.unsafe_to_char())
+    } else {
+      let hex = "0123456789ABCDEF"
+      out.write_char('%')
+      out.write_char(hex[c / 16].unsafe_to_char())
+      out.write_char(hex[c % 16].unsafe_to_char())
+    }
+  }
+  out.to_string()
 }

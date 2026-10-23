@@ -1,0 +1,11 @@
+import {
+  "moonrockz/smithy-site/playground/core",
+  "moonrockz/smithy-site/playground/samples",
+  "moonrockz/smithy",
+  "moonrockz/smithy-validation" @validation,
+  "moonrockz/smithy-validation/rpc",
+  "moonbitlang/core/json",
+  "moonbitlang/x/fs",
+} for "test"
+
+supported_targets = "native"
