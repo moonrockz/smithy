@@ -66,7 +66,7 @@ fn toolbar(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
 /// The line under the toolbar: what the share button did, or why the page
 /// did not open a link. The element is always there, so a screen reader
 /// reads each change.
-fn share_status(m : Model) -> Html {
+fn share_status(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   let content : Array[Html] = match m.share {
     NoShare => []
     LinkCopied(_) =>
@@ -91,6 +91,8 @@ fn share_status(m : Model) -> Html {
         ),
       ]
     LinkTooLong(reason) => [@html.span(class="pg-err", reason)]
+    LinkIgnored(reason) =>
+      [@html.span(class="pg-err", reason + " I kept your page as it was.")]
     LinkRefused(reason) =>
       [
         @html.span(
@@ -99,12 +101,42 @@ fn share_status(m : Model) -> Html {
         ),
       ]
   }
-  @html.div(
-    id="pg-share-status",
-    class="pg-sharestatus",
-    attrs=@html.Attrs::build().role("status"),
-    content,
-  )
+  let ask : Array[Html] = match m.incoming {
+    Some(_) =>
+      [
+        @html.span(
+          id="pg-incoming-text",
+          "Open the new link? Your changes will be lost.",
+        ),
+        @html.button(
+          id="pg-incoming-open",
+          class="pg-btn pg-btn-primary",
+          on_click=emit(OpenIncoming),
+          "Open",
+        ),
+        @html.button(
+          id="pg-incoming-keep",
+          class="pg-btn",
+          on_click=emit(KeepMine),
+          "Keep my changes",
+        ),
+      ]
+    None => []
+  }
+  @html.div(class="pg-sharebox", [
+    @html.div(
+      id="pg-share-status",
+      class="pg-sharestatus",
+      attrs=@html.Attrs::build().role("status"),
+      content,
+    ),
+    @html.div(
+      id="pg-incoming",
+      class="pg-sharestatus",
+      attrs=@html.Attrs::build().role("alert"),
+      ask,
+    ),
+  ])
 }
 
 ///|
@@ -671,7 +703,7 @@ fn results_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
 pub fn view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   @html.div(class="pg", [
     toolbar(m, emit),
-    share_status(m),
+    share_status(m, emit),
     @html.div(class="pg-bench", [
       model_pane(m),
       @html.div(class="pg-splitter", ([] : Array[Html])),

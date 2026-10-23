@@ -26,11 +26,11 @@ extern "js" fn write_hash(fragment : String) -> String =
   #|}
 
 ///|
-/// Load the page again when the user opens another link in this tab. The
-/// browser changes the fragment only, so the page would keep its old state.
-/// The share button does not fire this event: it changes the address without it.
-extern "js" fn reload_on_hash_change() -> Unit =
-  #|() => { addEventListener('hashchange', () => location.reload()) }
+/// Call `f` when the fragment of the address changes with no page load: the
+/// user opened another link in this tab, or used Back or Forward. A change
+/// that the page makes with `history.replaceState` fires no event.
+extern "js" fn on_hash_change(f : () -> Unit) -> Unit =
+  #|(f) => { addEventListener('hashchange', () => f()) }
 
 ///|
 extern "js" fn set_timeout(ms : Int32, f : () -> Unit) -> Unit =

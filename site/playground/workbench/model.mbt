@@ -202,6 +202,8 @@ pub(all) enum Share {
   LinkTooLong(String)
   /// The page could not open the link that it was given. The text says why.
   LinkRefused(String)
+  /// The user pasted a link that the page could not read. The page kept its state.
+  LinkIgnored(String)
 } derive(Eq, Debug)
 
 ///|
@@ -283,6 +285,9 @@ pub(all) struct Model {
   line : Int32
   column : Int32
   share : Share
+  /// The state of a pasted link that waits for the answer of the user,
+  /// because the editors have changes.
+  incoming : @samples.ShareState?
 } derive(Eq, Debug)
 
 ///|
@@ -317,6 +322,13 @@ pub(all) enum Msg {
   ShareDone(Share)
   /// The Download button of the toolbar.
   SaveClicked
+  /// The user opened another link in this tab. `dirty` is true when an editor
+  /// text differs from the text that the page loaded or shared last.
+  LinkOpened(opened~ : Opened, dirty~ : Bool)
+  /// "Open" of the question about a pasted link.
+  OpenIncoming
+  /// "Keep my changes" of the question about a pasted link.
+  KeepMine
   SampleChosen(Int32)
   TabChosen(Tab)
   DiagnosticChosen(line~ : Int32, column~ : Int32)
@@ -368,6 +380,13 @@ pub(all) enum Effect {
     output~ : Output,
     selector~ : String,
     settings~ : Settings
+  )
+  /// Put the texts of a pasted link in the editors. The page script keeps
+  /// them as the texts that the user has not changed.
+  ApplyShared(
+    model~ : String,
+    transcript~ : String,
+    format~ : @samples.TranscriptFormat
   )
   /// Save the model, and the transcript in this format, as files on the
   /// computer of the user.
@@ -524,6 +543,7 @@ pub fn Model::start_with(
       Refused(reason) => LinkRefused(reason)
       _ => NoShare
     },
+    incoming: None,
   }
   m.send_validate()
 }
@@ -641,6 +661,68 @@ pub fn Model::warnings(self : Model) -> Int32 {
     Checked(items~, ..) => items.filter(d => !d.is_error()).length()
     _ => 0
   }
+}
+
+///|
+/// Open the state of a link in a page that runs. The state joins the pickers
+/// as "Shared link", in place of the one of an earlier link. The texts go to
+/// the editors, which send their own change messages; the check starts after
+/// the wait as for any change. The settings stay as the link gives them until
+/// that check lists the protocols, then they fit the model.
+fn Model::reopen(
+  self : Model,
+  state : @samples.ShareState,
+) -> (Model, Array[Effect]) {
+  let samples = self.data.samples.filter(s => s.path != "")
+  let transcripts = self.data.transcripts.filter(s => s.path != "")
+  let transcript : @samples.TranscriptSample = {
+    title: "Shared link",
+    path: "",
+    protocol: state.protocol,
+    format: state.format,
+    version: state.version,
+    preset: state.log_preset,
+    text: state.transcript,
+  }
+  let data = {
+    ..self.data,
+    samples: [
+      ..samples,
+      { title: "Shared link", path: "", model: state.model, },
+    ],
+    selected: samples.length(),
+    transcripts: [..transcripts, transcript],
+    transcript: transcripts.length(),
+  }
+  let selector = state.selector.unwrap_or(DEFAULT_SELECTOR)
+  let edits = self.edits + 1
+  (
+    {
+      ..self,
+      data,
+      sample: samples.length(),
+      transcript: transcripts.length(),
+      tab: state.tab,
+      output: state.output,
+      selector,
+      tx_output: state.output,
+      tx_selector: selector,
+      tx: TxIdle,
+      copy: NotCopied,
+      settings: { ..Settings::of_sample(transcript), complete: state.complete, },
+      edits,
+      share: NoShare,
+      incoming: None,
+    },
+    [
+      ApplyShared(
+        model=state.model,
+        transcript=state.transcript,
+        format=state.format,
+      ),
+      Wait(ms=DEBOUNCE_MS, then=Debounced(edits~)),
+    ],
+  )
 }
 
 ///|
@@ -831,6 +913,24 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
           ),
         ],
       )
+    LinkOpened(opened~, dirty~) =>
+      match opened {
+        Default => (m, [])
+        Refused(reason) =>
+          ({ ..m, share: LinkIgnored(reason), incoming: None, }, [])
+        Shared(state) =>
+          if dirty {
+            ({ ..m, incoming: Some(state), share: NoShare, }, [])
+          } else {
+            m.reopen(state)
+          }
+      }
+    OpenIncoming =>
+      match m.incoming {
+        Some(state) => m.reopen(state)
+        None => (m, [])
+      }
+    KeepMine => ({ ..m, incoming: None, }, [])
     ShareDone(share) => ({ ..m, share, }, [])
     SaveClicked =>
       (

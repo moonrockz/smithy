@@ -104,6 +104,45 @@ fn length_reason(fragment : String) -> String? {
 }
 
 ///|
+const INFLATE_CHUNK : Int32 = 65536
+
+///|
+/// Unpack a raw deflate stream, and stop as soon as the output passes
+/// `MAX_STATE_BYTES`, so a link that packs 1000 to 1 never unpacks in full.
+fn bounded_inflate(packed : Bytes) -> Result[Bytes, String] {
+  let inflater = @flate.Inflater::new()
+  let chunk : FixedArray[Byte] = FixedArray::make(INFLATE_CHUNK, b'\x00')
+  let out : Array[Byte] = []
+  let mut offset = 0
+  while true {
+    let (status, consumed, produced) = inflater.step(
+      packed[offset:],
+      chunk.mut_view(),
+    ) catch {
+      @flate.InflateError(message) =>
+        return Err("I could not unpack the link: \{message}")
+      _ => return Err("I could not unpack the link.")
+    }
+    offset += consumed
+    for i in 0..<produced {
+      out.push(chunk[i])
+    }
+    if out.length() > MAX_STATE_BYTES {
+      return Err(
+        "The link unpacks to more than \{MAX_STATE_BYTES} bytes. I do not open a state that large.",
+      )
+    }
+    match status {
+      Done => break
+      NeedMoreOutput => ()
+      NeedMoreInput =>
+        return Err("I could not unpack the link: the data ends too soon.")
+    }
+  }
+  Ok(Bytes::from_array(out))
+}
+
+///|
 /// The reason a state is too large for a link, or `None` when it fits. A link
 /// of a state that is too large would not open.
 pub fn share_state_problem(state : ShareState) -> String? {
@@ -159,14 +198,9 @@ pub fn decode_share(text : String) -> Result[ShareState, String] {
     Ok(bytes) => bytes
     Err(reason) => return Err(reason)
   }
-  let inflated = @flate.inflate_all(packed) catch {
-    @flate.InflateError(message) =>
-      return Err("I could not unpack the link: \{message}")
-  }
-  if inflated.length() > MAX_STATE_BYTES {
-    return Err(
-      "The link unpacks to more than \{MAX_STATE_BYTES} bytes. I do not open a state that large.",
-    )
+  let inflated = match bounded_inflate(packed) {
+    Ok(bytes) => bytes
+    Err(reason) => return Err(reason)
   }
   let json_text = @utf8.decode(inflated) catch {
     _ => return Err("The link does not hold UTF-8 text.")

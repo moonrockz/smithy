@@ -1107,6 +1107,27 @@ test "share: a state that inflates above the limit is rejected" {
 }
 
 ///|
+test "share: the decoder stops at the limit and does not unpack a bomb" {
+  // 4 MB of one letter packs to a few KB and unpacks past the limit.
+  let bomb = { ..sample_state(), model: "a".repeat(4000000), }
+  let json = @utf8.encode(@json.to_json(bomb).stringify())
+  let packed = @flate.deflate_all(json)
+  assert_true(packed.length() < 8000)
+  match bounded_inflate(packed) {
+    Err(message) =>
+      assert_true(message.has_prefix("The link unpacks to more than"))
+    Ok(_) => fail("I expected the bomb to be rejected")
+  }
+  // A stream within the limit unpacks to the same bytes as `inflate_all`.
+  let small = @utf8.encode("hello ".repeat(30000))
+  assert_eq(bounded_inflate(@flate.deflate_all(small)), Ok(small))
+  // Stored data, empty data and cut data.
+  assert_eq(bounded_inflate(@flate.deflate_all(b"")), Ok(b""))
+  let cut = @flate.deflate_all(small)
+  assert_true(bounded_inflate(cut[:cut.length() / 2].to_owned()) is Err(_))
+}
+
+///|
 test "share: a model of a few hundred KB still fits when its link is short" {
   let state = { ..sample_state(), model: "// line\n".repeat(50000), }
   assert_true(state.model.length() >= 400000)

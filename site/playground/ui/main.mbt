@@ -9,6 +9,13 @@ priv struct Runtime {
   /// of every other request.
   files : Map[Int32, Array[(String, String)]]
   mut dispatch : (@workbench.Msg) -> Unit
+  /// The texts that the page loaded or shared last. An editor with another
+  /// text has changes that a pasted link would replace.
+  mut saved_model : String
+  mut saved_transcript : String
+  /// The fragment of the address that the page loaded or wrote last. A
+  /// `hashchange` to this fragment is the page's own and changes nothing.
+  mut fragment : String
 }
 
 ///|
@@ -232,6 +239,20 @@ fn Runtime::reply_msg(self : Runtime, text : String) -> @workbench.Msg? {
 }
 
 ///|
+/// The user opened another link in this tab: only the fragment changed. The
+/// page tells the workbench, which opens the state or asks first.
+fn Runtime::link_changed(self : Runtime) -> Unit {
+  let fragment = read_hash()
+  if fragment == self.fragment {
+    return
+  }
+  self.fragment = fragment
+  let dirty = editor_text(@workbench.EDITOR_ID) != self.saved_model ||
+    editor_text(@workbench.TRANSCRIPT_ID) != self.saved_transcript
+  (self.dispatch)(LinkOpened(opened=opened_by(fragment), dirty~))
+}
+
+///|
 fn Runtime::start_worker(self : Runtime) -> Unit {
   self.worker = Some(
     Worker::start(
@@ -300,6 +321,16 @@ fn Runtime::run(self : Runtime, effect : @workbench.Effect) -> Unit {
       if self.file(seq, index) is Some((name, text)) {
         download_text(name, text)
       }
+    ApplyShared(model~, transcript~, format~) => {
+      self.saved_model = model
+      self.saved_transcript = transcript
+      editor_load(@workbench.EDITOR_ID, model)
+      editor_show(
+        @workbench.TRANSCRIPT_ID,
+        transcript,
+        transcript_language(format),
+      )
+    }
     MakeShare(tab~, output~, selector~, settings~) => {
       let state = share_state_of(tab, output, selector, settings)
       if @core.share_state_problem(state) is Some(reason) {
@@ -312,6 +343,9 @@ fn Runtime::run(self : Runtime, effect : @workbench.Effect) -> Unit {
         return
       }
       let url = write_hash(fragment)
+      self.saved_model = state.model
+      self.saved_transcript = state.transcript
+      self.fragment = fragment
       copy_text(url, ok => {
         (self.dispatch)(
           ShareDone(if ok { LinkCopied(url) } else { LinkShown(url) }),
@@ -383,7 +417,15 @@ fn app(
   data : @workbench.PlaygroundData,
   opened : @workbench.Opened,
 ) -> @rabbita.Val[@rabbita.Html] {
-  let runtime = { data, worker: None, files: {}, dispatch: _ => (), }
+  let runtime = {
+    data,
+    worker: None,
+    files: {},
+    dispatch: _ => (),
+    saved_model: "",
+    saved_transcript: "",
+    fragment: read_hash(),
+  }
   let (model, emit) = @rabbita.create_state_with_init(
     init=emit => {
       let (m, effects) = @workbench.Model::start_with(data, opened)
@@ -409,7 +451,10 @@ fn app(
           () => (runtime.dispatch)(TranscriptEdited),
           (_, _) => (),
         )
+        runtime.saved_model = m.first_text()
+        runtime.saved_transcript = transcript
         runtime.start_worker()
+        on_hash_change(() => runtime.link_changed())
         for effect in effects {
           runtime.run(effect)
         }
@@ -437,6 +482,5 @@ fn main {
   let data : @workbench.PlaygroundData = @json.from_json(@json.parse(text)) catch {
     _ => return
   }
-  reload_on_hash_change()
   @rabbita.new(() => app(data, opened_by(read_hash()))).mount(@workbench.APP_ID)
 }

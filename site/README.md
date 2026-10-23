@@ -166,13 +166,16 @@ the model with its version and peers. A fragment that the page cannot read shows
 | a format other than `v1` (for example `v2.`, from a newer `/next/` build) | "it has the format v2, and I know only v1" |
 | corrupt text, a character that is not base64url, a bad deflate stream, JSON that is no state | the reason of `decode_share` |
 | more than 8,000 characters (`MAX_SHARE_LENGTH`) | the length, and the limit |
-| a state that unpacks to more than 2,097,152 bytes (`MAX_STATE_BYTES`) | the limit; checked after the inflate |
+| a state that unpacks to more than 2,097,152 bytes (`MAX_STATE_BYTES`) | the limit; checked while the inflate runs |
 
 A state too large for a link (`share_state_problem`, or a link over 8,000 characters) shows the same reason on the
 Share link button and says to use Download. On the release channel, a build from before the playground has no
 `/playground/` page: the link then gives the 404 page of the site. A build with the playground but with an older
-format also shows the message of the table. The page loads again on `hashchange`, so a link pasted in the address
-bar of an open playground tab opens too.
+format also shows the message of the table. A link pasted in the address bar of an open playground tab (a
+`hashchange`) opens in place with no page load (`Model::reopen`). When an editor differs from the text that the page
+loaded or shared last, a bar asks "Open the new link? Your changes will be lost." (`Open`, `Keep my changes`). A link
+that cannot be read keeps the page and shows the message. The fragment that the page wrote itself is ignored. The
+inflate stops at `MAX_STATE_BYTES` (`bounded_inflate`, `Inflater::step` with a 64 KB buffer).
 
 An example page (`/examples/<dir>`) shows "Open in playground" when `playground/samples` has a model under
 `examples/<dir>/` (`example_state`). The pre-render computes the fragment (`example_fragment` in `prerender`),

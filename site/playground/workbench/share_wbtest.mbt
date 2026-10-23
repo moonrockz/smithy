@@ -151,3 +151,99 @@ test "save: the model goes alone, and the transcript goes on its tab" {
   let (m, _) = update(m, TabChosen(TranscriptTab))
   assert_eq(update(m, SaveClicked).1, [SaveFiles(transcript=Some(Markdown))])
 }
+
+///|
+test "link: a pasted link opens in place when the editors have no changes" {
+  let m = answered()
+  let (m, effects) = update(
+    m,
+    LinkOpened(opened=Shared(shared_state()), dirty=false),
+  )
+  assert_eq(m.incoming, None)
+  assert_eq(m.tab, TranscriptTab)
+  assert_eq(m.output, Selector)
+  assert_eq(m.selector, "structure")
+  assert_eq(m.settings.protocol, "a#Editor")
+  assert_true(m.settings.complete)
+  assert_eq(m.tx, TxIdle)
+  assert_eq(m.data.samples[m.sample].title, "Shared link")
+  assert_eq(effects, [
+    ApplyShared(model="namespace shared\n", transcript="{}\n{}\n", format=Jsonl),
+    Wait(ms=DEBOUNCE_MS, then=Debounced(edits=m.edits)),
+  ])
+  // A second link replaces the first "Shared link" in the pickers.
+  let (m, _) = update(
+    m,
+    LinkOpened(
+      opened=Shared({ ..shared_state(), model: "namespace two\n", }),
+      dirty=false,
+    ),
+  )
+  assert_eq(m.data.samples.filter(s => s.title == "Shared link").length(), 1)
+  assert_eq(m.data.samples[m.sample].model, "namespace two\n")
+}
+
+///|
+test "link: the check after a pasted link fits the settings to the model" {
+  let m = answered()
+  let (m, _) = update(
+    m,
+    LinkOpened(
+      opened=Shared({ ..shared_state(), protocol: "gone#Missing", }),
+      dirty=false,
+    ),
+  )
+  assert_eq(m.settings.protocol, "gone#Missing")
+  let (m, effects) = update(m, Debounced(edits=m.edits))
+  // One request runs at a time: the check goes out with the next number.
+  assert_eq(effects[0], SendValidate(seq=m.seq))
+  let m = update(
+      m,
+      Answered(
+        seq=m.seq,
+        answer=Validated(items=[], shapes=1, protocols=[
+          chat_protocol, editor_protocol,
+        ]),
+      ),
+    ).0
+  assert_eq(m.settings.protocol, "a#Chat")
+}
+
+///|
+test "link: a pasted link waits for the answer when the editors have changes" {
+  let m = answered()
+  let (asked, effects) = update(
+    m,
+    LinkOpened(opened=Shared(shared_state()), dirty=true),
+  )
+  assert_eq(effects, [])
+  assert_eq(asked.incoming, Some(shared_state()))
+  assert_eq(asked.tab, m.tab)
+  assert_eq(asked.sample, m.sample)
+  let (kept, effects) = update(asked, KeepMine)
+  assert_eq(effects, [])
+  assert_eq(kept.incoming, None)
+  assert_eq(kept.tab, m.tab)
+  let (opened, effects) = update(asked, OpenIncoming)
+  assert_eq(opened.incoming, None)
+  assert_eq(opened.tab, TranscriptTab)
+  assert_eq(effects.length(), 2)
+  // With no question open, the buttons do nothing.
+  assert_eq(update(m, OpenIncoming), (m, []))
+}
+
+///|
+test "link: a link that cannot be read keeps the state of the page" {
+  let m = answered()
+  let (m, effects) = update(
+    m,
+    LinkOpened(opened=Refused("I could not open this link."), dirty=true),
+  )
+  assert_eq(effects, [])
+  assert_eq(m.share, LinkIgnored("I could not open this link."))
+  assert_eq(m.incoming, None)
+  assert_eq(m.sample, 1)
+  assert_eq(m.tab, ValidateTab)
+  // An empty fragment changes nothing.
+  assert_eq(update(m, LinkOpened(opened=Default, dirty=true)), (m, []))
+}

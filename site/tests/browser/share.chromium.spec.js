@@ -1,7 +1,7 @@
 // Share link with the clipboard, Download, and layout. These need Chromium: Lightpanda has no
 // clipboard and no layout (README.md).
 import { expect, test } from "./fixtures.js";
-import { openPlayground, settled, stateOfFragment } from "./playground.js";
+import { linkState, openPlayground, settled, shareFragment, stateOfFragment } from "./playground.js";
 import { siteUrl } from "./site.js";
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
@@ -38,12 +38,50 @@ test("Share link copies the URL, puts it in the address bar, and the link opens 
   expect(page.errors).toEqual([]);
 });
 
-test("a link opened in this tab after the page loaded is read, not ignored", async ({ page }) => {
+test("a pasted link opens in place when nothing changed, and a bad link keeps the page", async ({ page }) => {
   await openPlayground(page, siteUrl("playground/"));
-  // The user pastes a link into the address bar. Only the fragment differs, so the browser fires
-  // `hashchange` and the page loads again with the link.
+  const marker = await page.evaluate(() => (window.__marker = Math.random()));
+  const fragment = shareFragment(linkState({ model: "namespace pasted\n" }));
+  await page.evaluate((f) => (location.hash = f), "#" + fragment);
+  await expect(page.locator("#pg-editor .cm-content")).toContainText("namespace pasted");
+  await settled(page);
+  await expect(page.locator("#pg-example option:checked")).toHaveText("Shared link");
+  await expect(page.locator("#pg-incoming-open")).toHaveCount(0);
+  // The page did not load again.
+  expect(await page.evaluate(() => window.__marker)).toBe(marker);
+  // A link that cannot be read keeps the state of the page, with the message.
   await page.evaluate(() => (location.hash = "#v1.AAAA"));
   await expect(page.locator("#pg-share-status")).toContainText("I could not open this link.");
+  await expect(page.locator("#pg-share-status")).toContainText("I kept your page as it was.");
+  await expect(page.locator("#pg-editor .cm-content")).toContainText("namespace pasted");
+  expect(page.errors).toEqual([]);
+});
+
+test("a pasted link after an edit asks first: Keep my changes keeps them, Open restores the new model", async ({ page }) => {
+  await openPlayground(page, siteUrl("playground/"));
+  await page.locator("#pg-editor .cm-content").fill("namespace mine\n");
+  await settled(page);
+  const fragment = shareFragment(linkState({ model: "namespace pasted\n", tab: "TransformTab", output: "Idl" }));
+  await page.evaluate((f) => (location.hash = f), "#" + fragment);
+  const ask = page.locator("#pg-incoming");
+  await expect(ask).toContainText("Open the new link? Your changes will be lost.");
+  // Nothing changed yet.
+  await expect(page.locator("#pg-editor .cm-content")).toContainText("namespace mine");
+  await page.getByRole("button", { name: "Keep my changes" }).click();
+  await expect(page.locator("#pg-incoming-open")).toHaveCount(0);
+  await expect(page.locator("#pg-editor .cm-content")).toContainText("namespace mine");
+  // Going to another fragment and back asks again.
+  await page.evaluate(() => (location.hash = "#v1.AAAA"));
+  await expect(page.locator("#pg-share-status")).toContainText("I kept your page as it was.");
+  await page.evaluate((f) => (location.hash = f), "#" + fragment);
+  await expect(ask).toContainText("Open the new link?");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect(page.locator("#pg-editor .cm-content")).toContainText("namespace pasted");
+  await settled(page);
+  await expect(ask).toBeEmpty();
+  await expect(page.getByRole("tab", { name: "Transform" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#pg-output-kind")).toHaveValue("idl");
+  expect(page.errors).toEqual([]);
 });
 
 test("when the clipboard is missing, the page shows the link in a box", async ({ page }) => {
