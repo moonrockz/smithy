@@ -119,15 +119,91 @@ fn shape_count(model : @smithy.Model) -> Int32 {
 }
 
 ///|
+/// The members of the `jsonRpcProtocol` trait of a shape, or `None` when the
+/// shape does not have it.
+fn protocol_trait(shape : @smithy.Shape) -> Map[String, @smithy.NodeValue]? {
+  match shape.trait_value("smithy.rpc#jsonRpcProtocol") {
+    Some(Object(fields)) => Some(fields)
+    _ => None
+  }
+}
+
+///|
+/// The strings of the array `field` of a trait. With `name`, each item is an
+/// object and the string is its member `name`; without it, each item is a
+/// string.
+fn trait_strings(
+  fields : Map[String, @smithy.NodeValue],
+  field : String,
+  name? : String,
+) -> Array[String] {
+  guard fields.get(field) is Some(Array(items)) else { return [] }
+  items.filter_map(item => {
+    match (item, name) {
+      (String(text), None) => Some(text)
+      (Object(object), Some(key)) =>
+        match object.get(key) {
+          Some(String(text)) => Some(text)
+          _ => None
+        }
+      _ => None
+    }
+  })
+}
+
+///|
+/// The peer names of a protocol shape, in trait order.
+fn protocol_peers(shape : @smithy.Shape) -> Array[String] {
+  match protocol_trait(shape) {
+    Some(fields) => trait_strings(fields, "peers", name="name")
+    None => []
+  }
+}
+
+///|
+/// Compare two strings character by character, as a dictionary does.
+/// `String::compare` puts a shorter string first.
+fn text_compare(a : String, b : String) -> Int32 {
+  let ai = a.iter()
+  let bi = b.iter()
+  while true {
+    match (ai.next(), bi.next()) {
+      (None, None) => return 0
+      (None, _) => return -1
+      (_, None) => return 1
+      (Some(x), Some(y)) => if x != y { return x.compare(y) }
+    }
+  }
+  0
+}
+
+///|
+/// The structures with the `jsonRpcProtocol` trait, by shape ID: the version
+/// strings and the peer names that the trait gives.
+fn protocols_of(model : @smithy.Model) -> Array[ProtocolView] {
+  let out = []
+  for id, shape in model.shapes {
+    guard protocol_trait(shape) is Some(fields) else { continue }
+    out.push({
+      id: id.to_string(),
+      versions: trait_strings(fields, "versions"),
+      peers: trait_strings(fields, "peers", name="name"),
+    })
+  }
+  out.sort_by((a, b) => text_compare(a.id, b.id))
+  out
+}
+
+///|
 fn validate(seq : Int32, model : String) -> Response {
   let loaded = load(model)
   let source = @syntax.SourceText::new(model)
   let items = loaded
     .validation_events()
     .map(event => diagnostic_of(event, source))
-  let shapes = match loaded.model {
-    Some(model) => shape_count(model)
-    None => 0
+  let (shapes, protocols) = match loaded.model {
+    Some(model) => (shape_count(model), protocols_of(model))
+    None => (0, [])
   }
-  Diagnostics(seq~, items~, shapes~)
+  Diagnostics(seq~, items~, shapes~, protocols~)
 }

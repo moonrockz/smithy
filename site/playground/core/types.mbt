@@ -19,6 +19,26 @@ pub(all) enum TranscriptFormat {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+/// The sender of the message of a log record whose `dir` member has this
+/// value: the CLI option `--direction value=peer`.
+pub(all) struct Direction {
+  value : String
+  peer : String
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+/// How the lines of a JSONL log become transcript entries: the CLI option
+/// `--log-preset`.
+pub(all) enum LogPreset {
+  /// `{"dir", "message"}` records. Each direction names the sender for one
+  /// `dir` value. With no direction, "request" is the first peer of the
+  /// protocol and "response" the second, as in the CLI.
+  DirMessage(Array[Direction])
+  /// Each line is a JSON-RPC message from `sender`: `--log-preset raw --sender`.
+  Raw(sender~ : String)
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
 /// A message from the page to the Worker. `seq` comes back unchanged in the
 /// response, so the page can drop a stale response.
 pub(all) enum Request {
@@ -30,18 +50,20 @@ pub(all) enum Request {
     selector~ : String?
   )
   /// Load a transcript and check its first entries. `log_preset` applies to
-  /// the format Jsonl only: `None` or "dir-message" (request is the first peer,
-  /// response the second), "dir-message:value=peer,value=peer", or "raw:peer".
-  /// `complete` is the flag --complete of the CLI: true makes the check complete.
-  /// False leaves the choice to the document, and a document that says nothing
-  /// is partial.
+  /// the format Jsonl only, as the CLI option --log-preset; `None` is
+  /// `DirMessage([])`. `version` is the CLI option --version: a log needs it,
+  /// and a document gives its own, so the page sends `None` for a document.
+  /// `complete` is the flag --complete of the CLI: true makes the check
+  /// complete. False leaves the choice to the document, and a document that
+  /// says nothing is partial.
   TranscriptStart(
     seq~ : Int32,
     model~ : String,
     protocol~ : String,
     format~ : TranscriptFormat,
     complete~ : Bool,
-    log_preset~ : String?,
+    log_preset~ : LogPreset?,
+    version~ : String?,
     text~ : String
   )
   /// Check the next `count` entries: 1 for Step, a large number for Run all.
@@ -67,7 +89,9 @@ pub(all) struct Diagnostic {
 
 ///|
 /// A transcript entry. `line` and `column` are the place of the message in the
-/// transcript text.
+/// transcript text. `receiver` is the receiver that the document names, else
+/// the other peer for a request; it is `None` for a reply with no named
+/// receiver.
 pub(all) struct EntryView {
   index : Int32
   sender : String
@@ -75,8 +99,6 @@ pub(all) struct EntryView {
   message : String
   line : Int32?
   column : Int32?
-  /// False until the checker has read the entry.
-  checked : Bool
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -138,8 +160,24 @@ pub(all) enum BlockKind {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+/// A structure of the model with the `smithy.rpc#jsonRpcProtocol` trait: the
+/// versions that it declares and the names of its peers, in trait order.
+pub(all) struct ProtocolView {
+  id : String
+  versions : Array[String]
+  peers : Array[String]
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
 pub(all) enum Response {
-  Diagnostics(seq~ : Int32, items~ : Array[Diagnostic], shapes~ : Int32)
+  /// The diagnostics of the model, and its JSON-RPC protocols, by shape ID.
+  /// A model that does not assemble lists no protocol.
+  Diagnostics(
+    seq~ : Int32,
+    items~ : Array[Diagnostic],
+    shapes~ : Int32,
+    protocols~ : Array[ProtocolView]
+  )
   /// The files of a transform, as (name, text). `warnings` are the warnings
   /// of the converter, each as the CLI prints it: `WARNING: <shape>: <message>`.
   /// `service` is the shape ID of the service that an OpenAPI or OpenRPC
@@ -152,12 +190,17 @@ pub(all) enum Response {
   )
   /// The request did not run. `reason` says why, in a sentence.
   Blocked(seq~ : Int32, reason~ : String, kind~ : BlockKind)
-  /// The state of the check after a start or a step. `entries` lists every
-  /// entry of the transcript, and `findings` lists all findings so far.
+  /// The state of the check after a start or a step, as a change since the
+  /// previous response for the same transcript, so a step costs the same at
+  /// the end of a long log as at its start. A start gives every entry of the
+  /// transcript; a step gives none. `findings` are the findings that are new
+  /// since the previous response. `checked` is the number of entries that the
+  /// checker has read so far.
   TranscriptProgress(
     seq~ : Int32,
     entries~ : Array[EntryView],
     findings~ : Array[FindingView],
+    checked~ : Int32,
     done~ : Bool,
     summary~ : SummaryView?
   )
@@ -181,5 +224,7 @@ pub(all) struct ShareState {
   format : TranscriptFormat
   complete : Bool
   selector : String?
-  log_preset : String?
+  log_preset : LogPreset?
+  /// The JSON-RPC version of a log.
+  version : String?
 } derive(Eq, Debug, ToJson, FromJson)

@@ -56,3 +56,75 @@ test "samples: the mistake is peers.smithy with Intger for Integer" {
     "I could not resolve shape example.peers#Intger, referenced by example.peers#PostMessageOutput$count.",
   )
 }
+
+///|
+fn core_format(format : @samples.TranscriptFormat) -> @core.TranscriptFormat {
+  match format {
+    Markdown => Markdown
+    Json => Json
+    Jsonl => Jsonl
+  }
+}
+
+///|
+fn core_preset(preset : @samples.LogPreset) -> @core.LogPreset {
+  match preset {
+    DirMessage(directions) =>
+      DirMessage(directions.map(d => { value: d.value, peer: d.peer, }))
+    Raw(sender~) => Raw(sender~)
+  }
+}
+
+///|
+/// The codes of the findings of a transcript of the picker, checked against
+/// `examples/json-rpc/peers.smithy` with the settings of the picker.
+fn transcript_codes(source : @samples.TranscriptSource) -> Array[String] raise {
+  let (findings, summary) = run_all(
+    repository_file("examples/json-rpc/peers.smithy"),
+    source.protocol,
+    core_format(source.format),
+    repository_file(source.path),
+    log_preset?=source.preset.map(core_preset),
+    version?=source.version,
+  )
+  assert_eq(
+    summary.errors,
+    findings.filter(f => f.severity == "error").length(),
+  )
+  findings.map(f => f.code)
+}
+
+///|
+test "samples: the transcript picker opens the chat with the three findings of the mockup" {
+  let source = @samples.transcript_manifest[@samples.default_transcript]
+  assert_eq(source.path, "site/playground/samples/chat-findings.md")
+  assert_eq(transcript_codes(source), [
+    "TypeMismatch", "RequiredMember", "MissingResponse",
+  ])
+}
+
+///|
+test "samples: every other transcript of the picker is valid for peers.smithy" {
+  let paths = []
+  for i, source in @samples.transcript_manifest {
+    if i != @samples.default_transcript {
+      assert_eq(transcript_codes(source), [])
+      paths.push(source.path)
+    }
+  }
+  assert_eq(paths, [
+    "examples/json-rpc/transcripts/chat.md", "examples/json-rpc/transcripts/echo.md",
+    "examples/json-rpc/transcripts/editor.md", "examples/json-rpc/transcripts/editor.jsonl",
+  ])
+}
+
+///|
+test "samples: a document of the picker has no version or preset, and a log has both" {
+  for source in @samples.transcript_manifest {
+    match source.format {
+      Jsonl =>
+        assert_true(source.version is Some(_) && source.preset is Some(_))
+      _ => assert_true(source.version is None && source.preset is None)
+    }
+  }
+}

@@ -3,6 +3,7 @@ import {
   "moonbit-community/rabbita/cmd",
   "moonrockz/smithy-site/playground/core",
   "moonrockz/smithy-site/playground/workbench",
+  "moonrockz/smithy-site/playground/samples",
   "moonbitlang/core/json",
 }
 

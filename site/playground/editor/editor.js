@@ -132,7 +132,9 @@ const editors = {
           EditorState.readOnly.of(readOnly),
           EditorView.contentAttributes.of({ "aria-label": `${id} editor` }),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) pending.changed = true;
+            // A change that gives the same text is not a change (a browser can report one when it
+            // reads the DOM back).
+            if (update.docChanged && !update.startState.doc.eq(update.state.doc)) pending.changed = true;
             if (update.docChanged || update.selectionSet) {
               const head = update.state.selection.main.head;
               const line = update.state.doc.lineAt(head);
@@ -187,6 +189,23 @@ const editors = {
         };
       });
     view.dispatch(setDiagnostics(view.state, diagnostics));
+  },
+  // Change the language and keep the text.
+  language(id, language) {
+    const view = views.get(id);
+    if (!view) return;
+    view.dispatch({ effects: languageSlots.get(id).reconfigure((languages[language] ?? (() => []))()) });
+  },
+  // Move the cursor to the start of a line and show it, but not while the user types in the
+  // editor: the cursor stays where the user put it.
+  follow(id, line) {
+    const view = views.get(id);
+    if (!view || view.hasFocus) return;
+    const pos = position(view.state.doc, line, 1);
+    view.dispatch({ selection: { anchor: pos } });
+    // Scroll the editor only: scrollIntoView can also scroll the page.
+    const scroller = view.scrollDOM;
+    scroller.scrollTop = Math.max(0, view.lineBlockAt(pos).top - scroller.clientHeight / 2);
   },
   goTo(id, line, column) {
     const view = views.get(id);

@@ -134,6 +134,18 @@ test "the playground page carries its samples and round-trips" {
         },
       ],
       selected: 0,
+      transcripts: [
+        {
+          title: "Log",
+          path: "examples/json-rpc/transcripts/editor.jsonl",
+          protocol: "example.peers#Editor",
+          format: Jsonl,
+          version: Some("2.0"),
+          preset: Some(DirMessage([{ value: "in", peer: "client", }])),
+          text: "{\"dir\": \"in\"} </script>\n",
+        },
+      ],
+      transcript: 0,
     }),
   }
   assert_eq(SiteData::decode(data.encode()), Some(data))

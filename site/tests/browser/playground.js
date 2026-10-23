@@ -1,5 +1,6 @@
 // Steps on the playground page that the tests share.
 import { expect } from "./fixtures.js";
+import { siteUrl } from "./site.js";
 
 // The status bar has data-waiting="false" when the newest check has its answer.
 export async function settled(page) {
@@ -44,4 +45,16 @@ export async function clearEditor(page) {
 // Select a sample of the picker by its title.
 export async function chooseSample(page, title) {
   await page.selectOption("#pg-example", { label: title });
+}
+
+// Open the Transcript tab, after a sample of the model picker when `sample` is given. Lightpanda has no
+// layout, so the tab is selected with a click event.
+export async function openTranscript(page, sample) {
+  await openPlayground(page, siteUrl("playground/"));
+  if (sample) {
+    await chooseSample(page, sample);
+    await settled(page);
+  }
+  await page.locator(".pg-tab", { hasText: "Transcript" }).dispatchEvent("click");
+  await expect(page.locator(".pg-trpanel")).not.toHaveClass(/pg-off/);
 }

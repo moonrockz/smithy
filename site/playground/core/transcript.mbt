@@ -18,6 +18,10 @@ priv struct Active {
   mut cursor : Int32
   mut fed : Int32
   mut summary : SummaryView?
+  /// The number of findings that a response has given.
+  mut reported : Int32
+  /// The peer names of the protocol.
+  peers : Array[String]
 }
 
 ///|
@@ -69,20 +73,56 @@ fn is_error(finding : @rpc.TranscriptFinding) -> Bool {
 }
 
 ///|
-fn progress(seq : Int32, active : Active) -> Response {
-  let entries = active.entries.mapi((index, entry) => {
-    index,
-    sender: entry.sender.to_string(),
-    receiver: entry.receiver.map(peer => peer.to_string()),
-    message: entry.message,
-    line: entry.location.map(at => at.line),
-    column: entry.location.map(at => at.column),
-    checked: index < active.fed,
+/// True for the text of a JSON-RPC response: an object with no `method`, or a
+/// batch whose first item is one.
+fn is_reply(message : String) -> Bool {
+  let value = @json.parse(message) catch { _ => return false }
+  match value {
+    Object(fields) => !fields.contains("method")
+    Array([Object(fields), ..]) => !fields.contains("method")
+    _ => false
+  }
+}
+
+///|
+/// The entries for the page. An entry goes to the other peer, so a request
+/// with no named receiver gets the other peer of `peers`; a reply gets none.
+fn entry_views(
+  entries : Array[@rpc.TranscriptEntry],
+  peers : Array[String],
+) -> Array[EntryView] {
+  entries.mapi((index, entry) => {
+    let sender = entry.sender.to_string()
+    let receiver = match entry.receiver {
+      Some(peer) => Some(peer.to_string())
+      None if is_reply(entry.message) => None
+      None => peers.iter().find_first(peer => peer != sender)
+    }
+    {
+      index,
+      sender,
+      receiver,
+      message: entry.message,
+      line: entry.location.map(at => at.line),
+      column: entry.location.map(at => at.column),
+    }
   })
+}
+
+///|
+/// The change since the previous response: the entries at the start, and the
+/// findings that no response has given yet.
+fn progress(seq : Int32, active : Active, first~ : Bool) -> Response {
+  let findings = active.findings[active.reported:]
+    .iter()
+    .map(FindingView::from_finding)
+    .to_array()
+  active.reported = active.findings.length()
   TranscriptProgress(
     seq~,
-    entries~,
-    findings=active.findings.map(FindingView::from_finding),
+    entries=if first { entry_views(active.entries, active.peers) } else { [] },
+    findings~,
+    checked=active.fed,
     done=active.summary is Some(_),
     summary=active.summary,
   )
@@ -150,10 +190,10 @@ fn Active::finish(self : Active) -> Unit {
 }
 
 ///|
-/// The reader of a JSONL log for a preset: "dir-message", "dir-message:value=peer,...",
-/// or "raw:peer".
+/// The reader of a JSONL log for a preset. The peers must be peers of the
+/// protocol, as the CLI checks them.
 fn log_mapping(
-  preset : String?,
+  preset : LogPreset?,
   protocol : @rpc.ProtocolDescription,
 ) -> Result[@rpc.LogMapping, String] {
   let peers = protocol.peers()
@@ -168,56 +208,36 @@ fn log_mapping(
     }
   }
 
-  let text = preset.unwrap_or("dir-message")
-  let (kind, argument) = match text.find(":") {
-    Some(at) => (text[:at].to_owned(), Some(text[at + 1:].to_owned()))
-    None => (text, None)
-  }
-  match (kind, argument) {
-    ("raw", Some(name)) =>
-      match peer(name) {
-        Ok(sender) => Ok(@rpc.LogMapping::raw(sender))
-        Err(reason) => Err(reason)
+  match preset.unwrap_or(DirMessage([])) {
+    Raw(sender~) => peer(sender).map(@rpc.LogMapping::raw)
+    DirMessage(directions) => {
+      let map : Map[String, @rpc.PeerName] = Map([])
+      if directions.is_empty() {
+        map["request"] = peers[0]
+        map["response"] = peers[1]
       }
-    ("raw", None) =>
-      Err("I expected a sender for the raw preset, as raw:<peer>.")
-    ("dir-message", _) => {
-      let directions : Map[String, @rpc.PeerName] = Map([])
-      match argument {
-        None => {
-          directions["request"] = peers[0]
-          directions["response"] = peers[1]
+      for direction in directions {
+        if direction.value == "" {
+          return Err(
+            "I expected a dir value for the peer \{direction.peer}, but found none.",
+          )
         }
-        Some(list) =>
-          for pair in list.split(",") {
-            let pair = pair.to_owned()
-            guard pair.rev_find("=") is Some(at) &&
-              at > 0 &&
-              at < pair.length() - 1 else {
-              return Err(
-                "I expected value=peer in the log preset, but found '\{pair}'.",
-              )
-            }
-            let value = pair[:at].to_owned()
-            if directions.contains(value) {
-              return Err("The log preset gives the value '\{value}' twice.")
-            }
-            match peer(pair[at + 1:].to_owned()) {
-              Ok(name) => directions[value] = name
-              Err(reason) => return Err(reason)
-            }
-          }
+        if map.contains(direction.value) {
+          return Err(
+            "The log preset gives the value '\{direction.value}' twice.",
+          )
+        }
+        match peer(direction.peer) {
+          Ok(name) => map[direction.value] = name
+          Err(reason) => return Err(reason)
+        }
       }
-      try @rpc.LogMapping::dir_message(directions) catch {
+      try @rpc.LogMapping::dir_message(map) catch {
         @validation.ConfigurationError(message) => Err(message)
       } noraise {
         mapping => Ok(mapping)
       }
     }
-    _ =>
-      Err(
-        "I expected the log preset dir-message or raw:<peer>, but found '\{text}'.",
-      )
   }
 }
 
@@ -274,8 +294,8 @@ fn protocol_error(error : Error) -> String {
 ///|
 /// Start a transcript. A Markdown or JSON document gives its own version. A
 /// JSONL log gives none, so it needs `version` ("1.0" or "2.0"), as the CLI
-/// needs `--version`. `handle` passes no version, so a log is blocked there
-/// until the request has a version field.
+/// needs `--version`. A version for a document must equal the document's. The
+/// checks come in the order of the CLI: the options, the model, then the text.
 pub fn Session::start_transcript(
   self : Session,
   seq~ : Int32,
@@ -283,9 +303,9 @@ pub fn Session::start_transcript(
   protocol~ : String,
   format~ : TranscriptFormat,
   complete~ : Bool,
-  log_preset~ : String?,
+  log_preset~ : LogPreset?,
+  version~ : String?,
   text~ : String,
-  version? : String,
 ) -> Response {
   self.active = None
   let given = match version {
@@ -296,6 +316,9 @@ pub fn Session::start_transcript(
         None =>
           return blocked(seq~, reason="I expected 1.0 or 2.0 for the version.")
       }
+  }
+  if format != Jsonl && log_preset is Some(_) {
+    return blocked(seq~, reason="A log preset applies only to a JSONL log.")
   }
   if format == Jsonl && given is None {
     return blocked(
@@ -313,9 +336,10 @@ pub fn Session::start_transcript(
       reason="I expected a shape ID for the protocol, but found '\{protocol}'.",
     )
   }
-  guard assembled.shapes.get(id) is Some(_) else {
+  guard assembled.shapes.get(id) is Some(shape) else {
     return blocked(seq~, reason="I found no shape \{protocol} in the model.")
   }
+  let peers = protocol_peers(shape)
   let (document, read_findings) = match format {
     Markdown => {
       let (document, findings) = @rpc.read_markdown_transcript(text)
@@ -328,12 +352,17 @@ pub fn Session::start_transcript(
     Jsonl => (None, [])
   }
   let version = match (given, document.bind(d => d.version)) {
+    (Some(chosen), Some(written)) if chosen != written =>
+      return blocked(
+        seq~,
+        reason="The version \{chosen.to_string()} conflicts with version \{written.to_string()} in the transcript.",
+      )
     (Some(version), _) | (None, Some(version)) => version
     (None, None) => {
       // A document that I could not read may have lost its version. Its error
       // findings explain the problem better than a missing version, as in the CLI.
       if read_findings.any(is_error) {
-        return unread_document(seq, document.unwrap(), read_findings)
+        return unread_document(seq, document.unwrap(), read_findings, peers)
       }
       return blocked(
         seq~,
@@ -365,6 +394,8 @@ pub fn Session::start_transcript(
         cursor: 0,
         fed: 0,
         summary: None,
+        reported: 0,
+        peers,
       }
     }
     None => {
@@ -394,12 +425,14 @@ pub fn Session::start_transcript(
         cursor: 0,
         fed: 0,
         summary: None,
+        reported: 0,
+        peers,
       }
     }
   }
   active.advance(0)
   self.active = Some(active)
-  progress(seq, active)
+  progress(seq, active, first=true)
 }
 
 ///|
@@ -411,30 +444,25 @@ fn step_transcript(session : Session, seq : Int32, count : Int32) -> Response {
     )
   }
   active.advance(count)
-  progress(seq, active)
+  progress(seq, active, first=false)
 }
 
 ///|
 /// The response for a document that I cannot check: its reader findings only,
 /// and a summary that is not valid and not complete. The CLI writes the same.
+/// The CLI matches only an `--expect` file against these findings, not the
+/// expect list of the document, so the summary has no expectations.
 fn unread_document(
   seq : Int32,
   document : @rpc.TranscriptDocument,
   read_findings : Array[@rpc.TranscriptFinding],
+  peers : Array[String],
 ) -> Response {
-  let entries = document.entries.mapi((index, entry) => {
-    index,
-    sender: entry.sender.to_string(),
-    receiver: entry.receiver.map(peer => peer.to_string()),
-    message: entry.message,
-    line: entry.location.map(at => at.line),
-    column: entry.location.map(at => at.column),
-    checked: false,
-  })
   TranscriptProgress(
     seq~,
-    entries~,
+    entries=entry_views(document.entries, peers),
     findings=read_findings.map(FindingView::from_finding),
+    checked=0,
     done=true,
     summary=Some({
       valid: false,

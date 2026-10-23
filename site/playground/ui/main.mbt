@@ -54,6 +54,88 @@ fn output_of(output : @workbench.Output) -> @core.Output {
 }
 
 ///|
+fn format_of(format : @samples.TranscriptFormat) -> @core.TranscriptFormat {
+  match format {
+    Markdown => Markdown
+    Json => Json
+    Jsonl => Jsonl
+  }
+}
+
+///|
+fn preset_of(preset : @samples.LogPreset) -> @core.LogPreset {
+  match preset {
+    DirMessage(directions) =>
+      DirMessage(directions.map(d => { value: d.value, peer: d.peer, }))
+    Raw(sender~) => Raw(sender~)
+  }
+}
+
+///|
+/// The language of the transcript editor. A log has one JSON value on each
+/// line, and other lines, so it is plain text.
+fn transcript_language(format : @samples.TranscriptFormat) -> String {
+  match format {
+    Markdown => "markdown"
+    Json => "json"
+    Jsonl => "plain"
+  }
+}
+
+///|
+fn entry_of(e : @core.EntryView) -> @workbench.Entry {
+  {
+    index: e.index,
+    sender: e.sender,
+    receiver: e.receiver,
+    message: e.message,
+    line: e.line,
+    column: e.column,
+  }
+}
+
+///|
+fn finding_of(f : @core.FindingView) -> @workbench.Finding {
+  {
+    code: f.code,
+    severity: f.severity,
+    message: f.message,
+    entry: f.entry,
+    line: f.line,
+    column: f.column,
+    sender: f.sender,
+    related: f.related,
+    path: f.path,
+    shape: f.shape,
+    operation: f.operation,
+  }
+}
+
+///|
+fn summary_of(s : @core.SummaryView) -> @workbench.Summary {
+  {
+    valid: s.valid,
+    complete: s.complete,
+    entries: s.entries,
+    errors: s.errors,
+    outstanding: s.outstanding,
+    correlation: s.correlation,
+    lines: s.lines,
+    not_json: s.not_json,
+    skipped: s.skipped,
+    expectations: s.expectations.map(e => {
+      matched: e.matched,
+      missing: e.missing.map(x => {
+        code: x.code,
+        entry: x.entry,
+        related: x.related,
+      }),
+      unexpected: e.unexpected.map(finding_of),
+    }),
+  }
+}
+
+///|
 /// The language of the output editor for a file.
 fn language_of(name : String) -> String {
   if name.has_suffix(".json") {
@@ -66,19 +148,26 @@ fn language_of(name : String) -> String {
 }
 
 ///|
-/// The message for a reply of the Worker. A reply that is not for the
-/// Validate or Transform tab, or that does not decode, gives `None`. The files of a
-/// transform stay in `runtime`.
+/// The message for a reply of the Worker. A reply that does not decode gives
+/// `None`. The files of a transform stay in `runtime`.
 fn Runtime::reply_msg(self : Runtime, text : String) -> @workbench.Msg? {
   let response : @core.Response = @json.from_json(@json.parse(text)) catch {
     _ => return None
   }
   match response {
-    Diagnostics(seq~, items~, shapes~) =>
+    Diagnostics(seq~, items~, shapes~, protocols~) =>
       Some(
         Answered(
           seq~,
-          answer=Validated(items=items.map(diagnostic_of), shapes~),
+          answer=Validated(
+            items=items.map(diagnostic_of),
+            shapes~,
+            protocols=protocols.map(p => {
+              id: p.id,
+              versions: p.versions,
+              peers: p.peers,
+            }),
+          ),
         ),
       )
     Blocked(seq~, reason~, kind~) =>
@@ -107,7 +196,19 @@ fn Runtime::reply_msg(self : Runtime, text : String) -> @workbench.Msg? {
         ),
       )
     }
-    TranscriptProgress(..) => None
+    TranscriptProgress(seq~, entries~, findings~, checked~, done~, summary~) =>
+      Some(
+        Answered(
+          seq~,
+          answer=Progressed(
+            entries=entries.map(entry_of),
+            findings=findings.map(finding_of),
+            checked~,
+            done~,
+            summary=summary.map(summary_of),
+          ),
+        ),
+      )
   }
 }
 
@@ -129,6 +230,13 @@ fn Runtime::file(
   index : Int32,
 ) -> (String, String)? {
   self.files.get(seq).bind(files => files.get(index))
+}
+
+///|
+fn Runtime::post(self : Runtime, request : @core.Request) -> Unit {
+  if self.worker is Some(worker) {
+    worker.post(@json.to_json(request).stringify())
+  }
 }
 
 ///|
@@ -177,6 +285,28 @@ fn Runtime::run(self : Runtime, effect : @workbench.Effect) -> Unit {
     Mark(items) => editor_mark(@workbench.EDITOR_ID, mark_json(items))
     MoveCursor(line~, column~) =>
       editor_go_to(@workbench.EDITOR_ID, line, column)
+    SendTranscriptStart(seq~, settings~) =>
+      self.post(
+        TranscriptStart(
+          seq~,
+          model=editor_text(@workbench.EDITOR_ID),
+          protocol=settings.protocol,
+          format=format_of(settings.format),
+          complete=settings.complete,
+          log_preset=settings.request_preset().map(preset_of),
+          version=settings.request_version(),
+          text=editor_text(@workbench.TRANSCRIPT_ID),
+        ),
+      )
+    SendTranscriptStep(seq~, count~) => self.post(TranscriptStep(seq~, count~))
+    SendTranscriptReset(seq~) => self.post(TranscriptReset(seq~))
+    LoadTranscript(text~, format~) =>
+      editor_show(@workbench.TRANSCRIPT_ID, text, transcript_language(format))
+    SetTranscriptLanguage(format) =>
+      editor_language(@workbench.TRANSCRIPT_ID, transcript_language(format))
+    FollowTranscript(line~) => editor_follow(@workbench.TRANSCRIPT_ID, line)
+    GoToTranscript(line~, column~) =>
+      editor_go_to(@workbench.TRANSCRIPT_ID, line, column)
     RestartWorker => {
       if self.worker is Some(worker) {
         worker.stop()
@@ -221,6 +351,15 @@ fn app(data : @workbench.PlaygroundData) -> @rabbita.Val[@rabbita.Html] {
         editor_create(@workbench.OUTPUT_ID, "", "json", true, () => (), (_, _) => {
           ()
         })
+        let (transcript, format) = m.first_transcript()
+        editor_create(
+          @workbench.TRANSCRIPT_ID,
+          transcript,
+          transcript_language(format),
+          false,
+          () => (runtime.dispatch)(TranscriptEdited),
+          (_, _) => (),
+        )
         runtime.start_worker()
         for effect in effects {
           runtime.run(effect)

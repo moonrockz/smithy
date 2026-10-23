@@ -613,9 +613,7 @@ fn results_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
     ]),
     panel(m.tab == ValidateTab, "pg-validate", validate_panel(m, emit)),
     panel(m.tab == TransformTab, "pg-transform", transform_panel(m, emit)),
-    panel(m.tab == TranscriptTab, "pg-transcript", [
-      @html.p(class="pg-empty", "This tab is not available yet."),
-    ]),
+    panel(m.tab == TranscriptTab, "pg-trpanel", transcript_panel(m, emit)),
   ])
 }
 

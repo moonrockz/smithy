@@ -4,20 +4,23 @@ fn start(
   text : String,
   format~ : TranscriptFormat = Markdown,
   complete~ : Bool = true,
-  log_preset? : String,
+  log_preset? : LogPreset,
   model~ : String = chat_model,
   protocol~ : String = "example.peers#EchoChat",
   version? : String,
 ) -> Response {
-  session.start_transcript(
-    seq=1,
-    model~,
-    protocol~,
-    format~,
-    complete~,
-    log_preset~,
-    text~,
-    version?,
+  handle(
+    session,
+    TranscriptStart(
+      seq=1,
+      model~,
+      protocol~,
+      format~,
+      complete~,
+      log_preset~,
+      version~,
+      text~,
+    ),
   )
 }
 
@@ -90,11 +93,61 @@ fn progress_of(
 }
 
 ///|
+fn checked_of(response : Response) -> Int32 raise {
+  match response {
+    TranscriptProgress(checked~, ..) => checked
+    other =>
+      fail("I expected progress, but found \{@json.to_json(other).stringify()}")
+  }
+}
+
+///|
+/// Start, then step `count` entries at a time to the end. The findings are the
+/// findings of every response in order, as the page appends them.
+fn run_steps(
+  session : Session,
+  text : String,
+  count~ : Int32 = 100000,
+  format~ : TranscriptFormat = Markdown,
+  complete~ : Bool = true,
+  log_preset? : LogPreset,
+  version? : String,
+) -> (Array[EntryView], Array[FindingView], SummaryView?) raise {
+  let (entries, findings, done, summary) = progress_of(
+    start(session, text, format~, complete~, log_preset?, version?),
+  )
+  let all = findings.copy()
+  let mut last = summary
+  let mut done = done
+  let mut seq = 2
+  while !done {
+    let (more, found, finished, summary) = progress_of(
+      handle(session, TranscriptStep(seq~, count~)),
+    )
+    assert_eq(more, [])
+    all.append(found)
+    done = finished
+    last = summary
+    seq += 1
+    if seq > 100000 {
+      fail("the transcript did not finish")
+    }
+  }
+  (entries, all, last)
+}
+
+///|
 test "validate: a clean model has no diagnostics and counts its shapes" {
   let session = Session::new()
   assert_eq(
     handle(session, Validate(seq=7, model=chat_model)),
-    Diagnostics(seq=7, items=[], shapes=13),
+    Diagnostics(seq=7, items=[], shapes=13, protocols=[
+      {
+        id: "example.peers#EchoChat",
+        versions: ["1.0"],
+        peers: ["client", "server"],
+      },
+    ]),
   )
 }
 
@@ -125,7 +178,7 @@ test "validate: an empty model is valid and has no shapes" {
   let session = Session::new()
   assert_eq(
     handle(session, Validate(seq=1, model="")),
-    Diagnostics(seq=1, items=[], shapes=0),
+    Diagnostics(seq=1, items=[], shapes=0, protocols=[]),
   )
 }
 
@@ -133,7 +186,7 @@ test "validate: an empty model is valid and has no shapes" {
 test "validate: an unbalanced brace is an error at the end of the text" {
   let session = Session::new()
   match handle(session, Validate(seq=3, model="namespace a\nstructure S {")) {
-    Diagnostics(seq=3, items=[item], shapes=0) => {
+    Diagnostics(seq=3, items=[item], shapes=0, protocols=[]) => {
       assert_eq(item.severity, "ERROR")
       assert_eq(item.file, "model.smithy")
       assert_eq(item.start_line, 2)
@@ -301,13 +354,12 @@ test "transform: an empty model gives an empty AST and no service" {
 ///|
 test "transcript: a wrong result gives the CLI findings" {
   let session = Session::new()
-  ignore(start(session, chat_markdown))
-  let (entries, findings, done, summary) = progress_of(
-    handle(session, TranscriptStep(seq=2, count=100)),
-  )
+  let (entries, _, _, _) = progress_of(start(session, chat_markdown))
+  let step = handle(session, TranscriptStep(seq=2, count=100))
+  let (_, findings, done, summary) = progress_of(step)
   assert_true(done)
   assert_eq(entries.length(), 4)
-  assert_true(entries.all(entry => entry.checked))
+  assert_eq(checked_of(step), 4)
   assert_eq(codes(findings), [
     "TypeMismatch", "RequiredMember", "MissingResponse",
   ])
@@ -349,6 +401,19 @@ test "transcript: a wrong result gives the CLI findings" {
 }
 
 ///|
+test "transcript: an entry goes to the other peer, and a reply names no receiver" {
+  for (text, format) in [(chat_markdown, Markdown), (chat_json, Json)] {
+    let (entries, _, _, _) = progress_of(start(Session::new(), text, format~))
+    assert_eq(entries.map(e => (e.index, e.sender, e.receiver)), [
+      (0, "client", Some("server")),
+      (1, "server", Some("client")),
+      (2, "server", None),
+      (3, "client", Some("server")),
+    ])
+  }
+}
+
+///|
 test "transcript: the JSON form gives the same findings as the Markdown form" {
   let run = (text, format) => {
     let session = Session::new()
@@ -373,24 +438,75 @@ test "transcript: stepping one entry at a time gives the findings of run all" {
   assert_eq(none, [])
   assert_false(done)
   let counts = []
-  let mut last = (
-    ([] : Array[EntryView]),
-    ([] : Array[FindingView]),
-    false,
-    (None : SummaryView?),
-  )
+  let found = []
+  let mut summary = None
   for i in 0..<4 {
-    last = progress_of(handle(session, TranscriptStep(seq=10 + i, count=1)))
-    counts.push(
-      (last.0.filter(e => e.checked).length(), last.1.length(), last.2),
+    let step = handle(session, TranscriptStep(seq=10 + i, count=1))
+    let (entries, findings, done, last) = progress_of(step)
+    assert_eq(entries, [])
+    found.append(findings)
+    summary = last
+    counts.push((checked_of(step), findings.length(), done))
+  }
+  assert_eq(counts, [(1, 0, false), (2, 0, false), (3, 1, false), (4, 2, true)])
+  assert_eq(found, expected)
+  assert_eq(summary, expected_summary)
+  // A step after the end gives nothing new.
+  let again = handle(session, TranscriptStep(seq=20, count=1))
+  assert_eq(progress_of(again).1, [])
+  assert_eq(checked_of(again), 4)
+}
+
+///|
+test "transcript: a step gives only what is new since the previous response" {
+  let session = Session::new()
+  let first = start(session, chat_markdown)
+  assert_eq(progress_of(first).0.length(), 4)
+  assert_eq(checked_of(first), 0)
+  let steps = [1, 2, 1].map(count => {
+    let step = handle(session, TranscriptStep(seq=2, count~))
+    let (entries, findings, _, _) = progress_of(step)
+    (entries.length(), codes(findings), checked_of(step))
+  })
+  assert_eq(steps, [
+    (0, [], 1),
+    (0, ["TypeMismatch"], 3),
+    (0, ["RequiredMember", "MissingResponse"], 4),
+  ])
+}
+
+///|
+test "transcript: a log of 20,000 lines costs the same for each step" {
+  let lines = []
+  for i in 0..<10000 {
+    lines.push(
+      "{\"dir\": \"request\", \"message\": {\"method\": \"postMessage\", \"params\": [\"Hello \{i}\"], \"id\": \{i}}}",
+    )
+    lines.push(
+      "{\"dir\": \"response\", \"message\": {\"result\": \"x\", \"error\": null, \"id\": \{i}}}",
     )
   }
-  assert_eq(counts, [(1, 0, false), (2, 0, false), (3, 1, false), (4, 3, true)])
-  assert_eq(last.1, expected)
-  assert_eq(last.3, expected_summary)
-  // A step after the end changes nothing.
-  let again = progress_of(handle(session, TranscriptStep(seq=20, count=1)))
-  assert_eq(again.1, expected)
+  let text = lines.join("\n") + "\n"
+  let session = Session::new()
+  let first = start(session, text, format=Jsonl, version="1.0")
+  assert_eq(progress_of(first).0.length(), 20000)
+  // Each step of 500 entries gives at most the findings of those entries: one
+  // TypeMismatch for each wrong result.
+  let mut steps = 0
+  let mut found = 0
+  let mut done = false
+  while !done {
+    let (entries, findings, finished, _) = progress_of(
+      handle(session, TranscriptStep(seq=2, count=500)),
+    )
+    assert_eq(entries, [])
+    assert_true(findings.length() <= 250)
+    found += findings.length()
+    done = finished
+    steps += 1
+  }
+  assert_eq(steps, 40)
+  assert_eq(found, 10000)
 }
 
 ///|
@@ -432,6 +548,10 @@ test "transcript: a JSONL log uses the preset and counts its lines" {
   let (entries, findings, done, _) = progress_of(
     start(session, chat_log, format=Jsonl, version="1.0"),
   )
+  assert_eq(entries.map(e => (e.sender, e.receiver, e.line)), [
+    ("client", Some("server"), Some(2)),
+    ("server", None, Some(3)),
+  ])
   assert_eq(entries.length(), 2)
   assert_eq(findings, [])
   assert_false(done)
@@ -462,7 +582,13 @@ test "transcript: a raw log has one sender and no correlation" {
   let session = Session::new()
   let raw = "{\"method\": \"postMessage\", \"params\": [\"a\"], \"id\": 1}\n"
   ignore(
-    start(session, raw, format=Jsonl, version="1.0", log_preset="raw:client"),
+    start(
+      session,
+      raw,
+      format=Jsonl,
+      version="1.0",
+      log_preset=Raw(sender="client"),
+    ),
   )
   let (_, findings, done, summary) = progress_of(
     handle(session, TranscriptStep(seq=2, count=100)),
@@ -495,27 +621,82 @@ test "transcript: a request that cannot start is blocked with a reason" {
   )
   assert_eq(
     blocked_reason(
-      start(session, chat_log, format=Jsonl, version="1.0", log_preset="raw"),
-    ),
-    "I expected a sender for the raw preset, as raw:<peer>.",
-  )
-  assert_eq(
-    blocked_reason(
       start(
         session,
         chat_log,
         format=Jsonl,
         version="1.0",
-        log_preset="raw:nobody",
+        log_preset=Raw(sender="nobody"),
       ),
     ),
     "I expected a peer of the protocol (client, server), but found 'nobody'.",
   )
+}
+
+///|
+test "transcript: the dir-message preset maps each dir value to its sender" {
+  let log =
+    #|{"dir": "in", "message": {"method": "postMessage", "params": ["a"], "id": 1}}
+    #|{"dir": "out", "message": {"result": 1, "error": null, "id": 1}}
+  let preset = DirMessage([
+    { value: "in", peer: "client", },
+    { value: "out", peer: "server", },
+  ])
+  let session = Session::new()
+  let (entries, findings, summary) = run_steps(
+    session,
+    log,
+    format=Jsonl,
+    version="1.0",
+    log_preset=preset,
+  )
+  assert_eq(entries.map(e => e.sender), ["client", "server"])
+  assert_eq(findings, [])
+  assert_true(summary.unwrap().valid)
+  // No direction: request is the first peer and response the second, so
+  // the value "in" is not known.
+  let (entries, findings, _) = run_steps(
+    session,
+    log,
+    format=Jsonl,
+    version="1.0",
+    log_preset=DirMessage([]),
+  )
+  assert_eq(entries, [])
+  assert_eq(codes(findings), ["InvalidTranscript", "InvalidTranscript"])
+}
+
+///|
+test "transcript: a log preset that the CLI refuses is blocked" {
+  let session = Session::new()
+  let blocked = (preset : LogPreset) => {
+    blocked_reason(
+      start(session, chat_log, format=Jsonl, version="1.0", log_preset=preset),
+    )
+  }
+  assert_eq(
+    blocked(DirMessage([{ value: "in", peer: "nobody", }])),
+    "I expected a peer of the protocol (client, server), but found 'nobody'.",
+  )
+  assert_eq(
+    blocked(
+      DirMessage([
+        { value: "in", peer: "client", },
+        { value: "in", peer: "server", },
+      ]),
+    ),
+    "The log preset gives the value 'in' twice.",
+  )
+  assert_eq(
+    blocked(DirMessage([{ value: "", peer: "client", }])),
+    "I expected a dir value for the peer client, but found none.",
+  )
+  // The CLI applies --log-preset to JSONL input only.
   assert_eq(
     blocked_reason(
-      start(session, chat_log, format=Jsonl, version="1.0", log_preset="csv"),
+      start(session, chat_markdown, log_preset=Raw(sender="client")),
     ),
-    "I expected the log preset dir-message or raw:<peer>, but found 'csv'.",
+    "A log preset applies only to a JSONL log.",
   )
 }
 
@@ -530,7 +711,14 @@ test "transcript: step with no transcript, and reset, are blocked or empty" {
   ignore(start(session, chat_markdown))
   assert_eq(
     handle(session, TranscriptReset(seq=5)),
-    TranscriptProgress(seq=5, entries=[], findings=[], done=false, summary=None),
+    TranscriptProgress(
+      seq=5,
+      entries=[],
+      findings=[],
+      checked=0,
+      done=false,
+      summary=None,
+    ),
   )
   assert_eq(
     blocked_reason(handle(session, TranscriptStep(seq=6, count=1))),
@@ -552,9 +740,10 @@ test "transcript: a problem of the document comes before the entries" {
 test "transcript: a document with a bad version stops at the reader finding" {
   let session = Session::new()
   let text = "---\nversion: 9\n---\n```jsonrpc client -> server\n{}\n```\n"
-  let (entries, findings, done, summary) = progress_of(start(session, text))
+  let first = start(session, text)
+  let (entries, findings, done, summary) = progress_of(first)
   assert_eq(entries.length(), 1)
-  assert_false(entries[0].checked)
+  assert_eq(checked_of(first), 0)
   assert_eq(codes(findings), ["InvalidTranscript"])
   assert_eq(findings[0].line, Some(2))
   assert_true(done)
@@ -580,6 +769,95 @@ test "transcript: a document with no version is blocked" {
 }
 
 ///|
+test "transcript: a version that differs from the document's is blocked, as in the CLI" {
+  let session = Session::new()
+  assert_eq(
+    blocked_reason(start(session, chat_markdown, version="2.0")),
+    "The version 2.0 conflicts with version 1.0 in the transcript.",
+  )
+  assert_eq(
+    blocked_reason(start(session, chat_json, format=Json, version="2.0")),
+    "The version 2.0 conflicts with version 1.0 in the transcript.",
+  )
+  // The same version as the document's runs as with no version.
+  let (_, same, _) = run_steps(session, chat_markdown, version="1.0")
+  let (_, none, _) = run_steps(session, chat_markdown)
+  assert_eq(same, none)
+  assert_eq(codes(same), ["TypeMismatch", "RequiredMember", "MissingResponse"])
+}
+
+///|
+test "transcript: a document that I cannot read gives no expectations, as the CLI without --expect" {
+  // The CLI matches only an --expect file against the read findings of such a
+  // document; the expect list in the document is not read. The playground has
+  // no --expect file.
+  let text =
+    #|---
+    #|version: 9
+    #|---
+    #|```jsonrpc client -> server
+    #|{"method": "echo", "params": ["x"], "id": 1}
+    #|```
+    #|
+    #|```jsonrpc-expect
+    #|[{"code": "MissingResponse"}]
+    #|```
+  let session = Session::new()
+  let (_, findings, done, summary) = progress_of(start(session, text))
+  assert_true(done)
+  assert_eq(codes(findings), ["InvalidTranscript"])
+  assert_eq(summary.unwrap().expectations, None)
+}
+
+///|
+test "validate: the answer lists the JSON-RPC protocols with their versions and peers" {
+  let session = Session::new()
+  let protocols = match handle(session, Validate(seq=1, model=chat_model)) {
+    Diagnostics(protocols~, ..) => protocols
+    other => fail(@json.to_json(other).stringify())
+  }
+  assert_eq(protocols, [
+    {
+      id: "example.peers#EchoChat",
+      versions: ["1.0"],
+      peers: ["client", "server"],
+    },
+  ])
+  // A model with errors does not assemble, so it lists no protocol.
+  match handle(session, Validate(seq=2, model=bad_model)) {
+    Diagnostics(protocols~, items~, ..) => {
+      assert_eq(items.length(), 1)
+      assert_eq(protocols, [])
+    }
+    other => fail(@json.to_json(other).stringify())
+  }
+  match handle(session, Validate(seq=3, model=calculator_model)) {
+    Diagnostics(protocols~, ..) => assert_eq(protocols, [])
+    other => fail(@json.to_json(other).stringify())
+  }
+}
+
+///|
+test "validate: the protocols are in the order of their shape IDs, as text" {
+  let model =
+    #|$version: "2"
+    #|namespace a
+    #|use smithy.rpc#jsonRpcProtocol
+    #|@jsonRpcProtocol(versions: ["2.0", "1.0"], peers: [{ name: "x" }, { name: "y" }])
+    #|structure Zz {}
+    #|@jsonRpcProtocol(versions: ["2.0"], peers: [{ name: "x" }, { name: "y" }])
+    #|structure Editor {}
+  match handle(Session::new(), Validate(seq=1, model~)) {
+    Diagnostics(protocols~, ..) =>
+      assert_eq(protocols.map(p => (p.id, p.versions)), [
+        ("a#Editor", ["2.0"]),
+        ("a#Zz", ["2.0", "1.0"]),
+      ])
+    other => fail(@json.to_json(other).stringify())
+  }
+}
+
+///|
 test "transcript: a JSONL log needs a version, as the CLI needs --version" {
   let session = Session::new()
   let reason = "A JSONL log gives no JSON-RPC version. I need version 1.0 or 2.0."
@@ -594,6 +872,7 @@ test "transcript: a JSONL log needs a version, as the CLI needs --version" {
           format=Jsonl,
           complete=true,
           log_preset=None,
+          version=None,
           text=chat_log,
         ),
       ),
@@ -635,7 +914,23 @@ test "wire: requests and responses survive a JSON round trip" {
       protocol="a#B",
       format=Jsonl,
       complete=true,
-      log_preset=Some("raw:client"),
+      log_preset=Some(
+        DirMessage([
+          { value: "in", peer: "client", },
+          { value: "out", peer: "server", },
+        ]),
+      ),
+      version=Some("2.0"),
+      text="t",
+    ),
+    TranscriptStart(
+      seq=4,
+      model="m",
+      protocol="a#B",
+      format=Jsonl,
+      complete=false,
+      log_preset=Some(Raw(sender="client")),
+      version=None,
       text="t",
     ),
     TranscriptStep(seq=5, count=1),
@@ -668,7 +963,8 @@ fn sample_state() -> ShareState {
     transcript: chat_markdown,
     tab: TranscriptTab,
     selector: Some("structure"),
-    log_preset: None,
+    log_preset: Some(DirMessage([{ value: "in", peer: "client", }])),
+    version: Some("2.0"),
     output: OpenRpc,
     protocol: "example.peers#EchoChat",
     format: Markdown,
@@ -794,6 +1090,7 @@ test "share: a state without selector and log preset still decodes" {
   let state : ShareState = @json.from_json(json)
   assert_eq(state.selector, None)
   assert_eq(state.log_preset, None)
+  assert_eq(state.version, None)
   let link = "v1." + base64url_encode(@flate.deflate_all(@utf8.encode(old)))
   assert_eq(decode_share(link), Ok(state))
 }
@@ -805,7 +1102,7 @@ test "wire: handle_json answers a request with the response in JSON" {
   let response : Response = @json.from_json(
     @json.parse(handle_json(session, request)),
   )
-  assert_eq(response, Diagnostics(seq=4, items=[], shapes=0))
+  assert_eq(response, Diagnostics(seq=4, items=[], shapes=0, protocols=[]))
 }
 
 ///|

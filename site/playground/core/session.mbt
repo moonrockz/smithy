@@ -13,6 +13,7 @@ pub fn handle(session : Session, request : Request) -> Response {
       format~,
       complete~,
       log_preset~,
+      version~,
       text~
     ) =>
       session.start_transcript(
@@ -22,6 +23,7 @@ pub fn handle(session : Session, request : Request) -> Response {
         format~,
         complete~,
         log_preset~,
+        version~,
         text~,
       )
     TranscriptStep(seq~, count~) => step_transcript(session, seq, count)
@@ -31,6 +33,7 @@ pub fn handle(session : Session, request : Request) -> Response {
         seq~,
         entries=[],
         findings=[],
+        checked=0,
         done=false,
         summary=None,
       )

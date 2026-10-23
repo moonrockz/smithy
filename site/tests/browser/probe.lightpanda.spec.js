@@ -19,7 +19,7 @@ test("a Web Worker runs the Smithy library and answers", async ({ lightpanda: pa
       }),
     siteUrl("playground/worker.js"),
   );
-  expect(JSON.parse(reply)).toEqual(["Diagnostics", { seq: 7, items: [], shapes: 1 }]);
+  expect(JSON.parse(reply)).toEqual(["Diagnostics", { seq: 7, items: [], shapes: 1, protocols: [] }]);
   expect(page.errors.filter((e) => e !== lightpandaQuirk)).toEqual([]);
 });
 

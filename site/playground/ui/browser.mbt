@@ -68,6 +68,14 @@ extern "js" fn download_text(name : String, text : String) -> Unit =
   #|}
 
 ///|
+extern "js" fn editor_language(id : String, language : String) -> Unit =
+  #|(id, language) => globalThis.smithyEditors.language(id, language)
+
+///|
+extern "js" fn editor_follow(id : String, line : Int32) -> Unit =
+  #|(id, line) => globalThis.smithyEditors.follow(id, line)
+
+///|
 extern "js" fn editor_mark(id : String, items : String) -> Unit =
   #|(id, items) => globalThis.smithyEditors.mark(id, items)
 

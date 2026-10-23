@@ -107,23 +107,36 @@ the new page, so that no other page runs the playground script.
 
 | Part | Job |
 |---|---|
-| `playground/samples` | the example picker: titles and repository paths (`manifest`), and `chat-error.smithy` |
+| `playground/samples` | the example pickers: the models (`manifest`, with `chat-error.smithy`) and the transcripts (`transcript_manifest`, with `chat-findings.md`, the chat with the three findings of the mockup), and the typed transcript format and log preset |
 | `playground/workbench` | the state of the page (`Model`, `update`, which returns `Effect`s) and its view; the pre-render and `ui` share the view |
 | `playground/ui` | js: mounts the workbench in `#pg-app`, runs the effects: the editor, the Worker and the timers |
 | `playground/worker` | js: the Web Worker. It reads a `Request` as JSON, calls `core.handle` and posts the `Response` |
 | `playground/core` | the Smithy calls, with no browser (see below) |
+| `playground/editor` | JavaScript: CodeMirror 6, the Smithy stream language (the token kinds of `highlight`) and bracket folding |
 
-The Worker runs one request at a time (a Validate or a Transform). A change or a Run while a request runs waits
-for it: the Run goes first, then the newest text. The Transform tab keeps its output editor in the page at all
-times (`#pg-output`), and the page text of the files stays in `ui`, not in the workbench model.
+The Worker runs one request at a time (a Validate, a Transform or a transcript request). A change or a button
+while a request runs waits for it. When it ends, a Run of the Transform tab goes first, then a Step, Run all or
+Reset of the Transcript tab, then the newest text, then the next group of a Run all. So a long Run all does not
+stop the Validate tab. The Transform tab keeps its output editor in the page at all times (`#pg-output`), and the
+page text of the files stays in `ui`, not in the workbench model.
 A `Blocked` response has a `kind` (`ModelErrors` or `Other`), so that the tab shows its own copy only for model
 errors. `Transformed` has the converter `warnings`, each as the CLI prints it.
-| `playground/editor` | JavaScript: CodeMirror 6, the Smithy stream language (the token kinds of `highlight`) and bracket folding |
+
+The Transcript tab lists the `@jsonRpcProtocol` structures that `Diagnostics` gives (a model with errors keeps
+the list of the last model that assembled). Step sends `TranscriptStart`, then `TranscriptStep` of one entry; Run
+all sends `TranscriptStep` in groups of 250 entries (`RUN_GROUP`), so the list fills as the findings come. Each
+`TranscriptProgress` gives only what is new: every entry at the start, then the new findings and the number of
+checked entries, and the workbench appends them. A JSONL log needs a version (the CLI `--version`) and a log
+preset (`LogPreset`: `DirMessage` with a `dir` value for each peer, or `Raw` with a sender, the CLI
+`--log-preset`, `--direction` and `--sender`). A change of the model, the transcript or a setting after the
+start makes the check old, and the next Step or Run all starts again. A list of more than 200 entries shows the
+150 entries near the last checked entry and the first 50 entries with findings, so a log of 20,000 lines does not
+stop the page. The workbench compares a `Log` of entries by its revision only.
 
 `scripts/site-build.mbtx` builds the two bundles: `moon build --target js --release` compiles `ui` and
 `worker`, then `bun build` writes `<out>/playground/ui.js` (from `playground/editor/main.js`, which imports the
 editor and then the MoonBit script) and `<out>/playground/worker.js`. The pre-render reads the samples from
-`--content` and puts them in the site data of the playground page.
+`--content` and puts them in the site data of the playground page: the models and the transcripts of the pickers.
 
 The page sends Validate 250 ms after the last change. Only one request runs at a time: a change while one runs
 waits, and the newest text goes when that request ends. Each request has a new `seq`. The page uses only the

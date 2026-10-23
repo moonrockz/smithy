@@ -35,9 +35,11 @@ project `chromium`.
 | `half-typed`: an unbalanced brace, a deleted `$version`, an empty editor, a burst of edits (review focus 1) | Lightpanda |
 | `worker`: a Worker that does not answer in 10 seconds is ended and a new one starts; a Worker that stops with an error is replaced at once, once | Lightpanda |
 | `transform`: JSON AST of the valid sample (first line `{`, `"smithy": "2.0"`), a selector, the blocked copy for model errors, the reason of the library for another block, the OpenAPI note, OpenRPC | Lightpanda |
+| `transcript`: the chat variant gives TypeMismatch, RequiredMember and MissingResponse under their entries; Step one entry at a time and Reset; the editor log with its version and preset (the summary of the README); the empty states for a model with errors and a model with no protocol; a change after the check | Lightpanda |
 | `typing`: key input fixes the model; Ctrl-Shift-[ and ] fold and unfold; token colors | Chromium |
 | `large`: a pasted 1 MB model, typing while the Worker runs, the stopped check (review focus 2); typing bursts on a 100 KB model end in its result | Chromium |
 | `transform` (Chromium): Copy through the clipboard API, Download, OpenAPI for a model that Validate marks with warnings shown, an old output after a change, no page scroll at 360 and 1440 px with an output | Chromium |
+| `transcript` (Chromium): a log of 20,000 lines with Run all while typing in the model editor (review focus 2: frame gaps, findings before the end, at most 200 rows, the page does not scroll); no page scroll at 360 and 1440 px with findings; a click on the line of an entry | Chromium |
 | `layout`: no page scroll at 360 px, stacked and side-by-side panes, links into and out of the playground | Chromium |
 
 Why some checks run on Chromium:

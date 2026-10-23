@@ -512,6 +512,8 @@ async fn render_playground() -> String {
         },
       ],
       selected: 1,
+      transcripts: [],
+      transcript: 0,
     }),
   }
   @rabbita.new(() => component(data, data.encode())).render(

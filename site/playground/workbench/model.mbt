@@ -9,6 +9,10 @@ pub(all) struct PlaygroundData {
   samples : Array[@samples.Sample]
   /// The index of the sample to open.
   selected : Int32
+  /// The transcripts of the Transcript tab picker.
+  transcripts : Array[@samples.TranscriptSample]
+  /// The index of the transcript to open.
+  transcript : Int32
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -121,6 +125,7 @@ pub extend BlockedBy with @debug.Debug::{to_repr}
 pub(all) enum Kind {
   Validating
   Transforming
+  Transcribing
 } derive(Eq, Debug)
 
 ///|
@@ -133,13 +138,27 @@ pub extend Kind with @debug.Debug::{to_repr}
 /// The answer of the Worker to a request. The text of the files stays in
 /// the page script; the model holds the names only.
 pub(all) enum Answer {
-  Validated(items~ : Array[Diagnostic], shapes~ : Int32)
+  /// The diagnostics and the JSON-RPC protocols of the model.
+  Validated(
+    items~ : Array[Diagnostic],
+    shapes~ : Int32,
+    protocols~ : Array[Protocol]
+  )
   Transformed(
     files~ : Array[String],
     warnings~ : Array[String],
     service~ : String?
   )
   NotRun(String, BlockedBy)
+  /// The change of a transcript check since the previous answer: every entry
+  /// for a start, and the new findings.
+  Progressed(
+    entries~ : Array[Entry],
+    findings~ : Array[Finding],
+    checked~ : Int32,
+    done~ : Bool,
+    summary~ : Summary?
+  )
 } derive(Eq, Debug)
 
 ///|
@@ -232,6 +251,24 @@ pub(all) struct Model {
   tx_selector : String
   tx : Transformation
   copy : Copy
+  /// The index of the transcript of the picker.
+  transcript : Int32
+  /// The JSON-RPC protocols of the newest model that assembled.
+  protocols : Array[Protocol]
+  settings : Settings
+  /// The number of changes to the transcript text so far.
+  text_edits : Int32
+  /// What the session of the Worker checks; `None` when the Worker has none.
+  session : Started?
+  /// What the newest transcript request was sent for.
+  tr_sent : Started
+  tr : Checking
+  /// A button of the tab that waits for the request that runs.
+  tr_pending : Action?
+  /// What the check still needs after the transcript request that runs.
+  goal : Goal
+  /// The newest transcript request.
+  tr_request : TrRequest
   /// The cursor, from 1.
   line : Int32
   column : Int32
@@ -266,6 +303,22 @@ pub(all) enum Msg {
   SampleChosen(Int32)
   TabChosen(Tab)
   DiagnosticChosen(line~ : Int32, column~ : Int32)
+  TranscriptSampleChosen(Int32)
+  /// The transcript text changed.
+  TranscriptEdited
+  ProtocolChosen(String)
+  FormatChosen(@samples.TranscriptFormat)
+  CompleteChosen(Bool)
+  VersionChosen(String)
+  PresetChosen(LogKind)
+  /// The `dir` value of the messages of `peer` changed.
+  DirectionEdited(peer~ : String, value~ : String)
+  SenderChosen(String)
+  StepClicked
+  RunAllClicked
+  ResetClicked
+  /// An entry of the list: its place in the transcript text.
+  EntryChosen(line~ : Int32, column~ : Int32)
 } derive(Eq, Debug)
 
 ///|
@@ -298,6 +351,19 @@ pub(all) enum Effect {
   MoveCursor(line~ : Int32, column~ : Int32)
   /// End the Worker and start a new one.
   RestartWorker
+  /// Send the editor texts of the model and the transcript to the Worker, to
+  /// start a transcript check.
+  SendTranscriptStart(seq~ : Int32, settings~ : Settings)
+  SendTranscriptStep(seq~ : Int32, count~ : Int32)
+  SendTranscriptReset(seq~ : Int32)
+  /// Replace the text and the language of the transcript editor.
+  LoadTranscript(text~ : String, format~ : @samples.TranscriptFormat)
+  SetTranscriptLanguage(@samples.TranscriptFormat)
+  /// Move the cursor of the transcript editor to a line, if the user does not
+  /// type in it.
+  FollowTranscript(line~ : Int32)
+  /// Move the cursor of the transcript editor to a place and focus it.
+  GoToTranscript(line~ : Int32, column~ : Int32)
 } derive(Eq, Debug)
 
 ///|
@@ -326,6 +392,23 @@ pub fn Model::start(data : PlaygroundData) -> (Model, Array[Effect]) {
   } else {
     0
   }
+  let transcript = if data.transcript >= 0 &&
+    data.transcript < data.transcripts.length() {
+    data.transcript
+  } else {
+    0
+  }
+  let settings : Settings = match data.transcripts.get(transcript) {
+    Some(sample) => Settings::of_sample(sample)
+    None =>
+      {
+        protocol: "",
+        format: Markdown,
+        complete: false,
+        version: "",
+        preset: DirMessage([]),
+      }
+  }
   let m = {
     data,
     sample,
@@ -346,6 +429,16 @@ pub fn Model::start(data : PlaygroundData) -> (Model, Array[Effect]) {
     tx_selector: DEFAULT_SELECTOR,
     tx: TxIdle,
     copy: NotCopied,
+    transcript,
+    protocols: [],
+    settings,
+    text_edits: 0,
+    session: None,
+    tr_sent: { model_edits: 0, text_edits: 0, settings, },
+    tr: TrIdle,
+    tr_pending: None,
+    goal: NoGoal,
+    tr_request: Starting,
     line: 1,
     column: 1,
   }
@@ -420,19 +513,34 @@ pub fn Model::checking(self : Model) -> Bool {
 
 ///|
 /// After the newest request ended: send what waits for the Worker. A
-/// transform that the user asked for goes first, then the newest text. One
-/// request runs at a time, so the time limit of a request measures that
+/// transform that the user asked for goes first, then a button of the
+/// Transcript tab, then the newest text, then the next group of a Run all.
+/// One request runs at a time, so the time limit of a request measures that
 /// request only, and no request waits in the Worker behind another.
 fn Model::next(self : Model, effects : Array[Effect]) -> (Model, Array[Effect]) {
   let m = { ..self, waiting: false, }
   if m.run_pending {
     let (sent, more) = m.send_transform()
-    (sent, [..effects, ..more])
-  } else if m.pending {
+    return (sent, [..effects, ..more])
+  }
+  let m = match m.tr_pending {
+    Some(action) => {
+      let (sent, more) = m.act(action)
+      if sent.waiting {
+        return (sent, [..effects, ..more])
+      }
+      sent
+    }
+    None => m
+  }
+  if m.pending {
     let (sent, more) = m.send_validate()
     (sent, [..effects, ..more])
+  } else if m.goal != NoGoal && m.can_step() {
+    let (sent, more) = m.send_step(m.goal)
+    (sent, [..effects, ..more])
   } else {
-    (m, effects)
+    ({ ..m, goal: NoGoal, }, effects)
   }
 }
 
@@ -471,11 +579,18 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
     Answered(seq~, answer~) => {
       guard seq == m.seq && m.waiting else { return (m, []) }
       match (m.inflight, answer) {
-        (Validating, Validated(items~, shapes~)) =>
+        (Validating, Validated(items~, shapes~, protocols~)) =>
           // The answer is for text that changed since: it does not show.
           if m.edits != m.sent_edits {
             m.next([])
           } else {
+            // A model with errors does not assemble and lists no protocol;
+            // the protocols of the previous model stay until it assembles.
+            let m = if protocols.is_empty() && items.any(d => d.is_error()) {
+              m
+            } else {
+              { ..m, protocols, }.with_settings(m.settings)
+            }
             { ..m, check: Checked(items~, shapes~), check_edits: m.sent_edits, }.next([
                 Mark(items),
               ],
@@ -507,25 +622,47 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
           }.next(if files.is_empty() { [] } else { [ShowFile(seq~, index=0)] })
         (Transforming, NotRun(reason, by)) =>
           { ..m, tx: TxBlocked(reason~, by~), }.next([])
+        (Transcribing, answer) => m.transcript_answer(seq, answer)
         // An answer of the other kind cannot come; the request ends.
         _ => m.next([])
       }
     }
     TimedOut(seq~) => {
       guard seq == m.seq && m.waiting else { return (m, []) }
+      // A new Worker has no transcript session.
+      let m = m.lost_session()
       match m.inflight {
         Validating => { ..m, check: Stopped, }.next([RestartWorker, Mark([])])
         Transforming => { ..m, tx: TxStopped, }.next([RestartWorker])
+        Transcribing =>
+          {
+            ..m,
+            tr: if m.tr_request == Resetting {
+              TrIdle
+            } else {
+              TrStopped
+            },
+          }.next([RestartWorker])
       }
     }
     // An error while no request runs restarts nothing: a Worker that cannot
     // load would restart again and again.
     WorkerFailed(message) => {
       guard m.waiting else { return (m, []) }
+      let m = m.lost_session()
       match m.inflight {
         Validating =>
           { ..m, check: Failed(message), }.next([RestartWorker, Mark([])])
         Transforming => { ..m, tx: TxFailed(message), }.next([RestartWorker])
+        Transcribing =>
+          {
+            ..m,
+            tr: if m.tr_request == Resetting {
+              TrIdle
+            } else {
+              TrFailed(message)
+            },
+          }.next([RestartWorker])
       }
     }
     SampleChosen(index) =>
@@ -599,5 +736,6 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         TxDone(seq~, file~, ..) => (m, [DownloadFile(seq~, index=file)])
         _ => (m, [])
       }
+    _ => transcript_update(m, msg)
   }
 }

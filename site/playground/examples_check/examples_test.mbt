@@ -28,9 +28,12 @@ let chat_markdown : String =
   #|```
 
 ///|
+/// One response of the core: the entries and findings are the change since
+/// the previous response.
 priv struct Progress {
   entries : Array[@core.EntryView]
   findings : Array[@core.FindingView]
+  checked : Int32
   done : Bool
   summary : @core.SummaryView?
 }
@@ -38,8 +41,8 @@ priv struct Progress {
 ///|
 fn progress_of(response : @core.Response) -> Progress raise {
   match response {
-    TranscriptProgress(entries~, findings~, done~, summary~, ..) =>
-      { entries, findings, done, summary, }
+    TranscriptProgress(entries~, findings~, checked~, done~, summary~, ..) =>
+      { entries, findings, checked, done, summary, }
     other =>
       fail("I expected progress, but found \{@json.to_json(other).stringify()}")
   }
@@ -53,18 +56,21 @@ fn start(
   format : @core.TranscriptFormat,
   text : String,
   complete~ : Bool = false,
-  log_preset? : String,
+  log_preset? : @core.LogPreset,
   version? : String,
 ) -> @core.Response {
-  session.start_transcript(
-    seq=1,
-    model~,
-    protocol~,
-    format~,
-    complete~,
-    log_preset~,
-    text~,
-    version?,
+  @core.handle(
+    session,
+    TranscriptStart(
+      seq=1,
+      model~,
+      protocol~,
+      format~,
+      complete~,
+      log_preset~,
+      version~,
+      text~,
+    ),
   )
 }
 
@@ -75,11 +81,12 @@ fn run_all(
   format : @core.TranscriptFormat,
   text : String,
   complete~ : Bool = false,
-  log_preset? : String,
+  log_preset? : @core.LogPreset,
   version? : String,
+  count~ : Int32 = 100000,
 ) -> (Array[@core.FindingView], @core.SummaryView) raise {
   let session = @core.Session::new()
-  ignore(
+  let first = progress_of(
     start(
       session,
       model,
@@ -91,11 +98,22 @@ fn run_all(
       version?,
     ),
   )
-  let { findings, done, summary, .. } = progress_of(
-    @core.handle(session, TranscriptStep(seq=2, count=100000)),
-  )
-  assert_true(done)
-  (findings, summary.unwrap())
+  // The page appends the findings of each response.
+  let findings = first.findings.copy()
+  let mut last = first
+  let mut steps = 0
+  while !last.done {
+    last = progress_of(@core.handle(session, TranscriptStep(seq=2, count~)))
+    assert_eq(last.entries, [])
+    findings.append(last.findings)
+    steps += 1
+    if steps > 100000 {
+      fail("the transcript did not finish")
+    }
+  }
+  // The checker read every entry.
+  assert_eq(last.checked, last.summary.unwrap().entries)
+  (findings, last.summary.unwrap())
 }
 
 ///|
@@ -174,7 +192,10 @@ test "examples: the editor log gives the summary of the README" {
     "example.peers#Editor",
     Jsonl,
     example("transcripts/editor.jsonl"),
-    log_preset="dir-message:in=client,out=server",
+    log_preset=DirMessage([
+      { value: "in", peer: "client", },
+      { value: "out", peer: "server", },
+    ]),
     version="2.0",
   )
   assert_eq(findings, [])
@@ -202,6 +223,7 @@ fn differential(
   format : @core.TranscriptFormat,
   text : String,
   complete : Bool,
+  version? : String,
 ) -> Unit raise {
   let (document, read_findings) = match format {
     Markdown => @rpc.read_markdown_transcript(text)
@@ -245,23 +267,20 @@ fn differential(
       .map(@core.FindingView::from_finding),
     }),
   }
-  // Run all
-  let all = run_all(model, protocol, format, text, complete~)
-  assert_eq(all.0, findings)
-  assert_eq(all.1, summary)
-  // One entry at a time
-  let session = @core.Session::new()
-  let mut last = progress_of(
-    start(session, model, protocol, format, text, complete~),
-  )
-  let mut steps = 0
-  while !last.done && steps < 1000 {
-    last = progress_of(@core.handle(session, TranscriptStep(seq=2, count=1)))
-    steps += 1
+  // Run all, then one entry at a time.
+  for count in [100000, 1] {
+    let all = run_all(
+      model,
+      protocol,
+      format,
+      text,
+      complete~,
+      version?,
+      count~,
+    )
+    assert_eq(all.0, findings)
+    assert_eq(all.1, summary)
   }
-  assert_true(last.done)
-  assert_eq(last.findings, findings)
-  assert_eq(last.summary, Some(summary))
 }
 
 ///|
@@ -297,16 +316,186 @@ test "differential: the core equals run_transcript for the examples" {
     example("transcripts/lifecycle-violation.json"),
     false,
   )
+  // A version that equals the document's version gives the same result.
+  differential(
+    peers,
+    "example.peers#EchoChat",
+    Markdown,
+    chat_markdown,
+    true,
+    version="1.0",
+  )
+  differential(
+    peers,
+    "example.peers#Editor",
+    Json,
+    example("transcripts/editor.json"),
+    false,
+    version="2.0",
+  )
+}
+
+///|
+test "differential: a version that conflicts with the document's is refused, as the CLI refuses it" {
+  // The CLI stops with "--version 2.0 conflicts with version 1.0 in <file>"
+  // (apps/smithy/transcript_cli.mbt, transcript_version) before it checks.
+  let session = @core.Session::new()
+  match
+    start(
+      session,
+      example("peers.smithy"),
+      "example.peers#EchoChat",
+      Markdown,
+      example("transcripts/chat.md"),
+      version="2.0",
+    ) {
+    Blocked(reason~, ..) =>
+      assert_eq(
+        reason, "The version 2.0 conflicts with version 1.0 in the transcript.",
+      )
+    other => fail(@json.to_json(other).stringify())
+  }
+}
+
+///|
+/// The checker as the CLI runs it on a log (apps/smithy/transcript_log_cli.mbt,
+/// `stream_log` and `check_lines`): the reader findings and the checker
+/// findings in line order, then the findings of the end.
+fn log_differential(
+  model : String,
+  protocol : String,
+  text : String,
+  preset : @core.LogPreset,
+  directions : Map[String, String],
+  version : String,
+  complete~ : Bool = false,
+) -> Unit raise {
+  let assembled = @rpc.loader().add_idl("model.smithy", model).assemble().model.unwrap()
+  let description = @rpc.ProtocolDescription::from_smithy(
+    assembled,
+    @smithy.ShapeId::parse(protocol).unwrap(),
+    @rpc.ProtocolVersion::parse(version).unwrap(),
+  )
+  let map : Map[String, @rpc.PeerName] = Map([])
+  for value, peer in directions {
+    map[value] = @rpc.PeerName::parse(peer).unwrap()
+  }
+  let reader = @rpc.LogReader::new(@rpc.LogMapping::dir_message(map))
+  let checker = @rpc.TranscriptChecker::new(
+    description,
+    completeness=if complete { @rpc.Complete } else { @rpc.Partial },
+    correlation=!reader.single_sender(),
+  )
+  fn line(location : @rpc.SourceLocation?) -> Int32 {
+    location.map(at => at.line).unwrap_or(0)
+  }
+
+  fn check_lines(
+    read : (Array[@rpc.TranscriptEntry], Array[@rpc.TranscriptFinding]),
+  ) -> Array[@rpc.TranscriptFinding] {
+    let (entries, problems) = read
+    let out = []
+    let mut problem = 0
+    for entry in entries {
+      while problem < problems.length() &&
+            line(problems[problem].location) < line(entry.location) {
+        out.push(problems[problem])
+        problem += 1
+      }
+      out.append(checker.feed(entry))
+    }
+    out.append(problems[problem:].to_owned())
+    out
+  }
+
+  let expected = check_lines(reader.push_text(text))
+  expected.append(check_lines(reader.end()))
+  let result = checker.finish()
+  expected.append(result.findings)
+  let errors = expected.filter(f => f.severity == @validation.Error).length()
+  let counts = reader.counts()
+  let summary : @core.SummaryView = {
+    valid: result.complete && errors == 0,
+    complete: result.complete,
+    entries: result.entries,
+    errors,
+    outstanding: result.outstanding,
+    correlation: result.correlation,
+    lines: counts.lines,
+    not_json: counts.not_json,
+    skipped: counts.skipped,
+    expectations: None,
+  }
+  for count in [100000, 250, 1] {
+    let (findings, got) = run_all(
+      model,
+      protocol,
+      Jsonl,
+      text,
+      complete~,
+      log_preset=preset,
+      version~,
+      count~,
+    )
+    assert_eq(findings, expected.map(@core.FindingView::from_finding))
+    assert_eq(got, summary)
+  }
+}
+
+///|
+test "differential: a log gives the findings of the CLI's log check" {
+  let peers = example("peers.smithy")
+  log_differential(
+    peers,
+    "example.peers#Editor",
+    example("transcripts/editor.jsonl"),
+    DirMessage([
+      { value: "in", peer: "client", },
+      { value: "out", peer: "server", },
+    ]),
+    { "in": "client", "out": "server" },
+    "2.0",
+  )
+  // A log with findings in the middle and lines that are not messages.
+  let lines = []
+  for i in 0..<600 {
+    lines.push(
+      "{\"dir\": \"in\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": \{i}, \"method\": \"textDocument/hover\", \"params\": {\"uri\": \"file:///a.txt\", \"line\": 1, \"character\": 2}}}",
+    )
+    if i % 7 == 0 {
+      lines.push("not json \{i}")
+    }
+    let result = if i % 5 == 0 { "3" } else { "\"docs\"" }
+    if i % 11 != 0 {
+      lines.push(
+        "{\"dir\": \"out\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": \{i}, \"result\": \{result}}}",
+      )
+    }
+  }
+  log_differential(
+    peers,
+    "example.peers#Editor",
+    lines.join("\n"),
+    DirMessage([
+      { value: "in", peer: "client", },
+      { value: "out", peer: "server", },
+    ]),
+    { "in": "client", "out": "server" },
+    "2.0",
+    complete=true,
+  )
 }
 
 ///|
 test "differential: a document with no version gives its read findings" {
-  let text = "---\nversion: 9\n---\n```jsonrpc client -> server\n{}\n```\n"
+  // The expect list of the document does not count, as in the CLI: it
+  // matches only an --expect file against these findings.
+  let text = "---\nversion: 9\n---\n```jsonrpc client -> server\n{}\n```\n\n```jsonrpc-expect\n[{\"code\": \"MissingResponse\"}]\n```\n"
   let (document, read_findings) = @rpc.read_markdown_transcript(text)
   assert_true(document.version is None)
   assert_true(read_findings.any(f => f.severity == @validation.Error))
   let session = @core.Session::new()
-  let { entries, findings, done, summary, } = progress_of(
+  let { entries, findings, done, summary, .. } = progress_of(
     start(
       session,
       example("peers.smithy"),
@@ -322,4 +511,6 @@ test "differential: a document with no version gives its read findings" {
   assert_false(summary.valid)
   assert_false(summary.complete)
   assert_eq(summary.errors, read_findings.length())
+  assert_true(document.expect is Some(_))
+  assert_eq(summary.expectations, None)
 }

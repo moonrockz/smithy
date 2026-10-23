@@ -8,6 +8,8 @@ fn data() -> PlaygroundData {
       { title: "Bad", path: "b.smithy", model: "namespace b\nstructure S {", },
     ],
     selected: 1,
+    transcripts: [],
+    transcript: 0,
   }
 }
 
@@ -43,7 +45,7 @@ fn run(m : Model, msgs : Array[Msg]) -> (Model, Array[Effect]) {
 /// A started page whose first check has its answer.
 fn answered() -> Model {
   let (m, _) = Model::start(data())
-  update(m, Answered(seq=1, answer=Validated(items=[], shapes=1))).0
+  update(m, Answered(seq=1, answer=Validated(items=[], shapes=1, protocols=[]))).0
 }
 
 ///|
@@ -94,7 +96,10 @@ test "answer: the answer to the newest request shows and marks the editor" {
   let (m, _) = Model::start(data())
   let (m, effects) = update(
     m,
-    Answered(seq=1, answer=Validated(items=[error_at(2)], shapes=0)),
+    Answered(
+      seq=1,
+      answer=Validated(items=[error_at(2)], shapes=0, protocols=[]),
+    ),
   )
   assert_false(m.waiting)
   assert_eq(m.check, Checked(items=[error_at(2)], shapes=0))
@@ -110,17 +115,26 @@ test "answer: an answer to an older request never replaces a newer result" {
   // An answer to the old request after the new one was sent is dropped.
   let (m, stale) = update(
     m,
-    Answered(seq=1, answer=Validated(items=[error_at(2)], shapes=0)),
+    Answered(
+      seq=1,
+      answer=Validated(items=[error_at(2)], shapes=0, protocols=[]),
+    ),
   )
   assert_eq(stale, [])
   assert_true(m.waiting)
   assert_eq(m.check, Checked(items=[], shapes=1))
-  let (m, _) = update(m, Answered(seq=2, answer=Validated(items=[], shapes=4)))
+  let (m, _) = update(
+    m,
+    Answered(seq=2, answer=Validated(items=[], shapes=4, protocols=[])),
+  )
   assert_eq(m.check, Checked(items=[], shapes=4))
   // A late answer for the old text after the new one changes nothing.
   let (late, effects) = update(
     m,
-    Answered(seq=1, answer=Validated(items=[error_at(2)], shapes=0)),
+    Answered(
+      seq=1,
+      answer=Validated(items=[error_at(2)], shapes=0, protocols=[]),
+    ),
   )
   assert_eq(late, m)
   assert_eq(effects, [])
@@ -145,7 +159,7 @@ test "timeout: a Worker that does not answer in time is replaced" {
   // dropped if it does.
   let (m2, late) = update(
     m,
-    Answered(seq=1, answer=Validated(items=[], shapes=1)),
+    Answered(seq=1, answer=Validated(items=[], shapes=1, protocols=[])),
   )
   assert_eq(m2, m)
   assert_eq(late, [])
@@ -154,7 +168,10 @@ test "timeout: a Worker that does not answer in time is replaced" {
 ///|
 test "timeout: the timer of an answered request does nothing" {
   let (m, _) = Model::start(data())
-  let (m, _) = update(m, Answered(seq=1, answer=Validated(items=[], shapes=1)))
+  let (m, _) = update(
+    m,
+    Answered(seq=1, answer=Validated(items=[], shapes=1, protocols=[])),
+  )
   let (m2, effects) = update(m, TimedOut(seq=1))
   assert_eq(m2, m)
   assert_eq(effects, [])
@@ -217,7 +234,7 @@ test "errors: warnings do not count as errors" {
     m,
     Answered(
       seq=1,
-      answer=Validated(items=[warning, error_at(2), danger], shapes=1),
+      answer=Validated(items=[warning, error_at(2), danger], shapes=1, protocols=[]),
     ),
   )
   assert_eq(m.errors(), 2)
@@ -231,14 +248,20 @@ test "answer: an answer for text that changed after the request is dropped" {
   let (m, _) = update(m, Edited)
   let (m, effects) = update(
     m,
-    Answered(seq=1, answer=Validated(items=[error_at(2)], shapes=0)),
+    Answered(
+      seq=1,
+      answer=Validated(items=[error_at(2)], shapes=0, protocols=[]),
+    ),
   )
   assert_eq(effects, [])
   assert_eq(m.check, Unchecked)
   assert_false(m.waiting)
   // The wait ends and the new text is checked.
   let (m, _) = update(m, Debounced(edits=1))
-  let (m, _) = update(m, Answered(seq=2, answer=Validated(items=[], shapes=1)))
+  let (m, _) = update(
+    m,
+    Answered(seq=2, answer=Validated(items=[], shapes=1, protocols=[])),
+  )
   assert_eq(m.check, Checked(items=[], shapes=1))
   assert_false(m.waiting)
 }
@@ -260,7 +283,10 @@ test "queue: the answer then posts the newest text once" {
   // The answer is for older text: it does not show, and the newest text goes.
   let (m, effects) = update(
     m,
-    Answered(seq=1, answer=Validated(items=[error_at(2)], shapes=0)),
+    Answered(
+      seq=1,
+      answer=Validated(items=[error_at(2)], shapes=0, protocols=[]),
+    ),
   )
   assert_eq(m.check, Unchecked)
   assert_eq(m.seq, 2)
@@ -271,7 +297,7 @@ test "queue: the answer then posts the newest text once" {
   ])
   let (m, effects) = update(
     m,
-    Answered(seq=2, answer=Validated(items=[], shapes=1)),
+    Answered(seq=2, answer=Validated(items=[], shapes=1, protocols=[])),
   )
   assert_eq(m.check, Checked(items=[], shapes=1))
   assert_eq(effects, [Mark([])])
@@ -283,7 +309,7 @@ test "queue: an answer before the wait of a change ends lets the wait send" {
   let (m, _) = update(m, Edited)
   let (m, effects) = update(
     m,
-    Answered(seq=1, answer=Validated(items=[], shapes=1)),
+    Answered(seq=1, answer=Validated(items=[], shapes=1, protocols=[])),
   )
   assert_eq(effects, [])
   assert_false(m.waiting)
@@ -344,7 +370,10 @@ test "stale: a result for older text does not move the cursor" {
   let (m, _) = Model::start(data())
   let (m, _) = update(
     m,
-    Answered(seq=1, answer=Validated(items=[error_at(2)], shapes=0)),
+    Answered(
+      seq=1,
+      answer=Validated(items=[error_at(2)], shapes=0, protocols=[]),
+    ),
   )
   assert_true(m.is_current())
   let (stale, _) = update(m, Edited)
@@ -464,7 +493,7 @@ test "queue: Run while a check runs waits, and goes before the pending check" {
   // The check ends: only the transform goes to the Worker.
   let (m, effects) = update(
     m,
-    Answered(seq=1, answer=Validated(items=[], shapes=1)),
+    Answered(seq=1, answer=Validated(items=[], shapes=1, protocols=[])),
   )
   // The answer is for older text, so it does not show.
   assert_eq(effects.length(), 2)
