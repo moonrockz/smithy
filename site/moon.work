@@ -1,0 +1,7 @@
+members = [
+  ".",
+  "../pkgs/artifact-resources",
+  "../pkgs/jmespath",
+  "../pkgs/smithy-syntax",
+  "../pkgs/smithy",
+]

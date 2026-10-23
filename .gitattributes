@@ -3,3 +3,4 @@
 *.mbt text eol=lf
 *.mbtx text eol=lf
 *.toml text eol=lf
+site/landing/sample/* text eol=lf

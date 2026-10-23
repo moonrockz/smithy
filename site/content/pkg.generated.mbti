@@ -1,0 +1,100 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/smithy-site/content"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+  "moonrockz/smithy-site/route",
+}
+
+// Values
+pub fn classify(String) -> (@route.Route, Group)?
+
+pub fn example_summary(String) -> String
+
+pub fn fixed_sources() -> Array[String]
+
+pub fn is_excluded(String) -> Bool
+
+pub fn lex_compare(String, String) -> Int
+
+pub fn normalize_path(String) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct Example {
+  dir : String
+  title : String
+  summary : String
+  files : Array[String]
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Example::build(Array[ExampleDir]) -> Array[Self]
+pub fn Example::equal(Self, Self) -> Bool
+pub fn Example::find(Array[Self], String) -> Self?
+pub fn Example::find_source(Array[Self], String) -> Self?
+pub fn Example::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+pub fn Example::not_equal(Self, Self) -> Bool
+pub fn Example::source(Self) -> String
+pub fn Example::to_json(Self) -> Json
+pub fn Example::to_repr(Self) -> @debug.Repr
+
+pub(all) struct ExampleDir {
+  dir : String
+  title : String
+  files : Array[String]
+} derive(Eq, @debug.Debug)
+pub fn ExampleDir::equal(Self, Self) -> Bool
+pub fn ExampleDir::not_equal(Self, Self) -> Bool
+pub fn ExampleDir::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Group {
+  Guides
+  Cli
+  Libraries
+  Cookbook
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Group::equal(Self, Self) -> Bool
+pub fn Group::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+pub fn Group::label(Self) -> String
+pub fn Group::not_equal(Self, Self) -> Bool
+pub fn Group::to_json(Self) -> Json
+pub fn Group::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Manifest {
+  pages : Array[Page]
+} derive(Eq, @debug.Debug)
+pub fn Manifest::build(Array[SourceFile]) -> Self
+pub fn Manifest::default_route(Self) -> @route.Route
+pub fn Manifest::equal(Self, Self) -> Bool
+pub fn Manifest::find(Self, @route.Route) -> Page?
+pub fn Manifest::find_source(Self, String) -> Page?
+pub fn Manifest::groups(Self) -> Array[(Group, Array[Page])]
+pub fn Manifest::neighbors(Self, @route.Route) -> (Page?, Page?)
+pub fn Manifest::not_equal(Self, Self) -> Bool
+pub fn Manifest::resolve(Self, @route.Route) -> @route.Route
+pub fn Manifest::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Page {
+  route : @route.Route
+  title : String
+  source : String
+  group : Group
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Page::equal(Self, Self) -> Bool
+pub fn Page::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+pub fn Page::not_equal(Self, Self) -> Bool
+pub fn Page::to_json(Self) -> Json
+pub fn Page::to_repr(Self) -> @debug.Repr
+
+pub(all) struct SourceFile {
+  path : String
+  title : String
+} derive(Eq, @debug.Debug)
+pub fn SourceFile::equal(Self, Self) -> Bool
+pub fn SourceFile::not_equal(Self, Self) -> Bool
+pub fn SourceFile::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

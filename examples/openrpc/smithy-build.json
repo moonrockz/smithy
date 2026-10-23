@@ -1,5 +1,6 @@
 {
   "version": "1.0",
+  "outputDirectory": "../../.dev/out/openrpc",
   "sources": ["model.smithy"],
   "plugins": {
     "openrpc": {"service": "example.rpc#Calculator"}

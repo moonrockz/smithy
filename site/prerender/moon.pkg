@@ -1,0 +1,19 @@
+import {
+  "moonbit-community/rabbita",
+  "moonrockz/smithy-site/route",
+  "moonrockz/smithy-site/content",
+  "moonrockz/smithy-site/markdown",
+  "moonrockz/smithy-site/search",
+  "moonrockz/smithy-site/data",
+  "moonrockz/smithy-site/shell",
+  "moonbitlang/async",
+  "moonbitlang/x/fs",
+  "moonbitlang/x/sys",
+  "moonbitlang/core/env",
+}
+
+warnings = "-alert_experimental"
+
+supported_targets = "native"
+
+pkgtype(kind: "executable")

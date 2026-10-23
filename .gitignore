@@ -2,6 +2,8 @@
 
 # MoonBit default build output directory.
 _build/
+# Output of `mise run site:pages -- --out _site` at the repository root.
+_site/
 # Local MoonBit package cache directory.
 .mooncakes/
 
@@ -79,3 +81,14 @@ dist/
 
 # Verified remote artifact cache, relative to a build configuration.
 .smithy/
+
+# Site
+
+site/dist
+site/.bundle
+site/node_modules
+
+# AI tool state
+
+.superpowers/
+.playwright-mcp/

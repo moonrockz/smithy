@@ -1,0 +1,188 @@
+///|
+/// Build one version of the site: the warren bundle and the pre-rendered pages.
+///
+/// Usage: `mise run site:build -- --content <dir> --channel release|next --site-root /smithy/
+/// --release-version vX.Y.Z --ref <git ref> --out <dir>`, or `moonx scripts/site-build.mbtx <the same>`.
+/// `--content` defaults to `.` and `--out` to `site/dist`. The other arguments go to the `prerender`
+/// executable as they are. Both paths may be relative to the working directory; the build runs inside
+/// `site/`, so the script makes them absolute first.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let default_out : String = "site/dist"
+
+///|
+let default_content : String = "."
+
+///|
+/// The arguments split into the `--content` value, the `--out` value and the other arguments in order.
+struct Split {
+  content : String
+  out : String
+  rest : Array[String]
+} derive(Eq, Debug)
+
+///|
+fn split_args(args : ArrayView[String]) -> Split {
+  let mut content = default_content
+  let mut out = default_out
+  let rest = []
+  let mut i = 0
+  while i < args.length() {
+    if args[i] == "--content" && i + 1 < args.length() {
+      content = args[i + 1]
+      i += 2
+    } else if args[i] == "--out" && i + 1 < args.length() {
+      out = args[i + 1]
+      i += 2
+    } else {
+      rest.push(args[i])
+      i += 1
+    }
+  }
+  { content, out, rest, }
+}
+
+///|
+/// The arguments of the `prerender` executable.
+fn prerender_args(
+  split : Split,
+  content : String,
+  out : String,
+) -> Array[String] {
+  ["--content", content, "--out", out, ..split.rest]
+}
+
+///|
+/// The message for a command that did not start, with the fix when it is known.
+fn spawn_failure_message(command : String, error : Error) -> String {
+  let base = "site:build: cannot start `\{command}`: \{error}"
+  if command == "warren" {
+    base + "\nInstall it with `moon install moonbit-community/warren@0.4.5`."
+  } else {
+    base
+  }
+}
+
+///|
+async fn run_checked(command : String, args : Array[String]) -> Unit {
+  let code = @process.run(
+    command,
+    args,
+    cwd="site",
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  ) catch {
+    error => {
+      eprintln(spawn_failure_message(command, error))
+      @sys.exit(1)
+      return
+    }
+  }
+  if code != 0 {
+    eprintln("site:build: `\{command}` failed")
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+}
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true, allow_exist=true)
+  for name in @fs.readdir(source) {
+    let from = source + "/" + name
+    let to = destination + "/" + name
+    if @fs.kind(from) is Directory {
+      copy_tree(from, to)
+    } else {
+      @fs.write_file(to, @fs.read_file(from))
+    }
+  }
+}
+
+///|
+async fn main {
+  let split = split_args(@env.args()[1:])
+  @fs.mkdir(split.out, recursive=true, allow_exist=true)
+  let out = @fs.realpath(split.out)
+  let content = @fs.realpath(split.content) catch {
+    _ => {
+      eprintln("site:build: --content \{split.content} does not exist")
+      @sys.exit(2)
+      return
+    }
+  }
+  // warren only accepts a dist directory inside site/, so bundle there and copy.
+  if @fs.exists("site/.bundle") {
+    @fs.rmdir("site/.bundle", recursive=true)
+  }
+  run_checked("warren", ["build", "--browser-entry", "app", "--dist", ".bundle"])
+  copy_tree("site/.bundle", out)
+  @fs.rmdir("site/.bundle", recursive=true)
+  run_checked(
+    "moon",
+    [
+      "run",
+      "--target",
+      "native",
+      "prerender",
+      "--",
+      ..prerender_args(split, content, out),
+    ],
+  )
+}
+
+///|
+test "split_args takes content and out and keeps the rest in order" {
+  let split = split_args([
+    "--content", "../release", "--channel", "release", "--out", "_site", "--ref",
+    "v1.0.0",
+  ])
+  assert_eq(split, {
+    content: "../release",
+    out: "_site",
+    rest: ["--channel", "release", "--ref", "v1.0.0"],
+  })
+}
+
+///|
+test "split_args defaults" {
+  assert_eq(split_args([]), { content: ".", out: "site/dist", rest: [], })
+}
+
+///|
+test "split_args leaves a flag without a value to prerender" {
+  assert_eq(split_args(["--out"]), {
+    content: ".",
+    out: "site/dist",
+    rest: ["--out"],
+  })
+}
+
+///|
+test "prerender_args puts the absolute paths first" {
+  let split = split_args(["--channel", "next"])
+  assert_eq(prerender_args(split, "/c", "/o"), [
+    "--content", "/c", "--out", "/o", "--channel", "next",
+  ])
+}
+
+///|
+test "a warren that cannot start names the install command" {
+  let message = spawn_failure_message("warren", Failure("no such file"))
+  assert_true(message.contains("moon install moonbit-community/warren@0.4.5"))
+  assert_true(message.contains("no such file"))
+}
+
+///|
+test "another command that cannot start has no install hint" {
+  let message = spawn_failure_message("moon", Failure("no such file"))
+  assert_true(!message.contains("moon install"))
+  assert_true(message.contains("`moon`"))
+}

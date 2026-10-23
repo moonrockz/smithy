@@ -1,0 +1,1 @@
+smithy validate value --shape example#Order --value order.json order.smithy

@@ -1,0 +1,88 @@
+///|
+/// Print the newest stable release tag (`vX.Y.Z`, prereleases ignored), or print nothing when there is none.
+///
+/// Usage: `mise run site:latest-tag`, or `moonx scripts/site-latest-tag.mbtx`.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+/// `[major, minor, patch]` of a tag that is exactly `vX.Y.Z`, or `None`.
+fn stable_numbers(tag : String) -> Array[Int32]? {
+  guard tag.has_prefix("v") else { return None }
+  let numbers = []
+  for part in tag[1:].split(".") {
+    guard !part.is_empty() && part.iter().all(c => c >= '0' && c <= '9') else {
+      return None
+    }
+    let mut n = 0
+    for c in part {
+      n = n * 10 + (c.to_int() - '0'.to_int())
+    }
+    numbers.push(n)
+  }
+  if numbers.length() == 3 {
+    Some(numbers)
+  } else {
+    None
+  }
+}
+
+///|
+/// The newest stable tag of `tags`, compared by number, not by text: `v0.10.0` is newer than `v0.9.0`.
+fn latest(tags : Array[String]) -> String? {
+  let mut best : (String, Array[Int32])? = None
+  for tag in tags {
+    guard stable_numbers(tag) is Some(numbers) else { continue }
+    match best {
+      None => best = Some((tag, numbers))
+      Some((_, current)) =>
+        if numbers.compare(current) > 0 {
+          best = Some((tag, numbers))
+        }
+    }
+  }
+  best.map(pair => pair.0)
+}
+
+///|
+async fn main {
+  let (code, output, errors) = @process.collect_output("git", [
+    "tag", "--list", "v*",
+  ])
+  if code != 0 {
+    eprintln("site:latest-tag: git tag failed: \{errors.text()}")
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+  let tags = output
+    .text()
+    .split("\n")
+    .map(line => line.trim().to_owned())
+    .collect()
+  if latest(tags) is Some(tag) {
+    println(tag)
+  }
+}
+
+///|
+test "latest compares numerically" {
+  assert_eq(latest(["v0.9.0", "v0.10.0", "v0.2.1"]), Some("v0.10.0"))
+  assert_eq(latest(["v1.0.0", "v0.99.99"]), Some("v1.0.0"))
+}
+
+///|
+test "latest ignores prereleases and other tags" {
+  assert_eq(
+    latest(["v0.5.0", "v0.6.0-rc1", "v0.6", "nightly", "v1.0.0+b1"]),
+    Some("v0.5.0"),
+  )
+}
+
+///|
+test "latest of no stable tag is none" {
+  assert_eq(latest([]), None)
+  assert_eq(latest(["v1.0.0-beta", "", "x"]), None)
+}

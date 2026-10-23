@@ -1,0 +1,11 @@
+import {
+  "moonbit-community/rabbita",
+  "moonrockz/smithy-site/shell",
+  "moonrockz/smithy-site/data",
+}
+
+warnings = "-alert_experimental"
+
+supported_targets = "js"
+
+pkgtype(kind: "executable")

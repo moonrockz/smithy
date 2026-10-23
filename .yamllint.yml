@@ -8,6 +8,7 @@ ignore:
   - .git/
   - .dev/  # gitignored scratch area
   - .superpowers/  # gitignored agent notes
+  - .playwright-mcp/  # gitignored browser tool snapshots
   - .beads/  # bd rewrites config.yaml with its own indentation
 
 rules:
