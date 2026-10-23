@@ -71,7 +71,9 @@ fn spawn_failure_message(command : String, error : Error) -> String {
   if command == "warren" {
     base + "\nInstall it with `moon install moonbit-community/warren@0.4.5`."
   } else if command == "bun" {
-    base + "\nInstall the pinned tools with `mise install`."
+    // site/mise.toml pins bun, and mise reads that file only in site/.
+    base +
+    "\nRun `mise trust` and `mise install` in site/ to install the pinned bun."
   } else {
     base
   }
@@ -240,9 +242,11 @@ test "another command that cannot start has no install hint" {
 }
 
 ///|
-test "a bun that cannot start names the install command" {
+test "a bun that cannot start names the install commands in site/" {
   let message = spawn_failure_message("bun", Failure("no such file"))
-  assert_true(message.contains("mise install"))
+  assert_true(
+    message.contains("Run `mise trust` and `mise install` in site/"),
+  )
 }
 
 ///|
