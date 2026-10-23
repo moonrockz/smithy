@@ -625,7 +625,7 @@ fn Model::configured_validation_events(
   let candidate_ids = match validation_string(definition, "selector") {
     Some(expression) => {
       let selector = Selector::parse(expression) catch { _ => return [] }
-      Some(selector.select_ids(self))
+      Some(Set::from_array(selector.select_ids(self)))
     }
     None => None
   }
@@ -665,6 +665,9 @@ fn Model::configured_validation_events(
 ///|
 fn Model::trait_target_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
+  // The shapes that each trait selector matches, computed once per trait.
+  // `None` marks a selector that does not parse.
+  let targets : Map[ShapeId, Set[String]?] = Map([])
   for _, shape in self.shapes {
     if shape.source.file == "<contracts>" || shape.id.namespace == "smithy.api" {
       continue
@@ -695,8 +698,20 @@ fn Model::trait_target_events(self : Model) -> Array[ValidationEvent] {
         expression != "*" else {
         continue
       }
-      let selector = Selector::parse(expression) catch { _ => continue }
-      if !selector.select_ids(self).contains(shape.id.to_string()) {
+      let matched = match targets.get(trait_id) {
+        Some(matched) => matched
+        None => {
+          let matched = Some(
+            Set::from_array(Selector::parse(expression).select_ids(self)),
+          ) catch {
+            _ => None
+          }
+          targets[trait_id] = matched
+          matched
+        }
+      }
+      guard matched is Some(matched) else { continue }
+      if !matched.contains(shape.id.to_string()) {
         events.push(
           validation_event(
             "TraitTarget",
