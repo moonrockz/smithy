@@ -237,10 +237,10 @@ fn Assembly::apply_roots(self : Assembly) -> Unit {
     }
     let builtin = self.raw
       .get(id.root().to_string())
-      .map(r => is_builtin_source(r.source.file))
+      .map(r => r.source.is_builtin())
       .unwrap_or(false)
     if (id.namespace == "smithy.api" || builtin) &&
-      !is_builtin_source(application.source.file) {
+      !application.source.is_builtin() {
       self.problem(
         "SM-MODEL-014",
         "I cannot apply traits to the built-in shape \{id}.",
@@ -423,8 +423,7 @@ fn Assembly::flatten_one(
       id.member is Some(name) else {
       continue
     }
-    if is_builtin_source(raw.source.file) &&
-      !is_builtin_source(application.source.file) {
+    if raw.source.is_builtin() && !application.source.is_builtin() {
       continue
     }
     guard members.get(name) is Some(Object(member_)) else {

@@ -57,16 +57,13 @@ test "JSONL preserves structured values, nulls and UTF-16 source offsets" {
   }
   assert_eq(diff_event_json(event), expected)
   let shape = @smithy.ShapeId::parse("example#Value$name").unwrap()
-  let source : @smithy.SourceLocation = {
-    file: "models.jar!/模型.smithy",
-    path: "",
-    span: Some(
-      @syntax.Span::new(
-        @syntax.Offset::new(42).unwrap(),
-        @syntax.Length::new(12).unwrap(),
-      ),
+  let source = @smithy.SourceLocation::new(
+    "models.jar!/模型.smithy",
+    span=@syntax.Span::new(
+      @syntax.Offset::new(42).unwrap(),
+      @syntax.Length::new(12).unwrap(),
     ),
-  }
+  )
   let sourced = { ..event, shape: Some(shape), source: Some(source), }
   let expected : Json = {
     "id": "Example",
@@ -84,6 +81,7 @@ test "JSONL preserves structured values, nulls and UTF-16 source offsets" {
     file: "model.json",
     path: "/shapes/example#Value/members/name",
     span: None,
+    kind: User,
   }
   let expected : Json = {
     "file": "model.json",

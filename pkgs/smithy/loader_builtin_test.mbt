@@ -125,3 +125,45 @@ test "a built-in source name is reserved for built-in definitions" {
     .assemble()
   assert_true(prelude.diagnostics.iter().any(d => d.code == "SM-MODEL-001"))
 }
+
+///|
+test "each loader has its own built-in sources" {
+  let builtin = tag_loader().add_idl("model.smithy", tagged_source()).assemble()
+  // The same name and text are a user source in a loader without the builtin.
+  let user = @smithy.Loader::new()
+    .add_idl("<example-tags>", tag_definitions())
+    .add_idl("model.smithy", tagged_source())
+    .assemble()
+  assert_eq(errors(builtin), [])
+  assert_eq(errors(user), [])
+  let builtin = builtin.model.unwrap()
+  let user = user.model.unwrap()
+  assert_true(builtin.get("example.tags#tag").unwrap().source.is_builtin())
+  assert_false(user.get("example.tags#tag").unwrap().source.is_builtin())
+  assert_eq(
+    user.get("example.tags#tag").unwrap().source.kind,
+    @smithy.SourceKind::User,
+  )
+  assert_false(exported_shapes(builtin).contains("example.tags#tag"))
+  assert_true(exported_shapes(user).contains("example.tags#tag"))
+  assert_eq(builtin.to_idl().keys().to_array(), ["example"])
+  let namespaces = user.to_idl().keys().to_array()
+  namespaces.sort()
+  assert_eq(namespaces, ["example", "example.tags"])
+}
+
+///|
+test "the prelude has the built-in kind and user sources have the user kind" {
+  let model = @smithy.Loader::new()
+  .add_idl("model.smithy", tagged_source())
+  .add_idl("tags.smithy", tag_definitions())
+  .assemble().model.unwrap()
+  assert_true(model.get("smithy.api#String").unwrap().source.is_builtin())
+  assert_false(model.get("example#Tagged").unwrap().source.is_builtin())
+  assert_eq(@smithy.SourceLocation::new("a.smithy"), {
+    file: "a.smithy",
+    path: "",
+    span: None,
+    kind: User,
+  })
+}

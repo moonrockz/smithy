@@ -169,7 +169,7 @@ pub fn Model::to_idl(self : Model) -> Map[String, String] raise {
   let groups : Map[String, Array[Shape]] = Map([])
   for id in sorted_keys(self.shapes) {
     let shape = self.shapes.get(id).unwrap()
-    if id.member is Some(_) || is_builtin_source(shape.source.file) {
+    if id.member is Some(_) || shape.source.is_builtin() {
       continue
     }
     let group = groups.get_or_init(id.namespace, () => [])

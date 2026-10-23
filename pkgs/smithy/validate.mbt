@@ -229,8 +229,7 @@ fn Assembly::validate(
     group.push(shape)
     names[folded] = group
     for trait_id, value in shape.traits {
-      if trait_id.to_string() == "smithy.api#enum" &&
-        !is_builtin_source(shape.source.file) {
+      if trait_id.to_string() == "smithy.api#enum" && !shape.source.is_builtin() {
         self.problem(
           "SM-MODEL-015",
           "I found the deprecated enum trait on \{id}; I recommend an enum shape.",
@@ -316,7 +315,7 @@ fn Assembly::validate(
             trait_id.to_string(),
           )
           self.validate_conditions(model, shape, value)
-        } else if !is_builtin_source(shape.source.file) ||
+        } else if !shape.source.is_builtin() ||
           model.metadata.contains("__validatePrelude__") {
           for
             event in model.node_validation_events(

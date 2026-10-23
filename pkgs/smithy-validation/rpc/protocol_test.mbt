@@ -304,6 +304,45 @@ test "the trait definitions are built in and stay out of exports" {
 }
 
 ///|
+/// Assemble peers.smithy with the trait definitions as a user source named
+/// like the built-in one.
+fn plain_peers() -> @smithy.Model raise {
+  let loaded = @smithy.Loader::new()
+    .add_idl("<smithy-rpc-traits>", @rpc.trait_definitions())
+    .add_idl("peers.smithy", peers_source())
+    .assemble()
+  guard loaded.model is Some(model) &&
+    !loaded.diagnostics.iter().any(d => d.severity == Error) else {
+    fail(loaded.diagnostics.map(d => d.message).join("\n"))
+  }
+  model
+}
+
+///|
+test "a plain loader gives the same model before and after rpc.loader runs" {
+  let before = plain_peers()
+  let earlier = @smithy.Loader::new()
+  .add_idl("peers.smithy", peers_source())
+  .add_idl("traits.smithy", @rpc.trait_definitions())
+  .assemble().model.unwrap()
+  let exported = earlier.to_json_ast().to_json()
+  ignore(@rpc.loader().add_idl("peers.smithy", peers_source()).assemble())
+  let after = plain_peers()
+  assert_eq(after, before)
+  assert_false(after.get("smithy.rpc#jsonRpc").unwrap().source.is_builtin())
+  assert_true(
+    after.to_json_ast().shapes.unwrap_or(Map([])).contains("smithy.rpc#jsonRpc"),
+  )
+  // A model assembled before still exports its trait definitions.
+  assert_eq(earlier.to_json_ast().to_json(), exported)
+  assert_true(
+    earlier.to_json_ast().shapes
+    .unwrap_or(Map([]))
+    .contains("smithy.rpc#method"),
+  )
+}
+
+///|
 test "the loader can add the protocol test traits" {
   let plain = @rpc.loader().assemble().model.unwrap()
   assert_true(plain.get("smithy.test#httpRequestTests") is None)

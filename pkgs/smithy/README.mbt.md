@@ -33,7 +33,9 @@ test {
 
 Use `add_json(name, text)` for JSON text, `add_ast(name, document)` for a
 typed `@syntax.JsonAst`, or `add(ModelInput)` for an input chosen at runtime.
-Names identify sources in diagnostics; `<prelude>` and `<contracts>` are reserved.
+Names identify sources in diagnostics. The names `<prelude>`, `<contracts>` and
+`<protocol-tests>` are reserved, and so are the names that this loader adds with
+`add_builtin_idl`.
 The loader does no file-system or network I/O. Repeated calls to `assemble`
 build fresh state without changing caller-owned AST documents.
 
@@ -42,8 +44,14 @@ as the traits of a protocol. The model treats that source like the prelude:
 `to_json_ast` and `to_idl` omit its shapes unless `include_prelude` is true,
 other sources cannot apply traits to its shapes, and a different definition of
 one of its shapes is an error. An exported model that holds the same
-definitions loads again without a conflict. After the call, the name is
-reserved for built-in definitions in every loader of the process.
+definitions loads again without a conflict. The source locations of its shapes
+have the kind `BuiltIn` (`SourceLocation::is_builtin`); all other inputs and
+defaults have the kind `User`. Each loader has its own built-in sources: the
+name is reserved only in the loader that adds it.
+
+`SourceLocation` has the field `kind : SourceKind`. Build a location with
+`SourceLocation::new(file, path=..., span=..., kind=...)`; `path` defaults to
+`""`, `span` to `None` and `kind` to `User`.
 
 ```mbt check
 ///|

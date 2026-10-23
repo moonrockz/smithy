@@ -10,7 +10,7 @@ pub(all) enum ModelInput {
 /// Repeated assembly creates fresh state and does not mutate its inputs.
 pub struct Loader {
   inputs : Array[ModelInput]
-  builtins : Array[ModelInput]
+  builtins : Array[BuiltinIdl]
   defaults : Array[@syntax.JsonAst]
   protocol_tests : Bool
 }
@@ -21,10 +21,11 @@ pub fn Loader::new(protocol_tests~ : Bool = false) -> Loader {
 }
 
 ///|
-/// Names of the sources added with Loader::add_builtin_idl. Export and
-/// validation know a shape only by its source name, so every loader in the
-/// process shares this set.
-let registered_builtin_sources : Set[String] = Set([])
+/// An IDL source of built-in definitions, added with Loader::add_builtin_idl.
+struct BuiltinIdl {
+  name : String
+  text : String
+}
 
 ///|
 /// Add an IDL source of built-in definitions, such as the trait definitions of
@@ -32,17 +33,15 @@ let registered_builtin_sources : Set[String] = Set([])
 /// omit its shapes unless include_prelude is true, and other sources cannot
 /// apply traits to its shapes or define them with different contents. An
 /// exported model that holds identical definitions loads without a conflict.
-/// The name is reserved for built-in definitions in every loader of the
-/// process after this call.
+/// The source locations of its shapes have the kind BuiltIn. In this loader,
+/// the name is reserved for these definitions: another input with the same
+/// name is an error. Other loaders are not affected.
 pub fn Loader::add_builtin_idl(
   self : Loader,
   name : String,
   text : String,
 ) -> Loader {
-  if !is_core_source(name) {
-    registered_builtin_sources.add(name)
-  }
-  self.builtins.push(Idl(name~, text~))
+  self.builtins.push({ name, text, })
   self
 }
 
@@ -108,11 +107,13 @@ priv struct Assembly {
   locations : Map[String, SourceLocation]
   bindings : Map[String, String]
   syntactic : Array[(String, SourceLocation)]
+  builtin_sources : Set[String]
 }
 
 ///|
-fn Assembly::new() -> Assembly {
+fn Assembly::new(builtin_sources~ : Set[String] = Set([])) -> Assembly {
   {
+    builtin_sources,
     raw: Map([]),
     duplicates: [],
     applications: [],
@@ -133,17 +134,29 @@ fn location(
   path~ : String = "",
   span? : @syntax.Span,
 ) -> SourceLocation {
-  { file, path, span, }
+  SourceLocation::new(file, path~, span?)
+}
+
+///|
+/// A location in an input of this assembly. The sources of built-in
+/// definitions get the kind BuiltIn.
+fn Assembly::location(
+  self : Assembly,
+  file : String,
+  path~ : String = "",
+  span? : @syntax.Span,
+) -> SourceLocation {
+  let kind : SourceKind = if self.builtin_sources.contains(file) {
+    BuiltIn
+  } else {
+    User
+  }
+  SourceLocation::new(file, path~, span?, kind~)
 }
 
 ///|
 fn is_core_source(name : String) -> Bool {
   name == "<prelude>" || name == "<contracts>" || name == "<protocol-tests>"
-}
-
-///|
-fn is_builtin_source(name : String) -> Bool {
-  is_core_source(name) || registered_builtin_sources.contains(name)
 }
 
 ///|
@@ -302,7 +315,7 @@ fn Assembly::add_shape(self : Assembly, raw : RawShape) -> Unit {
     return
   }
   if self.raw.get(raw.id) is Some(old) {
-    if is_builtin_source(old.source.file) && !is_builtin_source(raw.source.file) {
+    if old.source.is_builtin() && !raw.source.is_builtin() {
       // An exported document can include built-in definitions. Compare their
       // assembled contents below without merging user changes into it.
       self.duplicates.push((old, raw))
@@ -384,16 +397,16 @@ fn Assembly::add_document(
   name : String,
   document : @syntax.JsonAst,
 ) -> Unit {
-  self.version(document.smithy, location(name, path="/smithy"))
+  self.version(document.smithy, self.location(name, path="/smithy"))
   for key, value in document.metadata.unwrap_or(Map([])) {
     self.metadata_value(
       key,
       value,
-      location(name, path="/metadata/" + pointer(key)),
+      self.location(name, path="/metadata/" + pointer(key)),
     )
   }
   for id, shape in document.shapes.unwrap_or(Map([])) {
-    let source = location(name, path="/shapes/" + pointer(id))
+    let source = self.location(name, path="/shapes/" + pointer(id))
     let fields = object(@json.to_json(shape))
     if !document.smithy.has_prefix("2") &&
       (
@@ -432,7 +445,11 @@ fn Assembly::add_document(
 
 ///|
 pub fn Loader::assemble(self : Loader) -> LoadResult {
-  let assembly = Assembly::new()
+  let builtin_sources = Set(["<prelude>", "<contracts>", "<protocol-tests>"])
+  for builtin in self.builtins {
+    builtin_sources.add(builtin.name)
+  }
+  let assembly = Assembly::new(builtin_sources~)
   let idls : Array[(String, @syntax.IdlFile)] = []
   let jsons : Array[(String, @syntax.JsonAst)] = []
   let input_order : Array[(Bool, Int32)] = []
@@ -445,25 +462,22 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
       ModelInput::Idl(name="<protocol-tests>", text=protocol_test_traits_text()),
     )
   }
-  for input in self.builtins {
-    let name = match input {
-      Idl(name~, ..) | Json(name~, ..) | Ast(name~, ..) => name
-    }
-    if is_core_source(name) {
+  for builtin in self.builtins {
+    if is_core_source(builtin.name) {
       assembly.problem(
         "SM-MODEL-001",
-        "I reserve the source name \{name} for built-in definitions.",
-        location(name),
+        "I reserve the source name \{builtin.name} for built-in definitions.",
+        location(builtin.name),
       )
     } else {
-      inputs.push(input)
+      inputs.push(Idl(name=builtin.name, text=builtin.text))
     }
   }
   for input in self.inputs {
     let name = match input {
       Idl(name~, ..) | Json(name~, ..) | Ast(name~, ..) => name
     }
-    if is_builtin_source(name) {
+    if builtin_sources.contains(name) {
       assembly.problem(
         "SM-MODEL-001",
         "I reserve the source name \{name} for built-in definitions.",
@@ -483,7 +497,7 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
             event_id: "Model",
             severity: d.severity,
             message: d.message,
-            source: location(name, span=d.span),
+            source: assembly.location(name, span=d.span),
             shape: None,
           })
         }

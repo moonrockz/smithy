@@ -2,7 +2,7 @@
 fn Model::basic_trait_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
   for _, shape in self.shapes {
-    if is_builtin_source(shape.source.file) {
+    if shape.source.is_builtin() {
       continue
     }
     if shape.body is Member(target~) &&
@@ -86,7 +86,7 @@ fn Model::basic_trait_events(self : Model) -> Array[ValidationEvent] {
     guard ["", "input", "output", "error", "mixin"].contains(edge.label) &&
       self.shapes.get(edge.from) is Some(shape) &&
       self.shapes.get(edge.to) is Some(target) &&
-      !is_builtin_source(shape.source.file) &&
+      !shape.source.is_builtin() &&
       target.trait_value("smithy.api#deprecated") is Some(config) else {
       continue
     }
@@ -117,7 +117,7 @@ fn Model::constraint_trait_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
   let zero = NodeNumber::parse("0").unwrap()
   for _, shape in self.shapes {
-    if is_builtin_source(shape.source.file) {
+    if shape.source.is_builtin() {
       continue
     }
     if shape.trait_value("smithy.api#range") is Some(config) {
@@ -216,7 +216,7 @@ fn validation_trait_name(id : ShapeId) -> String {
 fn Model::trait_conflict_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
   for _, shape in self.shapes {
-    if is_builtin_source(shape.source.file) {
+    if shape.source.is_builtin() {
       continue
     }
     let conflicts : Array[String] = []
@@ -271,8 +271,7 @@ fn Model::exclusive_trait_events(self : Model) -> Array[ValidationEvent] {
       continue
     }
     for _, shape in self.shapes {
-      guard !is_builtin_source(shape.source.file) &&
-        shape.body is Structure(members) else {
+      guard !shape.source.is_builtin() && shape.body is Structure(members) else {
         continue
       }
       let matches : Array[String] = []
@@ -320,7 +319,7 @@ fn Model::exclusive_trait_events(self : Model) -> Array[ValidationEvent] {
 fn Model::json_name_events(self : Model) -> Array[ValidationEvent] {
   let events : Array[ValidationEvent] = []
   for _, shape in self.shapes {
-    guard !is_builtin_source(shape.source.file) &&
+    guard !shape.source.is_builtin() &&
       shape.body is (Structure(members) | Union(members)) else {
       continue
     }

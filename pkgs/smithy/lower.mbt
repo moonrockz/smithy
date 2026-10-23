@@ -297,7 +297,7 @@ fn Assembly::finish(self : Assembly) -> LoadResult {
   for (a, b) in self.duplicates {
     let a = flattened.get(a.id).unwrap_or(a)
     let b = self.flatten_one(b, flattened)
-    if is_builtin_source(a.source.file) && !is_builtin_source(b.source.file) {
+    if a.source.is_builtin() && !b.source.is_builtin() {
       let shape_traits_equal = try
         NodeValue::from_json(Json::object(object_field(a.fields, "traits"))) ==
         NodeValue::from_json(Json::object(object_field(b.fields, "traits")))
