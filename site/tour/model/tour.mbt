@@ -129,6 +129,17 @@ pub fn digest(files : Array[LessonFile]) -> String {
 }
 
 ///|
+/// The output of a transform as one text, as the lesson page shows it and as
+/// `output_contains` reads it: one file as it is; several files, as (name,
+/// text), joined with a line break in their order.
+pub fn output_text(files : Array[(String, String)]) -> String {
+  if files is [(_, text)] {
+    return text
+  }
+  files.map(file => file.1).join("\n")
+}
+
+///|
 /// `id|SEVERITY|shape`, with `-` for an event without a shape.
 pub fn event_key(id : String, severity : String, shape : String?) -> String {
   id + "|" + severity + "|" + shape.unwrap_or("-")

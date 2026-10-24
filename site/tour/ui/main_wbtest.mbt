@@ -41,8 +41,6 @@ test "a transform answers with the text of its files" {
     ),
     Answered(seq=2, answer=Converted("{}\n")),
   )
-  assert_eq(output_text([("a.smithy", "A\n"), ("b.smithy", "B\n")]), "A\n\nB\n")
-  assert_eq(output_text([]), "")
 }
 
 ///|
@@ -90,4 +88,46 @@ test "the worker error text names the message when there is one" {
     stopped_text("trap"),
     "The checker stopped: trap. Edit the model to try again.",
   )
+}
+
+///|
+fn test_runtime(sent : Array[@lesson.Msg]) -> Runtime {
+  let page : @model.LessonPage = {
+    slug: "l",
+    title: "L",
+    section: "S",
+    number: 1,
+    total: 1,
+    output: None,
+    selector: None,
+    spec: "",
+    files: [],
+    digest: "d",
+    previous: None,
+    next: None,
+    worker: "worker.js",
+    storage_key: "k",
+    playground: None,
+  }
+  { page, worker: None, number: 2, dispatch: msg => sent.push(msg), seq: 5, }
+}
+
+///|
+test "an error of an older Worker changes nothing" {
+  let sent : Array[@lesson.Msg] = []
+  let runtime = test_runtime(sent)
+  runtime.worker_failed(1, "trap")
+  assert_eq(sent, [])
+  runtime.worker_failed(2, "trap")
+  assert_eq(sent, [Answered(seq=5, answer=NotConverted(stopped_text("trap")))])
+}
+
+///|
+test "a reply of an older Worker changes nothing" {
+  let sent : Array[@lesson.Msg] = []
+  let runtime = test_runtime(sent)
+  runtime.worker_replied(1, "not json")
+  assert_eq(sent, [])
+  runtime.worker_replied(2, "not json")
+  assert_eq(sent, [Answered(seq=5, answer=NotConverted(mismatch_text))])
 }

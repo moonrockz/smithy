@@ -192,3 +192,14 @@ test "the page types round-trip through JSON" {
     assert_eq(back, p)
   }
 }
+
+///|
+test "output_text gives one file as it is" {
+  assert_eq(output_text([("model.json", "{}\n")]), "{}\n")
+}
+
+///|
+test "output_text joins two files with a line break" {
+  assert_eq(output_text([("a.smithy", "A\n"), ("b.smithy", "B\n")]), "A\n\nB\n")
+  assert_eq(output_text([]), "")
+}

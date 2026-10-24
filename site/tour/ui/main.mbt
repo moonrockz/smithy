@@ -21,18 +21,12 @@ priv struct Runtime {
   /// `None` before the start and after an error that stopped the Worker. The
   /// next request starts a new one.
   mut worker : Worker?
+  /// The number of the newest Worker. Each start gives a new one, so an
+  /// error or a reply of a Worker that the page replaced changes nothing.
+  mut number : Int32
   mut dispatch : (@lesson.Msg) -> Unit
   /// The number of the newest request that the page sent.
   mut seq : Int32
-}
-
-///|
-/// The output of a transform as one text: the text of each file, in order.
-fn output_text(files : Array[(String, String)]) -> String {
-  if files is [(_, text)] {
-    return text
-  }
-  files.map(file => file.1).join("\n")
 }
 
 ///|
@@ -81,7 +75,7 @@ fn reply_msg(text : String, newest : Int32) -> @lesson.Msg {
     Blocked(seq=-1, ..) => mismatch
     Diagnostics(seq~, items~, ..) => Answered(seq~, answer=Checked(items))
     Transformed(seq~, files~, ..) =>
-      Answered(seq~, answer=Converted(output_text(files)))
+      Answered(seq~, answer=Converted(@model.output_text(files)))
     Blocked(seq~, reason~, ..) => Answered(seq~, answer=NotConverted(reason))
     // The page sends no transcript request.
     TranscriptProgress(..) => mismatch
@@ -89,21 +83,44 @@ fn reply_msg(text : String, newest : Int32) -> @lesson.Msg {
 }
 
 ///|
+/// A reply of the Worker with this number.
+fn Runtime::worker_replied(
+  self : Runtime,
+  number : Int32,
+  text : String,
+) -> Unit {
+  if number == self.number {
+    (self.dispatch)(reply_msg(text, self.seq))
+  }
+}
+
+///|
+/// An error stopped the Worker with this number. A Worker that does not load
+/// would fail again at once, so the page starts a new one at the next request
+/// only.
+fn Runtime::worker_failed(
+  self : Runtime,
+  number : Int32,
+  message : String,
+) -> Unit {
+  guard number == self.number else { return }
+  if self.worker is Some(worker) {
+    worker.stop()
+  }
+  self.worker = None
+  (self.dispatch)(
+    Answered(seq=self.seq, answer=NotConverted(stopped_text(message))),
+  )
+}
+
+///|
 fn Runtime::start_worker(self : Runtime) -> Worker {
+  self.number = self.number + 1
+  let number = self.number
   let worker = Worker::start(
     self.page.worker,
-    text => (self.dispatch)(reply_msg(text, self.seq)),
-    message => {
-      // A Worker that does not load would fail again at once, so the page
-      // starts a new one at the next request only.
-      if self.worker is Some(worker) {
-        worker.stop()
-      }
-      self.worker = None
-      (self.dispatch)(
-        Answered(seq=self.seq, answer=NotConverted(stopped_text(message))),
-      )
-    },
+    text => self.worker_replied(number, text),
+    message => self.worker_failed(number, message),
   )
   self.worker = Some(worker)
   worker
@@ -168,7 +185,7 @@ fn Runtime::perform(
 
 ///|
 fn app(page : @model.LessonPage) -> @rabbita.Val[@rabbita.Html] {
-  let runtime = { page, worker: None, dispatch: _ => (), seq: 0, }
+  let runtime = { page, worker: None, number: 0, dispatch: _ => (), seq: 0, }
   let (model, emit) = @rabbita.create_state_with_init(
     init=emit => {
       let stored = match storage_read(page.storage_key) {

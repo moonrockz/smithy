@@ -329,7 +329,7 @@ code, pre, kbd { font-family: var(--mono); }
 .tour-btn:hover { border-color: var(--accent); }
 .tour-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; }
 .tour-outwrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.tour-off, .tour-panel.tour-off, .tour-outwrap.tour-off { display: none; }
+.tour-off { display: none; }
 .tour-note { margin: 0; padding: 8px 14px; color: var(--muted); font-size: 0.8125rem; }
 .tour-actions .tour-note { padding: 0; }
 .tour-note.tour-err { margin: 10px 14px; padding: 10px 12px; border-radius: 8px; background: var(--err-soft);

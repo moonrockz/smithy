@@ -8,16 +8,6 @@ fn files_of(files : Array[@model.LessonFile]) -> Array[(String, String)] {
 }
 
 ///|
-fn joined(files : Array[(String, String)]) -> String {
-  let buf = StringBuilder()
-  for file in files {
-    buf.write_string(file.1)
-    buf.write_char('\n')
-  }
-  buf.to_string()
-}
-
-///|
 fn show(items : Array[String]) -> String {
   "[" + items.join(", ") + "]"
 }
@@ -112,7 +102,7 @@ test "every lesson case gives the findings and the output that its expect.json n
               session,
               TransformFiles(seq=2, files~, output~, selector=lesson.selector),
             ) {
-            Transformed(files=out, ..) => joined(out)
+            Transformed(files=out, ..) => @model.output_text(out)
             Blocked(reason~, ..) =>
               fail(where_ + ": the output was blocked: " + reason)
             _ => fail(where_ + ": unexpected answer")
