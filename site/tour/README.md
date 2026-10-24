@@ -161,6 +161,11 @@ Write `lesson.md` in ASD-STE100 Simplified Technical English:
 - Every claim of the text is a case. When the text says that the Findings tab shows an error, add a case with
   that error in `events`. When the text says what the output contains, add a needle. A claim about the CLI or
   the API is an include block (see "CLI and API blocks"), which `mise run test:cli` or `moon test` runs.
+- A feature of this project that standard Smithy does not have, such as the `smithy.rpc` traits or the OpenRPC
+  output, has no Java reference. A lesson that teaches such a feature starts with a note `> **Our extension:**`
+  that says so, and links the docs page of the feature. Level 2 compares only the events of its cases. Its output
+  needles and its `blocked` reasons have level 1 only, so review the text against the README of the package. Make
+  no claim about Java that a reference result does not give. No test checks the note.
 - Never change an expectation to make a check pass. When the playground core is wrong, fix the core or record
   the difference on the allow list.
 

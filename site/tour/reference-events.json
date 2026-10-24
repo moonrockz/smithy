@@ -2059,6 +2059,10 @@
                 "TraitValue|ERROR|example#WeatherProtocol"
             ]
         },
+        "22-json-rpc/service-order": {
+            "digest": "2a94e71aa9f3ac1e24b6cc775b86f47e4507a810c62f7f12e8588c46f35b38c5",
+            "events": []
+        },
         "22-json-rpc/start": {
             "digest": "a99b0788a2f931d1ed917892dcabb9be82adda82b78e00ac5e20ab543512cbed",
             "events": []

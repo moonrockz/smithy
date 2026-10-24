@@ -152,16 +152,31 @@ let mixed_model : String =
   #|structure CityOutput { name: String }
 
 ///|
-/// Two JSON-RPC services. `OldRpc` sorts first and speaks version 1.0 only.
+/// Two JSON-RPC services. `LegacyRpc` sorts first and speaks version 1.0 only.
 let versions_model : String =
   #|$version: "2"
   #|namespace example.versions
   #|use smithy.rpc#jsonRpc
   #|use smithy.rpc#method
   #|@jsonRpc(versions: ["1.0"])
-  #|service OldRpc { version: "1", operations: [Ping] }
+  #|service LegacyRpc { version: "1", operations: [Ping] }
   #|@jsonRpc(versions: ["2.0"])
   #|service NewRpc { version: "1", operations: [Ping] }
+  #|@method(name: "ping", params: "either", positional: [], nullResult: true)
+  #|operation Ping {}
+
+///|
+/// Two JSON-RPC 2.0 services. `Zed` comes first in the file and has the
+/// shorter shape ID, but `Alphabet` comes first by shape ID.
+let order_model : String =
+  #|$version: "2"
+  #|namespace example.order
+  #|use smithy.rpc#jsonRpc
+  #|use smithy.rpc#method
+  #|@jsonRpc(versions: ["2.0"])
+  #|service Zed { version: "1", operations: [Ping] }
+  #|@jsonRpc(versions: ["2.0"])
+  #|service Alphabet { version: "1", operations: [Ping] }
   #|@method(name: "ping", params: "either", positional: [], nullResult: true)
   #|operation Ping {}
 

@@ -1243,9 +1243,19 @@ test "transform: OpenRPC keeps the rule of the CLI: the first service with jsonR
   )
   assert_eq(service_of(response), Some("example.versions#NewRpc"))
   let files = files_of(response)
-  // OldRpc sorts first but speaks 1.0 only.
+  // LegacyRpc sorts first but speaks 1.0 only.
   assert_true(files[0].1.contains("\"ping\""))
   assert_true(files[0].1.contains("\"title\": \"NewRpc\""))
+}
+
+///|
+test "transform: OpenRPC picks the first service in the code unit order of shape IDs" {
+  let response = handle(
+    Session::new(),
+    Transform(seq=1, model=order_model, output=OpenRpc, selector=None),
+  )
+  // Not the file order and not the length of the ID: both give Zed.
+  assert_eq(service_of(response), Some("example.order#Alphabet"))
 }
 
 ///|

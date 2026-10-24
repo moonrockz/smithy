@@ -5,7 +5,22 @@ fn blocked(seq~ : Int32, reason~ : String) -> Response {
 }
 
 ///|
-/// The user services of the model, by shape ID.
+/// Order by UTF-16 code unit, then by length. `String::compare` orders by
+/// length first, so the order of shape IDs cannot use it.
+fn compare_code_units(a : String, b : String) -> Int32 {
+  let n = if a.length() < b.length() { a.length() } else { b.length() }
+  for i in 0..<n {
+    let x = a.code_unit_at(i).to_int()
+    let y = b.code_unit_at(i).to_int()
+    if x != y {
+      return if x < y { -1 } else { 1 }
+    }
+  }
+  a.length().compare(b.length())
+}
+
+///|
+/// The user services of the model, in the code unit order of their shape IDs.
 fn user_services(model : @smithy.Model) -> Array[@smithy.Shape] {
   let services = []
   for _, shape in model.shapes {
@@ -13,7 +28,9 @@ fn user_services(model : @smithy.Model) -> Array[@smithy.Shape] {
       services.push(shape)
     }
   }
-  services.sort_by_key(shape => shape.id.to_string())
+  services.sort_by((a, b) => {
+    compare_code_units(a.id.to_string(), b.id.to_string())
+  })
   services
 }
 
@@ -44,9 +61,9 @@ fn has_protocol_trait(model : @smithy.Model, shape : @smithy.Shape) -> Bool {
 }
 
 ///|
-/// The first service by shape ID that the output can use. OpenRPC needs a
-/// `jsonRpc` trait for version 2.0, as the CLI does. OpenAPI needs a protocol
-/// trait.
+/// The first service in the order of shape IDs that the output can use.
+/// OpenRPC needs a `jsonRpc` trait for version 2.0, as the CLI does. OpenAPI
+/// needs a protocol trait.
 fn pick_service(
   model : @smithy.Model,
   output : Output,
