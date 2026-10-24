@@ -662,3 +662,18 @@ async test "the playground page without its data shows a message" {
   let html = render_route(Playground, None)
   assert_true(html.contains("The playground could not start"))
 }
+
+///|
+#cfg(not(target="js"))
+async test "every page links the icon set and shows the logo in the header" {
+  for route in [@route.Landing, @route.DocsIndex, @route.Playground] {
+    let html = render_route(route, None)
+    assert_true(html.contains("href=\"/smithy/favicon.ico\""))
+    assert_true(html.contains("href=\"/smithy/favicon-32.png\""))
+    assert_true(html.contains("href=\"/smithy/apple-touch-icon.png\""))
+    assert_true(html.contains("rel=\"apple-touch-icon\""))
+    assert_true(html.contains("src=\"/smithy/logo-56.png\""))
+    assert_true(html.contains("href=\"/smithy/manifest.json\""))
+    assert_false(html.contains("favicon.png"))
+  }
+}

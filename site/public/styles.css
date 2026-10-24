@@ -38,8 +38,7 @@ code, pre, kbd { font-family: var(--mono); }
   padding: 0.6rem var(--edge); background: var(--surface); border-bottom: 1px solid var(--border); }
 .ms-brand { display: flex; align-items: center; gap: 8px; color: var(--fg); }
 .ms-brand:hover { text-decoration: none; }
-.ms-logo { width: 1.75rem; height: 1.75rem; border-radius: 50%; flex: none;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+.ms-logo { width: 1.75rem; height: 1.75rem; flex: none; }
 .ms-word { font-weight: 800; font-size: 1.125rem; letter-spacing: -0.02em; }
 .ms-accent { color: var(--accent); }
 .ms-links { display: flex; gap: 1rem; flex: 1; }

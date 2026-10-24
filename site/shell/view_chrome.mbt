@@ -88,7 +88,13 @@ fn nav_bar(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       @html.nothing
     },
     @html.a(class="ms-brand", href=base, [
-      @html.span(class="ms-logo", ([] : Array[Html])),
+      @html.img(
+        class="ms-logo",
+        src=base + "logo-56.png",
+        alt="",
+        width=28,
+        height=28,
+      ),
       @html.span(class="ms-word", [
         @html.text("smithy"),
         @html.span(class="ms-accent", ".mbt"),
