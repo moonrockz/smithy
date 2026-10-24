@@ -25,7 +25,12 @@ fn string_of(json : Json, what : String) -> String raise {
 
 ///|
 /// The ids that the file must hold: a case lost in a merge fails.
-let expected_ids : Array[String] = ["value-consumer-valid", "value-consumer-invalid", "value-unknown-reject", "value-unknown-ignore", "value-json-names", "value-member-target", "value-not-json", "value-duplicate-key", "value-missing-target", "value-invalid-model", "value-unsupported-pattern", "value-unsupported-timestamp", "value-json-limit"]
+let expected_ids : Array[String] = [
+  "value-consumer-valid", "value-consumer-invalid", "value-unknown-reject", "value-unknown-ignore",
+  "value-json-names", "value-member-target", "value-not-json", "value-duplicate-key",
+  "value-missing-target", "value-invalid-model", "value-unsupported-pattern", "value-unsupported-timestamp",
+  "value-json-limit",
+]
 
 ///|
 fn load_cases() -> Array[CliCase] raise {
