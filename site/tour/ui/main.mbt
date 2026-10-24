@@ -77,8 +77,8 @@ fn reply_msg(text : String, newest : Int32) -> @lesson.Msg {
     Transformed(seq~, files~, ..) =>
       Answered(seq~, answer=Converted(@model.output_text(files)))
     Blocked(seq~, reason~, ..) => Answered(seq~, answer=NotConverted(reason))
-    // The page sends no transcript request.
-    TranscriptProgress(..) => mismatch
+    // The page sends no transcript or value check request.
+    TranscriptProgress(..) | DataChecked(..) => mismatch
   }
 }
 

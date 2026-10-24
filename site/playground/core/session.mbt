@@ -1,6 +1,7 @@
 ///|
-/// Run one request. A validate or transform request has no state. A transcript
-/// request starts, steps or resets the transcript that the session holds.
+/// Run one request. A validate, transform or check request has no state. A
+/// transcript request starts, steps or resets the transcript that the session
+/// holds.
 pub fn handle(session : Session, request : Request) -> Response {
   match request {
     Validate(seq~, model~) => {
@@ -49,6 +50,8 @@ pub fn handle(session : Session, request : Request) -> Response {
         summary=None,
       )
     }
+    CheckValue(seq~, files~, shape~, value~, options~) =>
+      check_value(seq, files, shape, value, options)
   }
 }
 

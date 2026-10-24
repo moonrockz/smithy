@@ -8,6 +8,9 @@ pub using @samples {
   type Output,
   type Tab,
   type ShareState,
+  type UnknownMembers,
+  type MemberNames,
+  type ValueOptions,
 }
 
 ///|
@@ -58,6 +61,17 @@ pub(all) enum Request {
   /// Check the next `count` entries: 1 for Step, a large number for Run all.
   TranscriptStep(seq~ : Int32, count~ : Int32)
   TranscriptReset(seq~ : Int32)
+  /// Check a JSON value against a data shape of a model, as
+  /// `smithy validate value` does. `files` are the model files, as (name,
+  /// text). `shape` is the absolute shape ID of the target: the CLI option
+  /// `--shape`. `value` is the text of the value.
+  CheckValue(
+    seq~ : Int32,
+    files~ : Array[(String, String)],
+    shape~ : String,
+    value~ : String,
+    options~ : ValueOptions
+  )
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -158,6 +172,31 @@ pub(all) struct ProtocolView {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+/// A line of a value or message check, with the fields that the CLI prints.
+pub(all) enum DataFinding {
+  /// A finding in the checked text. `path` is a JSON pointer; "" is the root.
+  /// `offset` is the place in the text when the check gives one (a JSON-RPC
+  /// message that does not parse).
+  Found(
+    code~ : String,
+    severity~ : String,
+    path~ : String,
+    shape~ : String,
+    message~ : String,
+    offset~ : Int32?
+  )
+  /// A problem that stopped the check before it checked the value. `source` is
+  /// what the CLI names in place of the input file: "--shape", "--service" or
+  /// a model file; `None` is the input.
+  Stopped(
+    code~ : String,
+    message~ : String,
+    source~ : String?,
+    offset~ : Int32?
+  )
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
 pub(all) enum Response {
   /// The diagnostics of the model, and its JSON-RPC protocols, by shape ID.
   /// A model that does not assemble lists no protocol.
@@ -193,4 +232,7 @@ pub(all) enum Response {
     done~ : Bool,
     summary~ : SummaryView?
   )
+  /// The result of a value or message check. `valid` is the result of the
+  /// CLI: false when a finding is an error or a problem stopped the check.
+  DataChecked(seq~ : Int32, valid~ : Bool, findings~ : Array[DataFinding])
 } derive(Eq, Debug, ToJson, FromJson)
