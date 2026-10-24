@@ -130,7 +130,7 @@ an entry removes `/a/0`, the item that was at `/a/1` is at `/a/0`.
 A `kind` of `openapi` is the same for the OpenAPI documents: it has `pointer`, no `side`, and removes the value at
 the pointer from both documents.
 
-The reference OpenAPI entry is `null` when the Java conversion fails. Our output must then be blocked. A document
+The reference OpenAPI entry is `null` when the model has no service with a protocol trait or the Java conversion fails. Our output must then be blocked. A document
 on one side and a failure on the other side fails the check. The Java harness converts the one service of the
 model that has a trait with the `protocolDefinition` trait. A case with more than one such service fails the
 harness. The model loads with the bundled protocol definitions, as the transform loads it.
@@ -226,6 +226,10 @@ lesson unless a test runs it.
 The pre-render reads `site/tour/lessons` from the `--content` directory of the build and writes `/tour/` (the
 contents) and `/tour/<slug>/` (one page for each lesson). The lesson page runs in the browser through the
 tour bundle; see `site/README.md`.
+
+A lesson page has the link "Open in playground" only when the lesson has one file and its output is not
+`OpenApi30` or `OpenApi31`. The playground validates without the bundled protocol definitions. It shows
+`Model.UnresolvedTrait` for a protocol trait, but the lesson calls the model clean (bug smithy-2qe.41.22).
 
 | Package | Job |
 |---|---|

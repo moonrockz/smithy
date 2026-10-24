@@ -2,11 +2,11 @@
 
 A [resource](https://smithy.io/2.0/spec/service-types.html#resource) is an entity with an identity and a set of operations. In this model, the service `Weather` binds the resource `City` in its list `resources`.
 
-A resource has [identifiers](https://smithy.io/2.0/spec/service-types.html#resource-identifiers) and properties. The identifier `cityId` targets the string `CityId`. The property `name` targets `String`. The [lifecycle operations](https://smithy.io/2.0/spec/service-types.html#resource-lifecycle-operations) of `City` are `create`, `read` and `list`. Each lifecycle operation must agree with the rules of its lifecycle.
+A resource can have [identifiers](https://smithy.io/2.0/spec/service-types.html#resource-identifiers) and properties. The identifier `cityId` targets the string `CityId`. The property `name` targets `String`. The [lifecycle operations](https://smithy.io/2.0/spec/service-types.html#resource-lifecycle-operations) of `City` are `create`, `read` and `list`. Each lifecycle operation must agree with the rules of its lifecycle.
 
-The operations use [target elision](https://smithy.io/2.0/spec/idl.html#idl-target-elision). The words `for City` refer to the resource. A member name with `$`, such as `$cityId`, gets its target from an identifier or a [property](https://smithy.io/2.0/spec/service-types.html#resource-properties) of `City`.
+`CreateCity` and `GetCity` use [target elision](https://smithy.io/2.0/spec/idl.html#idl-target-elision). The words `for City` refer to the resource. A member name with `$`, such as `$cityId`, gets its target from an identifier or a [property](https://smithy.io/2.0/spec/service-types.html#resource-properties) of `City`.
 
-Look at the OpenAPI output. It has a path for each operation, such as `/service/Weather/operation/GetCity`. The schema of `cityId` has `"pattern": "^[a-z0-9-]+$"`. This is the pattern of `CityId`.
+Look at the OpenAPI output. The protocol trait `@rpcv2Json` makes each operation a `POST` request to `/service/Weather/operation/` and the operation name. See [Protocols](../21-protocols/lesson.md). It has a path for each operation, such as `/service/Weather/operation/GetCity`. The schema of `cityId` has `"pattern": "^[a-z0-9-]+$"`. This is the pattern of `CityId`.
 
 Make these changes one at a time. Change the model back after each change.
 

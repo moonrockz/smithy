@@ -6,7 +6,7 @@ An operation lists the errors that it can return in `errors`. In this model, `Ge
 
 The trait [`@httpError`](https://smithy.io/2.0/spec/http-bindings.html#httperror-trait) sets the HTTP status code of an error. `CityNotFound` has the code 404.
 
-Look at the OpenAPI output. The operation `GetForecast` has the response `"404"` with the schema `CityNotFoundErrorContent`. It also has the response `"500"` with `ServiceUnavailableErrorContent`, because the service lists this error. `ServiceUnavailable` has no `@httpError`. The output gives the code 500 to this server error.
+Look at the OpenAPI output. The protocol trait `@rpcv2Json` makes each operation a `POST` request to `/service/Weather/operation/` and the operation name. See [Protocols](../21-protocols/lesson.md). The operation `GetForecast` has the response `"404"` with the schema `CityNotFoundErrorContent`. It also has the response `"500"` with `ServiceUnavailableErrorContent`, because the service lists this error. `ServiceUnavailable` has no `@httpError`. The output gives the code 500 to this server error.
 
 The trait [`@retryable`](https://smithy.io/2.0/spec/behavior-traits.html#retryable-trait) tells a client that it can send the request again after this error.
 
