@@ -189,6 +189,25 @@ jobs:
       - name: Run the task script tests
         run: mise run test:scripts
 
+  # The task runs `moon -C site`, not in site/: a moon shim in site/ would read the untrusted site/mise.toml
+  # (bun, Lightpanda), and this job installs neither.
+  tour:
+    name: Check the tour lessons
+    runs-on: ubuntu-latest
+    needs: [lint]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check the tour lessons
+        run: mise run tour:check
+
   # Smoke after a merge: run the release binaries of cross-build on a runner of each OS. It runs
   # only on a push to main and a manual run, and only when no trusted run has smoked the same inputs
   # (scripts/smoke.mbtx). A change outside the inputs, such as docs or tests, carries the evidence
@@ -261,7 +280,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [lint, build, build-windows, test, cross-build, test-native-zig, test-scripts, smoke-plan, smoke]
+    needs: [lint, build, build-windows, test, cross-build, test-native-zig, test-scripts, tour, smoke-plan, smoke]
     steps:
       - name: Check that every job passed or was skipped
         env:

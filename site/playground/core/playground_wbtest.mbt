@@ -199,7 +199,7 @@ test "validate: an unbalanced brace is an error at the end of the text" {
 ///|
 test "transform: JSON AST equals the library's export" {
   let session = Session::new()
-  let model = load(chat_model).model.unwrap()
+  let model = load([(MODEL_FILE, chat_model)]).model.unwrap()
   let expected = @syntax.encode_json_ast(model.to_json_ast()).stringify(
     indent=4,
   )
@@ -215,7 +215,7 @@ test "transform: JSON AST equals the library's export" {
 ///|
 test "transform: IDL has one file for each namespace" {
   let session = Session::new()
-  let model = load(chat_model).model.unwrap()
+  let model = load([(MODEL_FILE, chat_model)]).model.unwrap()
   let expected = model.to_idl().get("example.peers").unwrap()
   let files = files_of(
     handle(
@@ -253,12 +253,17 @@ test "transform: a selector lists the shape IDs, and a bad one is blocked" {
 ///|
 test "transform: JSON Schema equals the library's conversion" {
   let session = Session::new()
-  let model = load(chat_model).model.unwrap()
+  let model = load([(MODEL_FILE, chat_model)]).model.unwrap()
   let expected = @jsonschema.convert(model).stringify(indent=4)
   let files = files_of(
     handle(
       session,
-      Transform(seq=1, model=chat_model, output=JsonSchema, selector=None),
+      Transform(
+        seq=1,
+        model=chat_model,
+        output=Output::JsonSchema,
+        selector=None,
+      ),
     ),
   )
   assert_eq(files, [("schema.json", expected + "\n")])
@@ -1336,4 +1341,84 @@ test "transform: outputs that use no service report none" {
       None,
     )
   }
+}
+
+///|
+let file_a : String = "$version: \"2\"\nnamespace a\nuse b#B\nstructure A { b: B }\n"
+
+///|
+let file_b_bad : String = "$version: \"2\"\nnamespace b\nstructure B {\n    x: Missing\n}\n"
+
+///|
+let file_b_ok : String = "$version: \"2\"\nnamespace b\nstructure B {\n    x: String\n}\n"
+
+///|
+test "ValidateFiles resolves a use across two files and places each finding in its file" {
+  let session = Session::new()
+  let response = handle(
+    session,
+    ValidateFiles(seq=1, files=[("a.smithy", file_a), ("b.smithy", file_b_bad)]),
+  )
+  match response {
+    Diagnostics(items=[item], ..) => {
+      assert_eq(item.severity, "ERROR")
+      assert_eq(item.code, "Target.UnresolvedShape")
+      assert_eq(item.file, "b.smithy")
+      assert_eq(item.start_line, 4)
+      assert_eq(item.shape, Some("b#B$x"))
+    }
+    other => fail(@json.to_json(other).stringify())
+  }
+}
+
+///|
+test "ValidateFiles with one file gives the same answer as Validate" {
+  let session = Session::new()
+  for text in [chat_model, bad_model, file_b_ok, "structure {", ""] {
+    assert_eq(
+      handle(session, ValidateFiles(seq=1, files=[("model.smithy", text)])),
+      handle(session, Validate(seq=1, model=text)),
+    )
+  }
+}
+
+///|
+test "TransformFiles builds JSON Schema from two files" {
+  let session = Session::new()
+  let response = handle(
+    session,
+    TransformFiles(
+      seq=1,
+      files=[("a.smithy", file_a), ("b.smithy", file_b_ok)],
+      output=Output::JsonSchema,
+      selector=None,
+    ),
+  )
+  match response {
+    Transformed(files~, ..) => {
+      assert_eq(files[0].0, "schema.json")
+      assert_true(files[0].1.contains("\"B\""))
+      assert_true(files[0].1.contains("\"A\""))
+    }
+    other => fail(@json.to_json(other).stringify())
+  }
+}
+
+///|
+test "TransformFiles is blocked when a file has an error" {
+  let session = Session::new()
+  let response = handle(
+    session,
+    TransformFiles(
+      seq=1,
+      files=[("a.smithy", file_a), ("b.smithy", file_b_bad)],
+      output=Output::JsonSchema,
+      selector=None,
+    ),
+  )
+  assert_eq(blocked_kind(response), ModelErrors)
+  assert_eq(
+    blocked_reason(response),
+    "The model has 1 error. Fix it in the Validate tab, then run again.",
+  )
 }

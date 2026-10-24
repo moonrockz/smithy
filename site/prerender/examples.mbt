@@ -77,6 +77,7 @@ async fn write_examples(
       route: @route.Examples,
       markdown: None,
       playground: None,
+      tour: None,
     }),
   )
   entries.push({
@@ -99,6 +100,7 @@ async fn write_examples(
         route,
         markdown: Some(text),
         playground: None,
+        tour: None,
       }),
     )
     write_file(args.out + "/content/" + e.source(), text)

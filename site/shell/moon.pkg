@@ -16,6 +16,7 @@ import {
   "moonrockz/smithy-site/highlight",
   "moonrockz/smithy-site/data",
   "moonrockz/smithy-site/playground/workbench",
+  "moonrockz/smithy-site/tour/model",
   "moonbitlang/core/json",
   "moonbitlang/core/debug",
 }

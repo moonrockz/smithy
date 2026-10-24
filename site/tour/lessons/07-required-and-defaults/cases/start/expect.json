@@ -1,0 +1,1 @@
+{"events": [], "output_contains": ["\"required\": [\n                \"name\"\n            ]", "\"points\": {\n                    \"type\": \"number\",\n                    \"default\": 0\n                }"]}

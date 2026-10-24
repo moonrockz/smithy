@@ -677,3 +677,147 @@ async test "every page links the icon set and shows the logo in the header" {
     assert_false(html.contains("favicon.png"))
   }
 }
+
+///|
+#cfg(not(target="js"))
+fn simple_shapes_page() -> @model.LessonPage {
+  {
+    slug: "simple-shapes",
+    title: "Simple shapes",
+    section: "Basics",
+    number: 2,
+    total: 12,
+    output: None,
+    selector: None,
+    spec: "https://smithy.io/2.0/spec/simple-types.html",
+    files: [{ name: "model.smithy", text: "namespace example\n", }],
+    digest: "d",
+    previous: Some({ slug: "hello-smithy", title: "Hello, Smithy", }),
+    next: Some({ slug: "documentation", title: "Comments and documentation", }),
+    worker: "/smithy/playground/worker.js?v=v0.5.0",
+    storage_key: "smithy-tour:release:simple-shapes",
+    playground: Some("/smithy/playground/"),
+  }
+}
+
+///|
+#cfg(not(target="js"))
+async fn render_tour(
+  route : @route.Route,
+  tour : @model.TourPage,
+  markdown : String?,
+) -> String {
+  let data = { ..site_data(route, markdown), tour: Some(tour), }
+  @rabbita.new(() => component(data, data.encode())).render(
+    url="http://localhost" + @route.href(data.config.base, route),
+  )
+}
+
+///|
+#cfg(not(target="js"))
+async test "a lesson page has the top bar, the text, the spec link and the empty panes" {
+  let html = render_tour(
+    Lesson("simple-shapes"),
+    Page(simple_shapes_page()),
+    Some("# Simple shapes\n\nA simple shape holds one value.\n"),
+  )
+  assert_true(html.contains("<title>Simple shapes — smithy</title>"))
+  assert_true(html.contains("2 / 12 · Simple shapes"))
+  assert_true(html.contains("href=\"/smithy/tour/\""))
+  assert_true(html.contains("href=\"/smithy/tour/hello-smithy/\""))
+  assert_true(html.contains("href=\"/smithy/tour/documentation/\""))
+  assert_true(html.contains("A simple shape holds one value."))
+  assert_true(
+    html.contains("href=\"https://smithy.io/2.0/spec/simple-types.html\""),
+  )
+  for id in ["tour-app", "tour-editor", "tour-output"] {
+    assert_true(html.contains("id=\"\{id}\""))
+  }
+  assert_true(
+    html.contains("<div class=\"tour-editor\" id=\"tour-editor\"></div>"),
+  )
+  assert_true(
+    html.contains("<div class=\"tour-output\" id=\"tour-output\"></div>"),
+  )
+  assert_true(html.contains("src=\"/smithy/tour/ui.js?v=v0.5.0\""))
+  assert_true(!html.contains("playground/ui.js"))
+  // Tour pages have no docs sidebar.
+  assert_true(!html.contains("ms-sidebar"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "the first lesson has no Back link" {
+  let page = { ..simple_shapes_page(), number: 1, previous: None, }
+  let html = render_tour(Lesson("simple-shapes"), Page(page), Some("# S\n"))
+  assert_true(html.contains("1 / 12 · Simple shapes"))
+  assert_true(!html.contains(">← Back</a>"))
+  assert_true(html.contains(">Next →</a>"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "the contents page has one list for each section" {
+  let html = render_tour(
+    Tour,
+    Contents({
+      sections: [
+        (
+          "Basics",
+          [
+            { slug: "hello-smithy", title: "Hello, Smithy", },
+            { slug: "simple-shapes", title: "Simple shapes", },
+          ],
+        ),
+        ("Data modelling", [{ slug: "structures", title: "Structures", }]),
+      ],
+    }),
+    None,
+  )
+  assert_true(html.contains("<title>Tour — smithy</title>"))
+  assert_eq(html.split("class=\"tour-list\"").count(), 3)
+  guard html.find("<h2>Basics</h2>") is Some(basics) else { fail("no Basics") }
+  guard html.find("<h2>Data modelling</h2>") is Some(data) else {
+    fail("no Data modelling")
+  }
+  assert_true(basics < data)
+  assert_true(html.contains("href=\"/smithy/tour/structures/\""))
+  assert_true(!html.contains("tour/ui.js"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "the nav links to the tour after the playground, and the landing page links to it" {
+  let html = render_route(Landing, None)
+  guard html.find(">Playground</a>") is Some(playground) else {
+    fail("no Playground link")
+  }
+  guard html.find(">Tour</a>") is Some(tour) else { fail("no Tour link") }
+  assert_true(playground < tour)
+  assert_true(html.contains("href=\"/smithy/tour/\""))
+  assert_true(html.contains(">Take the tour</a>"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "a lesson route without its tour data is not found" {
+  let html = render_route(Lesson("nope"), None)
+  assert_true(html.contains("Page not found"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "the docs sidebar links to the tour" {
+  let html = render_route(Doc("cli"), Some("# smithy CLI\n"))
+  guard html.find("class=\"ms-sidebar\"") is Some(sidebar) else {
+    fail("no sidebar")
+  }
+  let rest = html[sidebar:].to_owned()
+  guard rest.find("</aside>") is Some(end) else { fail("no sidebar end") }
+  let aside = rest[:end].to_owned()
+  assert_true(
+    aside.contains(
+      "href=\"/smithy/tour/\" target=\"_self\" class=\"ms-side-link\">Tour</a>",
+    ),
+  )
+}

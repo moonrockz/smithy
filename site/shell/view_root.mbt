@@ -22,6 +22,11 @@ fn page_title(m : Model) -> String {
   match (m.route, m.manifest.find(m.route)) {
     (Landing, _) => "Smithy for MoonBit"
     (Playground, _) => "Playground — smithy"
+    (Tour, _) | (Lesson(_), _) =>
+      match tour_title(m) {
+        Some(title) => title + " — smithy"
+        None => "Page not found — smithy"
+      }
     (Examples, _) => "Examples — smithy"
     (Example(dir), _) =>
       match @content.Example::find(m.examples, dir) {
@@ -76,6 +81,16 @@ pub fn view(m : Model, emit : @rabbita.Emit[Msg], site_json : String) -> Html {
       } else {
         @html.nothing
       },
+      // A lesson loads the tour script, which mounts the lesson component.
+      if current_tour(m.route, m.tour) is Some(Page(_)) {
+        script(
+          src=m.config.versioned(base + "tour/ui.js"),
+          type_="module",
+          ([] : Array[Html]),
+        )
+      } else {
+        @html.nothing
+      },
     ]),
     body([
       nav_bar(m, emit),
@@ -91,6 +106,7 @@ fn content_view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   match (m.route, m.manifest.find(m.route)) {
     (Landing, _) => landing_view(m, emit)
     (Playground, _) => playground_view(m)
+    (Tour, _) | (Lesson(_), _) => tour_view(m)
     (Examples, _) => examples_index_view(m)
     (Example(dir), _) =>
       match @content.Example::find(m.examples, dir) {

@@ -131,6 +131,8 @@ pub(all) struct Model {
   pending_anchor : String?
   /// The data of the playground page; `None` on every other page.
   playground : @workbench.PlaygroundData?
+  /// The data of a tour page; `None` on every other page.
+  tour : @model.TourPage?
 } derive(Eq, Debug)
 
 ///|
@@ -166,15 +168,36 @@ let closed_search : SearchState = {
 }
 
 ///|
+/// The tour data when it is the data of `route`: the contents for `Tour`, the
+/// lesson of the slug for `Lesson`. `None` for any other pair.
+fn current_tour(
+  route : @route.Route,
+  tour : @model.TourPage?,
+) -> @model.TourPage? {
+  match (route, tour) {
+    (Tour, Some(Contents(_))) => tour
+    (Lesson(slug), Some(Page(page))) if page.slug == slug => tour
+    _ => None
+  }
+}
+
+///|
 /// The repository path of the Markdown file that a route shows, or `None`
-/// for a route with no such file (the landing page, the examples index, 404).
+/// for a route with no such file (the landing page, the examples index, the
+/// tour contents, 404). A lesson has one only on its own page: `tour` holds it.
 fn source_of(
   manifest : @content.Manifest,
   examples : Array[@content.Example],
+  tour : @model.TourPage?,
   route : @route.Route,
 ) -> String? {
   match route {
     Example(dir) => @content.Example::find(examples, dir).map(e => e.source())
+    Lesson(_) =>
+      match current_tour(route, tour) {
+        Some(Page(page)) => Some(@model.lesson_source(page.number, page.slug))
+        _ => None
+      }
     _ => manifest.find(route).map(p => p.source)
   }
 }
@@ -184,10 +207,11 @@ fn parse_page(
   config : @data.SiteConfig,
   manifest : @content.Manifest,
   examples : Array[@content.Example],
+  tour : @model.TourPage?,
   route : @route.Route,
   markdown : String,
 ) -> @markdown.Document {
-  let source = source_of(manifest, examples, route).unwrap_or("")
+  let source = source_of(manifest, examples, tour, route).unwrap_or("")
   @markdown.parse(
     markdown,
     @data.link_context(config, manifest, examples, source),
@@ -198,10 +222,19 @@ fn parse_page(
 pub fn Model::init(data : @data.SiteData) -> Model {
   let manifest = data.manifest()
   let page = match
-    (source_of(manifest, data.examples, data.route), data.markdown) {
+    (source_of(manifest, data.examples, data.tour, data.route), data.markdown) {
     (None, _) => NoContent
     (Some(_), Some(md)) =>
-      Ready(parse_page(data.config, manifest, data.examples, data.route, md))
+      Ready(
+        parse_page(
+          data.config,
+          manifest,
+          data.examples,
+          data.tour,
+          data.route,
+          md,
+        ),
+      )
     (Some(_), None) => Loading
   }
   {
@@ -217,5 +250,6 @@ pub fn Model::init(data : @data.SiteData) -> Model {
     counterpart: Unknown,
     pending_anchor: None,
     playground: data.playground,
+    tour: data.tour,
   }
 }

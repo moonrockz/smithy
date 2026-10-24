@@ -24,6 +24,21 @@ pub extend Channel with ToJson::{to_json}
 pub extend Channel with FromJson::{from_json}
 
 ///|
+/// The name of the channel on the command line and in storage keys.
+pub fn Channel::name(self : Channel) -> String {
+  match self {
+    Release => "release"
+    Next => "next"
+  }
+}
+
+///|
+/// The channel of `name`, or `None` for another name.
+pub fn Channel::parse(name : String) -> Channel? {
+  [Release, Next].iter().find_first(c => c.name() == name)
+}
+
+///|
 /// One built version of the site.
 pub(all) struct SiteConfig {
   /// Base path of this version, for example "/smithy/next/".
@@ -66,6 +81,8 @@ pub(all) struct SiteData {
   markdown : String?
   /// The samples and the Worker of the playground page; `None` on every other page.
   playground : @workbench.PlaygroundData?
+  /// The contents or the lesson of a tour page; `None` on every other page.
+  tour : @model.TourPage?
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -111,7 +128,13 @@ pub fn link_context(
       match manifest.find_source(path) {
         Some(page) => Some(page.route)
         None =>
-          @content.Example::find_source(examples, path).map(e => Example(e.dir))
+          match @model.slug_of_source(path) {
+            Some(slug) => Some(Lesson(slug))
+            None =>
+              @content.Example::find_source(examples, path).map(e => {
+                Example(e.dir)
+              })
+          }
       }
     },
     repo_url: github_repo,

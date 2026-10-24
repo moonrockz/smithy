@@ -49,6 +49,7 @@ fn site_data(route : @route.Route, markdown : String?) -> @data.SiteData {
     route,
     markdown,
     playground: None,
+    tour: None,
   }
 }
 
@@ -413,16 +414,16 @@ test "navigating to an example loads its README" {
 test "source_of: documentation pages and examples have one, other routes none" {
   let m = Model::init(site_data(Landing, None))
   assert_eq(
-    source_of(m.manifest, m.examples, Example("openrpc")),
+    source_of(m.manifest, m.examples, None, Example("openrpc")),
     Some("examples/openrpc/README.md"),
   )
   assert_eq(
-    source_of(m.manifest, m.examples, Doc("cli")),
+    source_of(m.manifest, m.examples, None, Doc("cli")),
     Some("apps/smithy/README.md"),
   )
-  assert_eq(source_of(m.manifest, m.examples, Example("nope")), None)
-  assert_eq(source_of(m.manifest, m.examples, Examples), None)
-  assert_eq(source_of(m.manifest, m.examples, Landing), None)
+  assert_eq(source_of(m.manifest, m.examples, None, Example("nope")), None)
+  assert_eq(source_of(m.manifest, m.examples, None, Examples), None)
+  assert_eq(source_of(m.manifest, m.examples, None, Landing), None)
 }
 
 ///|
@@ -514,4 +515,49 @@ test "a link into or out of the playground is a full page load" {
     Internal(@url.parse("http://localhost/smithy/playground/")),
   )
   assert_eq(step(landing, req), landing)
+}
+
+///|
+test "a link into or out of a tour page is a full page load" {
+  let landing = Model::init(site_data(Landing, None))
+  let lesson = Model::init(site_data(Lesson("simple-shapes"), None))
+  let contents = Model::init(site_data(Tour, None))
+  assert_true(link_action(landing, "/smithy/tour/simple-shapes/") is Load)
+  assert_true(link_action(landing, "/smithy/tour/") is Load)
+  assert_true(link_action(lesson, "/smithy/docs/cli/") is Load)
+  assert_true(link_action(lesson, "/smithy/tour/") is Load)
+  assert_true(link_action(contents, "/smithy/tour/simple-shapes/") is Load)
+  // A heading link of the lesson text stays on the page.
+  assert_true(
+    link_action(lesson, "/smithy/tour/simple-shapes/#simple-shapes") is Push,
+  )
+}
+
+///|
+test "current_tour gives the tour data only for its own route" {
+  let contents : @model.TourPage = Contents({ sections: [], })
+  let page : @model.TourPage = Page({
+    slug: "a",
+    title: "A",
+    section: "Basics",
+    number: 1,
+    total: 1,
+    output: None,
+    selector: None,
+    spec: "https://smithy.io/2.0/",
+    files: [],
+    digest: "d",
+    previous: None,
+    next: None,
+    worker: "w",
+    storage_key: "k",
+    playground: None,
+  })
+  assert_eq(current_tour(Tour, Some(contents)), Some(contents))
+  assert_eq(current_tour(Tour, Some(page)), None)
+  assert_eq(current_tour(Lesson("a"), Some(page)), Some(page))
+  assert_eq(current_tour(Lesson("b"), Some(page)), None)
+  assert_eq(current_tour(Lesson("a"), Some(contents)), None)
+  assert_eq(current_tour(Lesson("a"), None), None)
+  assert_eq(current_tour(Doc("cli"), Some(page)), None)
 }

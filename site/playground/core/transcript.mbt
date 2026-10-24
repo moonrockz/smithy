@@ -326,7 +326,7 @@ pub fn Session::start_transcript(
       reason="A JSONL log gives no JSON-RPC version. I need version 1.0 or 2.0.",
     )
   }
-  let assembled = match clean_model(load(model)) {
+  let assembled = match clean_model(load([(MODEL_FILE, model)])) {
     Ok(assembled) => assembled
     Err((reason, kind)) => return Blocked(seq~, reason~, kind~)
   }

@@ -15,6 +15,8 @@ fn sidebar(m : Model) -> Html {
     class=class_if("ms-sidebar", "ms-sidebar-open", m.menu_open),
     [
       ..groups.flatten(),
+      @html.p(class="ms-side-group", "Learn"),
+      @html.a(class="ms-side-link", href=@route.href(base, Tour), "Tour"),
       @html.p(class="ms-side-group", "Reference"),
       @html.a(
         class="ms-side-link",

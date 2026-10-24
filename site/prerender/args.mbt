@@ -49,10 +49,9 @@ pub fn parse_args(argv : Array[String]) -> Result[Args, String] {
     match argv[i] {
       "--content" => args = { ..args, content: value, }
       "--channel" =>
-        match value {
-          "release" => args = { ..args, channel: Release, }
-          "next" => args = { ..args, channel: Next, }
-          _ => return Err("--channel must be release or next, got \{value}")
+        match @data.Channel::parse(value) {
+          Some(channel) => args = { ..args, channel, }
+          None => return Err("--channel must be release or next, got \{value}")
         }
       "--site-root" => args = { ..args, site_root: with_slashes(value), }
       "--base" => args = { ..args, base: Some(with_slashes(value)), }

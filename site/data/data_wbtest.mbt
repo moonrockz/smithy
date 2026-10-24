@@ -31,6 +31,7 @@ fn sample() -> SiteData {
     route: Doc("smithy-syntax"),
     markdown: Some("# Configuration\n\nQuote \" < > & </script> done\n"),
     playground: None,
+    tour: None,
   }
 }
 
@@ -163,4 +164,46 @@ test "versioned adds the git ref of the build as the query" {
   assert_eq(tagged.versioned("/a.js"), "/a.js?v=v0.5.0")
   let odd = { ..config, git_ref: "refs/heads/a b&c", }
   assert_eq(odd.versioned("/a.js"), "/a.js?v=refs%2Fheads%2Fa%20b%26c")
+}
+
+///|
+test "link_context resolves a lesson text to its lesson" {
+  let data = sample()
+  let ctx = link_context(
+    data.config,
+    data.manifest(),
+    data.examples,
+    "site/tour/lessons/01-hello-smithy/lesson.md",
+  )
+  assert_eq(
+    (ctx.resolve)("site/tour/lessons/02-simple-shapes/lesson.md"),
+    Some(Lesson("simple-shapes")),
+  )
+  assert_eq(
+    (ctx.resolve)("site/tour/lessons/02-simple-shapes/files/model.smithy"),
+    None,
+  )
+}
+
+///|
+test "a tour page round-trips" {
+  let data : SiteData = {
+    ..sample(),
+    route: Tour,
+    markdown: None,
+    tour: Some(
+      Contents({ sections: [("Basics", [{ slug: "a", title: "A", }])], }),
+    ),
+  }
+  assert_eq(SiteData::decode(data.encode()), Some(data))
+}
+
+///|
+test "channel names round-trip" {
+  assert_eq(Release.name(), "release")
+  assert_eq(Next.name(), "next")
+  for c in [Release, Next] {
+    assert_eq(Channel::parse(c.name()), Some(c))
+  }
+  assert_eq(Channel::parse("beta"), None)
 }

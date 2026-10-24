@@ -1,0 +1,621 @@
+{
+    "cases": {
+        "01-hello-smithy/missing-namespace": {
+            "digest": "9a2246af9c3d57e04b6ac66775857b8e8b384a939f5c468661d3ad9d10d0b9d9",
+            "events": [
+                "Model|ERROR|-"
+            ]
+        },
+        "01-hello-smithy/start": {
+            "digest": "9e02d76db2e3c58b3b4d8e8308ea1589a2ba9adc03f3fe514a7f6e95cbe6a23c",
+            "events": []
+        },
+        "02-simple-shapes/count-as-string": {
+            "digest": "4b24fb4de1877a456dc4c74cb4c1e379382635d6bebe79e0957b4205d38d13c9",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "Reading": {
+                        "properties": {
+                            "count": {
+                                "type": "string"
+                            },
+                            "extra": {},
+                            "raw": {
+                                "type": "string"
+                            },
+                            "sensor": {
+                                "type": "string"
+                            },
+                            "takenAt": {
+                                "format": "date-time",
+                                "type": "string"
+                            },
+                            "valid": {
+                                "type": "boolean"
+                            },
+                            "value": {
+                                "type": "number"
+                            }
+                        },
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "02-simple-shapes/start": {
+            "digest": "7cd2a86e27880d938ba31c80b7ba18290297da5a5988abfc0e0a99d8c53efe68",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "Reading": {
+                        "properties": {
+                            "count": {
+                                "type": "number"
+                            },
+                            "extra": {},
+                            "raw": {
+                                "type": "string"
+                            },
+                            "sensor": {
+                                "type": "string"
+                            },
+                            "takenAt": {
+                                "format": "date-time",
+                                "type": "string"
+                            },
+                            "valid": {
+                                "type": "boolean"
+                            },
+                            "value": {
+                                "type": "number"
+                            }
+                        },
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "03-documentation/comment-after-traits": {
+            "digest": "bd05fc404b924298ae72602faa3bb5713fbf39a09d3e3e4bde86c4650f1272c3",
+            "events": [
+                "Model.BadDocumentationComment|WARNING|-"
+            ]
+        },
+        "03-documentation/member-documentation": {
+            "digest": "648b3bc6e0570f3a2e2511b74ec242e4097820434b71dd47cff4b0cb97a67172",
+            "events": []
+        },
+        "03-documentation/start": {
+            "digest": "5e9cc1e2677bcfb09714b95afe5001240f5b34c14fdb5423d24084dd276f4077",
+            "events": []
+        },
+        "03-documentation/two-lines": {
+            "digest": "99f7f97b70e35a42d0a558de5120a4cc1a8922dab79893503e05a5c9888efb21",
+            "events": []
+        },
+        "04-shape-ids/absolute-id": {
+            "digest": "eeb681fbb9c45f11646d7cecbe597d1f955c7c2133947732f99a9d23a8b631ba",
+            "events": []
+        },
+        "04-shape-ids/no-use": {
+            "digest": "7c41b40b9815d632a65737e02dfa1812609c94b910a9157e9ad6d063045b54c7",
+            "events": [
+                "Target.UnresolvedShape|ERROR|example.weather#Forecast$city"
+            ]
+        },
+        "04-shape-ids/start": {
+            "digest": "f2bf949a4c9ee3bec6cb10c5ef67d9f93279f65ee487d18bf5211022e09e6c4c",
+            "events": []
+        },
+        "05-reading-findings/start": {
+            "digest": "7092c282a5516e9bd3540cb2beb1246e7069ccb5236a19b25cd35c4dd9aece3f",
+            "events": [
+                "DeprecatedShape.example#Fahrenheit|WARNING|example#Reading$temperature"
+            ]
+        },
+        "05-reading-findings/suppress-error": {
+            "digest": "5f28eea878f9cc11c56df83d95b4c849a2f115236aec8910c7127d5303cdf857",
+            "events": [
+                "Target.UnresolvedShape|ERROR|example#Reading$place"
+            ]
+        },
+        "05-reading-findings/suppressed": {
+            "digest": "25d4ee463a96a544578bdb7fa49c676d32007d87af4a112c700cf3d3a0ef2dca",
+            "events": []
+        },
+        "06-structures/add-member": {
+            "digest": "72e37125815ebd85faeba52b38ae54525fb86556ac61ccf18288ab12f845faba",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "Address": {
+                        "properties": {
+                            "city": {
+                                "type": "string"
+                            },
+                            "street": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "Customer": {
+                        "properties": {
+                            "address": {
+                                "$ref": "#/definitions/Address"
+                            },
+                            "email": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "phone": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "06-structures/start": {
+            "digest": "ea8bcf62a490855f7c9503d6ce3bc48ab1bf31449e81fefae9cc836cf73b3012",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "Address": {
+                        "properties": {
+                            "city": {
+                                "type": "string"
+                            },
+                            "street": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "Customer": {
+                        "properties": {
+                            "address": {
+                                "$ref": "#/definitions/Address"
+                            },
+                            "email": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "07-required-and-defaults/required-email": {
+            "digest": "760e88510e17703161c7e0f97eac3ab6c57587ebe17f8a4518e6d35c03db0961",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "Customer": {
+                        "properties": {
+                            "email": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "points": {
+                                "default": 0,
+                                "type": "number"
+                            }
+                        },
+                        "required": [
+                            "email",
+                            "name"
+                        ],
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "07-required-and-defaults/start": {
+            "digest": "16d4e33b39632862fefeb9f39e1dce1b2d5aca80ecae550040823f4319800bda",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "Customer": {
+                        "properties": {
+                            "email": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "points": {
+                                "default": 0,
+                                "type": "number"
+                            }
+                        },
+                        "required": [
+                            "name"
+                        ],
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "07-required-and-defaults/wrong-default": {
+            "digest": "457133a514c654cbe0e731c753efe5dcb837692f592ca432acdaaee875cc05a7",
+            "events": [
+                "DefaultTrait|ERROR|example#Customer$points"
+            ]
+        },
+        "08-lists-and-maps/integer-key": {
+            "digest": "93b42cf4e713931744e2e5f600e3cd5587326c7b0bdc69497de5ff13db665d9e",
+            "events": [
+                "Target|ERROR|example#Stock"
+            ]
+        },
+        "08-lists-and-maps/start": {
+            "digest": "ee328bd909d8f9a54c6f8321aabb1f6f5bf6c71e892b3033704f2311e485c99e",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "Product": {
+                        "properties": {
+                            "stock": {
+                                "$ref": "#/definitions/Stock"
+                            },
+                            "tags": {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "Stock": {
+                        "additionalProperties": {
+                            "type": "number"
+                        },
+                        "propertyNames": {
+                            "type": "string"
+                        },
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "09-enums/add-member": {
+            "digest": "d6251021183c26830a592bc7034d18620b3ea3a1b41dfd155972def117d73ee7",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "Order": {
+                        "properties": {
+                            "priority": {
+                                "$ref": "#/definitions/Priority"
+                            },
+                            "state": {
+                                "$ref": "#/definitions/OrderState"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "OrderState": {
+                        "enum": [
+                            "PENDING",
+                            "shipped",
+                            "delivered",
+                            "CANCELLED"
+                        ],
+                        "type": "string"
+                    },
+                    "Priority": {
+                        "enum": [
+                            1,
+                            2
+                        ],
+                        "type": "number"
+                    }
+                }
+            }
+        },
+        "09-enums/duplicate-value": {
+            "digest": "6ee9fc8e4224930cda088a4473476f22c289fdb987b3d50f0eb9a24cb5894c1b",
+            "events": [
+                "EnumShape|ERROR|example#OrderState$DELIVERED"
+            ]
+        },
+        "09-enums/missing-int-value": {
+            "digest": "7d184fe2ad5e4fb159458ef0d0091a105aaf016ed7d4bc7034c717a11b1cd271",
+            "events": [
+                "EnumShape|ERROR|example#Priority$LOW"
+            ]
+        },
+        "09-enums/start": {
+            "digest": "e7c41331b883a87108d2ddb00fd0e3f08636e948ecf7a883efbce63b96b0e893",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "Order": {
+                        "properties": {
+                            "priority": {
+                                "$ref": "#/definitions/Priority"
+                            },
+                            "state": {
+                                "$ref": "#/definitions/OrderState"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "OrderState": {
+                        "enum": [
+                            "PENDING",
+                            "shipped",
+                            "delivered"
+                        ],
+                        "type": "string"
+                    },
+                    "Priority": {
+                        "enum": [
+                            1,
+                            2
+                        ],
+                        "type": "number"
+                    }
+                }
+            }
+        },
+        "10-unions/no-members": {
+            "digest": "5cd2dc119a29e8e463a9f52e1363cce36b1533d32f54eed1e043316d47077143",
+            "events": [
+                "Union|ERROR|example#PaymentMethod"
+            ]
+        },
+        "10-unions/start": {
+            "digest": "cc3f37042268f6573fee62b05eac96eeb26b52fccc5087eb2a9295fa954cb955",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "Card": {
+                        "properties": {
+                            "number": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "number"
+                        ],
+                        "type": "object"
+                    },
+                    "Order": {
+                        "properties": {
+                            "payment": {
+                                "$ref": "#/definitions/PaymentMethod"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "PaymentMethod": {
+                        "oneOf": [
+                            {
+                                "properties": {
+                                    "card": {
+                                        "$ref": "#/definitions/Card"
+                                    }
+                                },
+                                "required": [
+                                    "card"
+                                ],
+                                "title": "card",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "cash": {
+                                        "$ref": "#/definitions/Unit"
+                                    }
+                                },
+                                "required": [
+                                    "cash"
+                                ],
+                                "title": "cash",
+                                "type": "object"
+                            }
+                        ]
+                    },
+                    "Unit": {
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "11-constraints/max-32": {
+            "digest": "cce914cd9b2f5724250c2173d142ac0ffea2fad1817b41d3ee17b07ba44c0dfe",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "OrderLine": {
+                        "properties": {
+                            "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                            },
+                            "name": {
+                                "maxLength": 32,
+                                "minLength": 1,
+                                "type": "string"
+                            },
+                            "quantity": {
+                                "maximum": 100,
+                                "minimum": 1,
+                                "type": "number"
+                            }
+                        },
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "11-constraints/range-on-string": {
+            "digest": "087f41b30a3fa82df60bd20b4ab11489c609d19c9f497f5d543181dfb598851e",
+            "events": [
+                "TraitTarget|ERROR|example#ProductName"
+            ]
+        },
+        "11-constraints/start": {
+            "digest": "6432529b3c2ddec022a18041cd253484f39ff81eb537c5e16267f093d8498630",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "OrderLine": {
+                        "properties": {
+                            "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                            },
+                            "name": {
+                                "maxLength": 64,
+                                "minLength": 1,
+                                "type": "string"
+                            },
+                            "quantity": {
+                                "maximum": 100,
+                                "minimum": 1,
+                                "type": "number"
+                            }
+                        },
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "12-domain-modelling/start": {
+            "digest": "61c2e2d4fc4b39b1b99f709d704bcd0310eae0679a2bfdcd6359fac1d4fce618",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "CardPayment": {
+                        "properties": {
+                            "lastDigits": {
+                                "description": "The last four digits of the card number.",
+                                "pattern": "^[0-9]{4}$",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "lastDigits"
+                        ],
+                        "type": "object"
+                    },
+                    "Order": {
+                        "properties": {
+                            "id": {
+                                "description": "An order ID, such as `ORD-12345`.",
+                                "pattern": "^ORD-[0-9]{5}$",
+                                "type": "string"
+                            },
+                            "lines": {
+                                "items": {
+                                    "$ref": "#/definitions/OrderLine"
+                                },
+                                "minItems": 1,
+                                "type": "array"
+                            },
+                            "payment": {
+                                "$ref": "#/definitions/PaymentMethod"
+                            },
+                            "state": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/definitions/OrderState"
+                                    },
+                                    {
+                                        "default": "PLACED"
+                                    }
+                                ]
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "lines",
+                            "payment",
+                            "state"
+                        ],
+                        "type": "object"
+                    },
+                    "OrderLine": {
+                        "properties": {
+                            "quantity": {
+                                "maximum": 99,
+                                "minimum": 1,
+                                "type": "number"
+                            },
+                            "sku": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "quantity",
+                            "sku"
+                        ],
+                        "type": "object"
+                    },
+                    "OrderState": {
+                        "description": "The state of an order.",
+                        "enum": [
+                            "PLACED",
+                            "PAID",
+                            "SHIPPED",
+                            "CANCELLED"
+                        ],
+                        "type": "string"
+                    },
+                    "PaymentMethod": {
+                        "description": "One way to pay for an order.",
+                        "oneOf": [
+                            {
+                                "properties": {
+                                    "card": {
+                                        "$ref": "#/definitions/CardPayment"
+                                    }
+                                },
+                                "required": [
+                                    "card"
+                                ],
+                                "title": "card",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "invoice": {
+                                        "$ref": "#/definitions/Unit"
+                                    }
+                                },
+                                "required": [
+                                    "invoice"
+                                ],
+                                "title": "invoice",
+                                "type": "object"
+                            }
+                        ]
+                    },
+                    "Unit": {
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "12-domain-modelling/unknown-state": {
+            "digest": "e85f0d711524af14cb757bf6126a1308ff470da46f5463b2119aba58fc4e3d48",
+            "events": [
+                "DefaultTrait|ERROR|example.shop#Order$state"
+            ]
+        }
+    },
+    "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
+}

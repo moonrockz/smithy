@@ -1,8 +1,8 @@
 // The editors of the playground. The MoonBit script of the page (site/playground/ui) calls these
 // functions through `globalThis.smithyEditors`; each editor has the id of the element it is in.
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
 import {
-  EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers,
+  Decoration, EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers,
 } from "@codemirror/view";
 import {
   HighlightStyle, bracketMatching, foldCode, foldGutter, foldKeymap, indentOnInput, syntaxHighlighting, unfoldCode,
@@ -71,7 +71,26 @@ const languages = {
   markdown: () => markdown(),
 };
 
+// The highlighted lines of an editor: the tour marks the output lines that changed after an edit. A
+// change of the text removes them, because they belong to the text before.
+const setChanged = StateEffect.define();
+const changedLine = Decoration.line({ class: "tour-changed" });
+const changedLines = StateField.define({
+  create: () => Decoration.none,
+  update(lines, tr) {
+    for (const effect of tr.effects) if (effect.is(setChanged)) return effect.value;
+    return tr.docChanged ? Decoration.none : lines;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
 const views = new Map();
+// The extensions of each editor, to make a new state for a file, and the states of the files of an
+// editor (text, selection and undo history), by file key.
+const extensionSets = new Map();
+const fileStates = new Map();
+// The key of the file that each editor shows.
+const currentFiles = new Map();
 // The compartment of the language of each editor, so that the output editor can change language.
 const languageSlots = new Map();
 
@@ -101,61 +120,75 @@ const editors = {
       if (cursor) onCursor(cursor[0], cursor[1]);
     };
     const slot = new Compartment();
-    const view = new EditorView({
-      parent,
-      state: EditorState.create({
-        doc: text,
-        extensions: [
-          lineNumbers(),
-          foldGutter({ openText: "▾", closedText: "▸" }),
-          lintGutter(),
-          highlightActiveLineGutter(),
-          history(),
-          drawSelection(),
-          indentOnInput(),
-          bracketMatching(),
-          highlightActiveLine(),
-          highlightSelectionMatches(),
-          // Ctrl-Shift-[ and ] fold on every platform; foldKeymap gives macOS Cmd-Alt-[ and ] instead.
-          keymap.of([
-            { key: "Ctrl-Shift-[", run: foldCode },
-            { key: "Ctrl-Shift-]", run: unfoldCode },
-            ...defaultKeymap,
-            ...historyKeymap,
-            ...foldKeymap,
-            ...searchKeymap,
-            ...lintKeymap,
-          ]),
-          slot.of((languages[language] ?? (() => []))()),
-          syntaxHighlighting(highlight),
-          theme,
-          EditorState.readOnly.of(readOnly),
-          EditorView.contentAttributes.of({ "aria-label": `${id} editor` }),
-          EditorView.updateListener.of((update) => {
-            // A change that gives the same text is not a change (a browser can report one when it
-            // reads the DOM back).
-            if (update.docChanged && !update.startState.doc.eq(update.state.doc)) pending.changed = true;
-            if (update.docChanged || update.selectionSet) {
-              const head = update.state.selection.main.head;
-              const line = update.state.doc.lineAt(head);
-              pending.cursor = [line.number, head - line.from + 1];
-            }
-            if ((pending.changed || pending.cursor) && !pending.timer) {
-              pending.timer = setTimeout(report, 0);
-            }
-          }),
-        ],
+    const extensions = [
+      lineNumbers(),
+      foldGutter({ openText: "▾", closedText: "▸" }),
+      lintGutter(),
+      highlightActiveLineGutter(),
+      history(),
+      drawSelection(),
+      indentOnInput(),
+      bracketMatching(),
+      highlightActiveLine(),
+      highlightSelectionMatches(),
+      // Ctrl-Shift-[ and ] fold on every platform; foldKeymap gives macOS Cmd-Alt-[ and ] instead.
+      keymap.of([
+        { key: "Ctrl-Shift-[", run: foldCode },
+        { key: "Ctrl-Shift-]", run: unfoldCode },
+        ...defaultKeymap,
+        ...historyKeymap,
+        ...foldKeymap,
+        ...searchKeymap,
+        ...lintKeymap,
+      ]),
+      slot.of((languages[language] ?? (() => []))()),
+      syntaxHighlighting(highlight),
+      changedLines,
+      theme,
+      EditorState.readOnly.of(readOnly),
+      EditorView.contentAttributes.of({ "aria-label": `${id} editor` }),
+      EditorView.updateListener.of((update) => {
+        // A change that gives the same text is not a change (a browser can report one when it
+        // reads the DOM back).
+        if (update.docChanged && !update.startState.doc.eq(update.state.doc)) pending.changed = true;
+        if (update.docChanged || update.selectionSet) {
+          const head = update.state.selection.main.head;
+          const line = update.state.doc.lineAt(head);
+          pending.cursor = [line.number, head - line.from + 1];
+        }
+        if ((pending.changed || pending.cursor) && !pending.timer) {
+          pending.timer = setTimeout(report, 0);
+        }
       }),
-    });
+    ];
+    const view = new EditorView({ parent, state: EditorState.create({ doc: text, extensions }) });
+    extensionSets.set(id, extensions);
     views.set(id, view);
     languageSlots.set(id, slot);
   },
   text(id) {
     return views.get(id)?.state.doc.toString() ?? "";
   },
-  load(id, text) {
+  // With a `key`, the editor keeps one state per key (text, selection and undo history): the state of
+  // the file that it shows is saved and the state of `key` is restored, so that Undo never crosses
+  // files and a switch is not a change of the text. `fresh` drops every saved state first, and the
+  // file gets a new state with `text`. Without a key this is an ordinary change of the text.
+  load(id, text, key, fresh) {
     const view = views.get(id);
     if (!view) return;
+    if (key !== undefined) {
+      const states = fileStates.get(id) ?? new Map();
+      fileStates.set(id, states);
+      const current = currentFiles.get(id);
+      if (current !== undefined) states.set(current, view.state);
+      if (fresh) states.clear();
+      currentFiles.set(id, key);
+      const saved = states.get(key);
+      view.setState(
+        saved ?? EditorState.create({ doc: text, selection: { anchor: 0 }, extensions: extensionSets.get(id) }),
+      );
+      return;
+    }
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, selection: { anchor: 0 } });
   },
   // Replace the text and the language together. A language that the editor does not know is plain text.
@@ -190,6 +223,16 @@ const editors = {
       });
     view.dispatch(setDiagnostics(view.state, diagnostics));
   },
+  // `lines` is a JSON array of line numbers, from 1. Highlight those lines, and only those: an empty
+  // array removes the highlight. A number outside the text is left out.
+  highlight(id, lines) {
+    const view = views.get(id);
+    if (!view) return;
+    const doc = view.state.doc;
+    const numbers = [...new Set(JSON.parse(lines))].filter((n) => n >= 1 && n <= doc.lines).sort((a, b) => a - b);
+    const value = Decoration.set(numbers.map((n) => changedLine.range(doc.line(n).from)));
+    view.dispatch({ effects: setChanged.of(value) });
+  },
   // Change the language and keep the text.
   language(id, language) {
     const view = views.get(id);
@@ -206,6 +249,10 @@ const editors = {
     // Scroll the editor only: scrollIntoView can also scroll the page.
     const scroller = view.scrollDOM;
     scroller.scrollTop = Math.max(0, view.lineBlockAt(pos).top - scroller.clientHeight / 2);
+  },
+  // Measure every editor again, after its element changed its size.
+  measure() {
+    for (const view of views.values()) view.requestMeasure();
   },
   goTo(id, line, column) {
     const view = views.get(id);

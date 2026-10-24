@@ -9,6 +9,8 @@ import {
   "moonrockz/smithy-site/playground/samples",
   "moonrockz/smithy-site/playground/workbench",
   "moonrockz/smithy-site/playground/core",
+  "moonrockz/smithy-site/tour/model",
+  "moonrockz/smithy-site/tour/source",
   "moonrockz/smithy",
   "moonbitlang/async",
   "moonbitlang/x/fs",

@@ -1,0 +1,1 @@
+{"events": [], "output_contains": ["\"smithy.api#documentation\": \"A greeting for one person.\"", "\"message\": {\n                    \"target\": \"smithy.api#String\"\n                }"]}
