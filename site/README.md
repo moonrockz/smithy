@@ -105,6 +105,8 @@ changes, update the four files and the constants together.
 workbench, and it is the only page that loads `playground/ui.js`. A link into or out of the playground loads
 the new page, so that no other page runs the playground script.
 
+A tour lesson links to the playground with the path `site/playground/README.md`, which opens the playground page.
+
 | Part | Job |
 |---|---|
 | `playground/samples` | the example pickers: the models (`manifest`, with `chat-error.smithy`) and the transcripts (`transcript_manifest`, with `chat-findings.md`, the chat with the three findings of the mockup), and the typed transcript format and log preset |
@@ -258,5 +260,3 @@ A tour lesson never holds a CLI or API block that no test runs. It includes a ma
 and the lesson reader (`site/tour/source`) replaces the include block with a tab group. The format and the rules
 are in `site/tour/README.md`, section "CLI and API blocks". A bad include or a hand-written CLI or API block fails
 `mise run tour:check` (the CI job `tour`, on every pull request) and `mise run site:check`.
-
-A link to `site/playground/README.md` opens the playground.
