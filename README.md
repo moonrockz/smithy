@@ -1,3 +1,8 @@
+<p align="center">
+  <a href="https://moonrockz.github.io/smithy/"><img src="docs/assets/smithy-badge.png" width="320"
+    alt="smithy.mbt: the pink moonrockz bunny forges hot metal on an anvil on the moon"></a>
+</p>
+
 # smithy
 
 A [Smithy](https://smithy.io/) implementation for the MoonBit ecosystem, organized as a monorepo.
