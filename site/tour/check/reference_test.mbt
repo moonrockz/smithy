@@ -1088,6 +1088,7 @@ test "our OpenAPI document is the .openapi.json file of the transform" {
     title: "x",
     section: "x",
     engine: Model,
+    extension: false,
     output: Some(OpenApi30),
     selector: None,
     spec: "",

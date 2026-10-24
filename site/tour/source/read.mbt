@@ -119,6 +119,7 @@ fn read_lesson(
       )
   }
   let engine = read_engine(meta, dir, output is Some(_))
+  let extension = read_extension(meta, dir, engine)
   let selector = optional_string_field(meta, "selector", dir)
   if selector is Some(_) && !(output is Some(@samples.Output::Selector)) {
     fail("\{dir}: \"selector\" is for the output Selector only")
@@ -135,6 +136,28 @@ fn read_lesson(
   let text = match check_hand_written(raw) {
     Ok(_) => text_of(dir, repo, raw)
     Err(e) => fail("\{dir}/lesson.md: \{e}")
+  }
+  if engine is Static {
+    if @fs.path_exists("\{base}/files") || @fs.path_exists("\{base}/cases") {
+      fail(
+        "\{dir}: a static lesson has no files/ and no cases/: its blocks come from include blocks",
+      )
+    }
+    return {
+      dir,
+      number,
+      slug,
+      title,
+      section,
+      engine,
+      extension,
+      output,
+      selector,
+      spec,
+      text,
+      files: [],
+      cases: [],
+    }
   }
   let data = engine.data_files()
   let files = read_files("\{base}/files", "\{dir}/files", data)
@@ -156,6 +179,7 @@ fn read_lesson(
     title,
     section,
     engine,
+    extension,
     output,
     selector,
     spec,
@@ -179,8 +203,36 @@ fn text_of(dir : String, repo : String, raw : String) -> String raise {
 }
 
 ///|
-/// The engine of a lesson: at most one of `output`, `value`. A lesson with
-/// none of them validates its model.
+/// Whether `lesson.json` has the flag `key` set to `true`. `false` for a flag
+/// that is absent or `false`.
+fn flag_field(meta : Json, key : String, where_ : String) -> Bool raise {
+  guard meta is Object(m) else { fail("\{where_}: I expected a JSON object") }
+  match m.get(key) {
+    None | Some(False) => false
+    Some(True) => true
+    Some(_) => fail("\{where_}: \"\{key}\" must be true or false")
+  }
+}
+
+///|
+/// The `extension` flag. Only a static lesson sets it: the other lessons with
+/// an engine of ours always say it.
+fn read_extension(
+  meta : Json,
+  dir : String,
+  engine : @model.Engine,
+) -> Bool raise {
+  let where_ = "\{dir}/lesson.json"
+  let extension = flag_field(meta, "extension", where_)
+  if extension && !(engine is Static) {
+    fail("\{where_}: \"extension\" is for a static lesson")
+  }
+  extension
+}
+
+///|
+/// The engine of a lesson: at most one of `output`, `value`, or `static`. A
+/// lesson with none of them validates its model.
 fn read_engine(
   meta : Json,
   dir : String,
@@ -190,6 +242,16 @@ fn read_engine(
     fail("\{dir}/lesson.json: I expected a JSON object")
   }
   let where_ = "\{dir}/lesson.json"
+  if flag_field(meta, "static", where_) {
+    for key in ["output", "selector", "value", "message", "diff", "transcript"] {
+      if m.contains(key) {
+        fail(
+          "\{where_}: a static lesson cannot have \"\{key}\": it has no editor and no output",
+        )
+      }
+    }
+    return Static
+  }
   let value = m.get("value")
   if has_output && value is Some(_) {
     fail("\{where_}: I expected at most one of output, value, message, diff")
@@ -313,6 +375,7 @@ fn read_case(
       if !(json is Object(m) && m.contains("findings")) {
         fail("\{where_}: a value lesson needs \"findings\" in expect.json")
       }
+    Static => fail("\{where_}: a static lesson has no cases")
     Model =>
       if !findings.is_empty() || has_key(json, "findings") {
         fail("\{where_}: \"findings\" is for a value or message lesson")
@@ -354,7 +417,7 @@ fn read_case(
 ///|
 /// The keys of `lesson.json`.
 let lesson_keys : Array[String] = [
-  "slug", "title", "section", "spec", "output", "selector", "value",
+  "slug", "title", "section", "spec", "output", "selector", "value", "static", "extension",
 ]
 
 ///|

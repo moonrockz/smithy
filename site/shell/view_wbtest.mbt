@@ -904,3 +904,17 @@ async test "two tab groups on a page do not share their radio names" {
   let checked = html.split("checked").to_array().length() - 1
   assert_eq(checked, 2)
 }
+
+///|
+#cfg(not(target="js"))
+async test "a static lesson page has no tour-app and a full-width text" {
+  let page = { ..simple_shapes_page(), files: [], playground: None, }
+  let html = render_tour(
+    Lesson("simple-shapes"),
+    Page(page),
+    Some("# Static\n\nText.\n"),
+  )
+  assert_true(html.contains("tour-body tour-static"))
+  assert_true(!html.contains("tour-app"))
+  assert_true(!html.contains("tour-editor"))
+}

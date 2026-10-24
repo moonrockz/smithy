@@ -281,6 +281,8 @@ fn check_case(
         }
         _ => ()
       }
+    // A static lesson has no cases.
+    Static => ()
   }
 }
 
@@ -375,7 +377,9 @@ test "a value case with an ERROR or a DANGER cannot claim findings" {
 /// note.
 fn lessons_without_note(tour : @model.Tour) -> Array[String] {
   tour.lessons
-  .filter(l => !(l.engine is Model) && !l.text.contains(@model.extension_note))
+  .filter(l => {
+    l.needs_extension_note() && !l.text.contains(@model.extension_note)
+  })
   .map(l => l.dir)
 }
 
@@ -486,4 +490,23 @@ test "lesson 01 includes its own starting model" {
     }
   }
   assert_eq(copy.join("\n"), model)
+}
+
+///|
+test "a static extension lesson says that the feature is our extension" {
+  let ok = match
+    @source.read_tour("tour/source/testdata/static-ok", repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the fixture: " + e)
+  }
+  assert_eq(lessons_without_note(ok), [])
+  let bad = match
+    @source.read_tour(
+      "tour/source/testdata/static-extension-no-note",
+      repo="..",
+    ) {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the fixture: " + e)
+  }
+  assert_eq(lessons_without_note(bad), ["01-a"])
 }

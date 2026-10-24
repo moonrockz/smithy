@@ -12,6 +12,7 @@ fn fixture_lesson(
     title: "Lesson \{number}",
     section,
     engine: Model,
+    extension: false,
     output: Some(@samples.Output::JsonAst),
     selector: None,
     spec: "https://smithy.io/2.0/spec/idl.html",
@@ -130,4 +131,18 @@ test "a lesson with an OpenAPI output has no playground link" {
     let page = lesson_page(fixture_config("next"), tour, lesson)
     assert_eq(page.playground, None)
   }
+}
+
+///|
+test "a static lesson page has no files and no playground link" {
+  let lesson = {
+    ..fixture_lesson(4, "Basics", []),
+    engine: Static,
+    output: None,
+  }
+  let tour : @model.Tour = { lessons: [lesson], }
+  let page = lesson_page(fixture_config("next"), tour, lesson)
+  assert_eq(page.files, [])
+  assert_eq(page.playground, None)
+  assert_true(page.is_static())
 }

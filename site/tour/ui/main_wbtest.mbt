@@ -131,3 +131,13 @@ test "a reply of an older Worker changes nothing" {
   runtime.worker_replied(2, "not json")
   assert_eq(sent, [Answered(seq=5, answer=NotConverted(mismatch_text))])
 }
+
+///|
+test "the script mounts the lesson component for a lesson with an editor only" {
+  let sent : Array[@lesson.Msg] = []
+  let page = test_runtime(sent).page
+  assert_true(!should_mount(page))
+  assert_true(
+    should_mount({ ..page, files: [{ name: "model.smithy", text: "", }], }),
+  )
+}

@@ -12,6 +12,7 @@ fn lesson_of(
     title: "L\{number}",
     section,
     engine: Model,
+    extension: false,
     output: None,
     selector: None,
     spec: "https://smithy.io/2.0/",
@@ -285,4 +286,16 @@ test "model_files leaves out the data files of the engine" {
   assert_eq(engine.data_files(), ["v.json"])
   assert_eq(model_files(engine, files).map(f => f.name), ["model.smithy"])
   assert_eq(model_files(Model, files).length(), 2)
+}
+
+///|
+test "a static lesson has no data files and needs a note only when it is an extension" {
+  assert_eq(Static.data_files(), [])
+  let base = lesson_of(1, "S", [], [])
+  let static_ = { ..base, engine: Static, }
+  assert_true(static_.is_static())
+  assert_true(!base.is_static())
+  assert_true(!static_.needs_extension_note())
+  assert_true({ ..static_, extension: true, }.needs_extension_note())
+  assert_true(!base.needs_extension_note())
 }

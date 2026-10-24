@@ -307,3 +307,37 @@ test "a case cannot add a json file that no setup names" {
     "01-a/cases/start/files/other.json", ".smithy",
   ])
 }
+
+///|
+test "a static lesson has no files and no cases" {
+  let tour = match read("static-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(lesson.engine, Static)
+  assert_eq(lesson.extension, true)
+  assert_eq(lesson.files, [])
+  assert_eq(lesson.cases.length(), 0)
+  assert_eq(lesson.output, None)
+}
+
+///|
+test "a static lesson with files or cases" {
+  expect_err("static-with-files", [
+    "01-a", "a static lesson has no files/ and no cases/", "its blocks come from include blocks",
+  ])
+  expect_err("static-with-cases", [
+    "01-a", "a static lesson has no files/ and no cases/",
+  ])
+}
+
+///|
+test "a static lesson with an output" {
+  expect_err("static-with-output", ["01-a", "static", "output"])
+}
+
+///|
+test "extension is for a static lesson" {
+  expect_err("extension-not-static", ["01-a", "\"extension\"", "static"])
+}

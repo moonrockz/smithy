@@ -18,7 +18,7 @@ site/tour/lessons/NN-<slug>/
 
 - Lesson numbers start at 01 and have no gap. The folder name is `NN-<slug>`, and `<slug>` is the `slug` of
   `lesson.json`. Two lessons cannot have the same number or the same slug.
-- `lesson.json` has the keys `slug`, `title`, `section`, `spec`, and optionally `output` and `selector`.
+- `lesson.json` has the keys `slug`, `title`, `section`, `spec`, and optionally `output` and `selector` (and `value`, `static` and `extension`, see below).
   Another key is an error. `section` groups consecutive lessons on the contents page. `spec` is the link to what
   the lesson teaches: a URL that starts with `https://smithy.io/`, or the repository path of a docs page, such as
   `pkgs/smithy-openrpc/README.mbt.md`. The reader rejects any other value. A docs path links to the page on the
@@ -215,6 +215,19 @@ The text of a value lesson must have a note that starts with
 `> **Our extension:**`. Smithy defines no value validation, and no Java
 reference exists for it. Level 1 checks the note. Level 2 compares only the
 model events.
+
+## Static lessons
+
+A static lesson has no editor, no output and no cases. Its text shows blocks that come from tested sources through
+include blocks (see below), for example a CLI check that exits non-zero and an API block.
+
+- `lesson.json` has `"static": true`. It has none of `output`, `selector`, `value`, `message`, `diff` and
+  `transcript`.
+- The folder has `lesson.json` and `lesson.md` only. A `files/` or a `cases/` folder is an error.
+- `"extension": true` marks a feature that is ours, not Smithy's. It is only for a static lesson. The text of such a
+  lesson must have the note `> **Our extension:**`; level 1 checks it, as for a value lesson.
+- The page has no panes, no expand buttons and no Worker: the text takes the width, up to the reading measure of
+  the docs pages. The reference harness skips a static lesson.
 
 ## CLI and API blocks
 

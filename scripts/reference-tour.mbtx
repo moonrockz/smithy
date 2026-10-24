@@ -269,13 +269,22 @@ fn uses_smithy_rpc(files : Array[(String, String)]) -> Bool {
 }
 
 ///|
+/// Whether `lesson.json` is that of a static lesson: it has no files/ and no cases/.
+fn is_static(meta : Json) -> Bool {
+  meta is { "static": True, .. }
+}
+
+///|
 /// The cases of every lesson, in the input format of the harness.
-async fn lesson_cases() -> Array[Json] {
+async fn lesson_cases(root : String) -> Array[Json] {
   let cases : Array[Json] = []
-  for dir in list_dir(lessons_root) {
-    let base = lessons_root + "/" + dir
+  for dir in list_dir(root) {
+    let base = root + "/" + dir
     if !(@fs.kind(base) is Directory) { continue }
-    let flags = flags_of(match @json.parse(@fs.read_file(base + "/lesson.json").text()) {
+    let meta = @json.parse(@fs.read_file(base + "/lesson.json").text())
+    // A static lesson has no files/ and no cases/.
+    if is_static(meta) { continue }
+    let flags = flags_of(match meta {
       { "output": String(output), .. } => Some(output)
       _ => None
     })
@@ -371,7 +380,7 @@ async fn main {
   @fs.mkdir(scratch, recursive=true, allow_exist=true)
   compile_reference(options.checkout, classes)
   let input = scratch + "/cases.json"
-  @fs.write_file(input, Json::array(lesson_cases()).stringify(indent=2) + "\n")
+  @fs.write_file(input, Json::array(lesson_cases(lessons_root)).stringify(indent=2) + "\n")
   let output = scratch + "/reference-events.json"
   println(checked("java", ["-cp", classes, "ReferenceTour", input, output, reference_sha, smithy_rpc_path]).trim_end())
   let actual = @fs.read_file(output).text()
@@ -432,4 +441,11 @@ test "the lesson output gives the harness flags" {
 test "a case uses smithy.rpc when a file names the namespace" {
   assert_true(uses_smithy_rpc([("a.smithy", "use smithy.rpc#jsonRpc")]))
   assert_false(uses_smithy_rpc([("a.smithy", "namespace example")]))
+}
+
+///|
+test "a static lesson has no cases to read" {
+  assert_true(is_static(@json.parse("{\"slug\": \"a\", \"static\": true}")))
+  assert_false(is_static(@json.parse("{\"slug\": \"a\", \"static\": false}")))
+  assert_false(is_static(@json.parse("{\"slug\": \"a\"}")))
 }

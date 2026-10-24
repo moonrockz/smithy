@@ -40,6 +40,9 @@ pub(all) enum Engine {
   Model
   /// Check a JSON value against a shape of the model.
   Value(ValueSetup)
+  /// No editor, no files and no cases: the blocks of the text come from
+  /// include blocks.
+  Static
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -81,6 +84,7 @@ pub fn Engine::data_files(self : Engine) -> Array[String] {
   match self {
     Model => []
     Value(setup) => [setup.file]
+    Static => []
   }
 }
 
@@ -136,6 +140,16 @@ pub fn is_finding_key(key : String) -> Bool {
 pub let extension_note : String = "> **Our extension:**"
 
 ///|
+/// Whether the text of the lesson must hold `extension_note`.
+pub fn Lesson::needs_extension_note(self : Lesson) -> Bool {
+  match self.engine {
+    Model => false
+    Value(_) => true
+    Static => self.extension
+  }
+}
+
+///|
 /// A named edit of the starting files, and the result that it must give.
 pub(all) struct Case {
   name : String
@@ -151,12 +165,22 @@ pub(all) struct Lesson {
   title : String
   section : String
   engine : Engine
+  /// Whether the text must say that the lesson shows a feature of Smithy in
+  /// MoonBit, not of Smithy. Set in `lesson.json` of a static lesson; a value
+  /// lesson always says it.
+  extension : Bool
   output : @samples.Output?
   selector : String?
   spec : String
   text : String
   files : Array[LessonFile]
   cases : Array[Case]
+}
+
+///|
+/// Whether the lesson has an editor and an output. A static lesson has none.
+pub fn Lesson::is_static(self : Lesson) -> Bool {
+  self.engine is Static
 }
 
 ///|
@@ -484,6 +508,13 @@ pub(all) struct LessonPage {
   /// one file, because the playground holds one model.
   playground : String?
 } derive(Eq, Debug, ToJson, FromJson)
+
+///|
+/// Whether the page is a static lesson: it has no starting file, so it has no
+/// editor and no output.
+pub fn LessonPage::is_static(self : LessonPage) -> Bool {
+  self.files.is_empty()
+}
 
 ///|
 pub extend LessonPage with Eq::{equal, not_equal}

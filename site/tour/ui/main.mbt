@@ -237,6 +237,13 @@ fn app(page : @model.LessonPage) -> @rabbita.Val[@rabbita.Html] {
 }
 
 ///|
+/// Whether the page gets the lesson component. A static lesson has no editor
+/// and no output, so the script starts no Worker for it.
+fn should_mount(page : @model.LessonPage) -> Bool {
+  !page.is_static()
+}
+
+///|
 /// The tour script. The page is pre-rendered with the lesson text and empty
 /// panes; this mounts the live lesson component in the element with id
 /// `APP_ID`.
@@ -246,6 +253,6 @@ fn main {
   let tour : @model.TourPage = @json.from_json(@json.parse(text)) catch {
     _ => return
   }
-  guard tour is Page(page) else { return }
+  guard tour is Page(page) && should_mount(page) else { return }
   @rabbita.new(() => app(page)).mount(@lesson.APP_ID)
 }
