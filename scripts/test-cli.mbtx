@@ -1449,6 +1449,16 @@ fn doc_fixture_name(info : String) -> Result[String?, String] {
 }
 
 ///|
+/// True when an argument names an absolute path, or has a `..` segment, so it could leave the scratch folder.
+fn doc_path_leaves(word : String) -> Bool {
+  let drive = word.length() >= 2 && word[1] == ':'
+  word.has_prefix("/") ||
+  word.has_prefix("\\") ||
+  drive ||
+  word.split("/").any(part => part.split("\\").any(seg => seg == ".."))
+}
+
+///|
 fn doc_session(body : Array[String]) -> Result[DocStep, String] {
   let commands : Array[DocCommand] = []
   let mut args : Array[String]? = None
@@ -1474,6 +1484,13 @@ fn doc_session(body : Array[String]) -> Result[DocStep, String] {
       guard words.length() > 0 && words[0] == "smithy" else {
         return Err("I can run only a smithy command and found `\{line}`.")
       }
+      for word in words[1:] {
+        if doc_path_leaves(word) {
+          return Err(
+            "I cannot run an argument that is an absolute path or has a .. segment: `\{word}` in `\{line}`.",
+          )
+        }
+      }
       args = Some(words[1:].to_owned())
       output = []
     } else {
@@ -1484,11 +1501,24 @@ fn doc_session(body : Array[String]) -> Result[DocStep, String] {
     }
   }
   finish(commands, args, output)
+  if commands.is_empty() {
+    return Err("I found a console block with no command.")
+  }
   Ok(Session(commands))
 }
 
 ///|
 /// The fixture and console fences of `markdown`, in order. Other fences are skipped.
+///
+/// THE RULE (`@source` in site/tour/source/include.mbt must use the same one):
+/// - A fence starts at the start of a line with three or more backticks. The info string is the rest of
+///   the line. A fence closes at the first line of at least as many backticks, with only spaces or tabs after.
+/// - A console fence is a fence whose first info word is `console`, whatever words follow. Every
+///   command of it runs, and a console fence with no command is an error.
+/// - A fixture fence is a fence with an info word `file=NAME`. Its text is written to NAME.
+/// - A fence that starts with spaces or tabs, or with `~~~`, and that would be a console or fixture fence,
+///   is an error: I cannot tell whether a test runs it. I never skip it in silence.
+/// - Every other fence is skipped.
 fn doc_steps(markdown : String) -> Result[Array[DocStep], String] {
   let lines = markdown
     .split("\n")
@@ -1499,7 +1529,23 @@ fn doc_steps(markdown : String) -> Result[Array[DocStep], String] {
   while i < lines.length() {
     let line = lines[i]
     i += 1
-    guard line.has_prefix("```") else { continue }
+    let first = line.trim_start().to_owned()
+    let info_first = fn(text : String) -> String {
+      let rest = text.trim_start(chars="`~").trim().to_owned()
+      match rest.split(" ").next() {
+        Some(word) => word.to_owned()
+        None => ""
+      }
+    }
+    if !line.has_prefix("```") {
+      if (first.has_prefix("```") || first.has_prefix("~~~")) &&
+        (info_first(first) == "console" || first.contains(" file=")) {
+        return Err(
+          "I found a console or file= fence that does not start at the start of a line: `\{line}`. I cannot tell whether a test runs it.",
+        )
+      }
+      continue
+    }
     let mut ticks = 0
     while ticks < line.length() && line[ticks] == '`' {
       ticks += 1
@@ -1511,7 +1557,8 @@ fn doc_steps(markdown : String) -> Result[Array[DocStep], String] {
       let inner = lines[i]
       i += 1
       let inner_ticks = inner.iter().take_while(c => c == '`').count()
-      if inner_ticks >= ticks && inner_ticks == inner.length() {
+      let tail = inner[inner_ticks:].trim(chars=" \t")
+      if inner_ticks >= ticks && tail.is_empty() {
         closed = true
         break
       }
@@ -1520,7 +1567,7 @@ fn doc_steps(markdown : String) -> Result[Array[DocStep], String] {
     guard closed else {
       return Err("I found a fence that never closes: `\{line}`.")
     }
-    if info == "console" {
+    if info_first(info) == "console" {
       match doc_session(body) {
         Ok(step) => steps.push(step)
         Err(msg) => return Err(msg)
@@ -1553,13 +1600,13 @@ async fn check_readme(runner : Runner, root : String) -> Unit {
       @fs.rmdir(dir, recursive=true)
     }
     @fs.mkdir(dir, recursive=true, allow_exist=true)
-    let mut sessions = 0
+    let mut ran = 0
     for step in steps {
       match step {
         Fixture(name~, text~) => @fs.write_file("\{dir}/\{name}", text)
         Session(commands) => {
-          sessions += 1
           for command in commands {
+            ran += 1
             let (out, err) = scratch.command(command.args, 0)
             assert_eq(
               err,
@@ -1575,7 +1622,7 @@ async fn check_readme(runner : Runner, root : String) -> Unit {
         }
       }
     }
-    if sessions == 0 {
+    if ran == 0 {
       fail("I found no console block in \{file}")
     }
   }
@@ -2226,4 +2273,36 @@ test "shell_words rejects shell characters and an unclosed quote" {
     assert_true(shell_words(bad) is Err(_), msg=bad)
   }
   assert_true(shell_words("a 'b") is Err(_))
+}
+
+///|
+test "doc_steps does not skip console and fixture fences in silence" {
+  let cases = [
+    ("```console title=x\n$ smithy version\n0.6.0\n```", None),
+    ("  ```console\n  $ smithy version\n  ```", Some("does not start at the start of a line")),
+    ("  ```smithy file=a.smithy\n  ```", Some("does not start at the start of a line")),
+    ("```console\n```", Some("a console block with no command")),
+    ("```console\n$ smithy version\n0.6.0\n```  \n", None),
+    ("```console\n$ smithy cat /etc/passwd\n```", Some("absolute path")),
+    ("```console\n$ smithy cat ../x\n```", Some("absolute path")),
+    ("```console\n$ smithy cat 'a\\..\\x'\n```", Some("absolute path")),
+    ("```console\n$ smithy cat C:x\n```", Some("absolute path")),
+    ("```console\n$ smithy cat a/b.smithy ..x\n```", None),
+  ]
+  for c in cases {
+    let (md, want) = c
+    match (doc_steps(md), want) {
+      (Ok(steps), None) => assert_true(!steps.is_empty(), msg=md)
+      (Err(msg), Some(text)) =>
+        assert_true(msg.contains(text), msg="\{msg} lacks \{text}")
+      _ => fail("unexpected result for \{md}")
+    }
+  }
+  // A closing fence with trailing spaces closes, so the next fence is read.
+  assert_eq(
+    doc_steps(
+      "```console\n$ smithy version\n0.6.0\n```  \n\n```smithy file=a.smithy\nx\n```\n",
+    ).map(steps => steps.length()),
+    Ok(2),
+  )
 }
