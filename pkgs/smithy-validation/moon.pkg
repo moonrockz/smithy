@@ -2,7 +2,7 @@ import {
   "moonrockz/smithy",
   "moonrockz/smithy-syntax" @syntax,
   "moonbitlang/core/json",
-  "moonbitlang/core/string",
+  "moonrockz/smithy-validation/internal/regex",
   "moonbitlang/core/encoding/base64",
 }
 
@@ -12,3 +12,8 @@ import {
   "moonrockz/smithy",
   "moonbitlang/core/json",
 } for "test"
+
+import {
+  "moonbitlang/core/string",
+  "moonbitlang/core/quickcheck",
+} for "wbtest"

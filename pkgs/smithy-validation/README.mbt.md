@@ -96,11 +96,33 @@ Preparation limits patterns to 4,096 source UTF-16 units, 32 nested groups and 1
 expression units. Each repetition counts the copies the automaton builds (`*` once, `?` and `+`
 twice, `{n}` n times, `{n,}` n+1 times, `{n,m}` m times). A positive BMP-only class counts its
 members, each single character or range as one and each class escape as the intervals it expands
-to. Any other class counts its source length. The charge is a heuristic bound on the engine's
-work, not an exact count. Matching charges eight times
-the expanded estimate times the input UTF-16 length plus one against the call's work budget.
-Patterns exceeding the preparation caps raise `UnsupportedConstraint`; exhausted matching work
-returns `LimitExceeded` before executing the pattern.
+to. Any other class counts its source length. Patterns exceeding the preparation caps raise
+`UnsupportedConstraint`. The caps bound the size of the automaton, not the work of a match.
+
+The matcher is a copy of the lazy DFA of `@string.Regex` from moonbitlang/core, in
+`internal/regex` (see its README and NOTICE), and it matches as `@string.Regex` does. Budget hooks
+in the copy count its work while it runs and charge the count to the call's work budget:
+
+- Each input UTF-16 unit costs one unit, and the end of the input costs one, charged before the
+  search starts. A step on a transition that the automaton already built is one table lookup.
+- A step that needs a new state computes a derivative. It costs one unit for each expression node
+  and each thread that the derivative visits, and five units for each thread that duplicate removal
+  visits: the visit, the slot scan, the slot assignment, the hash and the state-table comparison.
+- When the state tables grow, the growth costs 1.5 times the cells of the new tables, for the
+  allocation and the copy of the old cells.
+
+These counts cover every loop of the matcher, so the charge is a bound on its work, not an
+estimate. A visit does constant work: the translated pattern captures only group 0, so a mark map
+holds at most two marks. The automaton keeps its states for the life of the prepared validator, so
+values of a known shape cost about one unit for each UTF-16 unit. When a search needs more units
+than the call has left, it stops at once, also in the middle of a derivative, keeps no partial
+state, and the call returns `LimitExceeded`.
+
+Measured on an Apple M5 Max, one unit takes about 20 ns on the native target and about 12 ns on
+wasm-gc. The Morphir FQName pattern costs 3,585 units the first time for a 97-unit name and 98
+units after that. The pattern `^(a?){150}a{150}$` needs 899,826 units for ten `a` characters,
+because each derivative visits the chain of optional items again. The default limit stops it after
+100,000 units, in about 2 ms.
 
 ## Findings, adapters and limits
 

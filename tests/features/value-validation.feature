@@ -43,6 +43,12 @@ Feature: Direct application value validation
     And I validate the JSON value "\"morphir/SDK:basics#int\""
     Then the value is valid
 
+  Scenario: A long FQName validates within the default work limit
+    Given a value model whose input has the pattern "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*:([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*#([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$"
+    When I prepare the value validator
+    And I validate the JSON value "\"my-org/finance-and-risk/regulatory-reporting:liquidity/coverage-ratio#calculate-net-cash-outflows\""
+    Then the value is valid
+
   Scenario: A literal dash may end a character class
     Given a value model whose input has the pattern "^[A-Za-z0-9/-]+:[A-Za-z0-9/-]+#[A-Za-z0-9-]+$"
     When I prepare the value validator

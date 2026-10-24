@@ -1,0 +1,10 @@
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/smithy-validation/internal/regex/regex_engine" @re,
+  "moonrockz/smithy-validation/internal/regex/regex_parser",
+}
+
+import {
+  "moonbitlang/core/string",
+  "moonbitlang/core/quickcheck",
+} for "test"

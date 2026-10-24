@@ -2,6 +2,11 @@
 let fqname_pattern = "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*:([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*#([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$"
 
 ///|
+fn BoundedPattern::execute(self : BoundedPattern, text : String) -> Bool {
+  self.matches(text, work=0x7fffffff) is Some((true, _))
+}
+
+///|
 test "portable patterns translate escapes without changing literals or classes" {
   let id = @smithy.ShapeId::parse("example#String").unwrap()
   for
@@ -21,26 +26,30 @@ test "portable patterns translate escapes without changing literals or classes" 
 }
 
 ///|
-test "pattern weight counts the copies the automaton builds" {
+test "pattern size counts the copies the automaton builds" {
   let id = @smithy.ShapeId::parse("example#String").unwrap()
   let nested = "^" + "(?:".repeat(8) + "a" + ")*".repeat(8) + "$"
   for
-    (pattern, weight) in [
-      ("^[a-z]$", 24),
-      ("^[a-z0-9]+$", 64), // a class counts its members
-      ("^a?$", 48), // ? counts two copies: core follows optional chains
-      ("^(?:a*)*$", 64),
-      ("^(?:a+)+$", 112), // control: + still counts two copies
-      ("^[^a]$", 48), // control: a negated class keeps its source length
-      (nested, 216), // 8 nested stars: linear, not 1276 units
-      (fqname_pattern, 1376),
-      ("^[\\d_]$", 32), // class escape counts its expanded members
-      ("^[\\w]$", 48),
-      ("^[\\s]$", 136),
-      ("^[😀]$", 48), // literal astral character: source length
-      ("^[\\u00e9a-z]$", 32),
+    (pattern, size) in [
+      ("^[a-z]$", 3),
+      ("^[a-z0-9]+$", 8), // a class counts its members
+      ("^a?$", 6), // ? counts two copies: the automaton follows optional chains
+      ("^(?:a*)*$", 8),
+      ("^(?:a+)+$", 14), // control: + still counts two copies
+      ("^[^a]$", 6), // control: a negated class keeps its source length
+      (nested, 27), // 8 nested stars: linear, not exponential
+      (fqname_pattern, 172),
+      ("^[\\d_]$", 4), // class escape counts its expanded members
+      ("^[\\w]$", 6),
+      ("^[\\s]$", 17),
+      ("^[😀]$", 6), // literal astral character: source length
+      ("^[\\u00e9a-z]$", 4),
     ] {
-    assert_eq(compile_pattern(pattern, id).weight, weight, msg=pattern)
+    assert_eq(
+      pattern_size(translate_pattern(pattern, id), id),
+      size,
+      msg=pattern,
+    )
   }
 }
 

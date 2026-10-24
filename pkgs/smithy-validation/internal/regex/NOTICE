@@ -1,0 +1,13 @@
+The packages under this directory, except the files listed as added in
+README.md, are copied from MoonBit core:
+
+  https://github.com/moonbitlang/core
+  commit d3c49d103fbe7bcfe86a2299250bdfe52654e70d
+  (the core bundled with moonc 0.10.15+943464bfa, 2026-10-12)
+  Licensed under the Apache License, Version 2.0.
+
+MoonBit core
+Copyright 2026 International Digital Economy Academy
+
+Each changed file keeps its licence header and states the change in a
+"Modified for moonrockz/smithy-validation" comment below it.

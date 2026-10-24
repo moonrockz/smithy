@@ -1,0 +1,13 @@
+import {
+  "moonbitlang/core/list",
+  "moonbitlang/core/hashmap",
+  "moonbitlang/core/debug",
+  "moonrockz/smithy-validation/internal/regex/automata",
+  "moonrockz/smithy-validation/internal/regex/shared_types",
+  "moonrockz/smithy-validation/internal/regex/regex_engine/ast",
+  "moonrockz/smithy-validation/internal/regex/regex_engine/symbol_map",
+}
+
+import {
+  "moonbitlang/core/test",
+} for "test"

@@ -1,21 +1,25 @@
 ///|
 priv struct BoundedPattern {
-  regex : @string.Regex
-  weight : Int32
+  regex : @regex.Regex
 } derive(Debug)
 
 ///|
-fn BoundedPattern::execute(self : BoundedPattern, text : String) -> Bool {
-  self.regex.execute(text) is Some(_)
+/// Search `text`, spending at most `work` units. Returns whether it matched and
+/// the units it spent, or `None` when the search needs more than `work` units.
+fn BoundedPattern::matches(
+  self : BoundedPattern,
+  text : String,
+  work~ : Int32,
+) -> (Bool, Int32)? {
+  self.regex.matches(text, work~)
 }
 
 ///|
-/// Bound the expanded expression before the core parser/compiler can recurse or
+/// Bound the expanded expression before the parser and compiler can recurse or
 /// copy quantified subexpressions. Counts include every alternative and class.
-/// This is a heuristic bound on the engine's work, not an exact count. `*`
-/// counts one copy; `?` and `+` count two, because core follows chains of
-/// optional items in quadratic time.
-fn pattern_cost(
+/// `*` counts one copy; `?` and `+` count two, because the automaton follows
+/// chains of optional items in quadratic time.
+fn pattern_size(
   pattern : String,
   id : @smithy.ShapeId,
 ) -> Int32 raise PreparationError {
@@ -128,8 +132,7 @@ fn pattern_cost(
     i += 1
   }
   guard groups.is_empty() else { raise unsupported() }
-  // UTF-16 lowering can expand a source atom; the lazy DFA's alphabet grows with class members.
-  Int32::max(1, total) * 8
+  total
 }
 
 ///|
@@ -225,18 +228,36 @@ fn ClassSlot::after_atom(self : ClassSlot) -> ClassSlot {
 }
 
 ///|
-/// Compile the portable pattern profile. Unknown constructs are never ignored.
-/// Core rejects a bare '-' at the edge of a class, so each literal class dash
-/// leaves as `\-` and only a range operator stays a bare '-'.
+/// Compile the portable pattern profile, after its expanded size passes the cap.
 fn compile_pattern(
   pattern : String,
   id : @smithy.ShapeId,
 ) -> BoundedPattern raise PreparationError {
-  let unsupported = fn() {
-    UnsupportedConstraint(
-      id, "I could not compile the pattern in the portable regular-expression profile.",
-    )
+  let translated = translate_pattern(pattern, id)
+  ignore(pattern_size(translated, id))
+  let regex = @regex.Regex::compile(translated) catch {
+    _ => raise unsupported_pattern(id)
   }
+  { regex, }
+}
+
+///|
+fn unsupported_pattern(id : @smithy.ShapeId) -> PreparationError {
+  UnsupportedConstraint(
+    id, "I could not compile the pattern in the portable regular-expression profile.",
+  )
+}
+
+///|
+/// Translate the portable pattern profile to the matcher's syntax. Unknown
+/// constructs are never ignored. The matcher rejects a bare '-' at the edge of
+/// a class, so each literal class dash leaves as `\-` and only a range operator
+/// stays a bare '-'.
+fn translate_pattern(
+  pattern : String,
+  id : @smithy.ShapeId,
+) -> String raise PreparationError {
+  let unsupported = fn() { unsupported_pattern(id) }
   guard pattern.length() <= 4096 else { raise unsupported() }
   let out = StringBuilder()
   let mut class : ClassSlot? = None
@@ -373,12 +394,5 @@ fn compile_pattern(
     }
     i += 1
   }
-  let translated = out.to_string()
-  let weight = pattern_cost(translated, id)
-  let regex = @string.Regex::Regex(translated) catch {
-    _ => raise unsupported()
-  }
-  // Core compiles its automaton lazily; do that once, only after the cost guard.
-  ignore(regex.execute(""))
-  { regex, weight, }
+  out.to_string()
 }
