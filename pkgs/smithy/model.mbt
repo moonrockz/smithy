@@ -41,16 +41,23 @@ pub fn SourceLocation::is_builtin(self : SourceLocation) -> Bool {
 }
 
 ///|
+/// How the validation events report a diagnostic.
+pub(all) enum DiagnosticReport {
+  /// An event with the severity of the diagnostic.
+  Event
+  /// An event with severity DANGER. The diagnostic severity stays Error.
+  DangerEvent
+  /// No event: the selector check of the trait definition reports the same finding.
+  CoveredBySelector
+} derive(Eq, Debug)
+
+///|
 /// An assembly error. Syntax diagnostics retain their original code and span.
 pub(all) struct ModelDiagnostic {
   code : String
   event_id : String
   severity : @syntax.Severity
-  /// The event severity is DANGER. The diagnostic severity stays Error.
-  danger : Bool
-  /// A validation event reports this diagnostic. It is false when the selector
-  /// check of the trait definition reports the same finding.
-  event : Bool
+  report : DiagnosticReport
   message : String
   source : SourceLocation
   shape : ShapeId?

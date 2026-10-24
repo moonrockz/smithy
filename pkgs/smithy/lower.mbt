@@ -381,7 +381,9 @@ fn Assembly::finish(self : Assembly) -> LoadResult {
     },
     diagnostics: self.diagnostics,
     validation_findings: model.collect_validation_events(
-      self.diagnostics.filter(d => d.event).map(diagnostic_event),
+      self.diagnostics
+      .filter(d => d.report != CoveredBySelector)
+      .map(diagnostic_event),
     ),
   }
 }

@@ -806,7 +806,9 @@ pub fn Model::validation_events(self : Model) -> Array[ValidationEvent] {
   let assembly = Assembly::new()
   assembly.validate(self, check_trait_definitions=false)
   self.collect_validation_events(
-    assembly.diagnostics.filter(d => d.event).map(diagnostic_event),
+    assembly.diagnostics
+    .filter(d => d.report != CoveredBySelector)
+    .map(diagnostic_event),
   )
 }
 
@@ -914,7 +916,7 @@ fn diagnostic_event(d : ModelDiagnostic) -> ValidationEvent {
   {
     id: d.event_id,
     severity: if d.severity == Error {
-      if d.danger {
+      if d.report == DangerEvent {
         "DANGER"
       } else {
         "ERROR"

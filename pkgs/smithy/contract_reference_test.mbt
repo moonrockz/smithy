@@ -177,7 +177,7 @@ test "the selector check reports a contract trait on the wrong shape once" {
     let result = @smithy.Loader::new().add_idl("model.smithy", text).assemble()
     let loader = result.diagnostics.filter(d => d.code == "SM-MODEL-011")
     assert_eq(loader.length(), 1)
-    assert_false(loader[0].event)
+    assert_eq(loader[0].report, CoveredBySelector)
     // One event for conditions and one for error, none twice.
     assert_eq(contract_keys(text), [
       "TraitTarget|ERROR|example#Thing", "TraitTarget|ERROR|example#Thing",

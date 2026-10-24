@@ -26,23 +26,23 @@ fn ContractAnalysis::problem(
   message : String,
   event~ : ContractEvent,
 ) -> Unit {
-  let (code, event_id, severity, danger) = match event {
-    Syntax => ("SM-MODEL-015", "Model", @syntax.Severity::Error, false)
-    NotBoolean => ("SM-MODEL-017", "ConditionsTrait", Error, true)
-    Error => ("SM-MODEL-016", "ConditionsTrait", Error, false)
+  let (code, event_id, severity, report) = match event {
+    Syntax => ("SM-MODEL-015", "Model", @syntax.Severity::Error, Event)
+    NotBoolean => ("SM-MODEL-017", "ConditionsTrait", Error, DangerEvent)
+    Error => ("SM-MODEL-016", "ConditionsTrait", Error, Event)
     Danger =>
       (
         "SM-MODEL-016",
         "ConditionsTrait.JmespathProblem.JmespathEventDanger.\{self.condition}",
         Error,
-        true,
+        DangerEvent,
       )
     Warning =>
       (
         "SM-MODEL-016",
         "ConditionsTrait.JmespathProblem.JmespathEventWarning.\{self.condition}",
         Warning,
-        false,
+        Event,
       )
   }
   let key = "\{code}:\{span.start}:\{span.end}:\{message}"
@@ -56,8 +56,7 @@ fn ContractAnalysis::problem(
     code,
     event_id,
     severity,
-    danger,
-    event: true,
+    report,
     message: "I found a problem in JMESPath condition \{Json::string(self.condition).stringify()} on \{self.owner.id} at expression \{line}:\{column} (UTF-16 offsets \{span.start}..\{span.end}): \{message}",
     source: {
       ..self.owner.source,

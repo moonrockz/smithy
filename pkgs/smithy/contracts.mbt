@@ -32,7 +32,7 @@ fn Assembly::validate_conditions(
       owner.source,
       shape=owner.id.to_string(),
       // The selector of the trait definition reports the same TraitTarget event.
-      skip_event=true,
+      report=CoveredBySelector,
     )
     return
   }
