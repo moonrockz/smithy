@@ -194,35 +194,53 @@ fn hand_written_error(lang : String) -> String {
 }
 
 ///|
-/// Whether `line` uses the API: `@smithy.` at any position, followed by `[A-Za-z0-9_.]*` and
-/// anything but `#`. A qualified shape ID such as `@smithy.api#documentation("x")` has a `#`
-/// there, so model text stays legal.
+fn is_lower_ident_char(c : Char) -> Bool {
+  (c >= 'a' && c <= 'z') || c.is_ascii_digit() || c == '_'
+}
+
+///|
+fn is_word_char(c : Char) -> Bool {
+  is_lower_ident_char(c) || (c >= 'A' && c <= 'Z')
+}
+
+///|
+/// Whether `line` uses the API of a package: an `@` at the start of the line or after a
+/// character that is not a letter, digit or `_`, then an alias `[a-z_][a-z0-9_]*`, then `.`,
+/// then `[A-Za-z0-9_.]*` and anything but `#`. A qualified shape ID such as
+/// `@smithy.api#documentation("x")` has a `#` there, an unqualified trait such as
+/// `@length(min: 1)` has no `.` after its name, and an e-mail address has a letter before
+/// the `@`, so model text stays legal.
 fn is_api_call(line : String) -> Bool {
-  let marker = "@smithy."
-  let mut from = 0
-  while from < line.length() {
-    guard line[from:].find(marker) is Some(i) else { break }
-    let rest = line[from + i + marker.length():].to_owned()
-    let name = rest
-      .iter()
-      .take_while(c => {
-        (c >= 'a' && c <= 'z') ||
-        (c >= 'A' && c <= 'Z') ||
-        c.is_ascii_digit() ||
-        c == '_' ||
-        c == '.'
-      })
-      .count()
-    if !(name < rest.length() && rest[name] == '#') {
+  let cs = line.to_array()
+  let n = cs.length()
+  for i in 0..<n {
+    if cs[i] != '@' || (i > 0 && is_word_char(cs[i - 1])) {
+      continue
+    }
+    let mut j = i + 1
+    if j >= n || !((cs[j] >= 'a' && cs[j] <= 'z') || cs[j] == '_') {
+      continue
+    }
+    while j < n && is_lower_ident_char(cs[j]) {
+      j = j + 1
+    }
+    if j >= n || cs[j] != '.' {
+      continue
+    }
+    j = j + 1
+    while j < n && (is_word_char(cs[j]) || cs[j] == '.') {
+      j = j + 1
+    }
+    if !(j < n && cs[j] == '#') {
       return true
     }
-    from = from + i + marker.length()
   }
   false
 }
 
 ///|
-/// The text of a line that looks like a CLI command or an API call of Smithy, or `None`.
+/// The text of a line that looks like a CLI command of Smithy or an API call of a package, or
+/// `None`.
 fn smithy_use(code : String) -> String? {
   for line in code.split("\n") {
     let t = line.trim().to_owned()
@@ -235,7 +253,7 @@ fn smithy_use(code : String) -> String? {
 
 ///|
 /// Err when `text` has a fence with a CLI, API or tabs language (at any depth), or a fence
-/// of any other language whose text is a `smithy` command or a `@smithy.` call.
+/// of any other language whose text is a `smithy` command or a package API call.
 pub fn check_hand_written(text : String) -> Result[Unit, String] {
   let doc = @markdown.parse(text, {
     source: "",

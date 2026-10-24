@@ -298,3 +298,27 @@ test "every MoonBit API use is rejected in an untyped and a text fence" {
     Ok(()),
   )
 }
+
+///|
+test "an API use of any package is rejected in an untyped and a text fence" {
+  for fence in ["", "text"] {
+    for
+      case in [
+        ("@syntax.parse(x)", "@syntax."),
+        ("@openapi.convert(m)", "@openapi."),
+        ("let x = @validation.Validator::new()", "@validation."),
+      ] {
+      let (code, pkg) = case
+      contains_all(
+        @source.check_hand_written("# T\n\n```\{fence}\n\{code}\n```\n"),
+        pkg,
+      )
+    }
+  }
+  assert_eq(
+    @source.check_hand_written(
+      "# T\n\n```smithy\n@length(min: 1)\n@smithy.api#documentation(\"x\")\n@example.ns#x\nstring A\n```\n\n```json\n{\"email\": \"a@example.com\"}\n```\n",
+    ),
+    Ok(()),
+  )
+}

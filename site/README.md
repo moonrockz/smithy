@@ -265,5 +265,13 @@ A tour lesson (`site/tour/lessons/NN-slug/lesson.md`) must not hold a CLI or API
   (`scripts/test-cli.mbtx` runs them).
 - The reader rejects a lesson that has a fence in `console`, `shell`, `sh`, `bash`, `zsh`, `mbt`, `moonbit`,
   `shell-session`, `powershell`, `fish`, `cmd` or a similar terminal language (the case does not matter), a `tabs`
-  fence, or a fence of any other language (also `text` or no language) with a line that starts with `$ smithy`,
-  `smithy `, or that has `@smithy.` at any position of a line. After `@smithy.` the reader skips letters, digits, `_` and `.`; only a `#` there makes a qualified shape ID such as `@smithy.api#documentation("x")`, which stays legal. Any other character is an API use.
+  fence, or a fence of any other language (also `text` or no language) with a line that starts with `$ smithy`
+  or `smithy `, or with a package API use at any position of a line.
+- The API rule runs on every fence except `include`, also on `smithy` and `json` fences. A package API use is
+  an `@` at the start of the line or after a character that is not a letter, digit or `_`, then a lowercase
+  alias `[a-z_][a-z0-9_]*`, then `.`, then `[A-Za-z0-9_.]*`, and then any character other than `#` (or the end
+  of the line). It guards every package alias, such as `@smithy.`, `@syntax.`, `@openapi.` and `@validation.`.
+  These stay legal: a qualified trait such as `@smithy.api#documentation("x")` or `@example.ns#x` (a `#`
+  follows the name), an unqualified trait such as `@length(min: 1)` or `@required` (no `.` after the name), and
+  an e-mail address such as `a@example.com` (a letter comes before the `@`). A doc comment such as
+  `/// see @smithy.api` in a `smithy` fence is rejected, because no `#` follows the name.
