@@ -559,6 +559,185 @@
       ],
       "status": 0,
       "lines": []
+    },
+    {
+      "id": "rpc-legacy-error",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "1.0",
+        "--service",
+        "example#Replies",
+        "--response",
+        "legacy-error.json",
+        "--method",
+        "subtract",
+        "--legacy-errors",
+        "code-message-data",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "legacy-error.json",
+          "text": "{\"result\":null,\"error\":{\"code\":1001,\"message\":\"failure\",\"data\":1},\"id\":1}"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "legacy-error.json/error/data: error[TypeMismatch] example#Problem$detail: I expected a string value, but found number."
+      ]
+    },
+    {
+      "id": "rpc-legacy-opaque",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "1.0",
+        "--service",
+        "example#Replies",
+        "--response",
+        "legacy-error.json",
+        "--method",
+        "subtract",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "legacy-error.json",
+          "text": "{\"result\":null,\"error\":{\"code\":1001,\"message\":\"failure\",\"data\":1},\"id\":1}"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": [
+        "legacy-error.json/error: advisory[LimitedScope] example#Subtract: I checked an opaque legacy error; no code/message/data application mapping was selected."
+      ]
+    },
+    {
+      "id": "rpc-legacy-version-2",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--legacy-errors",
+        "opaque",
+        "--service",
+        "example#Replies",
+        "--response",
+        "reply.json",
+        "--method",
+        "subtract",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "reply.json",
+          "from": "examples/json-rpc/reply.json"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 2,
+      "lines": [
+        "smithy: --legacy-errors requires version 1.0"
+      ]
+    },
+    {
+      "id": "rpc-envelope-only",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Replies",
+        "--response",
+        "reply.json",
+        "--envelope-only",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "reply.json",
+          "from": "examples/json-rpc/reply.json"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": [
+        "reply.json: advisory[LimitedScope] example#Replies: I checked only the response envelope; payload contracts and request ID correlation were not checked."
+      ]
+    },
+    {
+      "id": "rpc-unknown-reject",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Calculator",
+        "--message",
+        "extra.json",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "extra.json",
+          "text": "{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":{\"minuend\":42,\"subtrahend\":23,\"extra\":1},\"id\":1}"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "extra.json/params/extra: error[UnknownMember] example#SubtractInput: I expected a declared member, but found an unknown member."
+      ]
+    },
+    {
+      "id": "rpc-unknown-ignore",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Calculator",
+        "--message",
+        "extra.json",
+        "--unknown-members",
+        "ignore",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "extra.json",
+          "text": "{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":{\"minuend\":42,\"subtrahend\":23,\"extra\":1},\"id\":1}"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": []
     }
   ]
 }

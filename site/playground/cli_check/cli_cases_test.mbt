@@ -30,7 +30,8 @@ let expected_ids : Array[String] = [
   "value-json-names", "value-member-target", "value-not-json", "value-duplicate-key",
   "value-missing-target", "value-invalid-model", "value-unsupported-pattern", "value-unsupported-timestamp",
   "value-json-limit", "rpc-call", "rpc-invalid", "rpc-reply", "rpc-error", "rpc-reply-no-context",
-  "rpc-not-json", "rpc-missing-service", "rpc-legacy-call",
+  "rpc-not-json", "rpc-missing-service", "rpc-legacy-call", "rpc-legacy-error", "rpc-legacy-opaque",
+  "rpc-legacy-version-2", "rpc-envelope-only", "rpc-unknown-reject", "rpc-unknown-ignore",
 ]
 
 ///|
@@ -188,8 +189,7 @@ fn value_request_of(
 ///|
 /// `validate rpc` for one message: `--version`, `--service`, `--message` or
 /// `--response`, the response context (`--method`, `--operation`, `--request`,
-/// `--envelope-only`), `--legacy-errors`, `--unknown-members` and
-/// `--member-names`; any other argument is a model file. The presence of
+/// `--envelope-only`), `--legacy-errors` and `--unknown-members`; any other argument is a model file. The presence of
 /// `--legacy-errors` gives `Some`, its absence `None`, as the CLI tells them apart.
 fn rpc_request_of(
   rest : ArrayView[String],
@@ -203,7 +203,6 @@ fn rpc_request_of(
   let mut context : @core.ResponseContext? = None
   let mut legacy_errors : @core.LegacyErrors? = None
   let mut unknown_members : @core.UnknownMembers = Reject
-  let mut member_names : @core.MemberNames = Smithy
   let set_context = fn(next : @core.ResponseContext) -> Unit raise {
     if context is Some(_) {
       fail("a case needs at most one response context")
@@ -256,12 +255,6 @@ fn rpc_request_of(
           "ignore" => Ignore
           other => fail("I do not know --unknown-members \{other}")
         }
-      "--member-names" =>
-        member_names = match argument {
-          "smithy" => Smithy
-          "json" => JsonName
-          other => fail("I do not know --member-names \{other}")
-        }
       _ => fail("the differential test does not know the option \{option}")
     }
     i += 2
@@ -282,7 +275,7 @@ fn rpc_request_of(
       version~,
       message=file_of(files, file),
       kind~,
-      options={ unknown_members, member_names, },
+      options={ unknown_members, member_names: Smithy, },
     ),
     file,
   )
@@ -302,6 +295,15 @@ test "every CLI case gives the CLI lines and the CLI status in the core" {
         }
         if valid != (c.status == 0) {
           fail("\{c.id}: valid is \{valid} but the CLI status is \{c.status}")
+        }
+      }
+      // A usage error before any check: the CLI prints `smithy: <reason>`, status 2.
+      Blocked(reason~, kind=Other, ..) => {
+        let lines = ["smithy: \{reason}"]
+        if lines != c.lines || c.status != 2 {
+          fail(
+            "\{c.id}: the core blocked with \{Json(lines).stringify()} but the CLI printed \{Json(c.lines).stringify()} with status \{c.status}",
+          )
         }
       }
       other =>
