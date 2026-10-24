@@ -271,3 +271,51 @@ test("Undo after a file tab switch never moves the text of one file into another
   expect(await editorText(page)).toEqual(modelStart);
   expect(page.errors).toEqual([]);
 });
+
+// The two tabs of the first include block of the lesson: the CLI and the MoonBit block.
+function includeTabs(page) {
+  const group = page.locator(".ms-tabs").first();
+  return {
+    cli: group.locator(".ms-tab-panel").nth(0),
+    api: group.locator(".ms-tab-panel").nth(1),
+    label: (name) => group.locator(".ms-tab-label", { hasText: name }),
+  };
+}
+
+async function expectCliShown({ cli, api }) {
+  await expect(cli).toBeVisible();
+  await expect(cli).toContainText("$ smithy convert --to json greeting.smithy");
+  await expect(api).toBeHidden();
+}
+
+async function expectApiShown({ cli, api }) {
+  await expect(api).toBeVisible();
+  await expect(api).toContainText("@smithy.Loader::new()");
+  await expect(cli).toBeHidden();
+}
+
+test("the include tabs switch without a reload", async ({ page }) => {
+  await page.goto(lessonUrl);
+  const tabs = includeTabs(page);
+  await expectCliShown(tabs);
+
+  await tabs.label("MoonBit").click();
+  await expectApiShown(tabs);
+
+  // The arrow keys move between the tabs, as for any radio group.
+  await page.locator("#tabs-1-2").focus();
+  await page.keyboard.press("ArrowLeft");
+  await expectCliShown(tabs);
+  expect(page.errors).toEqual([]);
+});
+
+test("the include tabs switch with JavaScript off", async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto(lessonUrl);
+  const tabs = includeTabs(page);
+  await expectCliShown(tabs);
+  await tabs.label("MoonBit").click();
+  await expectApiShown(tabs);
+  await context.close();
+});
