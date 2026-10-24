@@ -144,11 +144,11 @@ test "a new spelling is named in the snapshot line" {
     verdict: Accepted,
     value: { "Hole": {} },
   }
-  assert_eq(example.line(), "s.json /a Type accepted unknown() {\"Hole\":{}}")
+  assert_eq(example.line(), "Accepted unknown() Type s.json /a")
 }
 
 ///|
-test "snapshot lines for each verdict" {
+test "snapshot lines for each verdict and form" {
   let legacy : Example = {
     source: "k.feature",
     at: "line 4",
@@ -156,29 +156,26 @@ test "snapshot lines for each verdict" {
     verdict: Legacy("legacy_spelling"),
     value: ["a"],
   }
-  assert_eq(
-    legacy.line(),
-    "k.feature line 4 Name legacy(legacy_spelling) - [\"a\"]",
-  )
+  assert_eq(legacy.line(), "Legacy(legacy_spelling) - Name k.feature line 4")
   let rejected : Example = {
-    source: "k.feature",
+    ..legacy,
     at: "line 5",
-    kind: Name,
     verdict: Rejected("invalid_name"),
-    value: "Usd",
   }
-  assert_eq(
-    rejected.line(),
-    "k.feature line 5 Name rejected(invalid_name) - \"Usd\"",
-  )
+  assert_eq(rejected.line(), "Rejected(invalid_name) - Name k.feature line 5")
   let compact : Example = {
     source: "k.feature",
     at: "line 6",
     kind: Type,
     verdict: Accepted,
-    value: "a",
+    value: { "Function": { "parameterType": "a", "returnType": ["b"] } },
   }
-  assert_eq(compact.line(), "k.feature line 6 Type accepted compact(1) \"a\"")
+  assert_eq(
+    compact.line(),
+    "Accepted compact(/Function/parameterType,/Function/returnType) Type k.feature line 6",
+  )
+  let expanded : Example = { ..compact, at: "line 7", value: { "Unit": {} }, }
+  assert_eq(expanded.line(), "Accepted expanded Type k.feature line 7")
 }
 
 ///|

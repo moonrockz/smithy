@@ -159,3 +159,102 @@ test "a row with the wrong number of cells is an error with its line" {
     Ok(_) => fail("I expected an error")
   }
 }
+
+///|
+fn kit_error(text : String) -> String {
+  match kit_examples("k.feature", text) {
+    Err(message) => message
+    Ok(_) => "I expected an error"
+  }
+}
+
+///|
+test "an unknown node tag is an error with its line" {
+  let message = kit_error(
+    (
+      #|@node:Frob
+      #|Feature: T
+      #|  Scenario: s
+      #|    Then its canonical JSON spelling is "a"
+    ),
+  )
+  assert_true(message.contains("k.feature:1"))
+  assert_true(message.contains("Frob"))
+}
+
+///|
+test "a row without a node tag is an error with its line" {
+  let message = kit_error(
+    (
+      #|Feature: T
+      #|  Scenario Outline: s
+      #|    Then a reader of <format> accepts <input>
+      #|    Examples:
+      #|      | format | input |
+      #|      | JSON   | "a"   |
+    ),
+  )
+  assert_true(message.contains("k.feature:6"))
+  assert_true(message.contains("node tag"))
+}
+
+///|
+test "a step without a node tag is an error with its line" {
+  let message = kit_error(
+    (
+      #|Feature: T
+      #|  Scenario: s
+      #|    Then its canonical JSON spelling is "a"
+    ),
+  )
+  assert_true(message.contains("k.feature:3"))
+}
+
+///|
+test "a table without a format column is an error with its line" {
+  let message = kit_error(
+    (
+      #|@node:Name
+      #|Feature: T
+      #|  Scenario Outline: s
+      #|    Then a reader of <format> accepts <input>
+      #|    Examples:
+      #|      | input |
+      #|      | "a"   |
+    ),
+  )
+  assert_true(message.contains("k.feature:7"))
+  assert_true(message.contains("format"))
+}
+
+///|
+test "a But step or a star step is read like an And step" {
+  let text =
+    #|@node:Name
+    #|Feature: T
+    #|  Scenario: s
+    #|    Then its canonical JSON spelling is "a"
+    #|    But a reader of JSON rejects "B" with invalid_name
+    #|    * a reader of JSON accepts ["c"]
+  assert_eq(rows(text), [
+    ("line 4", Name, Accepted, "\"a\""),
+    ("line 5", Name, Rejected("invalid_name"), "\"B\""),
+    ("line 6", Name, Accepted, "[\"c\"]"),
+  ])
+}
+
+///|
+test "a separator inside a JSON string does not split the step" {
+  let text =
+    #|@node:Name
+    #|Feature: T
+    #|  Scenario: s
+    #|    Then a reader of JSON rejects "a with b \" with c" with invalid_name
+    #|    And a reader of JSON accepts "x with warning y" with warning legacy_spelling
+    #|    And a reader of JSON accepts "p with warning q"
+  assert_eq(rows(text), [
+    ("line 4", Name, Rejected("invalid_name"), "\"a with b \\\" with c\""),
+    ("line 5", Name, Legacy("legacy_spelling"), "\"x with warning y\""),
+    ("line 6", Name, Accepted, "\"p with warning q\""),
+  ])
+}

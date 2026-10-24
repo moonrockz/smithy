@@ -7,7 +7,7 @@ pub(all) struct Example {
   kind : Kind
   verdict : Verdict
   value : Json
-}
+} derive(Eq, Debug)
 
 ///|
 /// A value of a lesson that quotes an example of the Morphir sources.
@@ -54,9 +54,9 @@ pub fn rejected_code(diagnostic : String) -> String? {
 ///|
 fn verdict_text(verdict : Verdict) -> String {
   match verdict {
-    Accepted => "accepted"
-    Legacy(warning) => "legacy(\{warning})"
-    Rejected(diagnostic) => "rejected(\{diagnostic})"
+    Accepted => "Accepted"
+    Legacy(warning) => "Legacy(\{warning})"
+    Rejected(diagnostic) => "Rejected(\{diagnostic})"
   }
 }
 
@@ -73,21 +73,21 @@ fn kind_text(kind : Kind) -> String {
 }
 
 ///|
-/// One line of the review snapshot: source, position, kind, verdict, form, and
-/// the value. Only an accepted example is sorted.
+/// One line of the review snapshot: `<verdict> <form> <kind> <source> <at>`.
+/// The form is `expanded`, `compact(<pointer>,...)` or `unknown(<pointer>)`.
+/// Only an accepted example is sorted; the form of another verdict is `-`.
 pub fn Example::line(self : Example) -> String {
   let form = match self.verdict {
     Accepted =>
       match sort(self.kind, self.value) {
         Expanded => "expanded"
-        Compact(found) => "compact(\{found.length()})"
+        Compact(found) =>
+          "compact(\{found.map(fn(f) { f.pointer }).join(","  )})"
         Unknown(pointer) => "unknown(\{pointer})"
       }
     _ => "-"
   }
-  let kind = kind_text(self.kind)
-  let verdict = verdict_text(self.verdict)
-  "\{self.source} \{self.at} \{kind} \{verdict} \{form} \{self.value.stringify()}"
+  "\{verdict_text(self.verdict)} \{form} \{kind_text(self.kind)} \{self.source} \{self.at}"
 }
 
 ///|

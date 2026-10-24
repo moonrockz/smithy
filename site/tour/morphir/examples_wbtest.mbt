@@ -74,3 +74,21 @@ test "quotes name the two lesson 39 values" {
     }),
   )
 }
+
+///|
+test "inputTypes gives one example for each entry" {
+  let document : Json = {
+    "def": { "inputTypes": { "a": "x", "b/c": { "Unit": {} } } },
+  }
+  assert_eq(file_examples("f.json", document).map(fn(e) { e.at }), [
+    "/def/inputTypes/a", "/def/inputTypes/b~1c",
+  ])
+}
+
+///|
+test "a reject case without validAs is rejected" {
+  let corpus : Json = { "rejectCases": [{ "input": "Usd" }] }
+  assert_eq(naming_examples("n.json", corpus).map(fn(e) { e.verdict }), [
+    Rejected("invalid_name"),
+  ])
+}

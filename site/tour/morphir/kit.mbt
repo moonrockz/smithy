@@ -32,6 +32,36 @@ fn parse_json(
 }
 
 ///|
+/// The index of the first `separator` that is not inside a JSON string.
+fn find_outside_string(text : String, separator : String) -> Int32? {
+  let mut in_string = false
+  let mut escaped = false
+  for i in 0..<text.length() {
+    let unit = text.code_unit_at(i).to_int()
+    if in_string {
+      if escaped {
+        escaped = false
+      } else if unit == 92 {
+        escaped = true
+      } else if unit == 34 {
+        in_string = false
+      }
+    } else if unit == 34 {
+      in_string = true
+    } else if text[i:].has_prefix(separator) {
+      return Some(i)
+    }
+  }
+  None
+}
+
+///|
+/// The keywords that start a step. `But` and `*` act like `And`.
+let step_words : Array[String] = [
+  "Given ", "When ", "Then ", "And ", "But ", "* ",
+]
+
+///|
 /// Reads a step. None: the step does not name JSON. A step that names JSON
 /// and fits no form is an error.
 fn parse_step(
@@ -50,7 +80,7 @@ fn parse_step(
     return Some(Literal(parse_json(source, line, json), Accepted))
   }
   if literal("a reader of JSON accepts ") is Some(rest) {
-    if rest.rev_find(" with warning ") is Some(i) {
+    if find_outside_string(rest, " with warning ") is Some(i) {
       let json = rest[:i].to_owned()
       let warning = rest[i + 14:].to_owned()
       return Some(Literal(parse_json(source, line, json), Legacy(warning)))
@@ -58,7 +88,7 @@ fn parse_step(
     return Some(Literal(parse_json(source, line, rest), Accepted))
   }
   if literal("a reader of JSON rejects ") is Some(rest) {
-    if rest.rev_find(" with ") is Some(i) {
+    if find_outside_string(rest, " with ") is Some(i) {
       let json = rest[:i].to_owned()
       let diagnostic = rest[i + 6:].to_owned()
       return Some(Literal(parse_json(source, line, json), Rejected(diagnostic)))
@@ -178,13 +208,12 @@ fn kit_examples_raise(
       })
       continue
     }
-    let step = ["Then ", "And ", "Given ", "When "].search_by(fn(p) {
-      trimmed.has_prefix(p)
-    })
-    guard step is Some(i) else { continue }
+    guard step_words.search_by(fn(word) { trimmed.has_prefix(word) }) is Some(i) else {
+      continue
+    }
     outline = None
     header = None
-    let step_text = trimmed[["Then ", "And ", "Given ", "When "][i].length():].to_owned()
+    let step_text = trimmed[step_words[i].length():].to_owned()
     match parse_step(source, line, step_text) {
       None => ()
       Some(Literal(json, verdict)) => {
