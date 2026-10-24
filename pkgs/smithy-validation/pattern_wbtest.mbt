@@ -37,7 +37,6 @@ test "pattern weight counts the copies the automaton builds" {
       ("^[\\d_]$", 32), // class escape counts its expanded members
       ("^[\\w]$", 48),
       ("^[\\s]$", 136),
-      ("^[\\u{1F600}]$", 104), // astral: source length
       ("^[😀]$", 48), // literal astral character: source length
       ("^[\\u00e9a-z]$", 32),
     ] {
@@ -59,6 +58,9 @@ test "class dashes follow ECMA-262 ClassRanges" {
       ("^[!--]$", ["!", ",", "-"], ["a"]), // dash as the high end
       ("^[\\d-a]$", ["5", "-", "a"], ["b"]), // dash after a class escape
       ("^[\\u0041-\\u005a]$", ["M"], ["a", "-"]), // \u escapes as range ends
+      ("^[\\d-a-c]$", ["a", "c", "-", "5"], ["b"]), // Annex B pseudo-range
+      ("^[\\d--a]$", ["-", "a", "5"], ["A", "."]),
+      ("^[\\d-\\w]$", ["5", "a", "_", "-"], ["."]), // union of two class escapes
       ("^[0-9/-]+$", ["12/3-4"], ["a"]),
       (
         "^[A-Za-z0-9/-]+:[A-Za-z0-9/-]+#[A-Za-z0-9-]+$",
@@ -73,5 +75,18 @@ test "class dashes follow ECMA-262 ClassRanges" {
     for text in bad {
       assert_false(compiled.execute(text), msg=pattern + " / " + text)
     }
+  }
+}
+
+///|
+test "a braced unicode escape is rejected" {
+  let id = @smithy.ShapeId::parse("example#String").unwrap()
+  for pattern in ["^[\\u{41}]$", "^\\u{41}$"] {
+    let mut message = ""
+    ignore(compile_pattern(pattern, id)) catch {
+      UnsupportedConstraint(_, text) => message = text
+      _ => fail("Expected UnsupportedConstraint")
+    }
+    assert_true(message.contains("\\u{"), msg=pattern)
   }
 }

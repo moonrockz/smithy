@@ -212,13 +212,14 @@ priv enum ClassSlot {
   AfterRangeDash
   AfterRange
   AfterSet
+  AfterSetDash
 }
 
 ///|
 /// The slot after one character: it completes a range when a range dash came before.
 fn ClassSlot::after_atom(self : ClassSlot) -> ClassSlot {
   match self {
-    AfterRangeDash => AfterRange
+    AfterRangeDash | AfterSetDash => AfterRange
     Start | AfterAtom | AfterRange | AfterSet => AfterAtom
   }
 }
@@ -263,7 +264,8 @@ fn compile_pattern(
             )
           }
           out.write_string(expansion)
-          class = Some(AfterSet)
+          // Annex B: a dash beside a class escape makes a union, not a range.
+          class = Some(if slot is AfterSetDash { AfterRange } else { AfterSet })
         } else {
           out.write_string("[" + expansion + "]")
         }
@@ -289,17 +291,14 @@ fn compile_pattern(
           }
           // A \u escape is one class atom: copy all of it.
           let end = if escape == 117 {
+            // ECMA without the u flag reads \u{ as 'u' and text; Java rejects it.
             if i + 1 < pattern.length() && pattern.code_unit_at(i + 1) == 123 {
-              let mut j = i + 2
-              while j < pattern.length() && pattern.code_unit_at(j) != 125 {
-                j += 1
-              }
-              guard j < pattern.length() else { raise unsupported() }
-              j + 1
-            } else {
-              guard i + 4 < pattern.length() else { raise unsupported() }
-              i + 5
+              raise UnsupportedConstraint(
+                id, "I could not read '\\u{' in the pattern. I accept only \\uXXXX with four hex digits.",
+              )
             }
+            guard i + 4 < pattern.length() else { raise unsupported() }
+            i + 5
           } else {
             i + 1
           }
@@ -330,6 +329,11 @@ fn compile_pattern(
       if range_operator {
         out.write_string("-")
         class = Some(AfterRangeDash)
+      } else if slot is AfterSet &&
+        i + 1 < pattern.length() &&
+        pattern.code_unit_at(i + 1) != 93 {
+        out.write_string("\\-")
+        class = Some(AfterSetDash)
       } else {
         out.write_string("\\-")
         class = Some(slot.after_atom())
