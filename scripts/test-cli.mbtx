@@ -1641,6 +1641,18 @@ async fn exercise_engine_cases(runner : Runner, root : String) -> Unit {
   guard cases is { "cases": Array(cases), .. } else {
     fail("cli-cases.json must have a cases array")
   }
+  // The ids that the file must hold: a case lost in a merge fails here.
+  let expected_ids = ["value-consumer-valid", "value-consumer-invalid", "value-unknown-reject", "value-unknown-ignore", "value-json-names", "value-member-target", "value-not-json", "value-duplicate-key", "value-missing-target", "value-invalid-model", "value-unsupported-pattern", "value-unsupported-timestamp", "value-json-limit"]
+  let seen : Array[String] = []
+  for item in cases {
+    guard item is { "id": String(id), .. } else {
+      fail("a case needs an id: \{item.stringify()}")
+    }
+    assert_false(seen.contains(id), msg="duplicate case id \{id}")
+    seen.push(id)
+  }
+  assert_true(!cases.is_empty(), msg="cli-cases.json has no case")
+  assert_eq(seen, expected_ids)
   for item in cases {
     guard item
       is {
@@ -1675,17 +1687,15 @@ async fn exercise_engine_cases(runner : Runner, root : String) -> Unit {
     })
     let (out, err) = { ..runner, dir, }.command(args, status.to_int())
     let printed : Array[Json] = []
-    for line in (out + err).split("\n") {
+    for line in (out + err).replace_all(old="\r\n", new="\n").split("\n") {
       let line = line.to_owned()
       if !line.is_empty() {
         printed.push(Json::string(line))
       }
     }
-    assert_eq(
-      Json::array(printed).stringify(),
-      Json::array(lines).stringify(),
-      msg=id,
-    )
+    let expected = Json::array(lines).stringify()
+    let got = Json::array(printed).stringify()
+    assert_eq(got, expected, msg="\{id}: the CLI printed \{got} but the case has \{expected}")
   }
 }
 

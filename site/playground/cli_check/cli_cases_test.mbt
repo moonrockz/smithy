@@ -24,7 +24,32 @@ fn string_of(json : Json, what : String) -> String raise {
 }
 
 ///|
+/// The ids that the file must hold: a case lost in a merge fails.
+let expected_ids : Array[String] = ["value-consumer-valid", "value-consumer-invalid", "value-unknown-reject", "value-unknown-ignore", "value-json-names", "value-member-target", "value-not-json", "value-duplicate-key", "value-missing-target", "value-invalid-model", "value-unsupported-pattern", "value-unsupported-timestamp", "value-json-limit"]
+
+///|
 fn load_cases() -> Array[CliCase] raise {
+  let cases = read_cases()
+  let seen : Array[String] = []
+  for c in cases {
+    if seen.contains(c.id) {
+      fail("duplicate case id \{c.id}")
+    }
+    seen.push(c.id)
+  }
+  if cases.is_empty() {
+    fail("cli-cases.json has no case")
+  }
+  if seen != expected_ids {
+    fail(
+      "the case ids are \{Json(seen).stringify()} but I expected \{Json(expected_ids).stringify()}",
+    )
+  }
+  cases
+}
+
+///|
+fn read_cases() -> Array[CliCase] raise {
   let json = @json.parse(
     @fs.read_file_to_string("playground/cli_check/cli-cases.json"),
   )
