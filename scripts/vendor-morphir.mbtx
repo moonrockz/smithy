@@ -114,6 +114,7 @@ async fn main {
     }
   }
   let inventory : Array[(String, String)] = []
+  let contents : Array[Bytes] = []
   for path in files {
     guard blobs.get(path) is Some(blob) else {
       eprintln("Path not in the pinned tree: " + path)
@@ -124,11 +125,18 @@ async fn main {
       eprintln("Blob mismatch (the checkout is not at the pinned commit?): " + path)
       @sys.exit(1)
     }
-    write_bytes(target + "/upstream/" + path, content)
-    if path == "LICENSE" || path == "NOTICE" {
-      write_bytes(target + "/" + path, content)
-    }
+    contents.push(content)
     inventory.push((path, blob))
+  }
+  // Every file is verified. Remove the old copy, so a path that left `files` leaves no orphan.
+  if @fs.exists(target + "/upstream") {
+    @fs.rmdir(target + "/upstream", recursive=true)
+  }
+  for i, path in files {
+    write_bytes(target + "/upstream/" + path, contents[i])
+    if path == "LICENSE" || path == "NOTICE" {
+      write_bytes(target + "/" + path, contents[i])
+    }
   }
   @fs.write_file(target + "/inventory.json", render_inventory(morphir_sha, inventory))
   println("Vendored " + inventory.length().to_string() + " verified Morphir files")

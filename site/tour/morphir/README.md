@@ -13,7 +13,7 @@ cite the YAML lines at the pinned commit.
 
 ## Licence
 
-Apache-2.0. Copyright belongs to FINOS and the Morphir contributors. See `LICENSE` and `NOTICE`.
+Apache-2.0. See `LICENSE` and `NOTICE`.
 
 ## Do not edit
 
@@ -22,7 +22,8 @@ tree and fails on any difference.
 
 ## Refresh
 
-1. Change `morphir_sha` in `scripts/vendor-morphir.mbtx`.
+1. Change `morphir_sha` in `scripts/vendor-morphir.mbtx`. Edit `files` when an upstream path moves. The script
+   removes `upstream/` and writes it again, so a path that leaves `files` leaves no file.
 2. Check out that commit in `.dev/out/finos-morphir`.
 3. Run `mise run tour:vendor:morphir`.
 4. Run `cd site && moon test --target native -p moonrockz/smithy-site/tour/check --update`.
