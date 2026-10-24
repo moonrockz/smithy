@@ -37,6 +37,18 @@ Feature: Direct application value validation
     When I prepare the value validator
     Then value preparation reports an unsupported constraint
 
+  Scenario: A nested alternation pattern validates within the default work limit
+    Given a value model whose input has the pattern "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*:([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*#([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$"
+    When I prepare the value validator
+    And I validate the JSON value "\"morphir/SDK:basics#int\""
+    Then the value is valid
+
+  Scenario: A literal dash may end a character class
+    Given a value model whose input has the pattern "^[A-Za-z0-9/-]+:[A-Za-z0-9/-]+#[A-Za-z0-9-]+$"
+    When I prepare the value validator
+    And I validate the JSON value "\"morphir/SDK:basics#int\""
+    Then the value is valid
+
   Scenario: Duplicate names cannot hide an invalid input
     Given a prepared count value validator
     When I validate the JSON value "{\"count\":0,\"count\":2}"
