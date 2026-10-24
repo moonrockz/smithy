@@ -149,3 +149,19 @@ test "blocked in a lesson without an output" {
 test "blocked with an ERROR event" {
   expect_err("blocked-with-error", ["01-a/cases/b", "blocked", "ERROR"])
 }
+
+///|
+test "a spec that is neither a smithy.io URL nor a docs page" {
+  expect_err("bad-spec", [
+    "01-a: \"spec\" must be a smithy.io URL or the repository path of a docs page, not \"https://example.com/x\"",
+  ])
+}
+
+///|
+test "a spec that is the repository path of a docs page" {
+  match read("docs-spec") {
+    Ok(tour) =>
+      assert_eq(tour.lessons[0].spec, "pkgs/smithy-openrpc/README.mbt.md")
+    Err(msg) => fail(msg)
+  }
+}

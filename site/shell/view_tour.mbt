@@ -83,10 +83,16 @@ fn lesson_view(m : Model, page : @model.LessonPage) -> Html {
       @html.article(class="tour-text", [
         text,
         @html.p(class="tour-spec", [
-          @html.a(href=page.spec, [
-            @html.text("Read this subject in the Smithy specification"),
-            icon_external(),
-          ]),
+          if page.spec.has_prefix(@model.spec_url_prefix) {
+            @html.a(href=page.spec, [
+              @html.text("Read this subject in the Smithy specification"),
+              icon_external(),
+            ])
+          } else {
+            @html.a(href=page.spec, [
+              @html.text("Read the documentation of this feature"),
+            ])
+          },
         ]),
       ]),
       @html.div(id="tour-app", class="tour-app", [

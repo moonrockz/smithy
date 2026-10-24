@@ -19,10 +19,12 @@ site/tour/lessons/NN-<slug>/
 - Lesson numbers start at 01 and have no gap. The folder name is `NN-<slug>`, and `<slug>` is the `slug` of
   `lesson.json`. Two lessons cannot have the same number or the same slug.
 - `lesson.json` has the keys `slug`, `title`, `section`, `spec`, and optionally `output` and `selector`.
-  Another key is an error. `section` groups consecutive lessons on the contents page. `spec` is the link to the
-  smithy.io section that the lesson teaches. `output` is one of `JsonAst`, `Idl`, `Selector`, `JsonSchema`,
-  `OpenApi30`, `OpenApi31` or `OpenRpc`. `selector` is the selector for the `Selector` output, and is an error
-  with another output.
+  Another key is an error. `section` groups consecutive lessons on the contents page. `spec` is the link to what
+  the lesson teaches: a URL that starts with `https://smithy.io/`, or the repository path of a docs page, such as
+  `pkgs/smithy-openrpc/README.mbt.md`. The reader rejects any other value. A docs path links to the page on the
+  site, with the text "Read the documentation of this feature". `output` is one of `JsonAst`, `Idl`, `Selector`,
+  `JsonSchema`, `OpenApi30`, `OpenApi31` or `OpenRpc`. `selector` is the selector for the `Selector` output, and
+  is an error with another output.
 - `lesson.md` starts with the line `# <title>`, with the `title` of `lesson.json`.
 - A case runs the starting files with its own `files/` on top. A case file replaces a starting file of the same
   name, or adds a new file.
@@ -132,7 +134,7 @@ Write `lesson.md` in ASD-STE100 Simplified Technical English:
 - Use short sentences, the active voice, and one word for one thing.
 - A lesson has about one screen of text.
 - A lesson makes sense alone. Do not depend on the text of an earlier lesson.
-- Link to the smithy.io section that the lesson teaches (`spec` in `lesson.json`).
+- Link to the smithy.io section or the docs page that the lesson teaches (`spec` in `lesson.json`).
 - Link to another lesson by the path of its `lesson.md`, for example `../04-shape-ids/lesson.md`. The site
   opens the page of that lesson, and the link also works on GitHub. A test of `site/tour/check`
   (`links_test.mbt`) fails on a link into `site/tour/lessons` that does not open a lesson page.

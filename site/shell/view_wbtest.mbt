@@ -730,6 +730,8 @@ async test "a lesson page has the top bar, the text, the spec link and the empty
   assert_true(
     html.contains("href=\"https://smithy.io/2.0/spec/simple-types.html\""),
   )
+  assert_true(html.contains("Read this subject in the Smithy specification"))
+  assert_true(!html.contains("Read the documentation of this feature"))
   for id in ["tour-app", "tour-editor", "tour-output"] {
     assert_true(html.contains("id=\"\{id}\""))
   }
@@ -820,4 +822,25 @@ async test "the docs sidebar links to the tour" {
       "href=\"/smithy/tour/\" target=\"_self\" class=\"ms-side-link\">Tour</a>",
     ),
   )
+}
+
+///|
+#cfg(not(target="js"))
+async test "a lesson page with a docs link names it the documentation" {
+  let page = { ..simple_shapes_page(), spec: "/smithy/docs/smithy-openrpc/", }
+  let html = render_tour(
+    Lesson("simple-shapes"),
+    Page(page),
+    Some("# Simple shapes\n\nText.\n"),
+  )
+  assert_true(html.contains("href=\"/smithy/docs/smithy-openrpc/\""))
+  assert_true(html.contains("Read the documentation of this feature"))
+  assert_true(!html.contains("Read this subject in the Smithy specification"))
+  // The top bar has one external icon; the spec link adds none.
+  let spec_html = render_tour(
+    Lesson("simple-shapes"),
+    Page(simple_shapes_page()),
+    Some("# Simple shapes\n\nText.\n"),
+  )
+  assert_eq(spec_html.split("ms-ext").count(), html.split("ms-ext").count() + 1)
 }

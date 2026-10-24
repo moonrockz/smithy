@@ -17,6 +17,17 @@ fn tour_contents(tour : @model.Tour) -> @model.TourContents {
 }
 
 ///|
+/// The href of the `spec` of a lesson: a smithy.io URL as it is, or the docs
+/// page of a repository path.
+fn spec_href(config : @data.SiteConfig, spec : String) -> String {
+  match @content.classify(spec) {
+    Some((route, _)) if !spec.has_prefix(@model.spec_url_prefix) =>
+      @route.href(config.base, route)
+    _ => spec
+  }
+}
+
+///|
 /// The data of the page of `lesson`.
 fn lesson_page(
   config : @data.SiteConfig,
@@ -32,7 +43,7 @@ fn lesson_page(
     total: tour.lessons.length(),
     output: lesson.output,
     selector: lesson.selector,
-    spec: lesson.spec,
+    spec: spec_href(config, lesson.spec),
     files: lesson.files,
     digest: @model.digest(lesson.files),
     previous: previous.map(link_of),

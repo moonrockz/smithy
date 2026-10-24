@@ -302,6 +302,10 @@ pub fn lesson_dir(number : Int32, slug : String) -> String {
 }
 
 ///|
+/// A `spec` that starts with this is a link to the Smithy specification.
+pub let spec_url_prefix : String = "https://smithy.io/"
+
+///|
 /// The repository path of the lessons folder.
 pub let lessons_root : String = "site/tour/lessons"
 

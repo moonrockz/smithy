@@ -83,6 +83,15 @@ fn parse_number(dir : String) -> Int32 raise {
 }
 
 ///|
+/// Whether `path` is the repository path of a page that the site publishes.
+fn is_docs_page(path : String) -> Bool {
+  match @content.classify(path) {
+    Some((Doc(_), _)) => true
+    _ => false
+  }
+}
+
+///|
 fn read_lesson(root : String, dir : String) -> @model.Lesson raise {
   let base = "\{root}/\{dir}"
   let number = parse_number(dir)
@@ -98,6 +107,11 @@ fn read_lesson(root : String, dir : String) -> @model.Lesson raise {
   let title = string_field(meta, "title", dir)
   let section = string_field(meta, "section", dir)
   let spec = string_field(meta, "spec", dir)
+  if !spec.has_prefix(@model.spec_url_prefix) && !is_docs_page(spec) {
+    fail(
+      "\{dir}: \"spec\" must be a smithy.io URL or the repository path of a docs page, not \"\{spec}\"",
+    )
+  }
   let output = match optional_string_field(meta, "output", dir) {
     None => None
     Some(name) =>
