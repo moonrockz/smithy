@@ -661,3 +661,43 @@ test "OpenPlayground does not open a model that is too large for a link" {
   let (m, _) = update(m, Edited("namespace a\n"))
   assert_eq(m.link_problem, None)
 }
+
+///|
+test "ToggleExpand expands a pane and the same button gives the split view back" {
+  let (m, _) = Model::start(page(), None)
+  assert_eq(m.layout, Split)
+  let (m, effects) = update(m, ToggleExpand(EditorSide))
+  assert_eq(m.layout, EditorOnly)
+  assert_eq(effects, [Remeasure])
+  let (m, effects) = update(m, ToggleExpand(EditorSide))
+  assert_eq(m.layout, Split)
+  assert_eq(effects, [Remeasure])
+  let (m, effects) = update(m, ToggleExpand(OutputSide))
+  assert_eq(m.layout, OutputOnly)
+  assert_eq(effects, [Remeasure])
+  let (m, effects) = update(m, ToggleExpand(OutputSide))
+  assert_eq(m.layout, Split)
+  assert_eq(effects, [Remeasure])
+}
+
+///|
+test "the button of the other pane switches the expanded pane" {
+  let (m, _) = Model::start(page(), None)
+  let (m, _) = update(m, ToggleExpand(EditorSide))
+  let (m, effects) = update(m, ToggleExpand(OutputSide))
+  assert_eq(m.layout, OutputOnly)
+  assert_eq(effects, [Remeasure])
+  let (m, effects) = update(m, ToggleExpand(EditorSide))
+  assert_eq(m.layout, EditorOnly)
+  assert_eq(effects, [Remeasure])
+}
+
+///|
+test "a toggle changes nothing else, and Reset keeps the layout" {
+  let (m, _) = Model::start(page(), None)
+  let (expanded, _) = update(m, ToggleExpand(OutputSide))
+  assert_eq(expanded, { ..m, layout: OutputOnly, })
+  let (reset, effects) = update(expanded, Reset)
+  assert_eq(reset.layout, OutputOnly)
+  assert_false(effects.contains(Remeasure))
+}

@@ -43,6 +43,45 @@ pub extend Pane with Eq::{equal, not_equal}
 pub extend Pane with @debug.Debug::{to_repr}
 
 ///|
+/// Which right-hand pane fills the column.
+pub(all) enum Layout {
+  /// The editor above the output.
+  Split
+  EditorOnly
+  OutputOnly
+} derive(Eq, Debug)
+
+///|
+pub extend Layout with Eq::{equal, not_equal}
+
+///|
+pub extend Layout with @debug.Debug::{to_repr}
+
+///|
+/// A right-hand pane that has an expand button.
+pub(all) enum Expandable {
+  EditorSide
+  OutputSide
+} derive(Eq, Debug)
+
+///|
+pub extend Expandable with Eq::{equal, not_equal}
+
+///|
+pub extend Expandable with @debug.Debug::{to_repr}
+
+///|
+/// The layout after the button of this pane: the pane fills the column, or,
+/// when it did already, both panes show.
+fn Layout::toggled(self : Layout, side : Expandable) -> Layout {
+  match (side, self) {
+    (EditorSide, EditorOnly) | (OutputSide, OutputOnly) => Split
+    (EditorSide, _) => EditorOnly
+    (OutputSide, _) => OutputOnly
+  }
+}
+
+///|
 /// The answer of the Worker to a request.
 pub(all) enum Answer {
   /// The findings of the files.
@@ -73,6 +112,8 @@ pub(all) enum Msg {
   TimedOut(Int32)
   Reset
   OpenPlayground
+  /// The reader pressed the expand button of a pane.
+  ToggleExpand(Expandable)
 } derive(Eq, Debug)
 
 ///|
@@ -110,6 +151,8 @@ pub(all) enum Effect {
   Navigate(url~ : String)
   /// End the Worker and start a new one.
   RestartWorker
+  /// Make the editors measure their elements again, after a change of layout.
+  Remeasure
 } derive(Eq, Debug)
 
 ///|
@@ -172,6 +215,7 @@ pub(all) struct Model {
   /// The index of the file that the editor shows.
   selected : Int32
   pane : Pane
+  layout : Layout
   /// True when the reader selected a tab of the output pane. Then the
   /// lesson does not change the tab.
   chosen : Bool
@@ -257,6 +301,7 @@ pub fn Model::start(
     } else {
       FindingsPane
     },
+    layout: Split,
     chosen: false,
     edits: 0,
     seq: 0,

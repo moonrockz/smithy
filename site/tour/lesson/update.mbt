@@ -247,6 +247,8 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         ({ ..sent, retried: true, }, [RestartWorker, ..more])
       }
     }
+    ToggleExpand(side) =>
+      ({ ..m, layout: m.layout.toggled(side), }, [Remeasure])
     Reset => {
       let m = {
         ..m,

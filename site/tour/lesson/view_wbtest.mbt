@@ -110,3 +110,70 @@ test "each output has a tab name" {
   assert_eq(output_label(JsonSchema), "JSON Schema")
   assert_eq(output_label(Selector), "Selector")
 }
+
+///|
+/// The text of the start tag of the expand button of a pane, "" when it has none.
+#cfg(not(target="js"))
+fn expand_tag(html : String, name : String) -> String {
+  guard html.find("aria-label=\"" + name + "\"") is Some(at) else { return "" }
+  guard html[:at].rev_find("<button") is Some(start) else { return "" }
+  guard html[at:].find(">") is Some(end) else { return "" }
+  html[start:at + end + 1].to_owned()
+}
+
+///|
+#cfg(not(target="js"))
+async test "each pane has an expand button with a name, a title and a state" {
+  let (m, _) = Model::start(page(), None)
+  let html = render(m)
+  assert_true(html.contains("class=\"tour-panes\""))
+  let editor = expand_tag(html, "Expand the editor")
+  let output = expand_tag(html, "Expand the output")
+  for tag in [editor, output] {
+    assert_true(tag.contains("tour-expand"))
+    assert_true(tag.contains("type=\"button\""))
+    assert_true(tag.contains("aria-pressed=\"false\""))
+  }
+  assert_true(editor.contains("title=\"Expand the editor\""))
+  assert_true(output.contains("title=\"Expand the output\""))
+  assert_eq(html.split("class=\"tour-expand\"").count() - 1, 2)
+}
+
+///|
+#cfg(not(target="js"))
+async test "the pressed button says Show both panes and the panes get a layout class" {
+  let (m, _) = Model::start(page(), None)
+  let (m, _) = update(m, ToggleExpand(EditorSide))
+  let html = render(m)
+  assert_true(html.contains("class=\"tour-panes tour-editor-only\""))
+  let pressed = expand_tag(html, "Show both panes")
+  assert_true(pressed.contains("aria-pressed=\"true\""))
+  assert_true(pressed.contains("title=\"Show both panes\""))
+  assert_true(
+    expand_tag(html, "Expand the output").contains("aria-pressed=\"false\""),
+  )
+  assert_eq(expand_tag(html, "Expand the editor"), "")
+  let (m, _) = update(m, ToggleExpand(OutputSide))
+  let html = render(m)
+  assert_true(html.contains("class=\"tour-panes tour-output-only\""))
+  assert_true(
+    expand_tag(html, "Show both panes").contains("aria-pressed=\"true\""),
+  )
+  assert_true(
+    expand_tag(html, "Expand the editor").contains("aria-pressed=\"false\""),
+  )
+  assert_eq(expand_tag(html, "Expand the output"), "")
+}
+
+///|
+#cfg(not(target="js"))
+async test "both panes and both editor elements stay in the DOM in every layout" {
+  let (m, _) = Model::start(page(), None)
+  for layout in [Split, EditorOnly, OutputOnly] {
+    let html = render({ ..m, layout, })
+    assert_true(html.contains("tour-pane tour-edit"))
+    assert_true(html.contains("tour-pane tour-out"))
+    assert_true(html.contains("id=\"\{EDITOR_ID}\""))
+    assert_true(html.contains("id=\"\{OUTPUT_ID}\""))
+  }
+}

@@ -157,6 +157,7 @@ fn Runtime::run(self : Runtime, effect : @lesson.Effect) -> Unit {
     Store(key~, value~) => storage_write(key, value)
     Clear(key~) => storage_remove(key)
     Navigate(url~) => navigate(url)
+    Remeasure => ()
     RestartWorker => {
       if self.worker is Some(worker) {
         worker.stop()

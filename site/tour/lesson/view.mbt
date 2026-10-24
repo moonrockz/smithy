@@ -23,6 +23,52 @@ fn tab(on : Bool, click : @rabbita.Cmd, label : Array[Html]) -> Html {
 }
 
 ///|
+/// The button that expands a pane to the column, or gives the split view back.
+fn expand_button(
+  m : Model,
+  side : Expandable,
+  emit : @rabbita.Emit[Msg],
+) -> Html {
+  let (pressed, name) = match (side, m.layout) {
+    (EditorSide, EditorOnly) | (OutputSide, OutputOnly) =>
+      (true, "Show both panes")
+    (EditorSide, _) => (false, "Expand the editor")
+    (OutputSide, _) => (false, "Expand the output")
+  }
+  @html.button(
+    class="tour-expand",
+    title=name,
+    on_click=emit(ToggleExpand(side)),
+    attrs=@html.Attrs::build()
+      .type_("button")
+      .aria_label(name)
+      .aria_pressed(if pressed { "true" } else { "false" }),
+    [
+      @html.span(
+        class="tour-expand-icon",
+        attrs=@html.Attrs::build().aria_hidden("true"),
+        if pressed {
+          "⤡"
+        } else {
+          "⤢"
+        },
+      ),
+    ],
+  )
+}
+
+///|
+/// The header of a pane: its tabs and its expand button.
+fn head(
+  tabs : Html,
+  m : Model,
+  side : Expandable,
+  emit : @rabbita.Emit[Msg],
+) -> Html {
+  @html.div(class="tour-head", [tabs, expand_button(m, side, emit)])
+}
+
+///|
 fn file_tabs(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   @html.div(
     class="tour-tabs",
@@ -69,7 +115,7 @@ fn actions(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
 ///|
 fn editor_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   @html.section(class="tour-pane tour-edit", [
-    file_tabs(m, emit),
+    head(file_tabs(m, emit), m, EditorSide, emit),
     // The editor owns the children of this element. It must stay at the
     // same place, with the same attributes, in every render.
     @html.div(id=EDITOR_ID, class="tour-editor", ([] : Array[Html])),
@@ -157,18 +203,23 @@ fn output_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   }
   let on_output = m.page.output is Some(_) && m.pane == OutputPane
   @html.section(class="tour-pane tour-out", [
-    @html.div(
-      class="tour-tabs",
-      attrs=@html.Attrs::build().role("tablist").aria_label("Results"),
-      [
-        tab(
-          m.pane == FindingsPane,
-          emit(SelectPane(FindingsPane)),
-          [@html.text("Findings"), ..count],
-        ),
-        ..output_tab,
-        ..busy,
-      ],
+    head(
+      @html.div(
+        class="tour-tabs",
+        attrs=@html.Attrs::build().role("tablist").aria_label("Results"),
+        [
+          tab(
+            m.pane == FindingsPane,
+            emit(SelectPane(FindingsPane)),
+            [@html.text("Findings"), ..count],
+          ),
+          ..output_tab,
+          ..busy,
+        ],
+      ),
+      m,
+      OutputSide,
+      emit,
     ),
     panel(m.pane == FindingsPane, findings_panel(m)),
     // The output editor owns the children of its element. Every slot stays
@@ -192,5 +243,12 @@ fn output_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
 /// The right-hand panes of a lesson: the editor with a tab for each file,
 /// and the output with the Findings tab and the tab of the lesson output.
 pub fn view(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
-  @html.div(class="tour-panes", [editor_pane(m, emit), output_pane(m, emit)])
+  // Both panes stay in the DOM in every layout: the editors own their
+  // elements, so a class hides a pane.
+  let class_ = match m.layout {
+    Split => "tour-panes"
+    EditorOnly => "tour-panes tour-editor-only"
+    OutputOnly => "tour-panes tour-output-only"
+  }
+  @html.div(class=class_, [editor_pane(m, emit), output_pane(m, emit)])
 }
