@@ -70,6 +70,23 @@ test "tested_snippet accepts only tested fences" {
     @source.tested_snippet("apps/smithy/README.md", console, has_moon_pkg=false),
     Ok({ lang: "console", file: None, code: "$ x", }),
   )
+  let failing : @markdown.Fence = {
+    lang: "console",
+    rest: "status=1",
+    code: "$ x",
+  }
+  assert_eq(
+    @source.tested_snippet("apps/smithy/README.md", failing, has_moon_pkg=false),
+    Ok({ lang: "console", file: None, code: "$ x", }),
+  )
+  for rest in ["status=x", "status=0", "status=126", "status="] {
+    snippet_err(
+      "apps/smithy/README.md",
+      { lang: "console", rest, code: "$ x", },
+      has_moon_pkg=false,
+      "a tested block",
+    )
+  }
   let fixture : @markdown.Fence = {
     lang: "smithy",
     rest: "file=greeting.smithy",

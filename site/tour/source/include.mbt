@@ -47,8 +47,10 @@ pub fn tested_snippet(
   }
   if cli_doc_files.contains(path) {
     // The runner runs a fence whose first info word is `console`, whatever follows,
-    // so a `console` fence with more words is not a fixture.
-    if fence.lang == "console" && fence.rest == "" {
+    // so a `console` fence with more words is not a fixture. `status=N` (N from 1 to 125)
+    // makes each command exit with N (scripts/test-cli.mbtx, `doc_console_status`).
+    if fence.lang == "console" &&
+      (fence.rest == "" || console_status_word(fence.rest)) {
       return Ok({ lang: "console", file: None, code: fence.code, })
     }
     if fence.lang != "console" &&
@@ -64,6 +66,24 @@ pub fn tested_snippet(
     }
   }
   Err(untested(fence.lang, fence.rest))
+}
+
+///|
+/// True when `rest` is exactly `status=N` with N from 1 to 125.
+fn console_status_word(rest : String) -> Bool {
+  guard rest.has_prefix("status=") else { return false }
+  let digits = rest[7:].to_owned()
+  if digits.is_empty() || digits.length() > 3 {
+    return false
+  }
+  let mut n = 0
+  for c in digits {
+    if c < '0' || c > '9' {
+      return false
+    }
+    n = n * 10 + (c.to_int() - 48)
+  }
+  n >= 1 && n <= 125
 }
 
 ///|

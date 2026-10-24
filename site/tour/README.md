@@ -194,7 +194,12 @@ A lesson must not hold a CLI or API block that no test runs. It includes a marke
 | --- | --- | --- |
 | `mbt check` with a test | a `.mbt.md` file with a `moon.pkg` next to it | `moon test` |
 | `console` | `apps/smithy/README.md` | `mise run test:cli` |
+| `console status=N` (N from 1 to 125) | `apps/smithy/README.md` | `mise run test:cli` |
 | `LANG file=NAME` | `apps/smithy/README.md` | `mise run test:cli` (writes the file) |
+
+A `console` fence runs each command and requires exit status 0 and an empty stderr. `console status=N` runs each
+command and requires exit status N; the text after a command is its stdout, then its stderr. Use it to show a
+failing check from a tested source.
 
 A `console` or `file=` fence must start at the start of a line, because the runner (`scripts/test-cli.mbtx`)
 reads only those. Do not remove a tour marker that a lesson uses.

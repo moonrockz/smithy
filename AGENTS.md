@@ -103,7 +103,8 @@ format and the rules are in `site/tour/README.md`.
 A lesson never holds a hand-copied CLI or API block. It includes a marked region (`<!-- tour:start NAME -->` ...
 `<!-- tour:end NAME -->`) of a tested source: an `mbt check` block of a `.mbt.md` file, or a `console` or
 `LANG file=NAME` fence of `apps/smithy/README.md`. `mise run test:cli` runs each `console` fence and writes each
-`file=` fixture of that README. Do not remove a tour marker that a lesson uses: `mise run tour:check` and
+`file=` fixture of that README. `console status=N` runs each command and requires exit status N; the text after a
+command is its stdout, then its stderr. Do not remove a tour marker that a lesson uses: `mise run tour:check` and
 `mise run site:check` then fail.
 
 ## Release process

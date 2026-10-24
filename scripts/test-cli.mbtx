@@ -1373,6 +1373,7 @@ let readme_files : Array[String] = ["apps/smithy/README.md"]
 priv struct DocCommand {
   args : Array[String]
   output : String
+  status : Int32
 } derive(Eq, Debug)
 
 ///|
@@ -1459,7 +1460,43 @@ fn doc_path_leaves(word : String) -> Bool {
 }
 
 ///|
-fn doc_session(body : Array[String]) -> Result[DocStep, String] {
+/// The exit status that a console fence expects: 0, or N of an info word `status=N` with N from 1 to 125.
+fn doc_console_status(info : String) -> Result[Int32, String] {
+  let words = info.split(" ").collect()
+  for i = 1; i < words.length(); i = i + 1 {
+    let word : String = words[i].to_owned()
+    if word.has_prefix("status=") {
+      let digits : String = word[7:].to_owned()
+      let mut n = 0
+      let mut numeric = !digits.is_empty() && digits.length() <= 3
+      for c in digits {
+        if c >= '0' && c <= '9' {
+          n = n * 10 + (c.to_int() - 48)
+        } else {
+          numeric = false
+        }
+      }
+      if !numeric || n < 1 || n > 125 {
+        return Err(
+          "I expected status=N with N from 1 to 125 and found `\{word}`.",
+        )
+      }
+      // Int32 has no conversion from Int here, so count up.
+      let mut status : Int32 = 0
+      for _ in 0..<n {
+        status = status + 1
+      }
+      return Ok(status)
+    }
+  }
+  Ok(0)
+}
+
+///|
+fn doc_session(
+  body : Array[String],
+  status~ : Int32,
+) -> Result[DocStep, String] {
   let commands : Array[DocCommand] = []
   let mut args : Array[String]? = None
   let mut output : Array[String] = []
@@ -1470,7 +1507,7 @@ fn doc_session(body : Array[String]) -> Result[DocStep, String] {
   ) -> Unit {
     if args is Some(args) {
       let text = if output.is_empty() { "" } else { output.join("\n") + "\n" }
-      commands.push({ args, output: text })
+      commands.push({ args, output: text, status })
     }
   }
 
@@ -1515,7 +1552,9 @@ fn doc_session(body : Array[String]) -> Result[DocStep, String] {
 ///   the line. A fence closes at the first line of at least as many backticks, after up to 3 spaces (as in
 ///   CommonMark) and with only spaces or tabs after.
 /// - A console fence is a fence whose first info word is `console`, whatever words follow. Every
-///   command of it runs, and a console fence with no command is an error.
+///   command of it runs, and a console fence with no command is an error. The info word `status=N`
+///   (N from 1 to 125) makes each command exit with N; the lines after a command are then its stdout
+///   followed by its stderr. Without it each command exits 0 and writes nothing to stderr.
 /// - A fixture fence is a fence with an info word `file=NAME`. Its text is written to NAME.
 /// - A fence that starts with spaces or tabs, or with `~~~`, and that would be a console or fixture fence,
 ///   is an error: I cannot tell whether a test runs it. I never skip it in silence.
@@ -1570,7 +1609,11 @@ fn doc_steps(markdown : String) -> Result[Array[DocStep], String] {
       return Err("I found a fence that never closes: `\{line}`.")
     }
     if info_first(info) == "console" {
-      match doc_session(body) {
+      let status = match doc_console_status(info) {
+        Ok(status) => status
+        Err(msg) => return Err(msg)
+      }
+      match doc_session(body, status~) {
         Ok(step) => steps.push(step)
         Err(msg) => return Err(msg)
       }
@@ -1609,17 +1652,27 @@ async fn check_readme(runner : Runner, root : String) -> Unit {
         Session(commands) => {
           for command in commands {
             ran += 1
-            let (out, err) = scratch.command(command.args, 0)
-            assert_eq(
-              err,
-              "",
-              msg="\{file}: smithy \{command.args.join(" ")} wrote to stderr",
-            )
-            assert_eq(
-              out,
-              command.output,
-              msg="\{file}: smithy \{command.args.join(" ")}\nthe README shows:\n\{command.output}\nthe command wrote:\n\{out}",
-            )
+            let (out, err) = scratch.command(command.args, command.status)
+            if command.status == 0 {
+              assert_eq(
+                err,
+                "",
+                msg="\{file}: smithy \{command.args.join(" ")} wrote to stderr",
+              )
+              assert_eq(
+                out,
+                command.output,
+                msg="\{file}: smithy \{command.args.join(" ")}\nthe README shows:\n\{command.output}\nthe command wrote:\n\{out}",
+              )
+            } else {
+              // wasm-gc writes eprintln to stdout, so stdout then stderr is the same text on every target.
+              let text = out + err.replace_all(old="\r\n", new="\n")
+              assert_eq(
+                text,
+                command.output,
+                msg="\{file}: smithy \{command.args.join(" ")} (status \{command.status})\nthe README shows:\n\{command.output}\nthe command wrote:\n\{text}",
+              )
+            }
           }
         }
       }
@@ -2360,11 +2413,45 @@ test "doc_steps reads fixtures and console sessions in order" {
         {
           args: ["convert", "--to", "json", "greeting.smithy"],
           output: "{\n}\n",
+          status: 0,
         },
-        { args: ["version"], output: "0.6.0\n" },
+        { args: ["version"], output: "0.6.0\n", status: 0 },
       ]),
     ]),
   )
+}
+
+///|
+test "doc_steps reads the status of a console fence" {
+  let md = "```console status=1\n$ smithy validate bad.smithy\n[ERROR] x | Y\n```\n"
+  assert_eq(
+    doc_steps(md),
+    Ok([
+      Session([
+        {
+          args: ["validate", "bad.smithy"],
+          output: "[ERROR] x | Y\n",
+          status: 1,
+        },
+      ]),
+    ]),
+  )
+  let md = "```console title=x status=125\n$ smithy version\n```\n"
+  assert_true(doc_steps(md) is Ok([Session([{ status: 125, .. }])]))
+}
+
+///|
+test "doc_steps rejects a bad status" {
+  for info in ["status=0", "status=x", "status=126", "status=", "status=1000", "status=-1"] {
+    match doc_steps("```console \{info}\n$ smithy version\n```\n") {
+      Err(msg) =>
+        assert_true(
+          msg.contains("I expected status=N with N from 1 to 125"),
+          msg="\{info}: \{msg}",
+        )
+      Ok(_) => fail("expected an error for \{info}")
+    }
+  }
 }
 
 ///|
@@ -2378,8 +2465,9 @@ test "doc_steps reads CRLF text" {
         {
           args: ["convert", "--to", "json", "greeting.smithy"],
           output: "{\n}\n",
+          status: 0,
         },
-        { args: ["version"], output: "0.6.0\n" },
+        { args: ["version"], output: "0.6.0\n", status: 0 },
       ]),
     ]),
   )
@@ -2462,7 +2550,7 @@ test "doc_steps does not skip console and fixture fences in silence" {
         "```console\n$ smithy version\n0.6.0\n\{indent}```\n\n```smithy file=a.smithy\nx\n```\n",
       ),
       Ok([
-        Session([{ args: ["version"], output: "0.6.0\n" }]),
+        Session([{ args: ["version"], output: "0.6.0\n", status: 0 }]),
         Fixture(name="a.smithy", text="x\n"),
       ]),
       msg="indent \{indent.length()}",
