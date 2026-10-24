@@ -38,6 +38,17 @@ pub fn handle(session : Session, request : Request) -> Response {
         version~,
         text~,
       )
+    TranscriptStartFiles(seq~, files~, protocol~, format~, complete~, text~) =>
+      session.start_transcript_files(
+        seq~,
+        files~,
+        protocol~,
+        format~,
+        complete~,
+        log_preset=None,
+        version=None,
+        text~,
+      )
     TranscriptStep(seq~, count~) => step_transcript(session, seq, count)
     TranscriptReset(seq~) => {
       session.active = None

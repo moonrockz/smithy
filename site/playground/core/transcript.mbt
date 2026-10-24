@@ -292,14 +292,40 @@ fn protocol_error(error : Error) -> String {
 }
 
 ///|
-/// Start a transcript. A Markdown or JSON document gives its own version. A
-/// JSONL log gives none, so it needs `version` ("1.0" or "2.0"), as the CLI
-/// needs `--version`. A version for a document must equal the document's. The
-/// checks come in the order of the CLI: the options, the model, then the text.
+/// Start a transcript of the one model file `MODEL_FILE`.
 pub fn Session::start_transcript(
   self : Session,
   seq~ : Int32,
   model~ : String,
+  protocol~ : String,
+  format~ : TranscriptFormat,
+  complete~ : Bool,
+  log_preset~ : LogPreset?,
+  version~ : String?,
+  text~ : String,
+) -> Response {
+  self.start_transcript_files(
+    seq~,
+    files=[(MODEL_FILE, model)],
+    protocol~,
+    format~,
+    complete~,
+    log_preset~,
+    version~,
+    text~,
+  )
+}
+
+///|
+/// Start a transcript. A Markdown or JSON document gives its own version. A
+/// JSONL log gives none, so it needs `version` ("1.0" or "2.0"), as the CLI
+/// needs `--version`. A version for a document must equal the document's. The
+/// checks come in the order of the CLI: the options, the model, then the text.
+/// The model has several files, as (name, text).
+pub fn Session::start_transcript_files(
+  self : Session,
+  seq~ : Int32,
+  files~ : Array[(String, String)],
   protocol~ : String,
   format~ : TranscriptFormat,
   complete~ : Bool,
@@ -326,7 +352,7 @@ pub fn Session::start_transcript(
       reason="A JSONL log gives no JSON-RPC version. I need version 1.0 or 2.0.",
     )
   }
-  let assembled = match clean_model(load([(MODEL_FILE, model)])) {
+  let assembled = match clean_model(load(files)) {
     Ok(assembled) => assembled
     Err((reason, kind)) => return Blocked(seq~, reason~, kind~)
   }
@@ -477,4 +503,57 @@ fn unread_document(
       expectations: None,
     }),
   )
+}
+
+///|
+/// The place and subject of a finding as the CLI writes them:
+/// `<file>:<line>:<column>: entry <n> <sender>`, with no part that the finding
+/// does not have.
+fn finding_place(file : String, finding : FindingView) -> String {
+  let location = match (finding.line, finding.column) {
+    (Some(line), Some(column)) => "\{file}:\{line}:\{column}"
+    _ => file
+  }
+  let subject = []
+  if finding.entry is Some(entry) {
+    subject.push("entry \{entry}")
+  }
+  if finding.sender is Some(sender) {
+    subject.push(sender)
+  }
+  if subject.is_empty() {
+    location
+  } else {
+    "\{location}: \{subject.join(" ")}"
+  }
+}
+
+///|
+/// The line that `smithy validate rpc transcript` writes for the finding:
+/// `<file>:<line>:<column>: entry <n> <sender>: <severity> <code>: <message>`,
+/// with no part that the finding does not have.
+pub fn FindingView::cli_line(self : FindingView, file~ : String) -> String {
+  "\{finding_place(file, self)}: \{self.severity} \{self.code}: \{self.message}"
+}
+
+///|
+/// The expect lines that the CLI writes after the findings: one per missing
+/// item, then one per unexpected error.
+pub fn ExpectationView::cli_lines(
+  self : ExpectationView,
+  file~ : String,
+) -> Array[String] {
+  let lines = self.missing.map(expected => {
+    let entry = expected.entry.map(n => " at entry \{n}").unwrap_or("")
+    let related = expected.related
+      .map(n => " related to entry \{n}")
+      .unwrap_or("")
+    "\{file}: expect: I expected \{expected.code}\{entry}\{related}; no finding matches it."
+  })
+  for finding in self.unexpected {
+    lines.push(
+      "\{finding_place(file, finding)}: expect: I did not expect error \{finding.code}.",
+    )
+  }
+  lines
 }
