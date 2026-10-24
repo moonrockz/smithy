@@ -116,6 +116,9 @@ Write `lesson.md` in ASD-STE100 Simplified Technical English:
 - A lesson has about one screen of text.
 - A lesson makes sense alone. Do not depend on the text of an earlier lesson.
 - Link to the smithy.io section that the lesson teaches (`spec` in `lesson.json`).
+- Link to another lesson by the path of its `lesson.md`, for example `../04-shape-ids/lesson.md`. The site
+  opens the page of that lesson, and the link also works on GitHub. A test of `site/tour/check`
+  (`links_test.mbt`) fails on a link into `site/tour/lessons` that does not open a lesson page.
 - Every claim of the text is a case. When the text says that the Findings tab shows an error, add a case with
   that error in `events`. When the text says what the output contains, add a needle.
 - Never change an expectation to make a check pass. When the playground core is wrong, fix the core or record

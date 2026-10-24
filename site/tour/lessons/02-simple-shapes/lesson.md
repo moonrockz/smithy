@@ -16,7 +16,7 @@ Smithy has more simple types, for example `long`, `double` and `enum`.
 
 To define a simple shape, write the type and a name. This model defines the string shape `SensorName`.
 
-The members of the structure `Reading` target simple shapes. The member `sensor` targets `SensorName`. The other members target shapes from the prelude, such as `Integer` and `Timestamp`. Every model can use these shapes. [Shape IDs, use and the prelude](../shape-ids/) gives more information about the prelude.
+The members of the structure `Reading` target simple shapes. The member `sensor` targets `SensorName`. The other members target shapes from the prelude, such as `Integer` and `Timestamp`. Every model can use these shapes. [Shape IDs, use and the prelude](../04-shape-ids/lesson.md) gives more information about the prelude.
 
 Look at the JSON Schema output. The converter gives each member a JSON Schema:
 
