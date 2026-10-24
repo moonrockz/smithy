@@ -251,3 +251,19 @@ results. CI runs it as the job `tour`.
 `scripts/site-pages.mbtx` on main builds the release channel by running the tag's own `scripts/site-build.mbtx`
 in a worktree of that tag. A new main therefore calls an old `site-build`. Keep the arguments of `site-build`
 backward-compatible: add optional flags, and never rename or remove one.
+
+## Tour lessons: tested blocks only
+
+A tour lesson (`site/tour/lessons/NN-slug/lesson.md`) must not hold a CLI or API block that no test runs.
+
+- Write an `include` fence at the start of a line, with one line per tab: `LABEL: PATH#NAME`.
+  `PATH` is relative to the repository root. The lesson reader replaces the fence with a tab group.
+- Mark the block in its source with `<!-- tour:start NAME -->` and `<!-- tour:end NAME -->`, each alone on its line.
+  Between the markers put only fenced code blocks.
+- The reader accepts only tested fences: `mbt check` with a test in a `.mbt.md` file that has a `moon.pkg`
+  next to it, and `console` or `LANG file=NAME` fences at the start of a line in `apps/smithy/README.md`
+  (`scripts/test-cli.mbtx` runs them).
+- The reader rejects a lesson that has a fence in `console`, `shell`, `sh`, `bash`, `zsh`, `mbt`, `moonbit`,
+  `shell-session`, `powershell`, `fish`, `cmd` or a similar terminal language (the case does not matter), a `tabs`
+  fence, or a fence of any other language (also `text` or no language) with a line that starts with `$ smithy`,
+  `smithy ` or `@smithy.`.

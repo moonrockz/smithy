@@ -77,17 +77,57 @@ fn check_path(path : String) -> Result[Unit, String] {
 }
 
 ///|
-/// Whether `source` has a fence line that the CLI runner reads: at the start of a line, with
-/// three or more backticks, and the info string `lang` and `rest`.
-fn runner_reads(source : String, lang : String, rest : String) -> Bool {
-  let info = if rest == "" { lang } else { "\{lang} \{rest}" }
-  source
-  .split("\n")
-  .any(l => {
-    let line = l.trim_end(chars="\r").to_owned()
-    line.has_prefix("```") &&
-    line.trim_start(chars="`").trim().to_owned() == info
-  })
+/// The opening lines of the fences between the markers of `name`, in order: whether the line
+/// is a fence that the CLI runner reads (three or more backticks at the start of a line), and
+/// its info string.
+fn region_openers(source : String, name : String) -> Array[(Bool, String)] {
+  let lines = source.split("\n").map(l => l.trim_end(chars="\r").to_owned())
+  let out : Array[(Bool, String)] = []
+  let mut inside = false
+  let mut closer : (Char, Int32)? = None
+  for line in lines {
+    let t = line.trim().to_owned()
+    if closer is None && t == "<!-- tour:start \{name} -->" {
+      inside = true
+      continue
+    }
+    if closer is None && t == "<!-- tour:end \{name} -->" {
+      break
+    }
+    if !inside {
+      continue
+    }
+    let body = line.trim_start().to_owned()
+    let ch = if body.has_prefix("```") {
+      '`'
+    } else if body.has_prefix("~~~") {
+      '~'
+    } else {
+      ' '
+    }
+    if ch == ' ' {
+      continue
+    }
+    let n = body.iter().take_while(c => c == ch).count()
+    match closer {
+      Some((c, len)) =>
+        if c == ch &&
+          n >= len &&
+          body.trim_start(chars="`~").trim().to_owned() == "" {
+          closer = None
+        }
+      None => {
+        closer = Some((ch, n))
+        out.push(
+          (
+            line.has_prefix("```"),
+            body.trim_start(chars="`~").trim().to_owned(),
+          ),
+        )
+      }
+    }
+  }
+  out
 }
 
 ///|
@@ -118,14 +158,20 @@ pub fn resolve_include(
     "\{repo}/\{folder}/moon.pkg"
   }
   let has_moon_pkg = @fs.path_exists(pkg)
+  let openers = region_openers(source, inc.name)
   let out : Array[@markdown.Snippet] = []
-  for fence in fences {
+  for i, fence in fences {
     let snippet = match tested_snippet(path, fence, has_moon_pkg~) {
       Ok(s) => s
       Err(e) => return Err(e)
     }
     if snippet.lang == "console" || snippet.file is Some(_) {
-      if !runner_reads(source, fence.lang, fence.rest) {
+      let info = if fence.rest == "" {
+        fence.lang
+      } else {
+        "\{fence.lang} \{fence.rest}"
+      }
+      if i >= openers.length() || !openers[i].0 || openers[i].1 != info {
         return Err(
           "I found the fence `\{fence.lang} \{fence.rest}` in \{path}, but it does not start at the start of a line, so the CLI runner does not read it",
         )
@@ -138,7 +184,8 @@ pub fn resolve_include(
 
 ///|
 let hand_written : Array[String] = [
-  "console", "shell", "sh", "bash", "zsh", "mbt", "moonbit",
+  "console", "shell", "sh", "bash", "zsh", "mbt", "moonbit", "shell-session", "shellsession",
+  "sh-session", "terminal", "powershell", "pwsh", "fish", "cmd", "bat",
 ]
 
 ///|
@@ -147,7 +194,22 @@ fn hand_written_error(lang : String) -> String {
 }
 
 ///|
-/// Err when `text` has a fence with a CLI, API or tabs language (at any depth).
+/// The text of a line that looks like a CLI command or an API call of Smithy, or `None`.
+fn smithy_use(code : String) -> String? {
+  for line in code.split("\n") {
+    let t = line.trim().to_owned()
+    if t.has_prefix("$ smithy") ||
+      t.has_prefix("smithy ") ||
+      t.has_prefix("@smithy.") {
+      return Some(t)
+    }
+  }
+  None
+}
+
+///|
+/// Err when `text` has a fence with a CLI, API or tabs language (at any depth), or a fence
+/// of any other language whose text is a `smithy` command or a `@smithy.` call.
 pub fn check_hand_written(text : String) -> Result[Unit, String] {
   let doc = @markdown.parse(text, {
     source: "",
@@ -159,15 +221,26 @@ pub fn check_hand_written(text : String) -> Result[Unit, String] {
   @markdown.walk_blocks(doc.blocks, block => {
     if found is None {
       match block {
-        CodeBlock(lang, _) if hand_written.contains(lang) || lang == "tabs" =>
-          found = Some(lang)
-        Tabs(_, _) => found = Some("tabs")
+        CodeBlock(lang, code) => {
+          let l = lang.to_lower()
+          if hand_written.contains(l) || l == "tabs" {
+            found = Some(hand_written_error(l))
+          } else if l != "include" {
+            if smithy_use(code) is Some(line) {
+              let kind = if l == "" { "a code block" } else { "a `\{l}` block" }
+              found = Some(
+                "I found \{kind} with the line `\{line}`. A CLI or API block must come from a tested source: use an include block",
+              )
+            }
+          }
+        }
+        Tabs(_, _) => found = Some(hand_written_error("tabs"))
         _ => ()
       }
     }
   })
   match found {
-    Some(lang) => Err(hand_written_error(lang))
+    Some(e) => Err(e)
     None => Ok(())
   }
 }

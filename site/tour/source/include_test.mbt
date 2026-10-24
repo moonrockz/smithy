@@ -187,3 +187,74 @@ test "every console and file fence of an included region is read by the CLI runn
     assert_true(count > 0, msg="\{file} has no included region")
   }
 }
+
+///|
+test "check_hand_written rejects other cases, aliases and command text" {
+  for
+    lang in [
+      "Console", "BASH", "shell-session", "shellsession", "sh-session", "terminal",
+      "powershell", "pwsh", "fish", "cmd", "bat", "MoonBit", "Mbt",
+    ] {
+    contains_all(
+      @source.check_hand_written("# T\n\n```\{lang}\nx\n```\n"),
+      "`\{lang.to_lower()}`",
+    )
+  }
+  for fence in ["", "text", "plaintext", "txt"] {
+    contains_all(
+      @source.check_hand_written("# T\n\n```\{fence}\n$ smithy version\n```\n"),
+      "smithy",
+    )
+    contains_all(
+      @source.check_hand_written(
+        "# T\n\n```\{fence}\n  smithy validate x\n```\n",
+      ),
+      "smithy",
+    )
+    contains_all(
+      @source.check_hand_written("# T\n\n```\{fence}\n@smithy.parse(x)\n```\n"),
+      "@smithy.",
+    )
+  }
+  // A line that starts with the word `smithy` is a command; `smithy.api#x` is not.
+  assert_eq(
+    @source.check_hand_written(
+      "# T\n\n```json\n{\"id\": \"smithy.api#String\"}\n```\n\n```smithy\nnamespace a\n```\n",
+    ),
+    Ok(()),
+  )
+}
+
+///|
+test "cli_doc_files equals readme_files of scripts/test-cli.mbtx" {
+  let text = @fs.read_file_to_string("../scripts/test-cli.mbtx")
+  let marker = "let readme_files : Array[String] = ["
+  guard text.find(marker) is Some(at) else {
+    fail("I could not find `\{marker}` in scripts/test-cli.mbtx")
+  }
+  let after = text[at + marker.length():].to_owned()
+  guard after.find("]") is Some(close) else {
+    fail("I could not find the end of readme_files in scripts/test-cli.mbtx")
+  }
+  let names : Array[String] = []
+  for part in after[:close].to_owned().split(",") {
+    let t = part.trim().to_owned()
+    if t != "" {
+      names.push(t.trim(chars="\"").to_owned())
+    }
+  }
+  assert_eq(names, @source.cli_doc_files)
+}
+
+///|
+test "a console fence that is not at the start of a line is rejected" {
+  let dir = "tour/source/testdata/indented-readme"
+  contains_all(
+    @source.resolve_include(dir, {
+      label: "L",
+      path: "apps/smithy/README.md",
+      name: "x",
+    }).map(_ => ()),
+    "does not start at the start of a line",
+  )
+}
