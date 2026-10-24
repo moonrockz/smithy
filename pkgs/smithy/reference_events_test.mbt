@@ -424,3 +424,13 @@ test "a documentation comment that Smithy drops silently stays a diagnostic for 
     (["SM-PARSE-016"], []),
   )
 }
+
+///|
+test "an elided member that a mixin does not define is one Model error on the member, as in Smithy" {
+  assert_eq(
+    reference_keys(
+      "@mixin\nstructure M {\n    y: String\n}\nstructure S with [M] {\n    $x\n}",
+    ),
+    ["Model|ERROR|example#S$x"],
+  )
+}
