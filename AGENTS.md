@@ -96,9 +96,9 @@ enforce:
 
 ## Tour
 
-Every lesson claim is a checked case. A difference from the Java reference is on the allow list with an issue and is told in the lesson. Run
-`mise run tour:check` after a change to a lesson or to the playground core. The format and the rules are in
-`site/tour/README.md`.
+Every lesson claim is a checked case. A difference from the Java reference is on the allow list with an issue
+and is told in the lesson. Run `mise run tour:check` after a change to a lesson or to the playground core. The
+format and the rules are in `site/tour/README.md`.
 
 ## Release process
 

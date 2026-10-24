@@ -211,15 +211,18 @@ An example page (`/examples/<dir>`) shows "Open in playground" when `playground/
 ## Tour
 
 `/tour/` is the Smithy language tour: lessons with a model that the reader edits. The lessons are in
-`tour/lessons`, and `tour/README.md` explains the format of a lesson, the two checks and the allow list. The
-pre-render reads the lessons from the `--content` directory and writes `/tour/` and `/tour/<slug>/`.
+`tour/lessons`, and `tour/README.md` explains the format of a lesson, the two checks and the allow list.
+The pre-render reads the lessons from `<content>/site/tour/lessons`, where `<content>` is the `--content`
+directory. It writes `/tour/` and `/tour/<slug>/`.
 
-A lesson page loads `tour/ui.js` and uses the playground Worker (`playground/worker.js`) to validate and convert the
-model. The tour glue is the MoonBit package `tour/ui` (js), with `tour/lesson` for the page state and view and
-`tour/editor/main.js` as the entry. `scripts/site-build.mbtx` compiles `tour/ui` with the playground packages
-(`moon build --target js --release`), and then `bun build tour/editor/main.js` writes `<out>/tour/ui.js`. The
-playground and the tour share the editor code of `playground/editor`. The server serves `tour/ui.js` as a static
-file, as it does `playground/ui.js`, and `?v=<ref>` keeps a new page from running an old script.
+A lesson page loads `tour/ui.js`. It uses the playground Worker (`playground/worker.js`) to validate and convert
+the model. The tour glue is the MoonBit package `tour/ui` (js). `tour/lesson` holds the page state and view.
+`tour/editor/main.js` is the entry of the bundle.
+
+`scripts/site-build.mbtx` compiles `tour/ui` with the playground packages (`moon build --target js --release`).
+Then `bun build tour/editor/main.js` writes `<out>/tour/ui.js`. The playground and the tour share the editor code
+of `playground/editor`. The server serves `tour/ui.js` as a static file, as it does `playground/ui.js`. The query
+`?v=<ref>` keeps a new page from running an old script.
 
 `mise run tour:check` checks every lesson case against the playground core and the committed Java reference
 results. CI runs it as the job `tour`.
@@ -239,7 +242,7 @@ results. CI runs it as the job `tour`.
 | `playground/core` | pure MoonBit core of the playground: requests, responses, transcript stepping and share links (`encode_share`, `decode_share`; native and js tests) |
 | `playground/examples_check` | native: tests of the playground core against `examples/json-rpc/`, including the comparison with `run_transcript`, and of the samples of the picker |
 | `playground/samples`, `playground/workbench`, `playground/ui`, `playground/worker` | the playground page (see Playground) |
-| `tour/model`, `tour/source`, `tour/lesson`, `tour/ui`, `tour/check` | the language tour (see Tour) |
+| `tour/model`, `tour/source`, `tour/lesson`, `tour/ui`, `tour/editor`, `tour/check` | the language tour (see Tour) |
 | `prerender` | native: renders every route, writes content copies and the search index |
 | `linkcheck` | native: checks links, routes and the search index of a build |
 

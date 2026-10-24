@@ -27,12 +27,12 @@ site/tour/lessons/NN-<slug>/
   name, or adds a new file.
 - `expect.json` has `events` and, optionally, `output_contains`.
   - `events` lists the expected findings, each as `id|SEVERITY|shape`. `SEVERITY` is `WARNING`, `DANGER` or
-    `ERROR`. A finding with no shape has `-` in its place, for example `Model|ERROR|-`. The list is the complete
-    list: an empty list says that the case has no finding of these severities.
+    `ERROR`. A finding with no shape has `-` in its place, for example `Model|ERROR|-`.
+    The list is the complete list. An empty list says that the case has no finding of these severities.
   - `output_contains` lists strings (needles). Each string must be a substring of the output text of the case.
-    A lesson that has an `output_contains` needs an `output`, and its `events` must have no `ERROR` and no
-    `DANGER`, because the output does not run for a model with those events. When the output has more than one
-    file, the check joins the text of the files with a newline.
+    A lesson that has an `output_contains` needs an `output`.
+    Its `events` must have no `ERROR` and no `DANGER`, because the output does not run for a model with those
+    events. When the output has more than one file, the check joins the text of the files with a newline.
 
 ## The two checks
 
@@ -54,9 +54,9 @@ each needle of `output_contains` against the converted output.
 results are committed in `site/tour/reference-events.json`, with the `reference_sha` of the `smithy-lang/smithy`
 commit that made them. For each case, the check:
 
-1. requires a fresh reference result: the digest in the file must match the case files, and a case of a lesson
-   with the output `JsonSchema` must have a reference JSON Schema when the reference events have no `ERROR` and
-   no `DANGER`;
+1. requires a fresh reference result. The digest in the file must match the case files. The result has a
+   reference JSON Schema if and only if the lesson output is `JsonSchema` and the reference events have no
+   `ERROR` and no `DANGER`;
 2. requires the events of the playground core to be equal to the reference events (after the allow list);
 3. for a lesson with the output `JsonSchema`, requires the JSON Schema of the playground core to be equal to the
    reference JSON Schema (after the allow list).
@@ -100,8 +100,10 @@ Rules that the tests enforce:
 
 - An entry that removes no difference fails the check (a stale entry). Delete it when the difference is fixed.
 - An entry needs a valid issue and a reason that is not empty.
-- The `lesson.md` of the entry's lesson must contain the line `> **Reference difference:**`, followed by a
-  statement of the difference for the reader.
+- The `lesson.md` of the entry's lesson must contain the text `> **Reference difference:**`. The test checks only
+  that this text is present.
+
+Writing rule: after that text, state the difference for the reader.
 
 A difference from the Java reference is never hidden. Fix the playground core when it is wrong. Add an entry only
 for a difference that is known and tracked.
