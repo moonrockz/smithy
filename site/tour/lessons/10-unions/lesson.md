@@ -1,6 +1,6 @@
 # Unions as tagged unions
 
-A union is a tagged union. It has a fixed set of members, and exactly one member has a value at a time. The name of the member is the tag. The target of the member is the value for that tag.
+A union is a tagged union. It has a fixed set of members, and exactly one member is present at a time. The name of the member is the tag. The target of the member is the value for that tag.
 
 In this model, a `PaymentMethod` is a card or cash. A card payment holds a `Card` value. A cash payment holds no data, so the member `cash` targets [`Unit`](https://smithy.io/2.0/spec/aggregate-types.html#unit-types-in-unions). The shape `smithy.api#Unit` means "no value".
 
