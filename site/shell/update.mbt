@@ -69,18 +69,36 @@ priv enum LinkAction {
 }
 
 ///|
-/// The playground page loads its own script, so a link into or out of it
-/// loads the new page. A link into the other channel loads it too.
+/// The playground page and a lesson load their own script, so a link into or
+/// out of them loads the new page. The site data of a tour page holds only
+/// that page, so a link into the tour contents loads it too. A link to a
+/// heading of the same tour page only scrolls. A link into the other channel
+/// loads it too.
 fn link_action(m : Model, path : String) -> LinkAction {
   match site_path(m.config, path) {
     None => Load
-    Some(rest) =>
-      if m.route == Playground || @route.Route::parse(rest) == Playground {
+    Some(rest) => {
+      // A search result gives its heading as a fragment.
+      let page = match rest.find("#") {
+        Some(i) => rest[:i].to_owned()
+        None => rest
+      }
+      let target = @route.Route::parse(page)
+      if target == m.route && target is (Tour | Lesson(_)) {
+        Push
+      } else if loads_own_page(m.route) || loads_own_page(target) {
         Load
       } else {
         Push
       }
+    }
   }
+}
+
+///|
+/// The routes whose page the site cannot show without a page load.
+fn loads_own_page(route : @route.Route) -> Bool {
+  route is (Playground | Tour | Lesson(_))
 }
 
 ///|
@@ -190,7 +208,7 @@ fn on_url_changed(
   }
   let next = { ..closed, route, counterpart: Unknown, }
   let check = check_counterpart(next, emit)
-  match source_of(m.manifest, m.examples, route) {
+  match source_of(m.manifest, m.examples, m.tour, route) {
     Some(source) =>
       // The anchor is not in the DOM until the content is Ready.
       (
@@ -230,7 +248,8 @@ pub fn update(
     ContentLoaded(route, result) => {
       guard route == m.route else { return (m, @rabbita.none) }
       let page = match result {
-        Ok(md) => Ready(parse_page(m.config, m.manifest, m.examples, route, md))
+        Ok(md) =>
+          Ready(parse_page(m.config, m.manifest, m.examples, m.tour, route, md))
         Err(_) => PageFailed
       }
       ({ ..m, page, pending_anchor: None, }, scroll_cmd(m.pending_anchor))

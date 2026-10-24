@@ -222,6 +222,7 @@ fn hero_view(base : String) -> Html {
           href=@route.href(base, Playground),
           "Try the playground",
         ),
+        @html.a(class="ms-btn", href=@route.href(base, Tour), "Take the tour"),
       ]),
       @html.div(class="ms-facts", [
         @html.span([@html.b("native · wasm · js"), @html.text(" targets")]),

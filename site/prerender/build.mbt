@@ -136,6 +136,14 @@ pub async fn build_site(args : Args) -> Unit {
       return
     }
   }
+  let tour = match load_tour(args.content) {
+    Ok(tour) => tour
+    Err(message) => {
+      println("prerender: " + message)
+      @sys.exit(1)
+      return
+    }
+  }
   // Every page carries the playground fragment of each example. A fragment
   // that is too long fails the build.
   let examples = match
@@ -171,6 +179,7 @@ pub async fn build_site(args : Args) -> Unit {
       route: Landing,
       markdown: None,
       playground: None,
+      tour: None,
     }),
   )
   for page in manifest.pages {
@@ -184,6 +193,7 @@ pub async fn build_site(args : Args) -> Unit {
         route: page.route,
         markdown: Some(text),
         playground: None,
+        tour: None,
       }),
     )
     write_file(args.out + "/content/" + page.source, text)
@@ -206,10 +216,12 @@ pub async fn build_site(args : Args) -> Unit {
       route: Playground,
       markdown: None,
       playground: Some(playground),
+      tour: None,
     }),
   )
   entries.push(playground_entry(playground))
   routes.push(@route.Playground.to_path())
+  write_tour(args, config, manifest, examples, tour, entries, routes)
   // `/docs/` shows the default page; GitHub Pages needs a real file for it.
   let default_route = manifest.default_route()
   match manifest.find(default_route) {
@@ -223,6 +235,7 @@ pub async fn build_site(args : Args) -> Unit {
           route: default_route,
           markdown: Some(texts.get(page.source).unwrap_or("")),
           playground: None,
+          tour: None,
         }),
       )
       routes.push("docs")
@@ -238,6 +251,7 @@ pub async fn build_site(args : Args) -> Unit {
       route: NotFound("404"),
       markdown: None,
       playground: None,
+      tour: None,
     }),
   )
   write_file(args.out + "/search-index.json", Json(entries).stringify())

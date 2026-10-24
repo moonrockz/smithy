@@ -8,6 +8,7 @@ import {
   "moonrockz/smithy-site/markdown",
   "moonrockz/smithy-site/playground/workbench",
   "moonrockz/smithy-site/route",
+  "moonrockz/smithy-site/tour/model",
 }
 
 // Values
@@ -45,6 +46,7 @@ pub fn SiteConfig::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecod
 pub fn SiteConfig::not_equal(Self, Self) -> Bool
 pub fn SiteConfig::to_json(Self) -> Json
 pub fn SiteConfig::to_repr(Self) -> @debug.Repr
+pub fn SiteConfig::versioned(Self, String) -> String
 
 pub(all) struct SiteData {
   config : SiteConfig
@@ -53,6 +55,7 @@ pub(all) struct SiteData {
   route : @route.Route
   markdown : String?
   playground : @workbench.PlaygroundData?
+  tour : @model.TourPage?
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn SiteData::decode(String) -> Self?
 pub fn SiteData::encode(Self) -> String

@@ -99,3 +99,24 @@ test "parse and href: the playground" {
   assert_eq(Playground.to_path(), "playground")
   assert_eq(href("/smithy/next/", Playground), "/smithy/next/playground/")
 }
+
+///|
+test "parse and href: the tour and a lesson" {
+  assert_eq(Route::parse("tour"), Tour)
+  assert_eq(Route::parse("/tour/"), Tour)
+  assert_eq(Route::parse("tour/index.html"), Tour)
+  assert_eq(Route::parse("tour/enums"), Lesson("enums"))
+  assert_eq(Route::parse("/tour/enums/"), Lesson("enums"))
+  assert_eq(Route::parse("tour/a/b"), NotFound("tour/a/b"))
+  assert_eq(Tour.to_path(), "tour")
+  assert_eq(Lesson("enums").to_path(), "tour/enums")
+  assert_eq(href("/smithy/", Tour), "/smithy/tour/")
+  assert_eq(href("/smithy/next/", Lesson("enums")), "/smithy/next/tour/enums/")
+  assert_eq(
+    strip_base("/smithy/next/", "/smithy/next/tour/enums/").map(Route::parse),
+    Some(Lesson("enums")),
+  )
+  for r in [Tour, Lesson("enums")] {
+    assert_eq(@json.from_json(Json(r)), r)
+  }
+}

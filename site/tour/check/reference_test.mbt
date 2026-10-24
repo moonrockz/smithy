@@ -79,7 +79,11 @@ fn parse_reference(text : String) -> Map[String, ReferenceCase] raise {
   }
   guard sha == reference_sha else {
     fail(
-      reference_path + ": the reference SHA is " + sha + ", not " + reference_sha,
+      reference_path +
+      ": the reference SHA is " +
+      sha +
+      ", not " +
+      reference_sha,
     )
   }
   let result : Map[String, ReferenceCase] = Map([])
@@ -121,7 +125,8 @@ fn parse_allow(text : String) -> Array[Allowed] raise {
             "reference" => Reference
             other =>
               fail(
-                where_ + ": \"side\" must be \"ours\" or \"reference\", not \"" +
+                where_ +
+                ": \"side\" must be \"ours\" or \"reference\", not \"" +
                 other +
                 "\"",
               )
@@ -138,7 +143,8 @@ fn parse_allow(text : String) -> Array[Allowed] raise {
       }
       other =>
         fail(
-          where_ + ": \"kind\" must be \"event\" or \"json_schema\", not \"" +
+          where_ +
+          ": \"kind\" must be \"event\" or \"json_schema\", not \"" +
           other +
           "\"",
         )
@@ -183,13 +189,15 @@ fn pointer_keys(pointer : String) -> Array[String] raise {
   guard pointer.has_prefix("/") else { fail("not a JSON pointer: " + pointer) }
   pointer[1:]
   .split("/")
-  .map(key => key.to_owned().replace_all(old="~1", new="/").replace_all(old="~0", new="~"))
+  .map(key => {
+    key.to_owned().replace_all(old="~1", new="/").replace_all(old="~0", new="~")
+  })
   .to_array()
 }
 
 ///|
 /// The array index of a pointer key: decimal digits only.
-fn array_index(key : String) -> Int? {
+fn array_index(key : String) -> Int32? {
   guard !key.is_empty() && key.length() < 10 else { return None }
   let mut index = 0
   for c in key {
@@ -305,7 +313,9 @@ fn our_json_schema(
   files : Array[(String, String)],
 ) -> Json raise {
   guard lesson.output is Some(output) else {
-    fail(where_ + ": the reference has a JSON Schema, but the lesson has no output")
+    fail(
+      where_ + ": the reference has a JSON Schema, but the lesson has no output",
+    )
   }
   match
     @core.handle(
@@ -473,14 +483,30 @@ test "our JSON Schema agrees with the reference JSON Schema" {
 ///|
 test "every allow list entry is used, has an issue, and its lesson says so" {
   let (tour, reference, allow) = inputs()
-  let used = compare_all(tour, reference, allow, events=false, json_schema=false)
+  let used = compare_all(
+    tour,
+    reference,
+    allow,
+    events=false,
+    json_schema=false,
+  )
   for i, entry in allow {
-    let where_ = allow_path + " entry " + i.to_string() + " (" + entry.case_id + ")"
+    let where_ = allow_path +
+      " entry " +
+      i.to_string() +
+      " (" +
+      entry.case_id +
+      ")"
     if !used[i] {
       fail(where_ + ": stale allow entry; it removes no difference")
     }
     if !is_issue(entry.issue) {
-      fail(where_ + ": the issue \"" + entry.issue + "\" must match smithy-[a-z0-9.]+")
+      fail(
+        where_ +
+        ": the issue \"" +
+        entry.issue +
+        "\" must match smithy-[a-z0-9.]+",
+      )
     }
     if entry.reason.trim().is_empty() {
       fail(where_ + ": the entry has no reason")
@@ -488,7 +514,15 @@ test "every allow list entry is used, has an issue, and its lesson says so" {
     let dir = entry.case_id.split("/").next().unwrap_or("").to_owned()
     match tour.lessons.search_by(l => l.dir == dir) {
       Some(l) if tour.lessons[l].text.contains(difference_note) => ()
-      Some(_) => fail(where_ + ": " + dir + "/lesson.md has no \"" + difference_note + "\" note")
+      Some(_) =>
+        fail(
+          where_ +
+          ": " +
+          dir +
+          "/lesson.md has no \"" +
+          difference_note +
+          "\" note",
+        )
       None => fail(where_ + ": no lesson has the folder " + dir)
     }
   }
@@ -498,7 +532,9 @@ test "every allow list entry is used, has an issue, and its lesson says so" {
 /// Whether the text is a beads issue id: `smithy-` and then `[a-z0-9.]+`.
 fn is_issue(text : String) -> Bool {
   guard text.has_prefix("smithy-") && text.length() > 7 else { return false }
-  text[7:].iter().all(c => c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.')
+  text[7:]
+  .iter()
+  .all(c => c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.')
 }
 
 ///|
@@ -550,14 +586,16 @@ test "an allowed event is removed once, from the side that the entry names" {
 ///|
 test "a JSON pointer removes one member or item, and reports a missing one" {
   let json = parse_json(
-    "test",
-    "{\"definitions\": {\"a/b\": {\"x\": 1}, \"c~d\": [1, 2]}}",
+    "test", "{\"definitions\": {\"a/b\": {\"x\": 1}, \"c~d\": [1, 2]}}",
   )
   assert_eq(remove_pointer(json, "/definitions/a~1b/x"), Some(Json::number(1)))
   assert_eq(remove_pointer(json, "/definitions/c~0d/0"), Some(Json::number(1)))
   assert_eq(remove_pointer(json, "/definitions/missing"), None)
   assert_eq(remove_pointer(json, "/definitions/c~0d/5"), None)
-  assert_eq(json, parse_json("test", "{\"definitions\": {\"a/b\": {}, \"c~d\": [2]}}"))
+  assert_eq(
+    json,
+    parse_json("test", "{\"definitions\": {\"a/b\": {}, \"c~d\": [2]}}"),
+  )
 }
 
 ///|
@@ -573,7 +611,7 @@ test "the JSON differences name the pointers" {
 test "a JSON Schema lesson needs a reference schema unless the case has an error" {
   let schema = Some(Json::object({}))
   let entry = fn(events : Array[String], json_schema : Json?) -> ReferenceCase {
-    { digest: "d", events, json_schema }
+    { digest: "d", events, json_schema, }
   }
   check_fresh("a", entry([], schema), "d", Some(JsonSchema))
   check_fresh("a", entry(["W|WARNING|-"], schema), "d", Some(JsonSchema))
@@ -582,13 +620,14 @@ test "a JSON Schema lesson needs a reference schema unless the case has an error
   check_fresh("a", entry([], None), "d", Some(JsonAst))
   check_fresh("a", entry([], None), "d", None)
   let stale_message = "a: the reference result is missing or stale; run `mise run reference:tour`"
-  for bad in [
-    (entry([], None), "d", Some(@core.Output::JsonSchema)),
-    (entry([], schema), "d", Some(@core.Output::JsonAst)),
-    (entry([], schema), "d", None),
-    (entry(["E|ERROR|-"], schema), "d", Some(@core.Output::JsonSchema)),
-    (entry([], None), "other", None),
-  ] {
+  for
+    bad in [
+      (entry([], None), "d", Some(@core.Output::JsonSchema)),
+      (entry([], schema), "d", Some(@core.Output::JsonAst)),
+      (entry([], schema), "d", None),
+      (entry(["E|ERROR|-"], schema), "d", Some(@core.Output::JsonSchema)),
+      (entry([], None), "other", None),
+    ] {
     try check_fresh("a", bad.0, bad.1, bad.2) catch {
       Failure(message) => assert_true(message.has_suffix(stale_message))
       e => fail("unexpected error: " + e.to_string())
@@ -614,7 +653,8 @@ test "a json_schema allow entry is used only when it removes a difference" {
 test "a json_schema allow entry must not name a side" {
   let text = "[{\"case\": \"01-a/start\", \"kind\": \"json_schema\", \"pointer\": \"/a\", \"side\": \"ours\", \"reason\": \"r\", \"issue\": \"smithy-1\"}]"
   try parse_allow(text) catch {
-    Failure(message) => assert_true(message.contains("\"side\" is for kind \"event\" only"))
+    Failure(message) =>
+      assert_true(message.contains("\"side\" is for kind \"event\" only"))
     e => fail("unexpected error: " + e.to_string())
   } noraise {
     _ => fail("a json_schema entry with a side was accepted")

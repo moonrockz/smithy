@@ -258,7 +258,12 @@ test "transform: JSON Schema equals the library's conversion" {
   let files = files_of(
     handle(
       session,
-      Transform(seq=1, model=chat_model, output=Output::JsonSchema, selector=None),
+      Transform(
+        seq=1,
+        model=chat_model,
+        output=Output::JsonSchema,
+        selector=None,
+      ),
     ),
   )
   assert_eq(files, [("schema.json", expected + "\n")])
@@ -1352,10 +1357,7 @@ test "ValidateFiles resolves a use across two files and places each finding in i
   let session = Session::new()
   let response = handle(
     session,
-    ValidateFiles(
-      seq=1,
-      files=[("a.smithy", file_a), ("b.smithy", file_b_bad)],
-    ),
+    ValidateFiles(seq=1, files=[("a.smithy", file_a), ("b.smithy", file_b_bad)]),
   )
   match response {
     Diagnostics(items=[item], ..) => {

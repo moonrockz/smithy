@@ -143,3 +143,52 @@ test "case_files sorts names of different length by code unit" {
     "a-long-name.smithy", "zz.smithy",
   ])
 }
+
+///|
+test "lesson_dir and slug_of_source agree" {
+  assert_eq(lesson_dir(1, "hello-smithy"), "01-hello-smithy")
+  assert_eq(lesson_dir(12, "domain-modelling"), "12-domain-modelling")
+  assert_eq(
+    lesson_source(2, "simple-shapes"),
+    "site/tour/lessons/02-simple-shapes/lesson.md",
+  )
+  assert_eq(
+    slug_of_source("site/tour/lessons/02-simple-shapes/lesson.md"),
+    Some("simple-shapes"),
+  )
+  assert_eq(slug_of_source("site/tour/lessons/02-simple-shapes/model.md"), None)
+  assert_eq(slug_of_source("site/tour/lessons/x/lesson.md"), None)
+  assert_eq(slug_of_source("site/tour/lessons/02-/lesson.md"), None)
+  assert_eq(slug_of_source("site/tour/lessons/a/b/lesson.md"), None)
+  assert_eq(slug_of_source("docs/lesson.md"), None)
+  assert_eq(slug_of_source("site/tour/lessons/lesson.md"), None)
+  assert_eq(slug_of_source("site/tour/lessons//lesson.md"), None)
+}
+
+///|
+test "the page types round-trip through JSON" {
+  let page : TourPage = Page({
+    slug: "l2",
+    title: "L2",
+    section: "Basics",
+    number: 2,
+    total: 3,
+    output: Some(@samples.Output::JsonSchema),
+    selector: None,
+    spec: "https://smithy.io/2.0/",
+    files: [{ name: "model.smithy", text: "namespace a\n", }],
+    digest: "d",
+    previous: Some({ slug: "l1", title: "L1", }),
+    next: None,
+    worker: "/smithy/playground/worker.js?v=x",
+    storage_key: "smithy-tour:next:l2",
+    playground: Some("/smithy/playground/"),
+  })
+  let contents : TourPage = Contents({
+    sections: [("Basics", [{ slug: "l1", title: "L1", }])],
+  })
+  for p in [page, contents] {
+    let back : TourPage = @json.from_json(p.to_json())
+    assert_eq(back, p)
+  }
+}

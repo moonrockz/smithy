@@ -3,9 +3,7 @@
 let lessons_root : String = "tour/lessons"
 
 ///|
-fn files_of(
-  files : Array[@model.LessonFile]
-) -> Array[(String, String)] {
+fn files_of(files : Array[@model.LessonFile]) -> Array[(String, String)] {
   files.map(f => (f.name, f.text))
 }
 
@@ -82,7 +80,8 @@ test "every lesson case gives the findings and the output that its expect.json n
           items
           .filter(d => @model.is_compared(d.severity))
           .map(d => @model.event_key(d.code, d.severity, d.shape))
-        Blocked(reason~, ..) => fail(where_ + ": validation was blocked: " + reason)
+        Blocked(reason~, ..) =>
+          fail(where_ + ": validation was blocked: " + reason)
         _ => fail(where_ + ": unexpected answer")
       }
       actual.sort_by(@model.compare_code_units)
@@ -98,7 +97,11 @@ test "every lesson case gives the findings and the output that its expect.json n
         )
       }
       let runs = match
-        output_plan(lesson.output is Some(_), expected, case.expect.output_contains) {
+        output_plan(
+          lesson.output is Some(_),
+          expected,
+          case.expect.output_contains,
+        ) {
         Ok(runs) => runs
         Err(reason) => fail(where_ + ": output_contains cannot run: " + reason)
       }

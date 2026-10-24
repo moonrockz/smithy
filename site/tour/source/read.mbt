@@ -81,6 +81,12 @@ fn read_lesson(root : String, dir : String) -> @model.Lesson raise {
   let number = parse_number(dir)
   let meta = read_json("\{base}/lesson.json")
   let slug = string_field(meta, "slug", dir)
+  // A link to a lesson text resolves to its page by the folder name alone.
+  if dir != @model.lesson_dir(number, slug) {
+    fail(
+      "\{dir}: I expected the folder name \"\{@model.lesson_dir(number, slug)}\", because the slug is \"\{slug}\"",
+    )
+  }
   let title = string_field(meta, "title", dir)
   let section = string_field(meta, "section", dir)
   let spec = string_field(meta, "spec", dir)

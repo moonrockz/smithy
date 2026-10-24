@@ -3,6 +3,7 @@ import {
   "moonrockz/smithy-site/content",
   "moonrockz/smithy-site/markdown",
   "moonrockz/smithy-site/playground/workbench",
+  "moonrockz/smithy-site/tour/model",
   "moonbitlang/core/json",
   "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",

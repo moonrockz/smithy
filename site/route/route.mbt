@@ -11,6 +11,10 @@ pub(all) enum Route {
   Example(String)
   /// `/playground/`: the workbench that runs Smithy in the browser.
   Playground
+  /// `/tour/`: the contents of the language tour.
+  Tour
+  /// `/tour/<slug>`: one lesson of the tour.
+  Lesson(String)
   NotFound(String)
 } derive(Eq, Debug, ToJson, FromJson)
 
@@ -53,6 +57,8 @@ pub fn Route::parse(path : String) -> Route {
     ["examples"] => Examples
     ["examples", dir] => Example(dir)
     ["playground"] => Playground
+    ["tour"] => Tour
+    ["tour", slug] => Lesson(slug)
     _ => NotFound(segs.join("/"))
   }
 }
@@ -67,6 +73,8 @@ pub fn Route::to_path(self : Route) -> String {
     Examples => "examples"
     Example(dir) => "examples/" + dir
     Playground => "playground"
+    Tour => "tour"
+    Lesson(slug) => "tour/" + slug
     NotFound(path) => path
   }
 }

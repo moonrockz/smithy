@@ -104,6 +104,7 @@ fn nav_bar(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       @html.a(href=@route.href(base, DocsIndex), "Docs"),
       @html.a(href=@route.href(base, Examples), "Examples"),
       @html.a(href=@route.href(base, Playground), "Playground"),
+      @html.a(href=@route.href(base, Tour), "Tour"),
       @html.a(class="ms-extlink", href=@data.api_docs_url, [
         @html.text("API"),
         icon_external(),

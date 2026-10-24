@@ -21,6 +21,8 @@ pub(all) enum Route {
   Examples
   Example(String)
   Playground
+  Tour
+  Lesson(String)
   NotFound(String)
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn Route::equal(Self, Self) -> Bool

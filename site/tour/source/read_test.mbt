@@ -47,7 +47,7 @@ test "a case without expect.json" {
 
 ///|
 test "two lessons with the same slug" {
-  expect_err("dup-slug", ["01-a", "02-b"])
+  expect_err("dup-slug", ["01-same", "02-same"])
 }
 
 ///|
@@ -68,4 +68,9 @@ test "lesson.md whose first line is not the title" {
 ///|
 test "a severity outside WARNING, DANGER and ERROR" {
   expect_err("bad-severity", ["NOTE"])
+}
+
+///|
+test "a folder name that does not end with the slug" {
+  expect_err("bad-dir", ["01-a", "01-b"])
 }

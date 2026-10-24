@@ -66,6 +66,8 @@ pub(all) struct SiteData {
   markdown : String?
   /// The samples and the Worker of the playground page; `None` on every other page.
   playground : @workbench.PlaygroundData?
+  /// The contents or the lesson of a tour page; `None` on every other page.
+  tour : @model.TourPage?
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -111,7 +113,13 @@ pub fn link_context(
       match manifest.find_source(path) {
         Some(page) => Some(page.route)
         None =>
-          @content.Example::find_source(examples, path).map(e => Example(e.dir))
+          match @model.slug_of_source(path) {
+            Some(slug) => Some(Lesson(slug))
+            None =>
+              @content.Example::find_source(examples, path).map(e => {
+                Example(e.dir)
+              })
+          }
       }
     },
     repo_url: github_repo,
