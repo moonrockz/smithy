@@ -1,0 +1,340 @@
+{
+  "cases": [
+    {
+      "id": "value-consumer-valid",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":2}"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "value-consumer-invalid",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":0}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "value.json/count: error[Range] example#Input$count: I expected the number to satisfy the modeled range."
+      ]
+    },
+    {
+      "id": "value-unknown-reject",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":2,\"extra\":1}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "value.json/extra: error[UnknownMember] example#Input: I expected a declared member, but found an unknown member."
+      ]
+    },
+    {
+      "id": "value-unknown-ignore",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "--unknown-members",
+        "ignore",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":2,\"extra\":1}"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "value-json-names",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "--member-names",
+        "json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required @jsonName(\"n\") count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"n\":2}"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "value-member-target",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input$count",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "0"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "value.json: error[Range] example#Input$count: I expected the number to satisfy the modeled range."
+      ]
+    },
+    {
+      "id": "value-not-json",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":1"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "value.json: error[InvalidJson]: I expected one well-formed JSON value: Unexpected end of file"
+      ]
+    },
+    {
+      "id": "value-duplicate-key",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":1,\"count\":2}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "value.json: error[DuplicateJsonKey]: I expected unique JSON object member names, but found a duplicate."
+      ]
+    },
+    {
+      "id": "value-missing-target",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Missing",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":2}"
+        }
+      ],
+      "status": 2,
+      "lines": [
+        "--shape: error[InvalidTarget]: example#Missing: I expected an existing data shape or data member as the validation target."
+      ]
+    },
+    {
+      "id": "value-invalid-model",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(foo: 1)\ninteger Count\nstructure Input { count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":2}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "example.smithy: error[InvalidModel]: example#Input$count: I found an unknown constraint bound."
+      ]
+    },
+    {
+      "id": "value-unsupported-pattern",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@pattern(\"^\\\\u{41}$\")\nstring Name\nstructure Input { name: Name }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"name\":\"A\"}"
+        }
+      ],
+      "status": 2,
+      "lines": [
+        "example.smithy: error[UnsupportedConstraint]: example#Input$name: I could not read '\\u{' in the pattern. I accept only \\uXXXX with four hex digits."
+      ]
+    },
+    {
+      "id": "value-unsupported-timestamp",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\nstructure Input { @timestampFormat(\"http-date\") when: Timestamp }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"when\":\"x\"}"
+        }
+      ],
+      "status": 2,
+      "lines": [
+        "example.smithy: error[UnsupportedConstraint]: example#Input$when: I cannot validate this timestamp format in the JSON value profile."
+      ]
+    },
+    {
+      "id": "value-json-limit",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "value.json: error[JsonInputLimit]: I expected JSON nesting depth no greater than 128."
+      ]
+    }
+  ]
+}

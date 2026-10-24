@@ -34,10 +34,9 @@ fn value_config(options : ValueOptions) -> @validation.Config {
 fn found_of(finding : @validation.Finding) -> DataFinding {
   Found(
     code=finding.code.to_string(),
-    severity=if finding.severity == @validation.Error {
-      "error"
-    } else {
-      "advisory"
+    severity=match finding.severity {
+      @validation.Error => "error"
+      @validation.Advisory => "advisory"
     },
     path=finding.path.pointer(),
     shape=finding.shape.to_string(),

@@ -1631,6 +1631,65 @@ async fn check_readme(runner : Runner, root : String) -> Unit {
 }
 
 ///|
+/// The cases of `site/playground/cli_check/cli-cases.json`: each runs in its own
+/// directory, and the lines it prints (stdout, then stderr) are the lines that
+/// the playground core must give for the same input.
+async fn exercise_engine_cases(runner : Runner, root : String) -> Unit {
+  let cases = @json.parse(
+    @fs.read_file("\{root}/site/playground/cli_check/cli-cases.json").text(),
+  )
+  guard cases is { "cases": Array(cases), .. } else {
+    fail("cli-cases.json must have a cases array")
+  }
+  for item in cases {
+    guard item
+      is {
+        "id": String(id),
+        "args": Array(args),
+        "files": Array(files),
+        "status": Number(status, ..),
+        "lines": Array(lines),
+        ..
+      } else {
+      fail("a case needs id, args, files, status and lines: \{item.stringify()}")
+    }
+    let dir = "\{runner.dir}/engine/\{id}"
+    @fs.mkdir(dir, recursive=true, allow_exist=true)
+    for file in files {
+      guard file is { "name": String(name), .. } else {
+        fail("\{id}: a file needs a name")
+      }
+      let text = match file {
+        { "text": _, "from": _, .. } =>
+          fail("\{id}: file \{name} needs exactly one of text and from")
+        { "text": String(text), .. } => text
+        { "from": String(from), .. } =>
+          @fs.read_file("\{root}/\{from}").text()
+        _ => fail("\{id}: file \{name} needs exactly one of text and from")
+      }
+      @fs.write_file("\{dir}/\{name}", text)
+    }
+    let args = args.map(arg => {
+      guard arg is String(arg) else { fail("\{id}: an argument must be a string") }
+      arg
+    })
+    let (out, err) = { ..runner, dir, }.command(args, status.to_int())
+    let printed : Array[Json] = []
+    for line in (out + err).split("\n") {
+      let line = line.to_owned()
+      if !line.is_empty() {
+        printed.push(Json::string(line))
+      }
+    }
+    assert_eq(
+      Json::array(printed).stringify(),
+      Json::array(lines).stringify(),
+      msg=id,
+    )
+  }
+}
+
+///|
 async fn exercise(
   root : String,
   target : String,
@@ -1669,6 +1728,7 @@ async fn exercise(
   exercise_landing_sample(runner, root)
   exercise_rpc(runner, root, skip_stdin)
   exercise_rpc_traits(runner, root)
+  exercise_engine_cases(runner, root)
   exercise_rpc_responses(runner, root, skip_stdin)
   exercise_rpc_batches(runner, root, skip_stdin)
   exercise_rpc_transcripts(runner, root, skip_stdin)
