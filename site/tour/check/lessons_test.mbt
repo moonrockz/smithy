@@ -225,14 +225,16 @@ test "lesson 01 includes its own starting model" {
     git_ref: "",
   })
   let mut cli : @markdown.Snippet? = None
+  let mut api : @markdown.Snippet? = None
   @markdown.walk_blocks(doc.blocks, block => {
     if block is Tabs(_, tabs) {
       for tab in tabs {
-        if tab.label == "CLI" {
-          for s in tab.snippets {
-            if s.file is Some(_) && cli is None {
-              cli = Some(s)
-            }
+        for s in tab.snippets {
+          if tab.label == "CLI" && s.file is Some(_) && cli is None {
+            cli = Some(s)
+          }
+          if tab.label == "MoonBit" && s.lang == "mbt" && api is None {
+            api = Some(s)
           }
         }
       }
@@ -241,7 +243,21 @@ test "lesson 01 includes its own starting model" {
   guard cli is Some(snippet) else {
     fail("lesson 01 has no CLI tab with a file")
   }
-  let model = lesson.files[0].text
-  // The README block has no final newline; the lesson file has one.
-  assert_eq(snippet.code, model.trim_end(chars="\n").to_owned())
+  guard api is Some(api_snippet) else { fail("lesson 01 has no MoonBit tab") }
+  // The README blocks have no final newline; the lesson file has one.
+  let model = lesson.files[0].text.trim_end(chars="\r\n").to_owned()
+  assert_eq(snippet.code, model)
+  // The first run of `#|` lines of the API block is its copy of the model.
+  let copy : Array[String] = []
+  let mut started = false
+  for line in api_snippet.code.split("\n") {
+    let t = line.trim().to_owned()
+    if t.has_prefix("#|") {
+      started = true
+      copy.push(t[2:].to_owned())
+    } else if started {
+      break
+    }
+  }
+  assert_eq(copy.join("\n"), model)
 }

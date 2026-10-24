@@ -263,15 +263,7 @@ A tour lesson (`site/tour/lessons/NN-slug/lesson.md`) must not hold a CLI or API
 - A missing file, a missing marker, a marker used twice, a region without a code block or an untested fence
   fails `mise run site:check`, with a message that starts with the lesson file.
 
-| Fence | Where | Run by |
-| --- | --- | --- |
-| `mbt check` with a test | a `.mbt.md` file with a `moon.pkg` next to it | `moon test` |
-| `console` | `apps/smithy/README.md` | `mise run test:cli` |
-| `LANG file=NAME` | `apps/smithy/README.md` | `mise run test:cli` (writes the file) |
-
-- The reader accepts only tested fences: `mbt check` with a test in a `.mbt.md` file that has a `moon.pkg`
-  next to it, and `console` or `LANG file=NAME` fences at the start of a line in `apps/smithy/README.md`
-  (`scripts/test-cli.mbtx` runs them).
+- The reader accepts only the fences of the table at the end of this section. Anything else fails the include.
 - The reader rejects a lesson that has a fence in `console`, `shell`, `sh`, `bash`, `zsh`, `mbt`, `moonbit`,
   `shell-session`, `powershell`, `fish`, `cmd` or a similar terminal language (the case does not matter), a `tabs`
   fence, or a fence of any other language (also `text` or no language) with a line that starts with `$ smithy`
@@ -285,3 +277,9 @@ A tour lesson (`site/tour/lessons/NN-slug/lesson.md`) must not hold a CLI or API
   a trait name at the end of a sentence such as `/// Add @required.` (no name follows the `.`), and an e-mail
   address such as `a@example.com` (a letter comes before the `@`). A doc comment such as
   `/// see @smithy.api` in a `smithy` fence is rejected, because no `#` follows the name.
+
+| Fence | Where | Run by |
+| --- | --- | --- |
+| `mbt check` with a test | a `.mbt.md` file with a `moon.pkg` next to it | `moon test` |
+| `console` | `apps/smithy/README.md` | `mise run test:cli` |
+| `LANG file=NAME` | `apps/smithy/README.md` | `mise run test:cli` (writes the file) |
