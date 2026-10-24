@@ -244,8 +244,12 @@ test "lesson 01 includes its own starting model" {
     fail("lesson 01 has no CLI tab with a file")
   }
   guard api is Some(api_snippet) else { fail("lesson 01 has no MoonBit tab") }
-  // The README blocks have no final newline; the lesson file has one.
-  let model = lesson.files[0].text.trim_end(chars="\r\n").to_owned()
+  // The README blocks have no final newline; the lesson file has one. A Windows
+  // checkout gives the lesson file CRLF line ends, and the snippets have LF.
+  let model = lesson.files[0].text
+    .replace_all(old="\r\n", new="\n")
+    .trim_end(chars="\n")
+    .to_owned()
   assert_eq(snippet.code, model)
   // The first run of `#|` lines of the API block is its copy of the model.
   let copy : Array[String] = []
