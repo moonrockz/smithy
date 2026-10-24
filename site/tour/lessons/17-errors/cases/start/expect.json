@@ -1,1 +1,1 @@
-{"events": [], "output_contains": ["\"404\": {", "\"CityNotFoundErrorContent\"", "\"500\": {", "\"ServiceUnavailableErrorContent\""]}
+{"events": [], "output_contains": ["\"/service/Weather/operation/GetForecast\"", "\"post\": {", "\"404\": {", "\"CityNotFoundErrorContent\"", "\"500\": {", "\"ServiceUnavailableErrorContent\""]}

@@ -1,1 +1,1 @@
-{"events": [], "output_contains": ["\"/service/Weather/operation/CreateCity\"", "\"/service/Weather/operation/GetCity\"", "\"/service/Weather/operation/ListCities\"", "\"pattern\": \"^[a-z0-9-]+$\""]}
+{"events": [], "output_contains": ["\"post\": {", "\"/service/Weather/operation/CreateCity\"", "\"/service/Weather/operation/GetCity\"", "\"/service/Weather/operation/ListCities\"", "\"pattern\": \"^[a-z0-9-]+$\""]}

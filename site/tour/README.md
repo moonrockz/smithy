@@ -130,7 +130,8 @@ an entry removes `/a/0`, the item that was at `/a/1` is at `/a/0`.
 A `kind` of `openapi` is the same for the OpenAPI documents: it has `pointer`, no `side`, and removes the value at
 the pointer from both documents.
 
-The reference OpenAPI entry is `null` when the model has no service with a protocol trait or the Java conversion fails. Our output must then be blocked. A document
+The reference OpenAPI entry is `null` when the model has no service with a protocol trait or the Java
+conversion fails. Our output must then be blocked. A document
 on one side and a failure on the other side fails the check. The Java harness converts the one service of the
 model that has a trait with the `protocolDefinition` trait. A case with more than one such service fails the
 harness. The model loads with the bundled protocol definitions, as the transform loads it.
@@ -233,7 +234,7 @@ A lesson page has the link "Open in playground" only when the lesson has one fil
 
 | Package | Job |
 |---|---|
-| `tour/model` | the lesson and tour types, the event key (`EventKey`, `Severity`), the case id (`CaseId`) and the digest |
+| `tour/model` | the lesson and tour types, the event key (`EventKey`, `Severity`), the case id and the digest |
 | `tour/source` | reads the lessons folder and checks its rules |
 | `tour/lesson` | the state of a lesson page (`Model`, `update`) and its view |
 | `tour/ui` | js: mounts the lesson page, runs the editors, the Worker and the timers |
