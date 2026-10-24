@@ -28,6 +28,9 @@ on:
       - apps/smithy/README.md
       - pkgs/**/README.mbt.md
       - scripts/site-*.mbtx
+      # site:check reads its readme_files (site/tour/source/include_test.mbt). It does not change
+      # the built site, so a push of it alone does not deploy.
+      - scripts/test-cli.mbtx
       - .github/workflows/site.yml
       - .config/mise/config.toml
       - .github/actions/setup/**
