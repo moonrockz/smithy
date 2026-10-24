@@ -380,7 +380,10 @@ fn transcript_outcome(
   match @core.handle(session, TranscriptStep(seq=2, count=1000000)) {
     // A transcript that is not readable has no entries to check: the CLI
     // prints its finding and exits 1.
-    Blocked(kind=Other, ..) if unreadable => (lines, false)
+    Blocked(kind=Other, reason~, ..) if unreadable => {
+      assert_eq(reason, "I have no transcript to check. Start one first.")
+      (lines, false)
+    }
     TranscriptProgress(findings~, summary~, ..) => {
       lines.append(findings.map(f => f.cli_line(file~)))
       guard summary is Some(summary) else {
