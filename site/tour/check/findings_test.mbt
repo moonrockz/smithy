@@ -15,7 +15,9 @@ fn case_diagnostics(
   guard lesson.cases.search_by(c => c.name == name) is Some(j) else {
     fail("I cannot find the case " + dir + "/" + name)
   }
-  let files = files_of(lesson.case_files(lesson.cases[j]))
+  let files = files_of(
+    @model.model_files(lesson.engine, lesson.case_files(lesson.cases[j])),
+  )
   match @core.handle(@core.Session::new(), ValidateFiles(seq=1, files~)) {
     Diagnostics(items~, ..) => items
     _ => fail(dir + "/" + name + ": unexpected answer")

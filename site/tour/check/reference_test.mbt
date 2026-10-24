@@ -392,6 +392,7 @@ fn our_json_schema(
   where_ : String,
   lesson : @model.Lesson,
   files : Array[(String, String)],
+  selector : String?,
 ) -> Json raise {
   guard lesson.output is Some(output) else {
     fail(
@@ -399,10 +400,7 @@ fn our_json_schema(
     )
   }
   match
-    @core.handle(
-      session,
-      TransformFiles(seq=2, files~, output~, selector=lesson.selector),
-    ) {
+    @core.handle(session, TransformFiles(seq=2, files~, output~, selector~)) {
     Transformed(files=out, ..) =>
       match out.search_by(f => f.0 == "schema.json") {
         Some(i) => parse_json(where_ + " schema.json", out[i].1)
@@ -421,6 +419,7 @@ fn our_openapi(
   where_ : String,
   lesson : @model.Lesson,
   files : Array[(String, String)],
+  selector : String?,
 ) -> Json? raise {
   guard lesson.output is Some(output) else {
     fail(
@@ -429,10 +428,7 @@ fn our_openapi(
     )
   }
   match
-    @core.handle(
-      session,
-      TransformFiles(seq=2, files~, output~, selector=lesson.selector),
-    ) {
+    @core.handle(session, TransformFiles(seq=2, files~, output~, selector~)) {
     Transformed(files=out, ..) =>
       match out.search_by(f => f.0.has_suffix(".openapi.json")) {
         Some(i) => Some(parse_json(where_ + " OpenAPI", out[i].1))
@@ -590,6 +586,10 @@ fn compare_all(
       let files = files_of(
         @model.model_files(lesson.engine, lesson.case_files(case)),
       )
+      let selector = @model.query_of(
+        lesson.case_files(case),
+        fixed=lesson.selector,
+      )
       let expected = reference_of(reference, case_id)
       let ours = our_events(session, where_, files, lesson.output)
       let theirs = expected.events.copy()
@@ -606,7 +606,7 @@ fn compare_all(
         )
       }
       if expected.json_schema is Some(schema) {
-        let mine = our_json_schema(session, where_, lesson, files)
+        let mine = our_json_schema(session, where_, lesson, files, selector)
         let theirs = parse_json(reference_path, schema.stringify())
         for i, entry in allow {
           guard entry.case_id == case_id &&
@@ -627,7 +627,7 @@ fn compare_all(
       }
       if expected.openapi is Some(document) {
         let theirs = parse_json(reference_path, document.stringify())
-        let mine = our_openapi(session, where_, lesson, files)
+        let mine = our_openapi(session, where_, lesson, files, selector)
         compare_openapi(case_id, mine, theirs, allow, used, openapi~)
       }
     }
@@ -1098,9 +1098,13 @@ test "our OpenAPI document is the .openapi.json file of the transform" {
     files: [],
     cases: [],
   }
-  let document = our_openapi(@core.Session::new(), "a", lesson, [
-    ("model.smithy", model),
-  ])
+  let document = our_openapi(
+    @core.Session::new(),
+    "a",
+    lesson,
+    [("model.smithy", model)],
+    None,
+  )
   guard document
     is Some({ "openapi": String("3.0.2"), "paths": Object(paths), .. }) else {
     fail("the OpenAPI document is missing or has no version 3.0.2 and paths")
