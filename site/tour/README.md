@@ -53,7 +53,9 @@ This runs the tests of `site/tour/check` with the native target. It needs no bun
 the same task in the job `tour`. The tests run with `site/` as the working directory.
 
 **Level 1** (`lessons_test.mbt`). For each case, the check validates the files with the playground core
-(`@core.handle`). It keeps only the findings with the severity `WARNING`, `DANGER` or `ERROR`, sorts them, and
+(`@core.handle`) and the request `@core.lesson_validate`. For a lesson with an OpenAPI output, the model loads with the
+bundled OpenAPI protocol definitions, as the transform loads it, so `@restJson1` resolves. For another lesson, it loads
+without them. The check keeps only the findings with the severity `WARNING`, `DANGER` or `ERROR`, sorts them, and
 requires them to be equal to the sorted `events` of `expect.json`. Then, for a case whose output runs, it checks
 each needle of `output_contains` against the converted output.
 

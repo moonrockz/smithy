@@ -332,8 +332,9 @@ fn our_events(
   session : @core.Session,
   where_ : String,
   files : Array[(String, String)],
+  output : @core.Output?,
 ) -> Array[@model.EventKey] raise {
-  match @core.handle(session, ValidateFiles(seq=1, files~)) {
+  match @core.handle(session, @core.lesson_validate(seq=1, files~, output~)) {
     Diagnostics(items~, ..) => compared(items)
     Blocked(reason~, ..) => fail(where_ + ": validation was blocked: " + reason)
     _ => fail(where_ + ": unexpected answer")
@@ -441,7 +442,7 @@ fn compare_all(
       let where_ = case_id.to_string()
       let files = files_of(lesson.case_files(case))
       let expected = reference_of(reference, case_id)
-      let ours = our_events(session, where_, files)
+      let ours = our_events(session, where_, files, lesson.output)
       let theirs = expected.events.copy()
       remove_allowed_events(case_id, ours, theirs, allow, used)
       ours.sort_by(@model.compare_events)

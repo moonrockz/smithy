@@ -207,8 +207,11 @@ fn protocols_of(model : @smithy.Model) -> Array[ProtocolView] {
 }
 
 ///|
-fn validate(seq : Int32, files : Array[(String, String)]) -> Response {
-  let loaded = load(files)
+fn validate(
+  seq : Int32,
+  files : Array[(String, String)],
+  loaded : @smithy.LoadResult,
+) -> Response {
   let sources : Map[String, @syntax.SourceText] = Map([])
   for file in files {
     sources[file.0] = @syntax.SourceText::new(file.1)

@@ -83,7 +83,11 @@ test "every lesson case gives the findings and the output that its expect.json n
     for case in lesson.cases {
       let where_ = lesson.case_id(case).to_string()
       let files = files_of(lesson.case_files(case))
-      let actual = match @core.handle(session, ValidateFiles(seq=1, files~)) {
+      let actual = match
+        @core.handle(
+          session,
+          @core.lesson_validate(seq=1, files~, output=lesson.output),
+        ) {
         Diagnostics(items~, ..) => compared(items)
         Blocked(reason~, ..) =>
           fail(where_ + ": validation was blocked: " + reason)

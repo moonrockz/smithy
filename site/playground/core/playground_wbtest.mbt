@@ -1422,3 +1422,60 @@ test "TransformFiles is blocked when a file has an error" {
     "The model has 1 error. Fix it in the Validate tab, then run again.",
   )
 }
+
+///|
+fn error_items(response : Response) -> Array[Diagnostic] raise {
+  match response {
+    Diagnostics(items~, ..) =>
+      items.filter(d => d.severity == "ERROR" || d.severity == "DANGER")
+    other => fail(@json.to_json(other).stringify())
+  }
+}
+
+///|
+test "ValidateFilesFor an OpenAPI output resolves the protocol trait" {
+  let session = Session::new()
+  let files = [("model.smithy", web_model)]
+  for output in [Output::OpenApi30, Output::OpenApi31] {
+    assert_eq(
+      error_items(handle(session, ValidateFilesFor(seq=1, files~, output~))),
+      [],
+    )
+  }
+  let plain = error_items(handle(session, ValidateFiles(seq=1, files~)))
+  assert_eq(plain.length(), 1)
+  assert_eq(plain[0].severity, "ERROR")
+}
+
+///|
+test "ValidateFilesFor another output gives the answer of ValidateFiles" {
+  let session = Session::new()
+  for text in [chat_model, bad_model, web_model] {
+    let files = [("model.smithy", text)]
+    for output in [Output::JsonAst, Idl, Selector, JsonSchema, OpenRpc] {
+      assert_eq(
+        handle(session, ValidateFilesFor(seq=1, files~, output~)),
+        handle(session, ValidateFiles(seq=1, files~)),
+      )
+    }
+  }
+  let web = [("model.smithy", web_model)]
+  assert_eq(
+    error_items(
+      handle(session, ValidateFilesFor(seq=1, files=web, output=JsonSchema)),
+    ).length(),
+    1,
+  )
+}
+
+///|
+test "lesson_validate asks for the model of the lesson output" {
+  assert_eq(
+    lesson_validate(seq=3, files=[], output=None),
+    ValidateFiles(seq=3, files=[]),
+  )
+  assert_eq(
+    lesson_validate(seq=3, files=[], output=Some(OpenApi31)),
+    ValidateFilesFor(seq=3, files=[], output=OpenApi31),
+  )
+}

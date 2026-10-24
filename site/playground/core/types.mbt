@@ -24,6 +24,13 @@ pub(all) enum Request {
   /// Validate a model of several files, as (name, text). Each name is the
   /// loader file name and the `file` of the findings in it.
   ValidateFiles(seq~ : Int32, files~ : Array[(String, String)])
+  /// Validate the files with the model that `TransformFiles` loads for `output`:
+  /// with the bundled OpenAPI protocol definitions for OpenApi30 and OpenApi31.
+  ValidateFilesFor(
+    seq~ : Int32,
+    files~ : Array[(String, String)],
+    output~ : Output
+  )
   /// Convert a model of several files, as `Transform` does for one.
   TransformFiles(
     seq~ : Int32,

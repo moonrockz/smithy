@@ -3,10 +3,18 @@
 /// request starts, steps or resets the transcript that the session holds.
 pub fn handle(session : Session, request : Request) -> Response {
   match request {
-    Validate(seq~, model~) => validate(seq, [(MODEL_FILE, model)])
+    Validate(seq~, model~) => {
+      let files = [(MODEL_FILE, model)]
+      validate(seq, files, load(files))
+    }
     Transform(seq~, model~, output~, selector~) =>
       transform(seq, [(MODEL_FILE, model)], output, selector)
-    ValidateFiles(seq~, files~) => validate(seq, files)
+    ValidateFiles(seq~, files~) => validate(seq, files, load(files))
+    ValidateFilesFor(seq~, files~, output~) =>
+      match load_for(files, output) {
+        Ok(loaded) => validate(seq, files, loaded)
+        Err(reason) => blocked(seq~, reason~)
+      }
     TransformFiles(seq~, files~, output~, selector~) =>
       transform(seq, files, output, selector)
     TranscriptStart(
@@ -56,4 +64,18 @@ pub fn handle_json(session : Session, text : String) -> String {
       ).stringify()
   }
   @json.to_json(handle(session, request)).stringify()
+}
+
+///|
+/// The validate request of a tour lesson: `ValidateFiles` without an output,
+/// `ValidateFilesFor` with one.
+pub fn lesson_validate(
+  seq~ : Int32,
+  files~ : Array[(String, String)],
+  output~ : Output?,
+) -> Request {
+  match output {
+    None => ValidateFiles(seq~, files~)
+    Some(output) => ValidateFilesFor(seq~, files~, output~)
+  }
 }

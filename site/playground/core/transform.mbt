@@ -206,19 +206,28 @@ fn run_output(
 }
 
 ///|
+/// The load of the files for `output`, as `TransformFiles` does it: the OpenAPI
+/// outputs load with the bundled protocol definitions, the others without.
+fn load_for(
+  files : Array[(String, String)],
+  output : Output,
+) -> Result[@smithy.LoadResult, String] {
+  match output {
+    OpenApi30 | OpenApi31 => load_with_http_protocols(files)
+    _ => Ok(load(files))
+  }
+}
+
+///|
 fn transform(
   seq : Int32,
   files : Array[(String, String)],
   output : Output,
   selector : String?,
 ) -> Response {
-  let loaded = match output {
-    OpenApi30 | OpenApi31 =>
-      match load_with_http_protocols(files) {
-        Ok(loaded) => loaded
-        Err(reason) => return blocked(seq~, reason~)
-      }
-    _ => load(files)
+  let loaded = match load_for(files, output) {
+    Ok(loaded) => loaded
+    Err(reason) => return blocked(seq~, reason~)
   }
   match clean_model(loaded) {
     Err((reason, kind)) => Blocked(seq~, reason~, kind~)

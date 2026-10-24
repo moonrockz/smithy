@@ -139,7 +139,11 @@ fn Runtime::post(self : Runtime, seq : Int32, request : @core.Request) -> Unit {
 ///|
 fn Runtime::run(self : Runtime, effect : @lesson.Effect) -> Unit {
   match effect {
-    SendValidate(seq~, files~) => self.post(seq, ValidateFiles(seq~, files~))
+    SendValidate(seq~, files~) =>
+      self.post(
+        seq,
+        @core.lesson_validate(seq~, files~, output=self.page.output),
+      )
     SendTransform(seq~, files~, output~, selector~) =>
       self.post(seq, TransformFiles(seq~, files~, output~, selector~))
     Wait(ms~, msg~) => set_timeout(ms, () => (self.dispatch)(msg))
