@@ -1,0 +1,1 @@
+{"events": [], "output_contains": ["\"OrderState\": {\n            \"type\": \"string\",\n            \"enum\": [\n                \"PENDING\",\n                \"shipped\",\n                \"delivered\"\n            ]\n        }", "\"Priority\": {\n            \"type\": \"number\",\n            \"enum\": [\n                1,\n                2\n            ]\n        }"]}

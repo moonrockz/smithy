@@ -1,0 +1,1 @@
+{"events": [], "output_contains": ["\"name\": {\n                    \"type\": \"string\",\n                    \"minLength\": 1,\n                    \"maxLength\": 32\n                }"]}

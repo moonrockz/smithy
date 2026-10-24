@@ -1,0 +1,1 @@
+{"events": [], "output_contains": ["\"Customer\": {\n            \"type\": \"object\",", "\"Address\": {\n            \"type\": \"object\",", "\"name\": {\n                    \"type\": \"string\"\n                }", "\"address\": {\n                    \"$ref\": \"#/definitions/Address\"\n                }"]}
