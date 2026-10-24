@@ -1,9 +1,9 @@
 ///|
 /// Export an API without a network service or optional Ion/WIT dependencies.
 import {
-  "moonrockz/smithy@0.5.0",
-  "moonrockz/smithy-validation@0.5.0/rpc",
-  "moonrockz/smithy-openrpc@0.5.0" @openrpc,
+  "moonrockz/smithy@0.6.0",
+  "moonrockz/smithy-validation@0.6.0/rpc",
+  "moonrockz/smithy-openrpc@0.6.0" @openrpc,
 }
 
 ///|

@@ -6,6 +6,50 @@ is 0.x, a minor release can contain breaking changes.
 
 <!-- git-cliff: end of header -->
 
+## [0.6.0] - 2026-10-24
+
+<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+
+### ⚠️ Breaking changes
+
+- *(validation)* Use `smithy validate value` instead of `smithy validate-value`. Model inputs and options follow the nested subcommand. No legacy alias is provided. ([#44](https://github.com/moonrockz/smithy/pull/44))
+- *(cli)* `SourceLocation` has a new field `kind : SourceKind`. Code that builds a `SourceLocation` with a struct literal must add `kind`, or use `SourceLocation::new(file, path~, span?, kind~ = User)`. Code that only reads a location needs no change. ([#57](https://github.com/moonrockz/smithy/pull/57))
+
+### 🚀 Features
+
+- *(validation)* Validate JSON-RPC requests ([#42](https://github.com/moonrockz/smithy/pull/42)) by @DamianReeves
+- *(validation)* [**breaking**] Validate JSON-RPC responses ([#44](https://github.com/moonrockz/smithy/pull/44)) by @DamianReeves
+- *(openrpc)* Export Smithy JSON-RPC services ([#45](https://github.com/moonrockz/smithy/pull/45)) by @DamianReeves
+- Add HTTP protocol test suites ([#46](https://github.com/moonrockz/smithy/pull/46)) by @DamianReeves
+- *(validation)* Validate JSON-RPC batches ([#47](https://github.com/moonrockz/smithy/pull/47)) by @DamianReeves
+- *(validation)* Validate native Ion values ([#48](https://github.com/moonrockz/smithy/pull/48)) by @DamianReeves
+- *(validation)* Validate JSON-RPC transcripts ([#49](https://github.com/moonrockz/smithy/pull/49)) by @DamianReeves
+- *(validation)* Finish JSON-RPC transcript follow-ups ([#50](https://github.com/moonrockz/smithy/pull/50)) by @DamianReeves
+- *(openrpc)* Build documents with published moonrockz/openrpc 0.2.0 ([#55](https://github.com/moonrockz/smithy/pull/55)) by @DamianReeves
+- *(site)* Add the project site with docs and examples ([#56](https://github.com/moonrockz/smithy/pull/56)) by @DamianReeves
+- *(site)* Add the in-browser playground ([#60](https://github.com/moonrockz/smithy/pull/60)) by @DamianReeves
+- *(site)* Show playground progress, group the Validate list and fold the controls ([#62](https://github.com/moonrockz/smithy/pull/62)) by @DamianReeves
+
+### 🐛 Bug fixes
+
+- *(validation)* Support recorded RFC 3339 leap seconds ([#43](https://github.com/moonrockz/smithy/pull/43)) by @DamianReeves
+- *(validation)* Make unreadable transcript input and refused entries consistent ([#52](https://github.com/moonrockz/smithy/pull/52)) by @DamianReeves
+- *(cli)* Report an unreadable stdin on js instead of crashing ([#53](https://github.com/moonrockz/smithy/pull/53)) by @DamianReeves
+- *(cli)* [**breaking**] Resolve the smithy.rpc traits in every model command ([#57](https://github.com/moonrockz/smithy/pull/57)) by @DamianReeves
+- *(site)* Link the other version to a page it has ([#59](https://github.com/moonrockz/smithy/pull/59)) by @DamianReeves
+
+### ⚡ Performance
+
+- *(smithy)* Make model validation linear in the shape count ([#61](https://github.com/moonrockz/smithy/pull/61)) by @DamianReeves
+
+### 🏗️ Build and CI
+
+- Smoke on evidence and stop release dry runs on feature pull requests ([#51](https://github.com/moonrockz/smithy/pull/51)) by @DamianReeves
+- File one GitHub issue per smoke breach ([#54](https://github.com/moonrockz/smithy/pull/54)) by @DamianReeves
+- *(site)* Build deployable site runs one at a time ([#58](https://github.com/moonrockz/smithy/pull/58)) by @DamianReeves
+
+**Full changelog**: https://github.com/moonrockz/smithy/compare/v0.5.0...v0.6.0
+
 ## [0.5.0] - 2026-10-21
 
 Validate JSON files against Smithy shapes with `smithy validate-value` or reuse prepared contracts from the new `moonrockz/smithy-validation` package. Structured findings identify exact instance paths, preserve numeric precision and enforce bounded traversal and pattern work across supported targets. This release also adds OpenAPI export and model compatibility diffs with JSONL event output. The shared JSON-RPC/OpenRPC design is documented for the next protocol-validation slices; date-time value validation currently excludes leap-second notation.
