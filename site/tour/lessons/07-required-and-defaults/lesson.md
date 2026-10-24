@@ -1,6 +1,6 @@
 # Required, defaults and nullability
 
-A structure member is optional by default. A value of the structure can leave out an optional member. Two traits make a member always present.
+A structure member is optional by default. A value of the structure can leave out an optional member. Two traits make sure that a member always has a value.
 
 The trait [`@required`](https://smithy.io/2.0/spec/type-refinement-traits.html#required-trait) means that the member must always have a value. In this model, `name` is required.
 
