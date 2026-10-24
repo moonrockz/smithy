@@ -29,15 +29,19 @@ fn expand_button(
   side : Expandable,
   emit : @rabbita.Emit[Msg],
 ) -> Html {
-  let (pressed, name) = match (side, m.layout) {
-    (EditorSide, EditorOnly) | (OutputSide, OutputOnly) =>
-      (true, "Show both panes")
-    (EditorSide, _) => (false, "Expand the editor")
-    (OutputSide, _) => (false, "Expand the output")
+  // The name stays the same; aria-pressed tells the state. The tooltip says
+  // what a press does.
+  let name = match side {
+    EditorSide => "Expand the editor"
+    OutputSide => "Expand the output"
+  }
+  let pressed = match (side, m.layout) {
+    (EditorSide, EditorOnly) | (OutputSide, OutputOnly) => true
+    _ => false
   }
   @html.button(
     class="tour-expand",
-    title=name,
+    title=if pressed { "Show both panes" } else { name },
     on_click=emit(ToggleExpand(side)),
     attrs=@html.Attrs::build()
       .type_("button")

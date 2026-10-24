@@ -157,7 +157,8 @@ tour bundle; see `site/README.md`.
 
 The right-hand column of a lesson page has two panes: the editor above, and the output with the Findings tab
 below. Each pane header has an expand button (class `tour-expand`, `aria-pressed`). "Expand the editor" or
-"Expand the output" makes that pane fill the column; the button then reads "Show both panes" and gives the split
+"Expand the output" makes that pane fill the column. The name of a button never changes; `aria-pressed` is
+`true` on the button of the expanded pane, its tooltip then reads "Show both panes", and a press gives the split
 view back. The layout is the `Layout` value of the lesson model (`Split`, `EditorOnly`, `OutputOnly`). A pane
 that is not shown stays in the DOM and has `display: none`, because the editors own their elements. Reset keeps
 the layout. After a change of layout the page makes the editors measure their elements again (the `Remeasure`

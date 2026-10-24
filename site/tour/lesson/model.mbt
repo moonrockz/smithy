@@ -47,7 +47,9 @@ pub extend Pane with @debug.Debug::{to_repr}
 pub(all) enum Layout {
   /// The editor above the output.
   Split
+  /// The editor fills the column; the output is hidden.
   EditorOnly
+  /// The output fills the column; the editor is hidden.
   OutputOnly
 } derive(Eq, Debug)
 

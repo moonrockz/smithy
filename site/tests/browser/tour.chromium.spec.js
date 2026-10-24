@@ -121,8 +121,9 @@ test("a pane expands to the right column and the split view comes back", async (
   await expect(out).toBeVisible();
   const columnHeight = await height(panes);
   expect(await height(out)).toBeGreaterThan(columnHeight - 2);
-  const back = page.getByRole("button", { name: "Show both panes" });
+  const back = page.getByRole("button", { name: "Expand the output" });
   await expect(back).toHaveAttribute("aria-pressed", "true");
+  await expect(back).toHaveAttribute("title", "Show both panes");
   await expect(back).toHaveCount(1);
   await page.screenshot({ path: "../.dev/out/tour-expanded-output.png" });
 
@@ -152,15 +153,55 @@ test("a pane expands to the right column and the split view comes back", async (
   await page.screenshot({ path: "../.dev/out/tour-expanded-editor.png" });
 
   // The keyboard: Tab from the last file tab reaches the button; Space presses it.
-  await page.getByRole("button", { name: "Show both panes" }).click();
+  await page.getByRole("button", { name: "Expand the editor" }).click();
   await expect(panes).not.toHaveClass(/tour-(editor|output)-only/);
   await page.getByRole("tab", { name: "model.smithy" }).focus();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Expand the editor" })).toBeFocused();
   await page.keyboard.press("Space");
   await expect(panes).toHaveClass(/tour-editor-only/);
-  await expect(page.getByRole("button", { name: "Show both panes" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Expand the editor" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Expand the editor" })).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("Space");
   await expect(panes).not.toHaveClass(/tour-(editor|output)-only/);
+  expect(page.errors).toEqual([]);
+});
+
+test("on a phone the expanded output fills the shared area and the editor pane is hidden", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await openLesson(page);
+  const edit = page.locator(".tour-pane.tour-edit");
+  const out = page.locator(".tour-pane.tour-out");
+  const panes = page.locator(".tour-panes");
+  const splitHeight = await height(panes);
+  const button = page.getByRole("button", { name: "Expand the output" });
+  await button.scrollIntoViewIfNeeded();
+  await button.click();
+  await expect(panes).toHaveClass(/tour-output-only/);
+  await expect(edit).toBeHidden();
+  await expect(edit).toHaveCount(1);
+  await expect(out).toBeVisible();
+  // The output takes the height of the viewport that the two panes shared.
+  await expect.poll(() => height(out)).toBeGreaterThan(800 - 200);
+  expect(await height(panes)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await button.click();
+  await expect(panes).not.toHaveClass(/tour-(editor|output)-only/);
+  await expect(edit).toBeVisible();
+  await expect(out).toBeVisible();
+  expect(await height(panes)).toBeGreaterThan(splitHeight - 2);
+  expect(page.errors).toEqual([]);
+});
+
+test("in dark mode the expand button shows against its background", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await openLesson(page);
+  const button = page.getByRole("button", { name: "Expand the editor" });
+  await expect(button).toBeVisible();
+  const [color, background] = await button.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return [style.color, style.backgroundColor];
+  });
+  expect(color).not.toEqual(background);
   expect(page.errors).toEqual([]);
 });

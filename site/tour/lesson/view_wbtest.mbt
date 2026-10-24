@@ -141,28 +141,27 @@ async test "each pane has an expand button with a name, a title and a state" {
 
 ///|
 #cfg(not(target="js"))
-async test "the pressed button says Show both panes and the panes get a layout class" {
+async test "the pressed button keeps its name, and its tooltip says Show both panes" {
   let (m, _) = Model::start(page(), None)
   let (m, _) = update(m, ToggleExpand(EditorSide))
   let html = render(m)
   assert_true(html.contains("class=\"tour-panes tour-editor-only\""))
-  let pressed = expand_tag(html, "Show both panes")
+  let pressed = expand_tag(html, "Expand the editor")
   assert_true(pressed.contains("aria-pressed=\"true\""))
   assert_true(pressed.contains("title=\"Show both panes\""))
-  assert_true(
-    expand_tag(html, "Expand the output").contains("aria-pressed=\"false\""),
-  )
-  assert_eq(expand_tag(html, "Expand the editor"), "")
+  let other = expand_tag(html, "Expand the output")
+  assert_true(other.contains("aria-pressed=\"false\""))
+  assert_true(other.contains("title=\"Expand the output\""))
+  assert_false(html.contains("aria-label=\"Show both panes\""))
   let (m, _) = update(m, ToggleExpand(OutputSide))
   let html = render(m)
   assert_true(html.contains("class=\"tour-panes tour-output-only\""))
   assert_true(
-    expand_tag(html, "Show both panes").contains("aria-pressed=\"true\""),
+    expand_tag(html, "Expand the output").contains("aria-pressed=\"true\""),
   )
   assert_true(
     expand_tag(html, "Expand the editor").contains("aria-pressed=\"false\""),
   )
-  assert_eq(expand_tag(html, "Expand the output"), "")
 }
 
 ///|

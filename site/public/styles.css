@@ -484,7 +484,7 @@ code, pre, kbd { font-family: var(--mono); }
   .tour-out .tour-panel { flex: none; min-height: 12rem; max-height: 60vh; }
   .tour-out .tour-outwrap { flex: none; height: 50vh; min-height: 14rem; }
   /* The expanded pane takes the height that the two panes shared. */
-  .tour-editor-only .tour-edit .tour-editor, .tour-output-only .tour-out .tour-outwrap { height: calc(100vh - 8rem); }
+  .tour-editor-only .tour-edit .tour-editor, .tour-output-only .tour-out .tour-outwrap { height: calc(100dvh - 8rem); }
   .tour-output-only .tour-out .tour-panel { max-height: none; }
   .tour-bar .tour-place { flex-basis: 100%; order: 3; text-align: left; }
 }
