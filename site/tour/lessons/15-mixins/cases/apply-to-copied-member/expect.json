@@ -1,0 +1,1 @@
+{"events": [], "output_contains": ["structure City {\n    @smithy.api#required({  })\n    @smithy.api#documentation(\"When the city was added.\")\n    createdAt: smithy.api#Timestamp", "structure Audited {\n    @smithy.api#required({  })\n    createdAt: smithy.api#Timestamp"]}

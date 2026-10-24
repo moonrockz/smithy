@@ -73,7 +73,7 @@ fn Model::check_now(self : Model) -> (Model, Array[Effect]) {
 pub fn output_label(output : @samples.Output) -> String {
   match output {
     JsonAst => "JSON AST"
-    Idl => "IDL"
+    Idl => "IDL (flattened)"
     Selector => "Selector"
     JsonSchema => "JSON Schema"
     OpenApi30 => "OpenAPI 3.0"
