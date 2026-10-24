@@ -31,6 +31,7 @@ fn Assembly::validate_conditions(
       "I cannot apply smithy.contracts#conditions to \{owner.body.keyword()} \{owner.id}.",
       owner.source,
       shape=owner.id.to_string(),
+      event_id="TraitTarget",
     )
     return
   }
@@ -42,6 +43,7 @@ fn Assembly::validate_conditions(
         "I expected a condition name matching ^[A-Z]+[A-Za-z0-9]*$ in smithy.contracts#conditions on \{owner.id}, but found \{Json::string(name).stringify()}.",
         owner.source,
         shape=owner.id.to_string(),
+        event_id="TraitValue",
       )
     }
     if condition is Object(fields) &&

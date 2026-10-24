@@ -220,8 +220,12 @@ Syntax errors use `SM-MODEL-015`, invalid operations and function calls use
 `SM-MODEL-016`, and non-boolean results use `SM-MODEL-017`. Invalid ordering
 comparisons produce a warning because JMESPath evaluates them to null; a null
 final result also produces `SM-MODEL-017`. Other static failures prevent
-assembly. These errors cover upstream `ConditionsTraitValidator` errors and
-danger events using this library's existing Error/Warning severities.
+assembly. The validation events use the IDs of the Smithy reference: `Model`,
+`ConditionsTrait` (DANGER for a result that is not boolean),
+`ConditionsTrait.JmespathProblem.JmespathEventDanger.<Name>`,
+`ConditionsTrait.JmespathProblem.JmespathEventWarning.<Name>`, `TraitValue` and
+`TraitTarget`. `<Name>` is the condition name. The diagnostic severity stays
+Error for a DANGER event, so the model does not assemble.
 
 Diagnostics retain the owning shape's source location and add a JSON Pointer
 to the condition's expression. The message contains the condition name,

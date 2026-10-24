@@ -211,6 +211,9 @@ The `smithy.contracts#conditions` trait is included. Validation checks its
 targets, condition names and required string fields, then analyzes JMESPath
 syntax, modeled member references, function arguments and boolean result types.
 Diagnostics identify the condition and its expression-relative location.
+The events use the IDs of the Smithy reference: `Model` for a syntax error, `ConditionsTrait` for a function error
+or a result that is not boolean (DANGER), `ConditionsTrait.JmespathProblem.JmespathEventDanger.<Name>`,
+`ConditionsTrait.JmespathProblem.JmespathEventWarning.<Name>`, `TraitValue` and `TraitTarget`.
 Conversion preserves expressions and
 documentation without evaluating contracts.
 
