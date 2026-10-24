@@ -118,10 +118,17 @@ fn Regex::growth_units(self : Regex) -> Int32 {
 }
 
 ///|
-/// The most states the tables keep between searches: at most 4,096, and at
-/// most about 2^18 cells. The cell bound also bounds the one table doubling
-/// that a search can do at once, which the growth shares of earlier
-/// transitions pay for.
+/// The most states the tables keep between searches: a power of two, at most
+/// 4,096, with at most about 2^17 cells. A search starts with at most this
+/// many states, so the first table doubling in it allocates and copies at
+/// most 3 * max_states * (4 * symbols + 2) <= 3 * 2^17 cells; the growth
+/// shares of earlier transitions pay for it. Later doublings in the same
+/// search are paid by the states that the search adds.
 fn Regex::max_states(self : Regex) -> Int32 {
-  Int32::min(4096, Int32::max(16, (1 << 18) / (4 * self.num_symbols() + 2)))
+  let limit = Int32::min(4096, (1 << 17) / (4 * self.num_symbols() + 2))
+  let mut states = 16
+  while states * 2 <= limit {
+    states *= 2
+  }
+  states
 }

@@ -122,11 +122,17 @@ most two marks. The scratch set and the slot book of a derivative are reset in t
 what they hold. When a search needs more units than the call has left, it stops at once, also in
 the middle of a derivative, keeps no partial state, and the call returns `LimitExceeded`.
 
-The automaton keeps at most 4,096 states, and at most about 2^18 table cells, between searches.
-Before a search, a full automaton forgets all its states. A search can add more states than that,
-but each one is charged to it. Over the life of the automaton, the growth shares pay for all table
-growth. One search that crosses a doubling does that copy at once; the cell bound keeps it below
-about 400,000 cells, under 1 ms on js and 0.03 ms native.
+The automaton keeps at most 4,096 states between searches, a power of two with at most about 2^17
+table cells. Before a search, a full automaton forgets all its states. Over the life of the
+automaton, the growth shares pay for all table growth. The first table doubling in a search
+allocates and copies at most 3 * states * (4 * symbols + 2) <= 3 * 2^17 cells, about 393,000 cells:
+about 0.03 ms native and 1 ms on js. The growth shares of earlier searches pay for that doubling,
+and the states that the search adds pay for its later doublings.
+
+A search can add more states than the cap, and each one is charged to it, so the work limit, not
+the cap, bounds the memory of one search. The tables hold about 4 bytes per cell and at most about
+5 cells per work unit: about 2 MB at the default limit of 100,000 units, and about 200 MB at the
+largest configurable limit of 10,000,000 units. The next search starts from empty tables again.
 
 Measured on an Apple M5 Max, one unit takes 12 to 20 ns; allocating or copying a table cell takes
 0.07 ns native, 0.4 ns wasm-gc and 2.4 ns js. The Morphir FQName pattern costs 2,295 units for a
