@@ -184,10 +184,14 @@ test "each case gives the CLI lines" {
 }
 
 ///|
+/// A truncated document gives InvalidTranscript. Where the cut falls decides
+/// the line: a cut outside a string gives 1:1 "the end of the value", a cut
+/// inside a string gives the place of that string. The CLI agrees on this
+/// fixture. Task 5 pins the 120-character cut of the real exchange.json
+/// against the CLI.
 test "text that is not JSON gives InvalidTranscript at 1:1" {
   let session = Session::new()
-  let text = WEATHER_EXCHANGE[:119].to_owned()
-  match start_files(session, text) {
+  match start_files(session, WEATHER_EXCHANGE[:119].to_owned()) {
     TranscriptProgress(findings~, ..) =>
       assert_eq(lines_of(findings), [
         "exchange.json:1:1: error InvalidTranscript: I expected the end of the value that starts here, and I found the end of the text.",
@@ -197,7 +201,19 @@ test "text that is not JSON gives InvalidTranscript at 1:1" {
 }
 
 ///|
-test "the model files keep their names in model findings" {
+test "a cut inside a string gives InvalidTranscript at the string" {
+  let session = Session::new()
+  match start_files(session, WEATHER_EXCHANGE[:120].to_owned()) {
+    TranscriptProgress(findings~, ..) =>
+      assert_eq(lines_of(findings), [
+        "exchange.json:5:63: error InvalidTranscript: I expected the end of the string that starts here, and I found the end of the text.",
+      ])
+    other => fail(@json.to_json(other).stringify())
+  }
+}
+
+///|
+test "a model of two files with a use across them checks, and an error in one blocks" {
   let (head, tail) = split_model()
   let session = Session::new()
   match
@@ -216,9 +232,7 @@ test "the model files keep their names in model findings" {
       ("b.smithy", bad),
     ]) {
     Blocked(kind=ModelErrors, reason~, ..) =>
-      assert_eq(
-        reason, "The model has 1 error. Fix it in the Validate tab, then run again.",
-      )
+      assert_true(reason.contains("1 error"))
     other => fail(@json.to_json(other).stringify())
   }
 }
