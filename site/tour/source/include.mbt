@@ -6,7 +6,8 @@ pub let cli_doc_files : Array[String] = ["apps/smithy/README.md"]
 ///|
 fn untested(lang : String, rest : String) -> String {
   let found = if rest == "" { lang } else { "\{lang} \{rest}" }
-  "I can include only a tested block: `mbt check` in a .mbt.md file, or `console` and `LANG file=NAME` in apps/smithy/README.md. I found `\{found}`"
+  let files = cli_doc_files.join(" or ")
+  "I can include only a tested block: `mbt check` in a .mbt.md file, or `console` and `LANG file=NAME` in \{files}. I found `\{found}`"
 }
 
 ///|

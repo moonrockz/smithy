@@ -427,3 +427,16 @@ test "check_hand_written rejects a command or an API use in an HTML block" {
     Ok(()),
   )
 }
+
+///|
+test "the message for an untested fence names each CLI README" {
+  let fence : @markdown.Fence = { lang: "text", rest: "", code: "x", }
+  for file in @source.cli_doc_files {
+    snippet_err(
+      "docs/a.md",
+      fence,
+      has_moon_pkg=false,
+      "`LANG file=NAME` in \{file}",
+    )
+  }
+}
