@@ -789,6 +789,266 @@
       "lines": [
         "[ERROR] example#B: Removed structure `example#B` | RemovedShape"
       ]
+    },
+    {
+      "id": "transcript-weather-valid",
+      "args": [
+        "validate",
+        "rpc",
+        "transcript",
+        "--protocol",
+        "example#WeatherProtocol",
+        "weather-peers.smithy",
+        "exchange.json"
+      ],
+      "files": [
+        {
+          "name": "weather-peers.smithy",
+          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+        },
+        {
+          "name": "exchange.json",
+          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"result\": \"Rain\"}}\n  ]\n}"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "transcript-weather-no-reply",
+      "args": [
+        "validate",
+        "rpc",
+        "transcript",
+        "--protocol",
+        "example#WeatherProtocol",
+        "weather-peers.smithy",
+        "no-reply.json"
+      ],
+      "files": [
+        {
+          "name": "weather-peers.smithy",
+          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+        },
+        {
+          "name": "no-reply.json",
+          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}}\n  ]\n}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "no-reply.json:5:35: entry 0 client: error MissingResponse: I expected a reply from server to entry 0 from client with id 1; the complete transcript has none."
+      ]
+    },
+    {
+      "id": "transcript-weather-partial",
+      "args": [
+        "validate",
+        "rpc",
+        "transcript",
+        "--protocol",
+        "example#WeatherProtocol",
+        "weather-peers.smithy",
+        "partial.json"
+      ],
+      "files": [
+        {
+          "name": "weather-peers.smithy",
+          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+        },
+        {
+          "name": "partial.json",
+          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": false,\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}}\n  ]\n}"
+        }
+      ],
+      "status": 0,
+      "lines": [
+        "partial.json:5:35: entry 0 client: advisory OutstandingCall: I found no reply yet from server to entry 0 from client with id 1; the transcript is partial."
+      ]
+    },
+    {
+      "id": "transcript-weather-wrong-id",
+      "args": [
+        "validate",
+        "rpc",
+        "transcript",
+        "--protocol",
+        "example#WeatherProtocol",
+        "weather-peers.smithy",
+        "wrong-id.json"
+      ],
+      "files": [
+        {
+          "name": "weather-peers.smithy",
+          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+        },
+        {
+          "name": "wrong-id.json",
+          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 2, \"result\": \"Rain\"}}\n  ]\n}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "wrong-id.json:7:35: entry 2 server: error UnsolicitedResponse: I expected a reply to an active call from client; entry 2 from server sent id 2, which matches no call.",
+        "wrong-id.json:5:35: entry 0 client: error MissingResponse: I expected a reply from server to entry 0 from client with id 1; the complete transcript has none."
+      ]
+    },
+    {
+      "id": "transcript-weather-wrong-sender",
+      "args": [
+        "validate",
+        "rpc",
+        "transcript",
+        "--protocol",
+        "example#WeatherProtocol",
+        "weather-peers.smithy",
+        "wrong-sender.json"
+      ],
+      "files": [
+        {
+          "name": "weather-peers.smithy",
+          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+        },
+        {
+          "name": "wrong-sender.json",
+          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"result\": \"Rain\"}}\n  ]\n}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "wrong-sender.json:6:35: entry 1 client: error UnknownMethod: I expected a method declared by the selected service, but found weather/alert."
+      ]
+    },
+    {
+      "id": "transcript-weather-not-json",
+      "args": [
+        "validate",
+        "rpc",
+        "transcript",
+        "--protocol",
+        "example#WeatherProtocol",
+        "weather-peers.smithy",
+        "not-json.json"
+      ],
+      "files": [
+        {
+          "name": "weather-peers.smithy",
+          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+        },
+        {
+          "name": "not-json.json",
+          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \""
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "not-json.json:5:63: error InvalidTranscript: I expected the end of the string that starts here, and I found the end of the text."
+      ]
+    },
+    {
+      "id": "transcript-weather-expect-missing",
+      "args": [
+        "validate",
+        "rpc",
+        "transcript",
+        "--protocol",
+        "example#WeatherProtocol",
+        "weather-peers.smithy",
+        "expect-missing.json"
+      ],
+      "files": [
+        {
+          "name": "weather-peers.smithy",
+          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+        },
+        {
+          "name": "expect-missing.json",
+          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"expect\": [{\"code\": \"MissingResponse\", \"entry\": 0}],\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"result\": \"Rain\"}}\n  ]\n}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "expect-missing.json: expect: I expected MissingResponse at entry 0; no finding matches it."
+      ]
+    },
+    {
+      "id": "transcript-weather-expect-empty",
+      "args": [
+        "validate",
+        "rpc",
+        "transcript",
+        "--protocol",
+        "example#WeatherProtocol",
+        "weather-peers.smithy",
+        "expect-empty.json"
+      ],
+      "files": [
+        {
+          "name": "weather-peers.smithy",
+          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+        },
+        {
+          "name": "expect-empty.json",
+          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"expect\": [],\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}}\n  ]\n}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "expect-empty.json:6:35: entry 0 client: error MissingResponse: I expected a reply from server to entry 0 from client with id 1; the complete transcript has none.",
+        "expect-empty.json:6:35: entry 0 client: expect: I did not expect error MissingResponse."
+      ]
+    },
+    {
+      "id": "transcript-editor-negative",
+      "args": [
+        "validate",
+        "rpc",
+        "transcript",
+        "--protocol",
+        "example.peers#Editor",
+        "peers.smithy",
+        "editor-negative.json"
+      ],
+      "files": [
+        {
+          "name": "peers.smithy",
+          "from": "examples/json-rpc/peers.smithy"
+        },
+        {
+          "name": "editor-negative.json",
+          "from": "examples/json-rpc/transcripts/editor-negative.json"
+        }
+      ],
+      "status": 0,
+      "lines": [
+        "editor-negative.json:11:36: entry 1 server: error UnsolicitedResponse: I expected a reply to an active call from client; entry 1 from server sent id 9, which matches no call.",
+        "editor-negative.json:10:36: entry 0 client: error MissingResponse: I expected a reply from server to entry 0 from client with id 1; the complete transcript has none.",
+        "editor-negative.json:12:36: entry 2 client: error MissingResponse: I expected a reply from server to entry 2 from client with id 2; the complete transcript has none."
+      ]
+    },
+    {
+      "id": "transcript-chat-markdown",
+      "args": [
+        "validate",
+        "rpc",
+        "transcript",
+        "--protocol",
+        "example.peers#EchoChat",
+        "peers.smithy",
+        "chat.md"
+      ],
+      "files": [
+        {
+          "name": "peers.smithy",
+          "from": "examples/json-rpc/peers.smithy"
+        },
+        {
+          "name": "chat.md",
+          "from": "examples/json-rpc/transcripts/chat.md"
+        }
+      ],
+      "status": 0,
+      "lines": []
     }
   ]
 }
