@@ -85,6 +85,12 @@ const changedLines = StateField.define({
 });
 
 const views = new Map();
+// The extensions of each editor, to make a new state for a file, and the states of the files of an
+// editor (text, selection and undo history), by file key.
+const extensionSets = new Map();
+const fileStates = new Map();
+// The key of the file that each editor shows.
+const currentFiles = new Map();
 // The compartment of the language of each editor, so that the output editor can change language.
 const languageSlots = new Map();
 
@@ -114,62 +120,75 @@ const editors = {
       if (cursor) onCursor(cursor[0], cursor[1]);
     };
     const slot = new Compartment();
-    const view = new EditorView({
-      parent,
-      state: EditorState.create({
-        doc: text,
-        extensions: [
-          lineNumbers(),
-          foldGutter({ openText: "▾", closedText: "▸" }),
-          lintGutter(),
-          highlightActiveLineGutter(),
-          history(),
-          drawSelection(),
-          indentOnInput(),
-          bracketMatching(),
-          highlightActiveLine(),
-          highlightSelectionMatches(),
-          // Ctrl-Shift-[ and ] fold on every platform; foldKeymap gives macOS Cmd-Alt-[ and ] instead.
-          keymap.of([
-            { key: "Ctrl-Shift-[", run: foldCode },
-            { key: "Ctrl-Shift-]", run: unfoldCode },
-            ...defaultKeymap,
-            ...historyKeymap,
-            ...foldKeymap,
-            ...searchKeymap,
-            ...lintKeymap,
-          ]),
-          slot.of((languages[language] ?? (() => []))()),
-          syntaxHighlighting(highlight),
-          changedLines,
-          theme,
-          EditorState.readOnly.of(readOnly),
-          EditorView.contentAttributes.of({ "aria-label": `${id} editor` }),
-          EditorView.updateListener.of((update) => {
-            // A change that gives the same text is not a change (a browser can report one when it
-            // reads the DOM back).
-            if (update.docChanged && !update.startState.doc.eq(update.state.doc)) pending.changed = true;
-            if (update.docChanged || update.selectionSet) {
-              const head = update.state.selection.main.head;
-              const line = update.state.doc.lineAt(head);
-              pending.cursor = [line.number, head - line.from + 1];
-            }
-            if ((pending.changed || pending.cursor) && !pending.timer) {
-              pending.timer = setTimeout(report, 0);
-            }
-          }),
-        ],
+    const extensions = [
+      lineNumbers(),
+      foldGutter({ openText: "▾", closedText: "▸" }),
+      lintGutter(),
+      highlightActiveLineGutter(),
+      history(),
+      drawSelection(),
+      indentOnInput(),
+      bracketMatching(),
+      highlightActiveLine(),
+      highlightSelectionMatches(),
+      // Ctrl-Shift-[ and ] fold on every platform; foldKeymap gives macOS Cmd-Alt-[ and ] instead.
+      keymap.of([
+        { key: "Ctrl-Shift-[", run: foldCode },
+        { key: "Ctrl-Shift-]", run: unfoldCode },
+        ...defaultKeymap,
+        ...historyKeymap,
+        ...foldKeymap,
+        ...searchKeymap,
+        ...lintKeymap,
+      ]),
+      slot.of((languages[language] ?? (() => []))()),
+      syntaxHighlighting(highlight),
+      changedLines,
+      theme,
+      EditorState.readOnly.of(readOnly),
+      EditorView.contentAttributes.of({ "aria-label": `${id} editor` }),
+      EditorView.updateListener.of((update) => {
+        // A change that gives the same text is not a change (a browser can report one when it
+        // reads the DOM back).
+        if (update.docChanged && !update.startState.doc.eq(update.state.doc)) pending.changed = true;
+        if (update.docChanged || update.selectionSet) {
+          const head = update.state.selection.main.head;
+          const line = update.state.doc.lineAt(head);
+          pending.cursor = [line.number, head - line.from + 1];
+        }
+        if ((pending.changed || pending.cursor) && !pending.timer) {
+          pending.timer = setTimeout(report, 0);
+        }
       }),
-    });
+    ];
+    const view = new EditorView({ parent, state: EditorState.create({ doc: text, extensions }) });
+    extensionSets.set(id, extensions);
     views.set(id, view);
     languageSlots.set(id, slot);
   },
   text(id) {
     return views.get(id)?.state.doc.toString() ?? "";
   },
-  load(id, text) {
+  // With a `key`, the editor keeps one state per key (text, selection and undo history): the state of
+  // the file that it shows is saved and the state of `key` is restored, so that Undo never crosses
+  // files and a switch is not a change of the text. `fresh` drops every saved state first, and the
+  // file gets a new state with `text`. Without a key this is an ordinary change of the text.
+  load(id, text, key, fresh) {
     const view = views.get(id);
     if (!view) return;
+    if (key !== undefined) {
+      const states = fileStates.get(id) ?? new Map();
+      fileStates.set(id, states);
+      const current = currentFiles.get(id);
+      if (current !== undefined) states.set(current, view.state);
+      if (fresh) states.clear();
+      currentFiles.set(id, key);
+      const saved = states.get(key);
+      view.setState(
+        saved ?? EditorState.create({ doc: text, selection: { anchor: 0 }, extensions: extensionSets.get(id) }),
+      );
+      return;
+    }
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, selection: { anchor: 0 } });
   },
   // Replace the text and the language together. A language that the editor does not know is plain text.

@@ -138,8 +138,12 @@ pub(all) enum Effect {
   )
   /// Send `msg` after `ms` milliseconds.
   Wait(ms~ : Int32, msg~ : Msg)
-  /// Put this text, of the selected file, in the model editor (Smithy mode).
-  LoadEditor(text~ : String)
+  /// Put this text, of the selected file `file`, in the model editor (Smithy
+  /// mode). The editor keeps the text, cursor and undo history of each file
+  /// apart, so a switch to a file gives its state back and Undo never crosses
+  /// files. With `fresh`, every file starts with a new state (start and
+  /// Reset).
+  LoadEditor(text~ : String, file~ : String, fresh~ : Bool)
   /// Put this text in the output editor and highlight these lines, from 1.
   /// An empty list removes the highlight.
   ShowOutput(text~ : String, highlight~ : Array[Int32])
@@ -317,7 +321,23 @@ pub fn Model::start(
     link_problem: None,
   }
   let (m, sent) = m.send_validate()
-  (m, [..effects, LoadEditor(text=m.selected_text()), ..sent])
+  (
+    m,
+    [
+      ..effects,
+      LoadEditor(text=m.selected_text(), file=m.selected_name(), fresh=true),
+      ..sent,
+    ],
+  )
+}
+
+///|
+/// The name of the file that the editor shows.
+pub fn Model::selected_name(self : Model) -> String {
+  match self.files.get(self.selected) {
+    Some(file) => file.name
+    None => ""
+  }
 }
 
 ///|

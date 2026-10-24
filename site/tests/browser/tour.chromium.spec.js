@@ -205,3 +205,69 @@ test("in dark mode the expand button shows against its background", async ({ pag
   expect(color).not.toEqual(background);
   expect(page.errors).toEqual([]);
 });
+
+test("Undo after a file tab switch never moves the text of one file into another", async ({ page }) => {
+  await page.goto(siteUrl("tour/shape-ids/"));
+  await expect(page.locator("#tour-editor .cm-content")).toBeVisible();
+  await settled(page);
+  const editor = page.locator("#tour-editor .cm-content");
+  const modelTab = page.getByRole("tab", { name: "model.smithy" });
+  const commonTab = page.getByRole("tab", { name: "common.smithy" });
+
+  await modelTab.click();
+  await expect(editor).toContainText("structure Forecast");
+  const modelStart = await editorText(page);
+  await commonTab.click();
+  await expect(editor).toContainText("CityName");
+  const commonStart = await editorText(page);
+  expect(commonStart).not.toEqual(modelStart);
+
+  // Type in model.smithy, then switch to common.smithy and back.
+  await modelTab.click();
+  await expect(editor).toContainText("structure Forecast");
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.type("// edited");
+  await settled(page);
+  const modelEdited = await editorText(page);
+  expect(modelEdited).toContain("// edited");
+  await commonTab.click();
+  await expect(editor).not.toContainText("// edited");
+  expect(await editorText(page)).toEqual(commonStart);
+  await modelTab.click();
+  await expect(editor).toContainText("// edited");
+
+  // Undo until nothing changes: model.smithy goes back to its own start text, never to common.smithy.
+  await editor.click();
+  let before = "";
+  for (let i = 0; i < 30; i++) {
+    const text = await editorText(page);
+    if (text === before) break;
+    before = text;
+    await page.keyboard.press("ControlOrMeta+z");
+    await settled(page);
+  }
+  const modelUndone = await editorText(page);
+  expect(modelUndone).toEqual(modelStart);
+  expect(modelUndone).not.toContain("CityName {");
+
+  // common.smithy is unchanged, and Undo there has nothing to undo.
+  await commonTab.click();
+  await expect(editor).toContainText("CityName");
+  expect(await editorText(page)).toEqual(commonStart);
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+z");
+  expect(await editorText(page)).toEqual(commonStart);
+
+  // A reload shows the stored text of each file.
+  await page.reload();
+  await expect(editor).toBeVisible();
+  await settled(page);
+  await commonTab.click();
+  await expect(editor).toContainText("CityName");
+  expect(await editorText(page)).toEqual(commonStart);
+  await modelTab.click();
+  await expect(editor).toContainText("structure Forecast");
+  expect(await editorText(page)).toEqual(modelStart);
+  expect(page.errors).toEqual([]);
+});

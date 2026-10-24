@@ -163,7 +163,13 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       match m.files.get(index) {
         Some(file) if index != m.selected => {
           let m = { ..m, selected: index, }
-          (m, [LoadEditor(text=file.text), Mark(items=m.selected_findings())])
+          (
+            m,
+            [
+              LoadEditor(text=file.text, file=file.name, fresh=false),
+              Mark(items=m.selected_findings()),
+            ],
+          )
         }
         _ => (m, [])
       }
@@ -261,7 +267,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         m,
         [
           Clear(key=m.page.storage_key),
-          LoadEditor(text=m.selected_text()),
+          LoadEditor(text=m.selected_text(), file=m.selected_name(), fresh=true),
           ..sent,
         ],
       )

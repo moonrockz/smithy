@@ -122,7 +122,7 @@ test "start sends a validate of the starting files" {
   assert_eq(m.findings, Unchecked)
   assert_eq(m.output, NoOutput)
   assert_eq(effects, [
-    LoadEditor(text=start_text),
+    LoadEditor(text=start_text, file="model.smithy", fresh=true),
     SendValidate(seq=1, files=[("model.smithy", start_text)]),
     Wait(ms=10000, msg=TimedOut(1)),
   ])
@@ -137,7 +137,7 @@ test "start uses stored files whose digest matches" {
   )
   assert_eq(m.files, [{ name: "model.smithy", text: edited, }])
   assert_eq(effects, [
-    LoadEditor(text=edited),
+    LoadEditor(text=edited, file="model.smithy", fresh=true),
     SendValidate(seq=1, files=[("model.smithy", edited)]),
     Wait(ms=10000, msg=TimedOut(1)),
   ])
@@ -152,7 +152,7 @@ test "start ignores and clears stored files with another digest" {
   assert_eq(m.files, page().files)
   assert_eq(effects, [
     Clear(key~),
-    LoadEditor(text=start_text),
+    LoadEditor(text=start_text, file="model.smithy", fresh=true),
     SendValidate(seq=1, files=[("model.smithy", start_text)]),
     Wait(ms=10000, msg=TimedOut(1)),
   ])
@@ -264,7 +264,10 @@ test "a file tab change while a request runs keeps the newest answer" {
   let page = two_file_page()
   let (m, _) = Model::start(page, None)
   let (m, effects) = update(m, SelectFile(1))
-  assert_eq(effects, [LoadEditor(text="namespace b\n"), Mark(items=[])])
+  assert_eq(effects, [
+    LoadEditor(text="namespace b\n", file="b.smithy", fresh=false),
+    Mark(items=[]),
+  ])
   // The editor echo of the loaded text changes nothing.
   assert_eq(update(m, Edited("namespace b\n")).1, [])
   let items = [error_in("a.smithy", 1), warning_in("b.smithy")]
@@ -274,7 +277,7 @@ test "a file tab change while a request runs keeps the newest answer" {
   assert_eq(m.findings, Found(items))
   let (_, effects) = update(m, SelectFile(0))
   assert_eq(effects, [
-    LoadEditor(text="namespace a\n"),
+    LoadEditor(text="namespace a\n", file="a.smithy", fresh=false),
     Mark(items=[error_in("a.smithy", 1)]),
   ])
 }
@@ -433,7 +436,7 @@ test "Reset loads the starting files and clears the stored files" {
   assert_eq(m.files, page().files)
   assert_eq(effects, [
     Clear(key~),
-    LoadEditor(text=start_text),
+    LoadEditor(text=start_text, file="model.smithy", fresh=true),
     SendValidate(seq=3, files=[("model.smithy", start_text)]),
     Wait(ms=10000, msg=TimedOut(3)),
   ])
@@ -448,7 +451,10 @@ test "Reset while a request runs checks the starting files after it" {
   let (m, _) = Model::start(page(), None)
   let (m, _) = update(m, Edited("namespace changed\n"))
   let (m, effects) = update(m, Reset)
-  assert_eq(effects, [Clear(key~), LoadEditor(text=start_text)])
+  assert_eq(effects, [
+    Clear(key~),
+    LoadEditor(text=start_text, file="model.smithy", fresh=true),
+  ])
   let (_, effects) = update(m, Answered(seq=1, answer=Checked([])))
   assert_eq(effects, [
     SendValidate(seq=2, files=[("model.smithy", start_text)]),
@@ -700,4 +706,17 @@ test "a toggle changes nothing else, and Reset keeps the layout" {
   let (reset, effects) = update(expanded, Reset)
   assert_eq(reset.layout, OutputOnly)
   assert_false(effects.contains(Remeasure))
+}
+
+///|
+test "reset loads the selected file with a fresh state" {
+  let (m, _) = Model::start(two_file_page(), None)
+  let (m, _) = update(m, SelectFile(1))
+  let (m, _) = update(m, Edited("namespace c\n"))
+  let (_, effects) = update(m, Reset)
+  assert_true(
+    effects.contains(
+      LoadEditor(text="namespace b\n", file="b.smithy", fresh=true),
+    ),
+  )
 }
