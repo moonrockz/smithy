@@ -8,7 +8,7 @@ is 0.x, a minor release can contain breaking changes.
 
 ## [0.6.0] - 2026-10-24
 
-<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+This release adds JSON-RPC support. `smithy validate rpc` checks requests, responses, batches and whole transcripts against a Smithy model, `smithy validate value` checks JSON and native Ion values, and the OpenRPC transform exports Smithy JSON-RPC services. Model validation time is now linear in the shape count: a model of 4,000 shapes validates in less than a second, not in minutes. The new project site has docs, examples and an in-browser playground that validates, transforms and checks transcripts with no server. Two changes break existing use: replace `smithy validate-value` with `smithy validate value`, and add `kind` to code that builds a `SourceLocation` with a struct literal, or use `SourceLocation::new`.
 
 ### ⚠️ Breaking changes
 
