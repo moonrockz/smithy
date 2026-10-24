@@ -13,6 +13,22 @@ Do not link to them from the site: they are large.
 
 The art is raster (PNG), painted with an image generator. There is no vector source.
 
+## Variants
+
+`variants/` keeps the other designs from the same session. They are not the official logo. Use them for
+alternatives, for example a sticker or a slide. All are 1024 × 1024 with transparency.
+
+| File | Content |
+|---|---|
+| `smithy-badge-1-1024.png` | Badge 1, "smithy.mbt": three-quarter view, gloves, the hot bar held with tongs. |
+| `smithy-badge-3-1024.png` | Badge 3, "smithy.mbt": a two-handed backswing, full body, warm forge light. |
+| `smithy-badge-1-smithy-text-1024.png` | Badge 1 with the earlier text "smithy". |
+| `smithy-badge-2-smithy-text-1024.png` | Badge 2 (the official design) with the earlier text "smithy". |
+| `smithy-badge-3-smithy-text-1024.png` | Badge 3 with the earlier text "smithy". |
+| `smithy-mark-2-1024.png` | Mark 2: the hammer on the right, the hot bar held with tongs. |
+| `smithy-icon-a-1024.png` | Icon try A: a larger face, with the arm visible. |
+| `smithy-icon-c-1024.png` | Icon try C: a larger face, with the arm visible and an ear outside the disc. |
+
 ## Derived files
 
 The small files come from these originals. To make them again, resize with any image tool (on macOS:
