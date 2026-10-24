@@ -5,14 +5,21 @@ priv struct Conv {
   ids : Map[String, Int32]
   toc : Array[TocEntry]
   mut title : String?
-  mut tabs : Int
+  mut tabs : Int32
 }
 
 ///|
 /// Parses Markdown and rewrites its links for the site.
 pub fn parse(src : String, ctx : LinkContext) -> Document {
   let doc = @cmark.Doc::from_string(heading_auto_ids=true, strict=false, src)
-  let conv = Conv::{ ctx, defs: doc.defs, ids: {}, toc: [], title: None, tabs: 0, }
+  let conv = Conv::{
+    ctx,
+    defs: doc.defs,
+    ids: {},
+    toc: [],
+    title: None,
+    tabs: 0,
+  }
   let blocks = conv.blocks(doc.block)
   { title: conv.title.unwrap_or(""), blocks, toc: conv.toc, }
 }
@@ -182,9 +189,7 @@ fn Conv::blocks(self : Conv, block : @cmark.Block) -> Array[Block] {
       let lang = code_language(cb)
       let code = code_source(cb)
       if lang == "tabs" {
-        let decoded : Array[Tab]? = try {
-          Some(@json.from_json(@json.parse(code)))
-        } catch {
+        let decoded : Array[Tab]? = Some(@json.from_json(@json.parse(code))) catch {
           _ => None
         }
         if decoded is Some(tabs) {

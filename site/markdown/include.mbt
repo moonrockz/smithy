@@ -28,7 +28,9 @@ fn lines_of(text : String) -> Array[String] {
 ///|
 fn valid_name(name : String) -> Bool {
   name != "" &&
-  name.iter().all(c => (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')
+  name
+  .iter()
+  .all(c => (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')
 }
 
 ///|
@@ -64,7 +66,7 @@ pub fn parse_include(body : String) -> Result[Array[Include], String] {
     if out.iter().any(i => i.label == label) {
       return Err("I found the label \{label} twice in the include block")
     }
-    out.push({ label, path, name })
+    out.push({ label, path, name, })
   }
   if out.length() == 0 {
     return Err("I found no tab line in the include block")
@@ -116,7 +118,7 @@ fn collect_fences(
               @cmark.CodeBlock::language_of_info_string(v).unwrap_or(("", ""))
             None => ("", "")
           }
-          out.push({ lang, rest, code: code_source(cb) })
+          out.push({ lang, rest, code: code_source(cb), })
         }
       }
     other =>
@@ -133,7 +135,7 @@ pub fn region(source : String, name : String) -> Result[Array[Fence], String] {
   let start_marker = "<!-- tour:start \{name} -->"
   let end_marker = "<!-- tour:end \{name} -->"
   let lines = lines_of(source)
-  let starts : Array[Int] = []
+  let starts : Array[Int32] = []
   for i, line in lines {
     if line.trim().to_owned() == start_marker {
       starts.push(i)
@@ -170,7 +172,7 @@ pub fn region(source : String, name : String) -> Result[Array[Fence], String] {
 
 ///|
 /// The fence character and length of a fence line (up to 3 spaces of indent), or `None`.
-fn fence_of(line : String) -> (Char, Int, Int, String)? {
+fn fence_of(line : String) -> (Char, Int32, Int32, String)? {
   let mut i = 0
   while i < line.length() && line[i] == ' ' {
     i += 1
@@ -208,7 +210,7 @@ pub fn expand_includes(
 ) -> Result[String, String] {
   let lines = text.split("\n").map(l => l.to_owned()).collect()
   let out : Array[String] = []
-  let mut open : (Char, Int)? = None
+  let mut open : (Char, Int32)? = None
   let mut i = 0
   while i < lines.length() {
     let line = lines[i]
@@ -261,9 +263,10 @@ pub fn expand_includes(
           for inc in includes {
             let snippets = match resolve(inc) {
               Ok(v) => v
-              Err(e) => return Err("\{inc.label}: \{inc.path}#\{inc.name}: \{e}")
+              Err(e) =>
+                return Err("\{inc.label}: \{inc.path}#\{inc.name}: \{e}")
             }
-            tabs.push({ label: inc.label, snippets })
+            tabs.push({ label: inc.label, snippets, })
           }
           out.push(tabs_fence(tabs))
           i = j + 1

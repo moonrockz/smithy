@@ -854,13 +854,13 @@ async test "a tab group renders radio tabs that work without JavaScript" {
     {
       label: "CLI",
       snippets: [
-        { lang: "smithy", file: Some("greeting.smithy"), code: "namespace a" },
-        { lang: "console", file: None, code: "$ smithy version" },
+        { lang: "smithy", file: Some("greeting.smithy"), code: "namespace a", },
+        { lang: "console", file: None, code: "$ smithy version", },
       ],
     },
     {
       label: "MoonBit",
-      snippets: [{ lang: "mbt", file: None, code: "test {}" }],
+      snippets: [{ lang: "mbt", file: None, code: "test {}", }],
     },
   ]
   let html = render_route(
@@ -869,8 +869,8 @@ async test "a tab group renders radio tabs that work without JavaScript" {
   )
   for
     part in [
-      "type=\"radio\"", "name=\"tabs-1\"", "id=\"tabs-1-1\"", "id=\"tabs-1-2\"", "for=\"tabs-1-2\"",
-      "class=\"ms-tab-panel\"", "class=\"ms-codelabel\">greeting.smithy<",
+      "type=\"radio\"", "name=\"tabs-1\"", "id=\"tabs-1-1\"", "id=\"tabs-1-2\"",
+      "for=\"tabs-1-2\"", "class=\"ms-tab-panel\"", "class=\"ms-codelabel\">greeting.smithy<",
     ] {
     assert_true(html.contains(part))
   }

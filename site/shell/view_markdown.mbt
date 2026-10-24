@@ -121,7 +121,7 @@ fn tabs_view(id : String, tabs : Array[@markdown.Tab]) -> Html {
         class="ms-tab-input",
         name=id,
         id=tab_id,
-        checked=(i == 0),
+        checked=i == 0,
       ),
     )
     kids.push(

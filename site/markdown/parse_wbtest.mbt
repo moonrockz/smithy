@@ -255,12 +255,12 @@ let sample_tabs : Array[Tab] = [
         file: Some("greeting.smithy"),
         code: "$version: \"2\"\n```\nnamespace example",
       },
-      { lang: "console", file: None, code: "$ smithy version" },
+      { lang: "console", file: None, code: "$ smithy version", },
     ],
   },
   {
     label: "MoonBit",
-    snippets: [{ lang: "mbt", file: None, code: "///|\ntest {\n}" }],
+    snippets: [{ lang: "mbt", file: None, code: "///|\ntest {\n}", }],
   },
 ]
 

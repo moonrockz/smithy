@@ -23,7 +23,7 @@ test "parse_include reads one tab per line" {
       "CLI: apps/smithy/README.md#convert-json-cli\nMoonBit: pkgs/smithy/README.mbt.md#convert-json-api\n",
     ),
     Ok([
-      { label: "CLI", path: "apps/smithy/README.md", name: "convert-json-cli" },
+      { label: "CLI", path: "apps/smithy/README.md", name: "convert-json-cli", },
       {
         label: "MoonBit",
         path: "pkgs/smithy/README.mbt.md",
@@ -61,8 +61,12 @@ test "region returns the fences between the markers" {
   assert_eq(
     region(source, "convert"),
     Ok([
-      { lang: "smithy", rest: "file=greeting.smithy", code: "$version: \"2\"" },
-      { lang: "console", rest: "", code: "$ smithy convert --to json greeting.smithy" },
+      { lang: "smithy", rest: "file=greeting.smithy", code: "$version: \"2\"", },
+      {
+        lang: "console",
+        rest: "",
+        code: "$ smithy convert --to json greeting.smithy",
+      },
     ]),
   )
 }
@@ -79,8 +83,7 @@ test "region reads CRLF text" {
 test "region errors" {
   assert_true(
     region_err(
-      "text\n",
-      "I could not find the marker `<!-- tour:start convert -->`",
+      "text\n", "I could not find the marker `<!-- tour:start convert -->`",
     ),
   )
   let start = "<!-- tour:start convert -->\n"
@@ -109,7 +112,9 @@ test "region errors" {
       "I found no code block between the markers of convert",
     ),
   )
-  assert_true(region_err(start + "\n    indented\n\n" + end, "an indented code block"))
+  assert_true(
+    region_err(start + "\n    indented\n\n" + end, "an indented code block"),
+  )
 }
 
 ///|
@@ -117,19 +122,23 @@ test "region keeps a line of three backticks in the code" {
   let src = "<!-- tour:start convert -->\n````mbt\nlet s = \"\"\"\n```\n\"\"\"\n````\n<!-- tour:end convert -->\n"
   assert_eq(
     region(src, "convert"),
-    Ok([{ lang: "mbt", rest: "", code: "let s = \"\"\"\n```\n\"\"\"" }]),
+    Ok([{ lang: "mbt", rest: "", code: "let s = \"\"\"\n```\n\"\"\"", }]),
   )
 }
 
 ///|
 test "expand_includes replaces the include fence with a tabs fence" {
-  let snippet : Snippet = { lang: "console", file: None, code: "$ smithy version" }
+  let snippet : Snippet = {
+    lang: "console",
+    file: None,
+    code: "$ smithy version",
+  }
   let text = "# T\n\nIntro.\n\n```include\nCLI: a.md#x\n```\n\nAfter.\n"
   assert_eq(
     expand_includes(text, _ => Ok([snippet])),
     Ok(
       "# T\n\nIntro.\n\n" +
-      tabs_fence([{ label: "CLI", snippets: [snippet] }]) +
+      tabs_fence([{ label: "CLI", snippets: [snippet], }]) +
       "\n\nAfter.\n",
     ),
   )
@@ -143,9 +152,9 @@ test "expand_includes leaves text without an include as it is" {
 
 ///|
 test "expand_includes names the include line in an error" {
-  let r = expand_includes("```include\nCLI: a.md#x\n```\n", _ => Err(
-    "I could not find the file a.md",
-  ))
+  let r = expand_includes("```include\nCLI: a.md#x\n```\n", _ => {
+    Err("I could not find the file a.md")
+  })
   assert_true(err_has(r.map(_ => ()), "CLI: a.md#x"))
   assert_true(err_has(r.map(_ => ()), "I could not find the file a.md"))
 }
@@ -158,10 +167,9 @@ test "an include inside a longer fence is text" {
 
 ///|
 test "an indented include fails" {
-  let r = expand_includes(
-    "- item\n\n  ```include\n  CLI: a.md#x\n  ```\n",
-    _ => Ok([]),
-  )
+  let r = expand_includes("- item\n\n  ```include\n  CLI: a.md#x\n  ```\n", _ => {
+    Ok([])
+  })
   assert_true(err_has(r.map(_ => ()), "indented"))
 }
 
@@ -195,16 +203,18 @@ test "a backtick fence with a backtick in the info string is text" {
 
 ///|
 test "expand_includes reads CRLF text" {
-  let snippet : Snippet = { lang: "console", file: None, code: "$ smithy version" }
-  let r = expand_includes("A\r\n```include\r\nCLI: a.md#x\r\n```\r\nB\r\n", _ => Ok([
-    snippet,
-  ]))
+  let snippet : Snippet = {
+    lang: "console",
+    file: None,
+    code: "$ smithy version",
+  }
+  let r = expand_includes("A\r\n```include\r\nCLI: a.md#x\r\n```\r\nB\r\n", _ => {
+    Ok([snippet])
+  })
   assert_eq(
     r,
     Ok(
-      "A\r\n" +
-      tabs_fence([{ label: "CLI", snippets: [snippet] }]) +
-      "\nB\r\n",
+      "A\r\n" + tabs_fence([{ label: "CLI", snippets: [snippet], }]) + "\nB\r\n",
     ),
   )
 }
