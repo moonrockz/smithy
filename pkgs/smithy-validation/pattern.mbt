@@ -205,7 +205,28 @@ fn class_cost(pattern : String, start : Int32, end : Int32) -> Int32 {
 }
 
 ///|
+/// Where the translator is inside a character class, after the last item.
+priv enum ClassSlot {
+  Start
+  AfterAtom
+  AfterRangeDash
+  AfterRange
+  AfterSet
+}
+
+///|
+/// The slot after one character: it completes a range when a range dash came before.
+fn ClassSlot::after_atom(self : ClassSlot) -> ClassSlot {
+  match self {
+    AfterRangeDash => AfterRange
+    Start | AfterAtom | AfterRange | AfterSet => AfterAtom
+  }
+}
+
+///|
 /// Compile the portable pattern profile. Unknown constructs are never ignored.
+/// Core rejects a bare '-' at the edge of a class, so each literal class dash
+/// leaves as `\-` and only a range operator stays a bare '-'.
 fn compile_pattern(
   pattern : String,
   id : @smithy.ShapeId,
@@ -217,7 +238,7 @@ fn compile_pattern(
   }
   guard pattern.length() <= 4096 else { raise unsupported() }
   let out = StringBuilder()
-  let mut in_class = false
+  let mut class : ClassSlot? = None
   let mut i = 0
   while i < pattern.length() {
     let c = pattern.code_unit_at(i).to_int()
@@ -235,15 +256,19 @@ fn compile_pattern(
         _ => None
       }
       if expansion is Some(expansion) {
-        out.write_string(
-          if in_class {
-            expansion
-          } else {
-            "[" + expansion + "]"
-          },
-        )
+        if class is Some(slot) {
+          if slot is AfterRangeDash {
+            raise UnsupportedConstraint(
+              id, "I expected one character after '-' in a character class range, but found a class escape.",
+            )
+          }
+          out.write_string(expansion)
+          class = Some(AfterSet)
+        } else {
+          out.write_string("[" + expansion + "]")
+        }
       } else if escape == 68 || escape == 87 || escape == 83 {
-        guard !in_class else { raise unsupported() }
+        guard class is None else { raise unsupported() }
         out.write_string(
           match escape {
             68 => "[^0-9]"
@@ -252,30 +277,68 @@ fn compile_pattern(
               "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
           },
         )
-      } else if escape == 98 && in_class {
-        out.write_string("\\u0008")
       } else {
-        guard [
-          92, 46, 94, 36, 124, 63, 42, 43, 40, 41, 91, 93, 123, 125, 45, 47, 110,
-          114, 116, 102, 118, 98, 66, 117,
-        ].contains(escape) else {
-          raise unsupported()
+        if escape == 98 && class is Some(_) {
+          out.write_string("\\u0008")
+        } else {
+          guard [
+            92, 46, 94, 36, 124, 63, 42, 43, 40, 41, 91, 93, 123, 125, 45, 47, 110,
+            114, 116, 102, 118, 98, 66, 117,
+          ].contains(escape) else {
+            raise unsupported()
+          }
+          // A \u escape is one class atom: copy all of it.
+          let end = if escape == 117 {
+            if i + 1 < pattern.length() && pattern.code_unit_at(i + 1) == 123 {
+              let mut j = i + 2
+              while j < pattern.length() && pattern.code_unit_at(j) != 125 {
+                j += 1
+              }
+              guard j < pattern.length() else { raise unsupported() }
+              j + 1
+            } else {
+              guard i + 4 < pattern.length() else { raise unsupported() }
+              i + 5
+            }
+          } else {
+            i + 1
+          }
+          out.write_string("\\")
+          out.write_string(pattern[i:end].to_owned())
+          i = end - 1
         }
-        out.write_string("\\")
-        out.write_string(pattern[i:i + 1].to_owned())
+        if class is Some(slot) {
+          class = Some(slot.after_atom())
+        }
       }
     } else if c == 91 {
-      guard !in_class else { raise unsupported() }
-      in_class = true
-      out.write_string("[")
+      guard class is None else { raise unsupported() }
+      class = Some(Start)
+      if i + 1 < pattern.length() && pattern.code_unit_at(i + 1) == 94 {
+        out.write_string("[^")
+        i += 1
+      } else {
+        out.write_string("[")
+      }
     } else if c == 93 {
-      in_class = false
+      class = None
       out.write_string("]")
-    } else if c == 46 && !in_class {
+    } else if c == 45 && class is Some(slot) {
+      let range_operator = slot is AfterAtom &&
+        i + 1 < pattern.length() &&
+        pattern.code_unit_at(i + 1) != 93
+      if range_operator {
+        out.write_string("-")
+        class = Some(AfterRangeDash)
+      } else {
+        out.write_string("\\-")
+        class = Some(slot.after_atom())
+      }
+    } else if c == 46 && class is None {
       out.write_string("[^\\n\\r\\u2028\\u2029]")
     } else {
       if c == 40 &&
-        !in_class &&
+        class is None &&
         i + 1 < pattern.length() &&
         pattern.code_unit_at(i + 1) == 63 {
         guard i + 2 < pattern.length() && pattern.code_unit_at(i + 2) == 58 else {
@@ -283,7 +346,7 @@ fn compile_pattern(
         }
       }
       if c == 40 &&
-        !in_class &&
+        class is None &&
         !(i + 1 < pattern.length() && pattern.code_unit_at(i + 1) == 63) {
         out.write_string("(?:")
         i += 1
@@ -295,6 +358,9 @@ fn compile_pattern(
         i + 1
       }
       out.write_string(pattern[i:end].to_owned())
+      if class is Some(slot) {
+        class = Some(slot.after_atom())
+      }
       i = end
       continue
     }

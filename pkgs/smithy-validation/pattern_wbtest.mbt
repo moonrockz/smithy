@@ -44,3 +44,34 @@ test "pattern weight counts the copies the automaton builds" {
     assert_eq(compile_pattern(pattern, id).weight, weight, msg=pattern)
   }
 }
+
+///|
+test "class dashes follow ECMA-262 ClassRanges" {
+  let id = @smithy.ShapeId::parse("example#String").unwrap()
+  for
+    (pattern, good, bad) in [
+      ("^[a-]$", ["a", "-"], ["b"]), // last in class
+      ("^[-a]$", ["a", "-"], ["b"]), // first in class
+      ("^[a\\-]$", ["a", "-"], ["\\"]), // escaped
+      ("^[^-a]$", ["b", "z"], ["-", "a"]), // negated, first
+      ("^[a-c]$", ["b"], ["-", "d"]), // a real range
+      ("^[a-c-e]$", ["a", "-", "e"], ["d"]), // dash after a range
+      ("^[!--]$", ["!", ",", "-"], ["a"]), // dash as the high end
+      ("^[\\d-a]$", ["5", "-", "a"], ["b"]), // dash after a class escape
+      ("^[\\u0041-\\u005a]$", ["M"], ["a", "-"]), // \u escapes as range ends
+      ("^[0-9/-]+$", ["12/3-4"], ["a"]),
+      (
+        "^[A-Za-z0-9/-]+:[A-Za-z0-9/-]+#[A-Za-z0-9-]+$",
+        ["morphir/SDK:basics#int", "finos-x/a-b:c/d-e#f-g"],
+        ["a:b#c!", "a:b:c#d"],
+      ),
+    ] {
+    let compiled = compile_pattern(pattern, id)
+    for text in good {
+      assert_true(compiled.execute(text), msg=pattern + " / " + text)
+    }
+    for text in bad {
+      assert_false(compiled.execute(text), msg=pattern + " / " + text)
+    }
+  }
+}
