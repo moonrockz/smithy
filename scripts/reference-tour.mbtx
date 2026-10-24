@@ -449,3 +449,19 @@ test "a static lesson has no cases to read" {
   assert_false(is_static(@json.parse("{\"slug\": \"a\", \"static\": false}")))
   assert_false(is_static(@json.parse("{\"slug\": \"a\"}")))
 }
+
+///|
+async test "lesson_cases skips a static lesson that has no cases folder" {
+  let root = "static-lessons-scratch"
+  if @fs.exists(root) { @fs.rmdir(root, recursive=true) }
+  @fs.mkdir(root + "/01-s/", recursive=true, allow_exist=true)
+  @fs.write_file(root + "/01-s/lesson.json", "{\"slug\": \"s\", \"static\": true}")
+  @fs.mkdir(root + "/02-m/files", recursive=true, allow_exist=true)
+  @fs.mkdir(root + "/02-m/cases/start", recursive=true, allow_exist=true)
+  @fs.write_file(root + "/02-m/lesson.json", "{\"slug\": \"m\"}")
+  @fs.write_file(root + "/02-m/files/model.smithy", "namespace example\n")
+  let cases = lesson_cases(root)
+  @fs.rmdir(root, recursive=true)
+  let ids = cases.map(c => match c { { "id": String(id), .. } => id; _ => "" })
+  assert_eq(ids, ["02-m/start"])
+}

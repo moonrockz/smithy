@@ -15,6 +15,7 @@ fn page() -> @model.LessonPage {
     section: "Basics",
     number: 1,
     total: 12,
+    engine: Model,
     output: Some(JsonAst),
     selector: None,
     spec: "https://smithy.io/2.0/spec/idl.html",

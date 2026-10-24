@@ -98,6 +98,7 @@ fn test_runtime(sent : Array[@lesson.Msg]) -> Runtime {
     section: "S",
     number: 1,
     total: 1,
+    engine: Model,
     output: None,
     selector: None,
     spec: "",
@@ -136,8 +137,8 @@ test "a reply of an older Worker changes nothing" {
 test "the script mounts the lesson component for a lesson with an editor only" {
   let sent : Array[@lesson.Msg] = []
   let page = test_runtime(sent).page
-  assert_true(!should_mount(page))
-  assert_true(
-    should_mount({ ..page, files: [{ name: "model.smithy", text: "", }], }),
-  )
+  // A model lesson mounts, even before it has a starting file.
+  assert_eq(page.engine, Model)
+  assert_true(should_mount(page))
+  assert_true(!should_mount({ ..page, engine: Static, }))
 }

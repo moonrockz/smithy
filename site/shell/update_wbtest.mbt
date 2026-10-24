@@ -542,6 +542,7 @@ test "current_tour gives the tour data only for its own route" {
     section: "Basics",
     number: 1,
     total: 1,
+    engine: Model,
     output: None,
     selector: None,
     spec: "https://smithy.io/2.0/",

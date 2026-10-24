@@ -489,6 +489,8 @@ pub(all) struct LessonPage {
   /// The place of the lesson in the tour, from 1, and the number of lessons.
   number : Int32
   total : Int32
+  /// What the lesson runs. A static lesson has no editor and no output.
+  engine : Engine
   output : @samples.Output?
   selector : String?
   /// The smithy.io section that the lesson teaches.
@@ -510,10 +512,9 @@ pub(all) struct LessonPage {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
-/// Whether the page is a static lesson: it has no starting file, so it has no
-/// editor and no output.
+/// Whether the page is a static lesson: it has no editor and no output.
 pub fn LessonPage::is_static(self : LessonPage) -> Bool {
-  self.files.is_empty()
+  self.engine is Static
 }
 
 ///|

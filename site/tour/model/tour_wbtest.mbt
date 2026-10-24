@@ -223,6 +223,7 @@ test "the page types round-trip through JSON" {
     section: "Basics",
     number: 2,
     total: 3,
+    engine: Model,
     output: Some(@samples.Output::JsonSchema),
     selector: None,
     spec: "https://smithy.io/2.0/",

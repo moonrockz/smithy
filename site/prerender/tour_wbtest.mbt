@@ -144,5 +144,13 @@ test "a static lesson page has no files and no playground link" {
   let page = lesson_page(fixture_config("next"), tour, lesson)
   assert_eq(page.files, [])
   assert_eq(page.playground, None)
+  assert_eq(page.engine, Static)
   assert_true(page.is_static())
+  let model = lesson_page(
+    fixture_config("next"),
+    fixture_tour(),
+    fixture_tour().lessons[0],
+  )
+  assert_eq(model.engine, Model)
+  assert_true(!model.is_static())
 }

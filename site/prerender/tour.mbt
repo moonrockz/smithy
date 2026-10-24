@@ -40,6 +40,7 @@ fn lesson_page(
     section: lesson.section,
     number: lesson.number,
     total: tour.lessons.length(),
+    engine: lesson.engine,
     output: lesson.output,
     selector: lesson.selector,
     spec: spec_href(config, lesson.spec),
