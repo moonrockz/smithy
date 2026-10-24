@@ -56,7 +56,9 @@ mise run tour:check
 ```
 
 This runs the tests of `site/tour/check` with the native target. It needs no bun, no Java and no browser. CI runs
-the same task in the job `tour`. The tests run with `site/` as the working directory.
+the same task in the job `tour`. The tests run with `site/` as the working directory. The reader expands the
+include blocks of the lessons (see "CLI and API blocks"), so the check reads `apps/smithy/README.md` and
+`pkgs/*/README.mbt.md`: it needs a full checkout of the repository, not only `site/`. A bad include fails it.
 
 **Level 1** (`lessons_test.mbt`). For each case, the check validates the files with the playground core
 (`@core.handle`) and the request `@core.lesson_validate`. For a lesson with an OpenAPI output, the model loads with the
@@ -157,12 +159,62 @@ Write `lesson.md` in ASD-STE100 Simplified Technical English:
   opens the page of that lesson, and the link also works on GitHub. A test of `site/tour/check`
   (`links_test.mbt`) fails on a link into `site/tour/lessons` that does not open a lesson page.
 - Every claim of the text is a case. When the text says that the Findings tab shows an error, add a case with
-  that error in `events`. When the text says what the output contains, add a needle.
+  that error in `events`. When the text says what the output contains, add a needle. A claim about the CLI or
+  the API is an include block (see "CLI and API blocks"), which `mise run test:cli` or `moon test` runs.
 - Never change an expectation to make a check pass. When the playground core is wrong, fix the core or record
   the difference on the allow list.
 
 To add a lesson, number it with the next free number, add the files above, run `mise run reference:tour`, and
 then run `mise run tour:check`.
+
+## CLI and API blocks
+
+A lesson must not hold a CLI or API block that no test runs. It includes a marked region of a tested source.
+
+- Write an `include` fence at the start of a line, with one line per tab: `LABEL: PATH#NAME`. `PATH` is
+  relative to the repository root. The lesson reader replaces the fence with a tab group.
+- The reader expands only a fence of three or more backticks with the info string `include` and nothing more, at
+  the start of a line, outside a quote and a list. Any other code block of the language `include` (a `~~~`
+  fence, `include` with more words, an include in a quote or a list item) is an error, because the page would
+  show its raw text. An include example in a longer fence or in an indented code block is text.
+- Mark the block in its source with `<!-- tour:start NAME -->` and `<!-- tour:end NAME -->`, each alone on its
+  line and outside a fenced code block. A marker inside a fence is code, not a marker: the CLI runner skips the
+  whole fence, so no test would run the region. Between the markers put only fenced code blocks.
+- A missing file, a missing marker, a marker used twice, a region without a code block or an untested fence is
+  an error, with a message that starts with the lesson file.
+- The reader accepts only the fences of the table below. Anything else fails the include.
+
+| Fence | Where | Run by |
+| --- | --- | --- |
+| `mbt check` with a test | a `.mbt.md` file with a `moon.pkg` next to it | `moon test` |
+| `console` | `apps/smithy/README.md` | `mise run test:cli` |
+| `LANG file=NAME` | `apps/smithy/README.md` | `mise run test:cli` (writes the file) |
+
+A `console` or `file=` fence must start at the start of a line, because the runner (`scripts/test-cli.mbtx`)
+reads only those. Do not remove a tour marker that a lesson uses.
+
+The reader also rejects a hand-written CLI or API block:
+
+- a fence in `console`, `shell`, `sh`, `bash`, `zsh`, `mbt`, `moonbit`, `shell-session`, `powershell`, `fish`,
+  `cmd` or a similar terminal language (the case does not matter), and a `tabs` fence;
+- a fence of any other language (also `text` or no language) with a `smithy` command: a line that starts with
+  `smithy `, also after a shell prompt (`$`, `%`, `#`, `>`, `PS>`, `PS C:\work>` or `C:\work>`);
+- a fence with a package API use at any position of a line;
+- an HTML block (such as `<pre>`) with a `smithy` command or a package API use in its text without the tags.
+  The site does not show an HTML block, but GitHub shows the lesson file with it.
+
+The API rule runs on every fence except `include`, also on `smithy` and `json` fences. A package API use is an
+`@` at the start of the line or after a character that is not a letter, digit or `_`, then a lowercase alias
+`[a-z_][a-z0-9_]*`, then `.`, then a name `[A-Za-z_][A-Za-z0-9_.]*`, and then any character other than `#` (or
+the end of the line). It guards every package alias, such as `@smithy.`, `@syntax.`, `@openapi.` and
+`@validation.`. These stay legal: a qualified trait such as `@smithy.api#documentation("x")` or `@example.ns#x`
+(a `#` follows the name), an unqualified trait such as `@length(min: 1)` or `@required` (no `.` after the name),
+a trait name at the end of a sentence such as `/// Add @required.` (no name follows the `.`), and an e-mail
+address such as `a@example.com` (a letter comes before the `@`). A doc comment such as `/// see @smithy.api` in
+a `smithy` fence is rejected, because no `#` follows the name.
+
+The guard does not check other commands, such as `moon add moonrockz/smithy`. Do not put such a command in a
+lesson unless a test runs it.
 
 ## How the site uses the tour
 
