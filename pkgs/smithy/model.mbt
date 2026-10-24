@@ -48,6 +48,9 @@ pub(all) struct ModelDiagnostic {
   severity : @syntax.Severity
   /// The event severity is DANGER. The diagnostic severity stays Error.
   danger : Bool
+  /// A validation event reports this diagnostic. It is false when the selector
+  /// check of the trait definition reports the same finding.
+  event : Bool
   message : String
   source : SourceLocation
   shape : ShapeId?

@@ -164,9 +164,31 @@ test "a zero slice step has no static event, as in Smithy" {
 }
 
 ///|
-test "each trait target of an operation is reported once" {
-  let text = "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n@conditions({Never: {expression: \"`false`\", documentation: \"x\"}})\n@error(\"client\")\noperation Ping {}\n"
-  assert_eq(contract_keys(text), [
-    "TraitTarget|ERROR|example#Ping", "TraitTarget|ERROR|example#Ping",
-  ])
+test "the selector check reports a contract trait on the wrong shape once" {
+  // The loader diagnostic SM-MODEL-011 is the only TraitTarget source of the
+  // loader. It carries no event: the selector check of the trait gives it.
+  for
+    shape in [
+      "operation Thing {}", "resource Thing {}", "service Thing {\n    version: \"1\"\n}",
+    ] {
+    let text = "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n@conditions({Never: {expression: \"`false`\", documentation: \"x\"}})\n@error(\"client\")\n" +
+      shape +
+      "\n"
+    let result = @smithy.Loader::new().add_idl("model.smithy", text).assemble()
+    let loader = result.diagnostics.filter(d => d.code == "SM-MODEL-011")
+    assert_eq(loader.length(), 1)
+    assert_false(loader[0].event)
+    // One event for conditions and one for error, none twice.
+    assert_eq(contract_keys(text), [
+      "TraitTarget|ERROR|example#Thing", "TraitTarget|ERROR|example#Thing",
+    ])
+    let messages = result
+      .validation_events()
+      .filter(e => e.id == "TraitTarget")
+      .map(e => e.message)
+    assert_eq(
+      messages.filter(m => m.contains("smithy.contracts#conditions")).length(),
+      1,
+    )
+  }
 }

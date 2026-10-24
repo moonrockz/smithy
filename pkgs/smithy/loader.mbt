@@ -172,6 +172,7 @@ fn Assembly::problem(
   source : SourceLocation,
   shape? : String,
   event_id~ : String = "Model",
+  skip_event~ : Bool = false,
   severity~ : @syntax.Severity = Error,
 ) -> Unit {
   self.diagnostics.push({
@@ -179,6 +180,7 @@ fn Assembly::problem(
     event_id,
     severity,
     danger: false,
+    event: !skip_event,
     message,
     source,
     shape: shape.bind(ShapeId::parse),
@@ -499,6 +501,7 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
             event_id,
             severity: d.severity,
             danger: false,
+            event: true,
             message: d.message,
             source: assembly.location(name, span=d.span),
             shape: None,

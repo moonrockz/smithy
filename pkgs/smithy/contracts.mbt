@@ -31,7 +31,8 @@ fn Assembly::validate_conditions(
       "I cannot apply smithy.contracts#conditions to \{owner.body.keyword()} \{owner.id}.",
       owner.source,
       shape=owner.id.to_string(),
-      event_id="TraitTarget",
+      // The selector of the trait definition reports the same TraitTarget event.
+      skip_event=true,
     )
     return
   }

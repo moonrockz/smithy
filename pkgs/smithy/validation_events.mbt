@@ -805,7 +805,9 @@ fn Model::trait_validator_events(
 pub fn Model::validation_events(self : Model) -> Array[ValidationEvent] {
   let assembly = Assembly::new()
   assembly.validate(self, check_trait_definitions=false)
-  self.collect_validation_events(assembly.diagnostics.map(diagnostic_event))
+  self.collect_validation_events(
+    assembly.diagnostics.filter(d => d.event).map(diagnostic_event),
+  )
 }
 
 ///|
@@ -846,23 +848,9 @@ fn Model::collect_validation_events(
   }
   let events : Array[ValidationEvent] = []
   let graph = SelectorGraph::new(self)
-  let target_events = self.trait_target_events(graph)
-  // The loader reports `conditions` on a service, operation or resource itself.
-  // The selector check of the trait definition reports the same finding for
-  // the same shape and trait.
-  events.append(
-    initial.filter(e => {
-      !(e.id == "TraitTarget" &&
-      target_events
-      .iter()
-      .any(t => {
-        t.shape == e.shape &&
-        t.message.contains("`smithy.contracts#conditions`")
-      }))
-    }),
-  )
+  events.append(initial)
   events.append(self.validation_metadata_events())
-  events.append(target_events)
+  events.append(self.trait_target_events(graph))
   events.append(self.trait_validator_events(graph))
   events.append(self.constraint_trait_events())
   events.append(self.basic_trait_events())

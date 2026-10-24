@@ -57,6 +57,7 @@ fn ContractAnalysis::problem(
     event_id,
     severity,
     danger,
+    event: true,
     message: "I found a problem in JMESPath condition \{Json::string(self.condition).stringify()} on \{self.owner.id} at expression \{line}:\{column} (UTF-16 offsets \{span.start}..\{span.end}): \{message}",
     source: {
       ..self.owner.source,
@@ -320,13 +321,6 @@ fn ContractAnalysis::analyze(
         }
       Then(right) => {
         let input = values.pop().unwrap()
-        if input is Reference(_) {
-          self.problem(
-            event=Danger,
-            right.span,
-            "I expected a JSON value before this JMESPath subexpression, but found an expression reference.",
-          )
-        }
         tasks.push(Analyze(right, input))
       }
       Project(node) => {
@@ -397,20 +391,8 @@ fn ContractAnalysis::analyze(
                 }
               None => contract_join(args, self.model)
             }
-          Binary(op, _, _) => {
-            // Smithy compares a reference with a reference only: the result is
-            // null, so it warns. A reference and another type compare as false.
-            let references = args.iter().filter(t => t is Reference(_)).count()
-            if references == 2 {
-              self.problem(
-                event=Warning,
-                node.span,
-                "I expected JSON values for a JMESPath comparison, but found two expression references; the JMESPath result is null.",
-              )
-              Null
-            } else if references == 1 {
-              Boolean
-            } else if op is (Equal | NotEqual) {
+          Binary(op, _, _) =>
+            if op is (Equal | NotEqual) {
               Boolean
             } else {
               let invalid = args
@@ -430,7 +412,6 @@ fn ContractAnalysis::analyze(
                 Boolean
               }
             }
-          }
           Index(_, index) => {
             let elements = self.elements(args[0], node)
             match args[0].resolve(self.model) {
