@@ -11,6 +11,7 @@ fn fixture_lesson(
     slug,
     title: "Lesson \{number}",
     section,
+    engine: Model,
     output: Some(@samples.Output::JsonAst),
     selector: None,
     spec: "https://smithy.io/2.0/spec/idl.html",

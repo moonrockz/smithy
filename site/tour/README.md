@@ -173,6 +173,47 @@ Write `lesson.md` in ASD-STE100 Simplified Technical English:
 To add a lesson, number it with the next free number, add the files above, run `mise run reference:tour`, and
 then run `mise run tour:check`.
 
+## Value lessons
+
+A value lesson checks a JSON value against a shape of the lesson model, as
+`smithy validate value` does. `lesson.json` has `"value"` in place of `"output"`.
+A lesson has at most one of `output`, `value`, `message` and `diff`.
+
+```json
+"value": {"file": "order.json", "shape": "example.orders#Order",
+          "unknown_members": "reject", "member_names": "smithy"}
+```
+
+- `file` is a starting file in `files/` that ends in `.json`. It holds the
+  value. A case can replace it by name, as it replaces any file.
+- `shape` is the absolute ID of the target shape. A member ID is not valid
+  here; the CLI option `--shape` takes the same form.
+- `unknown_members` (`reject` or `ignore`) and `member_names` (`smithy` or
+  `json`) are optional. The defaults are the defaults of the CLI.
+- Other keys are an error.
+
+File rules, for every lesson: each file in `files/` and in a case must end in
+`.smithy`, except the value file. A case cannot add another `.json` file.
+
+`expect.json` of a value lesson needs `"findings"` (a lesson of another kind
+cannot have it). Each item is a key of what the reader sees, without the message:
+
+- A finding in the value: `code|severity|pointer|shape`. The severity is
+  `error` or `advisory`. The pointer is a JSON pointer, empty for the root.
+  Example: `Range|error|/quantity|example.orders#Order$quantity`.
+- A problem that stopped the check: `code|stopped|source`. The source is
+  `--shape`, `--service`, a model file or `-` for the value file.
+  Example: `InvalidJson|stopped|-`.
+
+`output_contains` is checked against the lines that the CLI prints, joined with a
+line break. A case whose model has an ERROR or a DANGER cannot name findings or
+output strings, because the check does not run.
+
+The text of a value lesson must have a note that starts with
+`> **Our extension:**`. Smithy defines no value validation, and no Java
+reference exists for it. Level 1 checks the note. Level 2 compares only the
+model events.
+
 ## CLI and API blocks
 
 A lesson must not hold a CLI or API block that no test runs. It includes a marked region of a tested source.

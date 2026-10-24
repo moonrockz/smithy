@@ -1087,6 +1087,7 @@ test "our OpenAPI document is the .openapi.json file of the transform" {
     slug: "x",
     title: "x",
     section: "x",
+    engine: Model,
     output: Some(OpenApi30),
     selector: None,
     spec: "",

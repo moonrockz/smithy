@@ -217,3 +217,92 @@ test "an include block that the reader cannot expand" {
     "01-hello/lesson.md", "I found an include block that I cannot expand",
   ])
 }
+
+///|
+test "a value lesson reads its setup and the findings of a case" {
+  let tour = match read("value-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(
+    lesson.engine,
+    Value({
+      file: "order.json",
+      shape: "example#Order",
+      options: { unknown_members: Ignore, member_names: Smithy, },
+    }),
+  )
+  assert_eq(lesson.output, None)
+  assert_eq(lesson.files.map(f => f.name), ["model.smithy", "order.json"])
+  assert_eq(lesson.cases[0].expect.findings, [])
+  assert_eq(lesson.cases[1].expect.findings, [
+    "Range|error|/quantity|example#Order", "InvalidJson|stopped|-",
+  ])
+  assert_eq(lesson.cases[1].expect.output_contains, ["Range"])
+  let merged = lesson.case_files(lesson.cases[1])
+  assert_eq(merged.map(f => f.text), [
+    "namespace example\nstructure Order { quantity: Integer }\n", "{\"quantity\": 0}\n",
+  ])
+}
+
+///|
+test "a value lesson that names a missing file" {
+  expect_err("value-bad-file", ["01-a", "missing.json"])
+}
+
+///|
+test "a lesson with an output and a value" {
+  expect_err("value-and-output", ["01-a", "at most one of output, value"])
+}
+
+///|
+test "a value setup with an unknown key" {
+  expect_err("value-unknown-key", ["01-a", "colour"])
+}
+
+///|
+test "a value setup with an unknown option" {
+  expect_err("value-bad-option", ["01-a", "member_names", "camel"])
+}
+
+///|
+test "a value file must end with .json" {
+  expect_err("value-file-not-json", ["01-a", "order.smithy", ".json"])
+}
+
+///|
+test "a value lesson case needs findings" {
+  expect_err("value-no-findings", ["01-a/cases/start", "findings"])
+}
+
+///|
+test "a finding key has the form of a found or a stopped finding" {
+  expect_err("bad-finding-key", ["01-a/cases/start", "Range|error|a#B"])
+}
+
+///|
+test "findings are for a value or message lesson" {
+  expect_err("findings-in-model-lesson", [
+    "01-a/cases/start", "\"findings\" is for a value or message lesson",
+  ])
+}
+
+///|
+test "diff is for a diff lesson" {
+  expect_err("diff-in-model-lesson", [
+    "01-a/cases/start", "\"diff\" is for a diff lesson",
+  ])
+}
+
+///|
+test "a model file must end with .smithy" {
+  expect_err("json-model-file", ["01-a/files/extra.json", ".smithy"])
+}
+
+///|
+test "a case cannot add a json file that no setup names" {
+  expect_err("value-case-adds-json", [
+    "01-a/cases/start/files/other.json", ".smithy",
+  ])
+}

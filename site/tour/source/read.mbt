@@ -118,6 +118,7 @@ fn read_lesson(
         },
       )
   }
+  let engine = read_engine(meta, dir, output is Some(_))
   let selector = optional_string_field(meta, "selector", dir)
   if selector is Some(_) && !(output is Some(@samples.Output::Selector)) {
     fail("\{dir}: \"selector\" is for the output Selector only")
@@ -135,17 +136,26 @@ fn read_lesson(
     Ok(_) => text_of(dir, repo, raw)
     Err(e) => fail("\{dir}/lesson.md: \{e}")
   }
-  let files = read_files("\{base}/files", "\{dir}/files")
+  let data = engine.data_files()
+  let files = read_files("\{base}/files", "\{dir}/files", data)
   if files.is_empty() {
     fail("\{dir}: I found no starting file in files/")
   }
-  let cases = read_cases(dir, "\{base}/cases", output is Some(_))
+  for name in data {
+    if !files.any(f => f.name == name) {
+      fail(
+        "\{dir}: the value file \"\{name}\" is not a starting file in files/",
+      )
+    }
+  }
+  let cases = read_cases(dir, "\{base}/cases", output is Some(_), engine)
   {
     dir,
     number,
     slug,
     title,
     section,
+    engine,
     output,
     selector,
     spec,
@@ -169,10 +179,59 @@ fn text_of(dir : String, repo : String, raw : String) -> String raise {
 }
 
 ///|
+/// The engine of a lesson: at most one of `output`, `value`. A lesson with
+/// none of them validates its model.
+fn read_engine(
+  meta : Json,
+  dir : String,
+  has_output : Bool,
+) -> @model.Engine raise {
+  guard meta is Object(m) else {
+    fail("\{dir}/lesson.json: I expected a JSON object")
+  }
+  let where_ = "\{dir}/lesson.json"
+  let value = m.get("value")
+  if has_output && value is Some(_) {
+    fail("\{where_}: I expected at most one of output, value, message, diff")
+  }
+  guard value is Some(setup) else { return Model }
+  check_keys(setup, value_keys, "\{where_} \"value\"")
+  let file = string_field(setup, "file", "\{where_} \"value\"")
+  if !file.has_suffix(".json") {
+    fail("\{where_}: the value file \"\{file}\" must end in .json")
+  }
+  let shape = string_field(setup, "shape", "\{where_} \"value\"")
+  let unknown_members : @samples.UnknownMembers = match
+    optional_string_field(setup, "unknown_members", where_) {
+    None | Some("reject") => Reject
+    Some("ignore") => Ignore
+    Some(other) =>
+      fail(
+        "\{where_}: \"unknown_members\" must be \"reject\" or \"ignore\", not \"\{other}\"",
+      )
+  }
+  let member_names : @samples.MemberNames = match
+    optional_string_field(setup, "member_names", where_) {
+    None | Some("smithy") => Smithy
+    Some("json") => JsonName
+    Some(other) =>
+      fail(
+        "\{where_}: \"member_names\" must be \"smithy\" or \"json\", not \"\{other}\"",
+      )
+  }
+  Value({ file, shape, options: { unknown_members, member_names, }, })
+}
+
+///|
 /// The files directly in the folder `path`. `where_` names the folder in an
-/// error. The playground core reads every file as IDL, so a file name must end
-/// in `.smithy`.
-fn read_files(path : String, where_ : String) -> Array[@model.LessonFile] raise {
+/// error. The playground core reads every model file as IDL, so a file name
+/// must end in `.smithy`. `data` are the names of the data files of the
+/// engine; they are the only other files.
+fn read_files(
+  path : String,
+  where_ : String,
+  data : Array[String],
+) -> Array[@model.LessonFile] raise {
   let files : Array[@model.LessonFile] = []
   if !@fs.path_exists(path) {
     return files
@@ -184,7 +243,7 @@ fn read_files(path : String, where_ : String) -> Array[@model.LessonFile] raise 
         "\{where_}/\{name}: I found a folder in the files of a lesson. Put each file directly in \{where_}",
       )
     }
-    if !name.has_suffix(".smithy") {
+    if !name.has_suffix(".smithy") && !data.contains(name) {
       fail(
         "\{where_}/\{name}: the name of a lesson file must end in .smithy, because the playground core reads every file as IDL",
       )
@@ -199,14 +258,15 @@ fn read_cases(
   dir : String,
   path : String,
   has_output : Bool,
+  engine : @model.Engine,
 ) -> Array[@model.Case] raise {
   if !@fs.path_exists("\{path}/start") {
     fail("\{dir}: I found no cases/start folder")
   }
   let names = list_dir(path).filter(n => n != "start" && is_dir("\{path}/\{n}"))
-  let cases = [read_case(dir, path, "start", has_output)]
+  let cases = [read_case(dir, path, "start", has_output, engine)]
   for name in names {
-    cases.push(read_case(dir, path, name, has_output))
+    cases.push(read_case(dir, path, name, has_output, engine))
   }
   cases
 }
@@ -217,6 +277,7 @@ fn read_case(
   path : String,
   name : String,
   has_output : Bool,
+  engine : @model.Engine,
 ) -> @model.Case raise {
   let base = "\{path}/\{name}"
   let expect_path = "\{base}/expect.json"
@@ -245,6 +306,28 @@ fn read_case(
     )
   }
   let where_ = "\{dir}/cases/\{name}"
+  let findings = optional_keys_field(json, "findings", where_)
+  let diff = optional_keys_field(json, "diff", where_)
+  match engine {
+    Value(_) =>
+      if !(json is Object(m) && m.contains("findings")) {
+        fail("\{where_}: a value lesson needs \"findings\" in expect.json")
+      }
+    Model =>
+      if !findings.is_empty() || has_key(json, "findings") {
+        fail("\{where_}: \"findings\" is for a value or message lesson")
+      }
+  }
+  if !diff.is_empty() || has_key(json, "diff") {
+    fail("\{where_}: \"diff\" is for a diff lesson")
+  }
+  for key in findings {
+    if !@model.is_finding_key(key) {
+      fail(
+        "\{where_}: the finding \"\{key}\" must have the form code|error|pointer|shape or code|stopped|source",
+      )
+    }
+  }
   let blocked = optional_string_field(json, "blocked", where_)
   if blocked is Some(_) {
     if !output_contains.is_empty() {
@@ -263,20 +346,28 @@ fn read_case(
   }
   {
     name,
-    files: read_files("\{base}/files", "\{where_}/files"),
-    expect: { events, output_contains, blocked, },
+    files: read_files("\{base}/files", "\{where_}/files", engine.data_files()),
+    expect: { events, output_contains, blocked, findings, diff, },
   }
 }
 
 ///|
 /// The keys of `lesson.json`.
 let lesson_keys : Array[String] = [
-  "slug", "title", "section", "spec", "output", "selector",
+  "slug", "title", "section", "spec", "output", "selector", "value",
+]
+
+///|
+/// The keys of `value` in `lesson.json`.
+let value_keys : Array[String] = [
+  "file", "shape", "unknown_members", "member_names",
 ]
 
 ///|
 /// The keys of `expect.json`.
-let expect_keys : Array[String] = ["events", "output_contains", "blocked"]
+let expect_keys : Array[String] = [
+  "events", "output_contains", "blocked", "findings", "diff",
+]
 
 ///|
 /// Fail on a key that is not in `keys`. A misspelt key would otherwise drop
@@ -345,5 +436,24 @@ fn string_array_field(
           fail("\{where_}: expect.json needs \"\{key}\" as an array of strings")
       }
     _ => fail("\{where_}: I expected a JSON object")
+  }
+}
+
+///|
+fn has_key(json : Json, key : String) -> Bool {
+  json is Object(m) && m.contains(key)
+}
+
+///|
+/// The strings of an optional array field; empty when the field is missing.
+fn optional_keys_field(
+  json : Json,
+  key : String,
+  where_ : String,
+) -> Array[String] raise {
+  if has_key(json, key) {
+    string_array_field(json, key, where_)
+  } else {
+    []
   }
 }

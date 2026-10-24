@@ -35,9 +35,13 @@ fn output_plan(
   events : Array[@model.EventKey],
   output_contains : Array[String],
   blocked~ : String? = None,
+  findings~ : Array[String] = [],
 ) -> Result[Bool, String] {
   let model_errors = events.any(e => e.severity.blocks_output())
   let runs = has_output && !model_errors && blocked is None
+  if findings.length() > 0 && !runs {
+    return Err("the expected events have an ERROR or a DANGER")
+  }
   if output_contains.length() > 0 && !runs {
     Err(
       if has_output {
@@ -122,6 +126,10 @@ test "output strings need an output that can run" {
   assert_true(output_plan(false, [], ["x"]) is Err(_))
   assert_true(output_plan(true, [event(Danger)], ["x"]) is Err(_))
   assert_true(output_plan(true, [event(Error)], ["x"]) is Err(_))
+  assert_eq(output_plan(true, [], [], findings=["A|error||x#Y"]), Ok(true))
+  assert_true(
+    output_plan(true, [event(Error)], [], findings=["A|error||x#Y"]) is Err(_),
+  )
 }
 
 ///|
@@ -133,59 +141,115 @@ test "the tour has lessons" {
 }
 
 ///|
-test "every lesson case gives the findings and the output that its expect.json names" {
-  let tour = match @source.read_tour(lessons_root, repo="..") {
-    Ok(tour) => tour
-    Err(e) => fail("I cannot read the tour: " + e)
+/// The keys of the findings of a value check, sorted, and the CLI lines.
+fn data_keys(findings : Array[@core.DataFinding]) -> Array[String] {
+  let keys = findings.map(f => {
+    match f {
+      Found(code~, severity~, path~, shape~, ..) =>
+        @model.found_key(code, severity, path, shape)
+      Stopped(code~, source~, ..) => @model.stopped_key(code, source)
+    }
+  })
+  keys.sort_by(@model.compare_code_units)
+  keys
+}
+
+///|
+/// Check one case of a lesson: its events, its findings and its output text.
+fn check_case(
+  session : @core.Session,
+  lesson : @model.Lesson,
+  case : @model.Case,
+) -> Unit raise {
+  let where_ = lesson.case_id(case).to_string()
+  let all_files = lesson.case_files(case)
+  let files = files_of(@model.model_files(lesson.engine, all_files))
+  let actual = match
+    @core.handle(
+      session,
+      @core.lesson_validate(seq=1, files~, output=lesson.output),
+    ) {
+    Diagnostics(items~, ..) => compared(items)
+    Blocked(reason~, ..) => fail(where_ + ": validation was blocked: " + reason)
+    _ => fail(where_ + ": unexpected answer")
   }
-  let session = @core.Session::new()
-  for lesson in tour.lessons {
-    for case in lesson.cases {
-      let where_ = lesson.case_id(case).to_string()
-      let files = files_of(lesson.case_files(case))
-      let actual = match
+  let expected = case.expect.events.copy()
+  expected.sort_by(@model.compare_events)
+  if actual != expected {
+    fail(
+      where_ +
+      ": events differ.\n  expected: " +
+      show_events(expected) +
+      "\n  actual:   " +
+      show_events(actual),
+    )
+  }
+  let runs = match
+    output_plan(
+      lesson.output is Some(_) || lesson.engine is Value(_),
+      expected,
+      case.expect.output_contains,
+      blocked=case.expect.blocked,
+      findings=case.expect.findings,
+    ) {
+    Ok(runs) => runs
+    Err(reason) => fail(where_ + ": output_contains cannot run: " + reason)
+  }
+  match (case.expect.blocked, lesson.output) {
+    (Some(text), Some(output)) =>
+      check_blocked(
+        where_,
+        text,
         @core.handle(
           session,
-          @core.lesson_validate(seq=1, files~, output=lesson.output),
-        ) {
-        Diagnostics(items~, ..) => compared(items)
-        Blocked(reason~, ..) =>
-          fail(where_ + ": validation was blocked: " + reason)
-        _ => fail(where_ + ": unexpected answer")
-      }
-      let expected = case.expect.events.copy()
-      expected.sort_by(@model.compare_events)
-      if actual != expected {
-        fail(
-          where_ +
-          ": events differ.\n  expected: " +
-          show_events(expected) +
-          "\n  actual:   " +
-          show_events(actual),
-        )
-      }
-      let runs = match
-        output_plan(
-          lesson.output is Some(_),
-          expected,
-          case.expect.output_contains,
-          blocked=case.expect.blocked,
-        ) {
-        Ok(runs) => runs
-        Err(reason) => fail(where_ + ": output_contains cannot run: " + reason)
-      }
-      match (case.expect.blocked, lesson.output) {
-        (Some(text), Some(output)) =>
-          check_blocked(
-            where_,
-            text,
-            @core.handle(
-              session,
-              TransformFiles(seq=3, files~, output~, selector=lesson.selector),
+          TransformFiles(seq=3, files~, output~, selector=lesson.selector),
+        ),
+      )
+    _ => ()
+  }
+  match lesson.engine {
+    Value(setup) =>
+      if runs {
+        let value = match all_files.search_by(f => f.name == setup.file) {
+          Some(i) => all_files[i].text
+          None => fail(where_ + ": the case has no file " + setup.file)
+        }
+        let findings = match
+          @core.handle(
+            session,
+            CheckValue(
+              seq=2,
+              files~,
+              shape=setup.shape,
+              value~,
+              options=setup.options,
             ),
+          ) {
+          DataChecked(findings~, ..) => findings
+          Blocked(reason~, ..) =>
+            fail(where_ + ": the value check was blocked: " + reason)
+          _ => fail(where_ + ": unexpected answer")
+        }
+        let keys = data_keys(findings)
+        let wanted = case.expect.findings.copy()
+        wanted.sort_by(@model.compare_code_units)
+        if keys != wanted {
+          fail(
+            where_ +
+            ": findings differ.\n  expected: " +
+            show(wanted) +
+            "\n  actual:   " +
+            show(keys),
           )
-        _ => ()
+        }
+        let text = findings.map(f => f.cli_line(file=setup.file)).join("\n")
+        for needle in case.expect.output_contains {
+          if !text.contains(needle) {
+            fail(where_ + ": the output has no " + needle + "\n" + text)
+          }
+        }
       }
+    Model =>
       match lesson.output {
         Some(output) if runs => {
           let text = match
@@ -206,6 +270,95 @@ test "every lesson case gives the findings and the output that its expect.json n
         }
         _ => ()
       }
+  }
+}
+
+///|
+test "every lesson case gives the findings and the output that its expect.json names" {
+  let tour = match @source.read_tour(lessons_root, repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the tour: " + e)
+  }
+  let session = @core.Session::new()
+  for lesson in tour.lessons {
+    for case in lesson.cases {
+      check_case(session, lesson, case)
+    }
+  }
+}
+
+///|
+test "a value lesson case gives the findings that its expect.json names" {
+  let tour = match
+    @source.read_tour("tour/source/testdata/value-level1", repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the fixture: " + e)
+  }
+  let lesson = tour.lessons[0]
+  assert_true(lesson.engine is Value(_))
+  assert_eq(lesson.text.contains(@model.extension_note), true)
+  let session = @core.Session::new()
+  for case in lesson.cases {
+    check_case(session, lesson, case)
+  }
+  // A claim that the check does not give is an error.
+  let start = lesson.cases[0]
+  let wrong : @model.Case = {
+    ..start,
+    expect: {
+      ..start.expect,
+      findings: ["Range|error|/quantity|example#Order"],
+    },
+  }
+  assert_true(raises(() => check_case(session, lesson, wrong)))
+  let wrong_text : @model.Case = {
+    ..start,
+    expect: { ..start.expect, output_contains: ["no such text"], },
+  }
+  assert_true(raises(() => check_case(session, lesson, wrong_text)))
+}
+
+///|
+test "a value case with an ERROR or a DANGER cannot claim findings" {
+  let tour = match
+    @source.read_tour("tour/source/testdata/value-level1", repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the fixture: " + e)
+  }
+  let lesson = tour.lessons[0]
+  let broken = lesson.cases.search_by(c => c.name == "model-error")
+  guard broken is Some(i) else { fail("the fixture has no model-error case") }
+  let case = lesson.cases[i]
+  assert_true(case.expect.events.any(e => e.severity.blocks_output()))
+  let claims : @model.Case = {
+    ..case,
+    expect: {
+      ..case.expect,
+      findings: ["Range|error|/quantity|example#Order"],
+    },
+  }
+  assert_true(raises(() => check_case(@core.Session::new(), lesson, claims)))
+  let says : @model.Case = {
+    ..case,
+    expect: { ..case.expect, output_contains: ["Range"], },
+  }
+  assert_true(raises(() => check_case(@core.Session::new(), lesson, says)))
+}
+
+///|
+test "a value or message lesson says that the check is our extension" {
+  let tour = match @source.read_tour(lessons_root, repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the tour: " + e)
+  }
+  for lesson in tour.lessons {
+    if lesson.engine is Model {
+      continue
+    }
+    if !lesson.text.contains(@model.extension_note) {
+      fail(
+        lesson.dir + ": the text has no \"" + @model.extension_note + "\" note",
+      )
     }
   }
 }

@@ -26,7 +26,114 @@ pub(all) struct Expectation {
   /// A text that the reason of a blocked output must contain. The output must
   /// be blocked for a reason other than model errors (`BlockKind::Other`).
   blocked : String?
+  /// The finding keys of a value or message lesson: `found_key` and
+  /// `stopped_key`. Empty for other lessons.
+  findings : Array[String]
+  /// The diff event keys of a diff lesson. Empty for other lessons.
+  diff : Array[String]
 }
+
+///|
+/// What a lesson runs on its files. A lesson has one engine.
+pub(all) enum Engine {
+  /// Validate the model files; `Lesson.output` names the transform, if any.
+  Model
+  /// Check a JSON value against a shape of the model.
+  Value(ValueSetup)
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend Engine with Eq::{equal, not_equal}
+
+///|
+pub extend Engine with @debug.Debug::{to_repr}
+
+///|
+pub extend Engine with ToJson::{to_json}
+
+///|
+pub extend Engine with FromJson::{from_json}
+
+///|
+/// The setup of a value lesson: the starting file with the value, the absolute
+/// ID of the target shape and the options of `smithy validate value`.
+pub(all) struct ValueSetup {
+  file : String
+  shape : String
+  options : @samples.ValueOptions
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend ValueSetup with Eq::{equal, not_equal}
+
+///|
+pub extend ValueSetup with @debug.Debug::{to_repr}
+
+///|
+pub extend ValueSetup with ToJson::{to_json}
+
+///|
+pub extend ValueSetup with FromJson::{from_json}
+
+///|
+/// The names of the files that hold data in place of a model.
+pub fn Engine::data_files(self : Engine) -> Array[String] {
+  match self {
+    Model => []
+    Value(setup) => [setup.file]
+  }
+}
+
+///|
+/// The files of the model: the files without the data files of the engine.
+pub fn model_files(
+  engine : Engine,
+  files : Array[LessonFile],
+) -> Array[LessonFile] {
+  let data = engine.data_files()
+  files.filter(f => !data.contains(f.name))
+}
+
+///|
+/// The key of a `Found` finding: `code|severity|path|shape`. The path is the
+/// JSON pointer, empty for the root.
+pub fn found_key(
+  code : String,
+  severity : String,
+  path : String,
+  shape : String,
+) -> String {
+  "\{code}|\{severity}|\{path}|\{shape}"
+}
+
+///|
+/// The key of a `Stopped` finding: `code|stopped|source`, with `-` for the
+/// input file.
+pub fn stopped_key(code : String, source : String?) -> String {
+  "\{code}|stopped|\{source.unwrap_or("-")}"
+}
+
+///|
+/// Whether the text has the form of a finding key: a `Found` key has 4 or more
+/// parts (a pointer can hold `|`) with `error` or `advisory` as part 2; a
+/// `Stopped` key has 3 parts with `stopped` as part 2.
+pub fn is_finding_key(key : String) -> Bool {
+  let parts = key.split("|").map(p => p.to_owned()).to_array()
+  if parts.length() < 3 || parts[0] == "" {
+    return false
+  }
+  if parts[1] == "stopped" {
+    return parts.length() == 3 && parts[2] != ""
+  }
+  parts.length() >= 4 &&
+  (parts[1] == "error" || parts[1] == "advisory") &&
+  parts[parts.length() - 1] != ""
+}
+
+///|
+/// The note that a value or message lesson must have in its text: Smithy
+/// defines no such check.
+pub let extension_note : String = "> **Our extension:**"
 
 ///|
 /// A named edit of the starting files, and the result that it must give.
@@ -43,6 +150,7 @@ pub(all) struct Lesson {
   slug : String
   title : String
   section : String
+  engine : Engine
   output : @samples.Output?
   selector : String?
   spec : String

@@ -11,6 +11,7 @@ fn lesson_of(
     slug: "l\{number}",
     title: "L\{number}",
     section,
+    engine: Model,
     output: None,
     selector: None,
     spec: "https://smithy.io/2.0/",
@@ -50,7 +51,13 @@ test "case_files replaces a starting file and adds a new one, sorted by name" {
       { name: "model.smithy", text: "new", },
       { name: "a.smithy", text: "a", },
     ],
-    expect: { events: [], output_contains: [], blocked: None, },
+    expect: {
+      events: [],
+      output_contains: [],
+      blocked: None,
+      findings: [],
+      diff: [],
+    },
   }
   let names = lesson.case_files(c).map(f => f.name + "=" + f.text)
   assert_eq(names, ["a.smithy=a", "b.smithy=b", "model.smithy=new"])
@@ -173,7 +180,13 @@ test "case_files sorts names of different length by code unit" {
   let c : Case = {
     name: "c",
     files: [],
-    expect: { events: [], output_contains: [], blocked: None, },
+    expect: {
+      events: [],
+      output_contains: [],
+      blocked: None,
+      findings: [],
+      diff: [],
+    },
   }
   assert_eq(lesson.case_files(c).map(f => f.name), [
     "a-long-name.smithy", "zz.smithy",
@@ -238,4 +251,38 @@ test "output_text gives one file as it is" {
 test "output_text joins two files with a line break" {
   assert_eq(output_text([("a.smithy", "A\n"), ("b.smithy", "B\n")]), "A\n\nB\n")
   assert_eq(output_text([]), "")
+}
+
+///|
+test "finding keys have one form each" {
+  assert_eq(found_key("Range", "error", "", "a#B"), "Range|error||a#B")
+  assert_eq(found_key("Range", "error", "/q", "a#B"), "Range|error|/q|a#B")
+  assert_eq(stopped_key("InvalidJson", None), "InvalidJson|stopped|-")
+  assert_eq(
+    stopped_key("InvalidTarget", Some("--shape")),
+    "InvalidTarget|stopped|--shape",
+  )
+  assert_true(is_finding_key("Range|error|/q|a#B"))
+  assert_true(is_finding_key("Range|advisory||a#B"))
+  assert_true(is_finding_key("InvalidJson|stopped|-"))
+  assert_true(!is_finding_key("Range|error|a#B"))
+  assert_true(!is_finding_key("Range|warning|/q|a#B"))
+  assert_true(!is_finding_key("InvalidJson|stopped|-|x"))
+  assert_true(!is_finding_key("Range"))
+}
+
+///|
+test "model_files leaves out the data files of the engine" {
+  let engine : Engine = Value({
+    file: "v.json",
+    shape: "a#B",
+    options: @samples.ValueOptions::default(),
+  })
+  let files : Array[LessonFile] = [
+    { name: "model.smithy", text: "m", },
+    { name: "v.json", text: "{}", },
+  ]
+  assert_eq(engine.data_files(), ["v.json"])
+  assert_eq(model_files(engine, files).map(f => f.name), ["model.smithy"])
+  assert_eq(model_files(Model, files).length(), 2)
 }
