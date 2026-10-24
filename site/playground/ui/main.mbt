@@ -357,8 +357,10 @@ fn Runtime::run(self : Runtime, effect : @workbench.Effect) -> Unit {
       editor_load(@workbench.EDITOR_ID, text)
     }
     Mark(items) => editor_mark(@workbench.EDITOR_ID, mark_json(items))
-    // A click that ends a text selection in the list does not move the cursor.
     MoveCursor(line~, column~) =>
+      editor_go_to(@workbench.EDITOR_ID, line, column)
+    // A click that ends a text selection in the list does not move the cursor.
+    MoveCursorUnlessSelecting(line~, column~) =>
       if !has_selection() {
         editor_go_to(@workbench.EDITOR_ID, line, column)
       }

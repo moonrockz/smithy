@@ -184,6 +184,7 @@ code, pre, kbd { font-family: var(--mono); }
   font: inherit; font-size: 0.75rem; white-space: nowrap; cursor: pointer; }
 .pg-fold[aria-expanded="false"] { color: var(--fg); }
 .pg-rstatus { flex: none; }
+.pg-stale-tag { color: var(--warn); font-weight: 700; }
 /* Folded controls: the code view follows the tab row. With no output, the notices stay. */
 .pg-folded > .pg-rowctl, .pg-folded > .pg-cli, .pg-folded > .pg-notices, .pg-folded > .pg-warnings-slot,
 .pg-folded > .pg-files, .pg-folded > .pg-notes, .pg-folded > .pg-logslot, .pg-folded > .pg-hintslot,

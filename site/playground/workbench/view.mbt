@@ -373,6 +373,7 @@ fn diagnostic_row(
   }
   let go = current && d.start_line > 0
   let chosen = DiagnosticChosen(line=d.start_line, column=d.start_column)
+  let clicked = DiagnosticClicked(line=d.start_line, column=d.start_column)
   let main = [
     @html.div(class="pg-msg", message_html(d.message)),
     @html.div(
@@ -388,7 +389,7 @@ fn diagnostic_row(
     @html.div(
       class="pg-diag-main",
       title="Go to line \{d.start_line}",
-      on_click=emit(chosen),
+      on_click=emit(clicked),
       main,
     )
   } else {
@@ -941,7 +942,7 @@ fn results_status_text(m : Model) -> String {
       }
     TransformTab =>
       match m.tx {
-        TxDone(output~, files~, file~, warnings~, edits~, ..) => {
+        TxDone(output~, files~, file~, warnings~, ..) => {
           let name = match files.get(file) {
             Some(name) => " · " + name
             None => ""
@@ -956,12 +957,7 @@ fn results_status_text(m : Model) -> String {
           } else {
             " · " + plural(warnings.length(), "warning", "warnings")
           }
-          let old = if edits != m.edits {
-            " · older than the model"
-          } else {
-            ""
-          }
-          output_label(output) + name + place + warned + old
+          output_label(output) + name + place + warned
         }
         TxRunning => "Running"
         TxIdle => "No output yet"
@@ -975,6 +971,30 @@ fn results_status_text(m : Model) -> String {
           plural(log.findings.length(), "finding", "findings") +
           (if log.done { "" } else { " so far" })
         _ => "Not checked"
+      }
+  }
+}
+
+///|
+/// The warning of the status bar under the results when the shown result is
+/// for older input. The folded controls hide the notice that says so, and an
+/// old result must not pass for the result of the text in the editors.
+fn results_stale_text(m : Model) -> String? {
+  match m.tab {
+    ValidateTab => None
+    TransformTab =>
+      match m.tx {
+        TxDone(edits~, ..) if edits != m.edits =>
+          Some("older than the model: select Run")
+        _ => None
+      }
+    TranscriptTab =>
+      match m.tr {
+        TrChecked(log) if m.session is None && !log.done && !m.tr_running() =>
+          Some("stopped: select Step or Run all")
+        TrChecked(_) if !m.tr_current() && !m.tr_running() =>
+          Some("older than the editors: select Step or Run all")
+        _ => None
       }
   }
 }
@@ -1026,9 +1046,16 @@ fn results_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       "pg-trpanel" + fold(TranscriptTab),
       transcript_panel(m, emit),
     ),
-    @html.div(class="pg-rstatus", [
-      @html.span(class="pg-hint", results_status_text(m)),
-    ]),
+    @html.div(
+      class="pg-rstatus",
+      [
+        @html.span(class="pg-hint", results_status_text(m)),
+        ..match results_stale_text(m) {
+          Some(text) => [@html.span(class="pg-stale-tag", text)]
+          None => []
+        },
+      ],
+    ),
   ])
 }
 

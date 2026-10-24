@@ -782,3 +782,17 @@ test "group: the playground groups repeats by default, and the button turns it o
   // The choice that the browser kept wins over the default.
   assert_false(answered().with_grouped(false).grouped)
 }
+
+///|
+test "go: Go moves the cursor always, and a click on the text only when it ends no selection" {
+  let m = answered()
+  assert_eq(update(m, DiagnosticChosen(line=4, column=2)).1, [
+    MoveCursor(line=4, column=2),
+  ])
+  assert_eq(update(m, DiagnosticClicked(line=4, column=2)).1, [
+    MoveCursorUnlessSelecting(line=4, column=2),
+  ])
+  // A row of an older result moves nothing.
+  let (stale, _) = update(m, Edited)
+  assert_eq(update(stale, DiagnosticClicked(line=4, column=2)).1, [])
+}

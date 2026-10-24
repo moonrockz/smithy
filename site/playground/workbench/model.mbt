@@ -345,7 +345,11 @@ pub(all) enum Msg {
   KeepMine
   SampleChosen(Int32)
   TabChosen(Tab)
+  /// The Go button of a diagnostic.
   DiagnosticChosen(line~ : Int32, column~ : Int32)
+  /// A click on the message or the place of a diagnostic. It can end a text
+  /// selection, which must stay.
+  DiagnosticClicked(line~ : Int32, column~ : Int32)
   TranscriptSampleChosen(Int32)
   /// The transcript text changed.
   TranscriptEdited
@@ -414,6 +418,9 @@ pub(all) enum Effect {
   /// Show these diagnostics in the editor.
   Mark(Array[Diagnostic])
   MoveCursor(line~ : Int32, column~ : Int32)
+  /// Move the cursor as `MoveCursor` does, unless the reader has selected
+  /// text on the page: the click then ended the selection.
+  MoveCursorUnlessSelecting(line~ : Int32, column~ : Int32)
   /// End the Worker and start a new one.
   RestartWorker
   /// Send the editor texts of the model and the transcript to the Worker, to
@@ -941,6 +948,12 @@ fn update_state(m : Model, msg : Msg) -> (Model, Array[Effect]) {
     DiagnosticChosen(line~, column~) =>
       if m.is_current() {
         (m, [MoveCursor(line~, column~)])
+      } else {
+        (m, [])
+      }
+    DiagnosticClicked(line~, column~) =>
+      if m.is_current() {
+        (m, [MoveCursorUnlessSelecting(line~, column~)])
       } else {
         (m, [])
       }

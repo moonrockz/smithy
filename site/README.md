@@ -127,7 +127,10 @@ tab row have one height (`--pg-head`). While a tab is folded, the tab row keeps 
 and Run all (`#pg-step-folded`, `#pg-runall-folded`). A notice that the reader must see (a refused, stopped or
 failed request, or a model that a transcript check cannot use) opens the controls when it appears; the reader
 can fold them again. The browser keeps the folds in `localStorage` under `smithy-playground-folded`. The results
-have a status bar (`.pg-rstatus`) that mirrors the one of the model editor, with a summary of the shown tab.
+have a status bar (`.pg-rstatus`) that mirrors the one of the model editor, with a summary of the shown tab. When the
+shown output or transcript check is older than the editors, it says so (`.pg-stale-tag`), because folded controls
+hide the notice. In the Validate list, Go always moves the cursor; a click on the text does not when it ends a
+text selection.
 
 The Worker runs one request at a time (a Validate, a Transform or a transcript request). A change or a button
 while a request runs waits for it. When it ends, a Run of the Transform tab goes first, then a Step, Run all or

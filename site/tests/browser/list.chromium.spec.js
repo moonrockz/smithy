@@ -30,7 +30,16 @@ test("the text of a row can be selected and copied, and the drag does not move t
   await page.keyboard.press("ControlOrMeta+c");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(selected);
 
+  // With the text still selected, Go from the keyboard moves the cursor.
+  await page.locator(".pg-go").focus();
+  expect(await page.evaluate(() => window.getSelection().toString())).toBe(selected);
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".pg-cursor")).toHaveText("Ln 46, Col 31");
+
   // A click without a drag moves the cursor to the place of the diagnostic.
+  await page.locator("#pg-editor .cm-content").click();
+  await page.keyboard.press("ControlOrMeta+Home");
+  await expect(page.locator(".pg-cursor")).toHaveText("Ln 1, Col 1");
   await row.locator(".pg-loc").click();
   await expect(page.locator(".pg-cursor")).toHaveText("Ln 46, Col 31");
   expect(page.errors).toEqual([]);

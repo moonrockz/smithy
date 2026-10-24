@@ -54,6 +54,12 @@ test("a folded Transcript tab lines its editor up with the model, and Step and R
   await page.locator("#pg-runall-folded").click();
   await expect(page.locator(".pg-rstatus")).toHaveText(/^\d+ entries checked · \d+ findings?$/, { timeout: 15_000 });
   await expect(page.locator("#pg-step-folded")).toBeDisabled();
+  await expect(page.locator(".pg-stale-tag")).toHaveCount(0);
+  // A change after the check: the folded tab hides the notice, so the status bar says the result is old.
+  await page.locator("#pg-transcript .cm-content").click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.type("\n");
+  await expect(page.locator(".pg-stale-tag")).toHaveText("older than the editors: select Step or Run all");
   expect(page.errors).toEqual([]);
 });
 
