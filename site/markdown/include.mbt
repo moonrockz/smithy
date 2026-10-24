@@ -130,14 +130,41 @@ fn collect_fences(
 }
 
 ///|
+/// For each line, whether it is a line of a fenced code block: a fence line or a line
+/// inside one. The CLI runner skips a whole fence, so a marker there is code, not a marker.
+fn fenced_lines(lines : Array[String]) -> Array[Bool] {
+  let out : Array[Bool] = []
+  let mut open : (Char, Int32)? = None
+  for line in lines {
+    match (open, fence_of(line)) {
+      (Some((ch, len)), Some((c, n, _, info))) => {
+        if c == ch && n >= len && info == "" {
+          open = None
+        }
+        out.push(true)
+      }
+      (Some(_), None) => out.push(true)
+      (None, Some((c, n, _, _))) => {
+        open = Some((c, n))
+        out.push(true)
+      }
+      (None, None) => out.push(false)
+    }
+  }
+  out
+}
+
+///|
 /// The fences between `<!-- tour:start NAME -->` and `<!-- tour:end NAME -->` of `source`.
+/// A marker counts only outside a fenced code block.
 pub fn region(source : String, name : String) -> Result[Array[Fence], String] {
   let start_marker = "<!-- tour:start \{name} -->"
   let end_marker = "<!-- tour:end \{name} -->"
   let lines = lines_of(source)
+  let code = fenced_lines(lines)
   let starts : Array[Int32] = []
   for i, line in lines {
-    if line.trim().to_owned() == start_marker {
+    if !code[i] && line.trim().to_owned() == start_marker {
       starts.push(i)
     }
   }
@@ -150,7 +177,7 @@ pub fn region(source : String, name : String) -> Result[Array[Fence], String] {
   let first = starts[0] + 1
   let mut end_at = -1
   for i = first; i < lines.length(); i = i + 1 {
-    if lines[i].trim().to_owned() == end_marker {
+    if !code[i] && lines[i].trim().to_owned() == end_marker {
       end_at = i
       break
     }
@@ -171,13 +198,15 @@ pub fn region(source : String, name : String) -> Result[Array[Fence], String] {
 }
 
 ///|
-/// The fence character and length of a fence line (up to 3 spaces of indent), or `None`.
+/// The fence character, length, indent and info string of a fence line, or `None`. As in
+/// CommonMark, a fence line has up to 3 spaces of indent: with 4 or more, the line is part of
+/// an indented code block.
 fn fence_of(line : String) -> (Char, Int32, Int32, String)? {
   let mut i = 0
   while i < line.length() && line[i] == ' ' {
     i += 1
   }
-  if i >= line.length() {
+  if i >= line.length() || i > 3 {
     return None
   }
   let ch = if line[i] == '`' {

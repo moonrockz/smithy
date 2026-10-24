@@ -79,7 +79,8 @@ fn check_path(path : String) -> Result[Unit, String] {
 ///|
 /// The opening lines of the fences between the markers of `name`, in order: whether the line
 /// is a fence that the CLI runner reads (three or more backticks at the start of a line), and
-/// its info string.
+/// its info string. The fences are tracked from the first line, so a marker inside a fence is
+/// code, as in `@markdown.region`.
 fn region_openers(source : String, name : String) -> Array[(Bool, String)] {
   let lines = source.split("\n").map(l => l.trim_end(chars="\r").to_owned())
   let out : Array[(Bool, String)] = []
@@ -92,9 +93,9 @@ fn region_openers(source : String, name : String) -> Array[(Bool, String)] {
       continue
     }
     if closer is None && t == "<!-- tour:end \{name} -->" {
-      break
-    }
-    if !inside {
+      if inside {
+        break
+      }
       continue
     }
     let body = line.trim_start().to_owned()
@@ -118,12 +119,14 @@ fn region_openers(source : String, name : String) -> Array[(Bool, String)] {
         }
       None => {
         closer = Some((ch, n))
-        out.push(
-          (
-            line.has_prefix("```"),
-            body.trim_start(chars="`~").trim().to_owned(),
-          ),
-        )
+        if inside {
+          out.push(
+            (
+              line.has_prefix("```"),
+              body.trim_start(chars="`~").trim().to_owned(),
+            ),
+          )
+        }
       }
     }
   }

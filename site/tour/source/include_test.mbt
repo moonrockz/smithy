@@ -260,6 +260,30 @@ test "a console fence that is not at the start of a line is rejected" {
 }
 
 ///|
+test "a region inside a longer fence of the CLI README is rejected" {
+  contains_all(
+    @source.resolve_include("tour/source/testdata/nested-readme", {
+      label: "L",
+      path: "apps/smithy/README.md",
+      name: "x",
+    }).map(_ => ()),
+    "I could not find the marker `<!-- tour:start x -->`",
+  )
+}
+
+///|
+test "an example of the markers in a fence before the region is skipped" {
+  assert_eq(
+    @source.resolve_include("tour/source/testdata/example-readme", {
+      label: "L",
+      path: "apps/smithy/README.md",
+      name: "x",
+    }).map(snippets => snippets.map(s => s.code)),
+    Ok(["$ smithy version"]),
+  )
+}
+
+///|
 test "a qualified trait in a model fence is not an API call" {
   assert_eq(
     @source.check_hand_written(

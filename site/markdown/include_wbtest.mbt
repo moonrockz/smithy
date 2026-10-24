@@ -127,6 +127,37 @@ test "region keeps a line of three backticks in the code" {
 }
 
 ///|
+/// The CLI runner skips a whole fence, so a region inside a fence is never run.
+test "a marker inside a fence is code, not a marker" {
+  let start = "<!-- tour:start convert -->\n"
+  let end = "<!-- tour:end convert -->\n"
+  let inner = start + "```console\n$ smithy version\n```\n" + end
+  for outer in ["````markdown\n", "~~~markdown\n", "   ````\n"] {
+    let close = if outer.has_prefix("~") { "~~~\n" } else { "````\n" }
+    assert_true(
+      region_err(
+        "# T\n\n" + outer + inner + close,
+        "I could not find the marker `<!-- tour:start convert -->`",
+      ),
+      msg=outer,
+    )
+  }
+  // The end marker inside a fence of the region is code too.
+  assert_true(
+    region_err(
+      start + "```console\n" + end + "```\n",
+      "I could not find the marker `<!-- tour:end convert -->`",
+    ),
+  )
+  // An example of the markers in a fence before the region is not a second marker.
+  let example = "````markdown\n" + inner + "````\n\n"
+  assert_eq(
+    region(example + source, "convert").map(fences => fences.length()),
+    Ok(2),
+  )
+}
+
+///|
 test "expand_includes replaces the include fence with a tabs fence" {
   let snippet : Snippet = {
     lang: "console",
@@ -171,6 +202,14 @@ test "an indented include fails" {
     Ok([])
   })
   assert_true(err_has(r.map(_ => ()), "indented"))
+}
+
+///|
+/// With 4 spaces of indent, the lines are an indented code block: an example of the
+/// include syntax, not an include.
+test "an include in an indented code block is text" {
+  let text = "Write it like this:\n\n    ```include\n    CLI: a.md#x\n    ```\n"
+  assert_eq(expand_includes(text, _ => Err("resolve called")), Ok(text))
 }
 
 ///|
