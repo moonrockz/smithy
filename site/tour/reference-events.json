@@ -2048,6 +2048,24 @@
             "digest": "671c49066eb7700155f4b74ef0d443ec09944da299ee320bc2909047f6dab992",
             "events": [],
             "openapi": null
+        },
+        "22-json-rpc/no-method": {
+            "digest": "47c79f1cca0a0cb4d6d717b359c494598431e95ed12ba95504dba43172a8f285",
+            "events": []
+        },
+        "22-json-rpc/one-peer": {
+            "digest": "63e412f65d7c5bb2afe89f6366912df90783fb8991a9f2359006f94c180504e6",
+            "events": [
+                "TraitValue|ERROR|example#WeatherProtocol"
+            ]
+        },
+        "22-json-rpc/start": {
+            "digest": "a99b0788a2f931d1ed917892dcabb9be82adda82b78e00ac5e20ab543512cbed",
+            "events": []
+        },
+        "22-json-rpc/wrong-result-member": {
+            "digest": "e0e957aae5000852cf774cf73d576db6d37aa240bf65f2d91f5faf51d62632de",
+            "events": []
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
