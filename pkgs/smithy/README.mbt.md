@@ -234,7 +234,11 @@ Serialization and default-value validation do not evaluate contracts.
 `LoadResult` contains diagnostics and an optional model. Errors prevent a
 partial model from being returned; warnings permit a model. Each diagnostic
 has a stable code, severity, message, source and optional shape ID. IDL parser
-diagnostics keep their original codes and UTF-16 spans. JSON codec errors keep
+diagnostics keep their original codes and UTF-16 spans. Their validation events
+have the ID `Model`, except a documentation comment that documents nothing
+(`SM-PARSE-009`), which is the `Model.BadDocumentationComment` warning with no
+shape, as in Smithy. A documentation comment before `apply` (`SM-PARSE-008`)
+gives no diagnostic and no event: Smithy builds that event and then drops it. JSON codec errors keep
 their JSON Pointer paths. `diagnostic_codes()` lists the assembly codes.
 
 ## Export a model

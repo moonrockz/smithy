@@ -828,6 +828,7 @@ fn validation_is_critical(event : ValidationEvent) -> Bool {
 ///|
 fn validation_is_loading_event(event : ValidationEvent) -> Bool {
   event.id == "Model" ||
+  event.id == "Model.BadDocumentationComment" ||
   event.id == "ModelDeprecation" ||
   event.id.has_prefix("UnknownValidator_") ||
   event.id.has_prefix("SM-")

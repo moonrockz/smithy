@@ -95,6 +95,19 @@ shapes. Unattached documentation remains available through traversal of the
 file's comments. Traversal spans widen over attached documentation so every
 child remains inside its parent.
 
+A `///` comment that documents nothing is a `SM-PARSE-009` warning, at the
+places where Smithy reports `Model.BadDocumentationComment`: after traits,
+inside a value or a shape body, before `{`, before `}`, before a control,
+`metadata`, `namespace` or `use` statement, on the line of a statement or a
+value assignment, and at the end of a file with a shape statement. The parser
+collects these stray comments and reports them as one warning where Smithy
+clears its pending documentation: at each statement or value `BR`, after the
+traits of a member, before `{` of shape members and before `}`. Smithy drops
+without a warning the comments before `:=` and those at the end of a file
+without a shape statement, and so does the parser. A comment before `apply`
+is `SM-PARSE-008`. A `///` comment on the line of a token stays an ordinary
+comment in the AST; it is a warning only where Smithy warns about it.
+
 Partial ASTs preserve duplicate members after `SM-PARSE-014`. Member names
 are unique only when `ParseResult::has_errors()` is false. AST construct
 spans end at the last consumed non-Error token; scanner holes must not widen

@@ -90,10 +90,12 @@ fn Parser::recover(
     // Doc comments inside the skipped run belong to it.
     let run_end = self.tokens[i - 1].span.end()
     while self.doc_head < self.doc_comments.length() &&
-          self.doc_comments[self.doc_head].span.start < run_end {
+          self.doc_comments[self.doc_head].comment.span.start < run_end {
       self.doc_head += 1
     }
   }
+  // The failed statement reports its error, not its doc comments.
+  self.stray_docs.clear()
   self.pos = i
   self.skip_holes()
   self.depth = Depth::zero()
@@ -282,7 +284,7 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
         k.kind == Identifier &&
         p.first_on_line(start_index) &&
         section is ControlSection {
-        p.detach_docs_before(start_offset)
+        p.stray_docs_before(start_offset)
         let c = p.parse_control()
         if control.iter().any(x => x.key.value == c.key.value) {
           p.fail(
@@ -300,7 +302,7 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
         Ok((@cst.StatementKind::Control, Some(c.key.value)))
       } else if p.at_keyword("metadata") &&
         (section is ControlSection || section is MetadataSection) {
-        p.detach_docs_before(start_offset)
+        p.stray_docs_before(start_offset)
         section = MetadataSection
         let m = p.parse_metadata()
         metadata.push(m)
@@ -308,14 +310,14 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
       } else if p.at_keyword("namespace") &&
         namespace is None &&
         !(section is UseSection || section is ShapeSection) {
-        p.detach_docs_before(start_offset)
+        p.stray_docs_before(start_offset)
         section = NamespaceSection
         let n = p.parse_namespace()
         namespace = Some(n)
         Ok((@cst.StatementKind::Namespace, Some(n.namespace.value)))
       } else if p.at_keyword("use") &&
         (section is NamespaceSection || section is UseSection) {
-        p.detach_docs_before(start_offset)
+        p.stray_docs_before(start_offset)
         section = UseSection
         let u = p.parse_use()
         uses.push(u)
@@ -348,7 +350,7 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
         }
         section = ShapeSection
         if p.at_keyword("use") {
-          p.detach_docs_before(start_offset)
+          p.stray_docs_before(start_offset)
           let u = p.parse_use()
           uses.push(u)
           Ok((@cst.StatementKind::Use, Some(u.id.value.to_string())))
@@ -404,7 +406,14 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
       }
     }
   }
-  p.detach_docs_before(p.text_end.next())
+  // Smithy warns about doc comments at the end of the file once it has
+  // read a shape statement, and drops them before that.
+  if section is ShapeSection {
+    p.stray_docs_before(p.text_end.next())
+    p.report_stray_docs()
+  } else {
+    ignore(p.take_docs_before(p.text_end.next()))
+  }
   // A tree when a statement was read, or when there was nothing to read:
   // an empty or comment-only file is a valid, empty `IdlFile` with an
   // empty span. `None` only when there were tokens and every statement

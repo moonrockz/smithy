@@ -144,6 +144,23 @@ impl @moonspec.World for ModelWorld with fn configure(self, setup) {
   ) raise {
     assert_true(self.assembled().diagnostics.iter().any(d => d.code == code))
   })
+  setup.then1("the validation events are {string}", fn(
+    expected : String,
+  ) raise {
+    let keys = self
+      .assembled()
+      .validation_events()
+      .filter(e => e.severity != "NOTE" && e.severity != "SUPPRESSED")
+      .map(e => {
+        e.id +
+        "|" +
+        e.severity +
+        "|" +
+        e.shape.map(s => s.to_string()).unwrap_or("-")
+      })
+    keys.sort()
+    assert_eq(keys.join(", "), expected)
+  })
   setup.then0("no semantic model is returned", fn() raise {
     assert_eq(self.assembled().model, None)
   })
