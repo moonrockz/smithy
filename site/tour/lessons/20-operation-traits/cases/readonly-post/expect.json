@@ -1,0 +1,1 @@
+{"events": ["HttpMethodSemantics.UnnecessaryReadonlyTrait|WARNING|example#GetCity"], "output_contains": ["\"post\": {"]}
