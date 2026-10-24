@@ -280,19 +280,10 @@ pub fn Lesson::case_id(self : Lesson, case : Case) -> CaseId {
 }
 
 ///|
-/// Order by UTF-16 code unit, then by length. `String::compare` orders by
-/// length first, so the digest and the file order cannot use it.
-pub fn compare_code_units(a : String, b : String) -> Int32 {
-  let n = if a.length() < b.length() { a.length() } else { b.length() }
-  for i in 0..<n {
-    let x = a.code_unit_at(i).to_int()
-    let y = b.code_unit_at(i).to_int()
-    if x != y {
-      return if x < y { -1 } else { 1 }
-    }
-  }
-  a.length().compare(b.length())
-}
+/// Order by UTF-16 code unit, then by length (`@samples.compare_code_units`).
+/// `String::compare` orders by length first, so the digest and the file order
+/// cannot use it.
+pub using @samples {compare_code_units}
 
 ///|
 /// The folder of a lesson: its number in two digits, `-`, and its slug.
