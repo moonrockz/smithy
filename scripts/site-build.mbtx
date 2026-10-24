@@ -8,8 +8,9 @@
 /// `site/`, so the script makes them absolute first.
 ///
 /// The playground is two more bundles in `<out>/playground/`: `ui.js` (CodeMirror and the MoonBit page script)
-/// and `worker.js` (the Smithy library in a Web Worker). `moon build` compiles the MoonBit packages, and
-/// `bun build` bundles them with the npm packages that `site/bun.lock` pins.
+/// and `worker.js` (the Smithy library in a Web Worker). The tour is one more, `<out>/tour/ui.js` (CodeMirror and
+/// the MoonBit lesson script); its lessons use the playground Worker. `moon build` compiles the MoonBit packages,
+/// and `bun build` bundles them with the npm packages that `site/bun.lock` pins.
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -80,8 +81,10 @@ fn spawn_failure_message(command : String, error : Error) -> String {
 }
 
 ///|
-/// The MoonBit packages of the playground, compiled to JavaScript before `bun build` bundles them.
-let playground_packages : Array[String] = ["playground/ui", "playground/worker"]
+/// The MoonBit packages of the playground and the tour, compiled to JavaScript before `bun build` bundles them.
+let browser_packages : Array[String] = [
+  "playground/ui", "playground/worker", "tour/ui",
+]
 
 ///|
 /// Where `moon build --target js --release` writes the script of a package of the site module.
@@ -94,12 +97,13 @@ fn moon_js_output(pkg : String) -> String {
 }
 
 ///|
-/// The commands that build the playground into `<out>/playground`, run inside `site/`, in order.
-fn playground_commands(out : String) -> Array[(String, Array[String])] {
+/// The commands that build the playground into `<out>/playground` and the tour script into `<out>/tour`, run
+/// inside `site/`, in order.
+fn browser_commands(out : String) -> Array[(String, Array[String])] {
   let dir = out + "/playground"
   [
     ("bun", ["install", "--frozen-lockfile"]),
-    ("moon", ["build", "--target", "js", "--release", ..playground_packages]),
+    ("moon", ["build", "--target", "js", "--release", ..browser_packages]),
     (
       "bun",
       [
@@ -117,6 +121,13 @@ fn playground_commands(out : String) -> Array[(String, Array[String])] {
         "--minify",
         "--outfile",
         dir + "/worker.js",
+      ],
+    ),
+    (
+      "bun",
+      [
+        "build", "tour/editor/main.js", "--format", "esm", "--minify", "--outfile",
+        out + "/tour/ui.js",
       ],
     ),
   ]
@@ -176,7 +187,7 @@ async fn main {
   run_checked("warren", ["build", "--browser-entry", "app", "--dist", ".bundle"])
   copy_tree("site/.bundle", out)
   @fs.rmdir("site/.bundle", recursive=true)
-  for command in playground_commands(out) {
+  for command in browser_commands(out) {
     run_checked(command.0, command.1)
   }
   run_checked(
@@ -250,17 +261,28 @@ test "a bun that cannot start names the install commands in site/" {
 }
 
 ///|
-test "the playground is built into the playground directory of the output" {
-  let commands = playground_commands("/o")
+test "the playground and the tour are built into their directories of the output" {
+  let commands = browser_commands("/o")
   assert_eq(commands[0], ("bun", ["install", "--frozen-lockfile"]))
   assert_eq(commands[1], (
     "moon",
-    ["build", "--target", "js", "--release", "playground/ui", "playground/worker"],
+    [
+      "build", "--target", "js", "--release", "playground/ui", "playground/worker",
+      "tour/ui",
+    ],
   ))
   assert_true(commands[2].1.contains("/o/playground/ui.js"))
   assert_true(commands[2].1.contains("playground/editor/main.js"))
   assert_true(commands[3].1.contains("/o/playground/worker.js"))
   assert_true(commands[3].1.contains("iife"))
+  assert_eq(commands[4], (
+    "bun",
+    [
+      "build", "tour/editor/main.js", "--format", "esm", "--minify", "--outfile",
+      "/o/tour/ui.js",
+    ],
+  ))
+  assert_eq(commands.length(), 5)
 }
 
 ///|

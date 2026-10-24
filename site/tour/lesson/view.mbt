@@ -51,16 +51,19 @@ fn actions(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
     Some(text) => [@html.span(class="tour-note", text)]
     None => []
   }
-  @html.div(class="tour-actions", [
-    @html.button(
-      class="tour-btn",
-      title="Restore the starting files of the lesson",
-      on_click=emit(Reset),
-      "Reset",
-    ),
-    ..open,
-    ..problem,
-  ])
+  @html.div(
+    class="tour-actions",
+    [
+      @html.button(
+        class="tour-btn",
+        title="Restore the starting files of the lesson",
+        on_click=emit(Reset),
+        "Reset",
+      ),
+      ..open,
+      ..problem,
+    ],
+  )
 }
 
 ///|
@@ -102,7 +105,10 @@ fn findings_panel(m : Model) -> Array[Html] {
     Found([]) => [@html.p(class="tour-note", "The model has no findings.")]
     Found(items) =>
       [
-        @html.p(class="tour-note", plural(items.length(), "finding", "findings")),
+        @html.p(
+          class="tour-note",
+          plural(items.length(), "finding", "findings"),
+        ),
         @html.ul(class="tour-findings", items.map(finding)),
       ]
     NotChecked(reason) => [@html.p(class="tour-note tour-err", reason)]
@@ -155,10 +161,11 @@ fn output_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       class="tour-tabs",
       attrs=@html.Attrs::build().role("tablist").aria_label("Results"),
       [
-        tab(m.pane == FindingsPane, emit(SelectPane(FindingsPane)), [
-          @html.text("Findings"),
-          ..count,
-        ]),
+        tab(
+          m.pane == FindingsPane,
+          emit(SelectPane(FindingsPane)),
+          [@html.text("Findings"), ..count],
+        ),
         ..output_tab,
         ..busy,
       ],

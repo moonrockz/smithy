@@ -7,7 +7,7 @@ let key : String = "smithy-tour:release:hello-smithy"
 ///|
 fn page() -> @model.LessonPage {
   let files : Array[@model.LessonFile] = [
-    { name: "model.smithy", text: start_text },
+    { name: "model.smithy", text: start_text, },
   ]
   {
     slug: "hello-smithy",
@@ -21,7 +21,7 @@ fn page() -> @model.LessonPage {
     files,
     digest: @model.digest(files),
     previous: None,
-    next: Some({ slug: "simple-shapes", title: "Simple shapes" }),
+    next: Some({ slug: "simple-shapes", title: "Simple shapes", }),
     worker: "/smithy/playground/worker.js",
     storage_key: key,
     playground: Some("/smithy/playground/"),
@@ -31,17 +31,17 @@ fn page() -> @model.LessonPage {
 ///|
 /// A lesson about findings: it has no output.
 fn findings_page() -> @model.LessonPage {
-  { ..page(), output: None }
+  { ..page(), output: None, }
 }
 
 ///|
 /// A lesson of two files. The playground holds one model, so it has no link.
 fn two_file_page() -> @model.LessonPage {
   let files : Array[@model.LessonFile] = [
-    { name: "a.smithy", text: "namespace a\n" },
-    { name: "b.smithy", text: "namespace b\n" },
+    { name: "a.smithy", text: "namespace a\n", },
+    { name: "b.smithy", text: "namespace b\n", },
   ]
-  { ..page(), files, digest: @model.digest(files), playground: None }
+  { ..page(), files, digest: @model.digest(files), playground: None, }
 }
 
 ///|
@@ -71,13 +71,15 @@ fn warning_in(file : String) -> @core.Diagnostic {
 
 ///|
 fn note_in(file : String) -> @core.Diagnostic {
-  { ..error_in(file, 1), severity: "NOTE", code: "ModelDeprecation" }
+  { ..error_in(file, 1), severity: "NOTE", code: "ModelDeprecation", }
 }
 
 ///|
 /// The stored value for these files, as the lesson writes it.
 fn stored(digest : String, files : Array[(String, String)]) -> String {
-  let pairs : Array[Json] = files.map(f => [Json::string(f.0), Json::string(f.1)])
+  let pairs : Array[Json] = files.map(f => {
+    [Json::string(f.0), Json::string(f.1)]
+  })
   ({ "digest": Json::string(digest), "files": Json::array(pairs) } : Json).stringify()
 }
 
@@ -133,7 +135,7 @@ test "start uses stored files whose digest matches" {
     page(),
     Some(stored(page().digest, [("model.smithy", edited)])),
   )
-  assert_eq(m.files, [{ name: "model.smithy", text: edited }])
+  assert_eq(m.files, [{ name: "model.smithy", text: edited, }])
   assert_eq(effects, [
     LoadEditor(text=edited),
     SendValidate(seq=1, files=[("model.smithy", edited)]),
@@ -283,8 +285,8 @@ test "an edit changes the file that the editor shows" {
   let (m, _) = update(m, SelectFile(1))
   let (m, effects) = update(m, Edited("namespace bb\n"))
   assert_eq(m.files, [
-    { name: "a.smithy", text: "namespace a\n" },
-    { name: "b.smithy", text: "namespace bb\n" },
+    { name: "a.smithy", text: "namespace a\n", },
+    { name: "b.smithy", text: "namespace bb\n", },
   ])
   assert_eq(
     effects[0],
@@ -325,7 +327,7 @@ test "a clean validate starts a transform; its output is highlighted against the
 
 ///|
 test "a transform sends the selector of the lesson" {
-  let page = { ..page(), output: Some(Selector), selector: Some("string") }
+  let page = { ..page(), output: Some(Selector), selector: Some("string"), }
   let (m, _) = Model::start(page, None)
   let (_, effects) = update(m, Answered(seq=1, answer=Checked([])))
   assert_eq(
@@ -369,7 +371,7 @@ test "an edit that does not parse shows the findings, the blocked reason and no 
   assert_false(m.waiting)
   let (_, effects) = update(
     m,
-    Answered(seq=3, answer=Checked([error, { ..error, severity: "DANGER" }])),
+    Answered(seq=3, answer=Checked([error, { ..error, severity: "DANGER", }])),
   )
   assert_eq(effects, [])
 }
@@ -382,7 +384,11 @@ test "the blocked reason counts every error and danger" {
     m,
     Answered(
       seq=1,
-      answer=Checked([error, { ..error, severity: "DANGER" }, note_in("model.smithy")]),
+      answer=Checked([
+        error,
+        { ..error, severity: "DANGER", },
+        note_in("model.smithy"),
+      ]),
     ),
   )
   assert_eq(

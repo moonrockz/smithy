@@ -3,6 +3,7 @@
   --border: #e5e7eb; --accent: #4f46e5; --accent-2: #a5b4fc;
   --code-bg: #0d1117; --code-fg: #e6edf3; --soft: #eef2ff; --on-accent: #ffffff;
   --err: #dc2626; --err-soft: #fef2f2; --ok: #059669; --ok-soft: #ecfdf5; --warn: #b45309; --warn-soft: #fffbeb;
+  --changed: #d2992238; --changed-edge: #e3b341;
   --font: Manrope, "Avenir Next", "Trebuchet MS", sans-serif;
   --mono: Menlo, Consolas, Monaco, monospace;
   --gutter: clamp(16px, 4vw, 48px);
@@ -15,6 +16,7 @@
   --border: #26283a; --accent: #a5b4fc; --accent-2: #c7d2fe;
   --code-bg: #0d0e12; --soft: #1e1b4b; --on-accent: #1e1b4b;
   --err: #f87171; --err-soft: #2a1416; --ok: #34d399; --ok-soft: #0f2a20; --warn: #fbbf24; --warn-soft: #2a2110;
+  --changed: #d299222e; --changed-edge: #d29922;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -22,6 +24,7 @@
     --border: #26283a; --accent: #a5b4fc; --accent-2: #c7d2fe;
     --code-bg: #0d0e12; --soft: #1e1b4b; --on-accent: #1e1b4b;
     --err: #f87171; --err-soft: #2a1416; --ok: #34d399; --ok-soft: #0f2a20; --warn: #fbbf24; --warn-soft: #2a2110;
+    --changed: #d299222e; --changed-edge: #d29922;
   }
 }
 * { box-sizing: border-box; }
@@ -284,6 +287,66 @@ code, pre, kbd { font-family: var(--mono); }
 .pg-stat b { font-size: 1rem; }
 .pg-stat span { color: var(--muted); font-size: 0.75rem; }
 
+/* Tour: the contents, and layout A of a lesson: the top bar, the lesson text on the left, the editor top
+   right and the output bottom right. */
+.tour-contents { width: min(100% - 2 * var(--gutter), 46rem); margin: 0 auto; padding: 2rem 0 3rem; }
+.tour-contents h2 { margin: 1.6rem 0 0.4rem; font-size: 1.15rem; }
+.tour-list { margin: 0; padding-left: 1.6rem; }
+.tour-list li { margin: 0.2rem 0; }
+.tour-lesson { display: flex; flex-direction: column; height: calc(100dvh - var(--nav-h)); min-height: 32rem; }
+.tour-bar { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 8px var(--gutter);
+  border-bottom: 1px solid var(--border); background: var(--surface); font-size: 0.875rem; }
+.tour-contents-link { font-weight: 700; }
+.tour-bar .tour-place { flex: 1; min-width: 0; font-weight: 800; text-align: center; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.tour-steps { color: var(--muted); white-space: nowrap; }
+.tour-step { font-weight: 700; }
+.tour-step-off { color: var(--muted); font-weight: 400; }
+.tour-body { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); flex: 1; min-height: 0; }
+.tour-text { min-width: 0; overflow-y: auto; padding: 1.2rem var(--gutter) 2rem; border-right: 1px solid var(--border); }
+.tour-text .ms-md h1 { margin-top: 0; font-size: clamp(1.5rem, 1.2rem + 0.8vw, 2rem); }
+.tour-spec { margin-top: 1.5rem; font-size: 0.875rem; }
+.tour-spec a { display: inline-flex; align-items: center; gap: 4px; }
+.tour-app { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--surface);
+  font-size: 0.875rem; line-height: 1.5; }
+.tour-panes { display: grid; grid-template-rows: minmax(0, 1.1fr) minmax(0, 1fr); flex: 1; min-height: 0; }
+.tour-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.tour-out { border-top: 1px solid var(--border); }
+.tour-tabs { display: flex; flex: none; align-items: center; gap: 2px; height: 40px; padding: 0 10px;
+  border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tour-tab { align-self: stretch; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: none;
+  color: var(--muted); font: inherit; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.tour-tab-on { color: var(--fg); border-bottom-color: var(--accent); }
+.tour-count { margin-left: 4px; padding: 1px 6px; border-radius: 99px; background: var(--err-soft); color: var(--err);
+  font-size: 0.6875rem; }
+.tour-busy { margin-left: auto; padding-left: 10px; color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
+/* The editors own the children of these elements; the CodeMirror view fills them. */
+.tour-editor, .tour-output { flex: 1; min-height: 0; overflow: hidden; background: var(--code-bg); }
+.tour-actions { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 10px;
+  border-top: 1px solid var(--border); }
+.tour-btn { padding: 4px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface);
+  color: var(--fg); font: inherit; font-size: 0.8125rem; cursor: pointer; }
+.tour-btn:hover { border-color: var(--accent); }
+.tour-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; }
+.tour-outwrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.tour-off, .tour-panel.tour-off, .tour-outwrap.tour-off { display: none; }
+.tour-note { margin: 0; padding: 8px 14px; color: var(--muted); font-size: 0.8125rem; }
+.tour-actions .tour-note { padding: 0; }
+.tour-note.tour-err { margin: 10px 14px; padding: 10px 12px; border-radius: 8px; background: var(--err-soft);
+  color: var(--err); }
+.tour-findings { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+.tour-finding { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 8px 14px;
+  border-bottom: 1px solid var(--border); }
+.tour-sev { padding: 2px 7px; border-radius: 5px; background: var(--soft); color: var(--accent); font-size: 0.6875rem;
+  font-weight: 800; }
+.tour-sev-error .tour-sev, .tour-sev-danger .tour-sev { background: var(--err-soft); color: var(--err); }
+.tour-sev-warning .tour-sev { background: var(--warn-soft); color: var(--warn); }
+.tour-code { color: var(--accent); font-size: 0.8125rem; }
+.tour-finding .tour-place { color: var(--muted); font-family: var(--mono); font-size: 0.75rem; }
+.tour-message { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; }
+/* An output line that changed after the last edit. The editor is dark in both site themes. */
+.tour-output .cm-line.tour-changed { background-color: var(--changed); box-shadow: inset 3px 0 0 var(--changed-edge); }
+
 /* Docs */
 .ms-docs { display: grid; grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr) minmax(11rem, 15rem); gap: 2rem;
   width: min(100% - 2 * var(--gutter), var(--page-max)); margin: 0 auto; padding: 1.5rem 0 3rem; }
@@ -398,6 +461,18 @@ code, pre, kbd { font-family: var(--mono); }
   .pg-outwrap { flex: none; height: 60vh; }
   .pg-txwrap { flex: none; height: 40vh; }
   .pg-entries { flex: none; max-height: 70vh; }
+}
+
+/* The tour panes stack: the lesson text, the editor, the output. */
+@media (max-width: 860px) {
+  .tour-lesson { height: auto; min-height: 0; }
+  .tour-body { grid-template-columns: minmax(0, 1fr); }
+  .tour-text { overflow: visible; border-right: 0; border-bottom: 1px solid var(--border); }
+  .tour-panes { grid-template-rows: auto auto; }
+  .tour-edit .tour-editor { flex: none; height: 50vh; min-height: 16rem; }
+  .tour-out .tour-panel { flex: none; min-height: 12rem; max-height: 60vh; }
+  .tour-out .tour-outwrap { flex: none; height: 50vh; min-height: 14rem; }
+  .tour-bar .tour-place { flex-basis: 100%; order: 3; text-align: left; }
 }
 
 @media (max-width: 559px) {

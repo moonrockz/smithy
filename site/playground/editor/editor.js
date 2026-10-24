@@ -1,8 +1,8 @@
 // The editors of the playground. The MoonBit script of the page (site/playground/ui) calls these
 // functions through `globalThis.smithyEditors`; each editor has the id of the element it is in.
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
 import {
-  EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers,
+  Decoration, EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers,
 } from "@codemirror/view";
 import {
   HighlightStyle, bracketMatching, foldCode, foldGutter, foldKeymap, indentOnInput, syntaxHighlighting, unfoldCode,
@@ -71,6 +71,19 @@ const languages = {
   markdown: () => markdown(),
 };
 
+// The highlighted lines of an editor: the tour marks the output lines that changed after an edit. A
+// change of the text removes them, because they belong to the text before.
+const setChanged = StateEffect.define();
+const changedLine = Decoration.line({ class: "tour-changed" });
+const changedLines = StateField.define({
+  create: () => Decoration.none,
+  update(lines, tr) {
+    for (const effect of tr.effects) if (effect.is(setChanged)) return effect.value;
+    return tr.docChanged ? Decoration.none : lines;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
 const views = new Map();
 // The compartment of the language of each editor, so that the output editor can change language.
 const languageSlots = new Map();
@@ -128,6 +141,7 @@ const editors = {
           ]),
           slot.of((languages[language] ?? (() => []))()),
           syntaxHighlighting(highlight),
+          changedLines,
           theme,
           EditorState.readOnly.of(readOnly),
           EditorView.contentAttributes.of({ "aria-label": `${id} editor` }),
@@ -189,6 +203,16 @@ const editors = {
         };
       });
     view.dispatch(setDiagnostics(view.state, diagnostics));
+  },
+  // `lines` is a JSON array of line numbers, from 1. Highlight those lines, and only those: an empty
+  // array removes the highlight. A number outside the text is left out.
+  highlight(id, lines) {
+    const view = views.get(id);
+    if (!view) return;
+    const doc = view.state.doc;
+    const numbers = [...new Set(JSON.parse(lines))].filter((n) => n >= 1 && n <= doc.lines).sort((a, b) => a - b);
+    const value = Decoration.set(numbers.map((n) => changedLine.range(doc.line(n).from)));
+    view.dispatch({ effects: setChanged.of(value) });
   },
   // Change the language and keep the text.
   language(id, language) {

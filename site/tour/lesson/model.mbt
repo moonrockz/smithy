@@ -229,7 +229,7 @@ fn stored_files(
     stored.files.map(f => f.0) == page.files.map(f => f.name) else {
     return None
   }
-  Some(stored.files.map(f => { name: f.0, text: f.1 }))
+  Some(stored.files.map(f => { name: f.0, text: f.1, }))
 }
 
 ///|
@@ -252,7 +252,11 @@ pub fn Model::start(
     page,
     files,
     selected: 0,
-    pane: if page.output is Some(_) { OutputPane } else { FindingsPane },
+    pane: if page.output is Some(_) {
+      OutputPane
+    } else {
+      FindingsPane
+    },
     chosen: false,
     edits: 0,
     seq: 0,
@@ -298,6 +302,6 @@ pub fn Model::busy(self : Model) -> Bool {
 /// The value to store for the files: the digest of the starting files and
 /// the files.
 fn Model::stored_value(self : Model) -> String {
-  let stored : Stored = { digest: self.page.digest, files: pairs(self.files) }
+  let stored : Stored = { digest: self.page.digest, files: pairs(self.files), }
   ToJson::to_json(stored).stringify()
 }

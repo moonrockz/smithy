@@ -49,7 +49,7 @@ fn Model::send_transform(self : Model) -> (Model, Array[Effect]) {
 /// ended while it ran. One request runs at a time, so the time limit of a
 /// request measures that request only.
 fn Model::next(self : Model, effects : Array[Effect]) -> (Model, Array[Effect]) {
-  let m = { ..self, waiting: false, retried: false }
+  let m = { ..self, waiting: false, retried: false, }
   if m.pending {
     let (sent, more) = m.send_validate()
     (sent, [..effects, ..more])
@@ -62,7 +62,7 @@ fn Model::next(self : Model, effects : Array[Effect]) -> (Model, Array[Effect]) 
 /// Check the files now, or after the request that runs.
 fn Model::check_now(self : Model) -> (Model, Array[Effect]) {
   if self.waiting {
-    ({ ..self, pending: true }, [])
+    ({ ..self, pending: true, }, [])
   } else {
     self.send_validate()
   }
@@ -103,7 +103,7 @@ fn is_error(d : @core.Diagnostic) -> Bool {
 /// The output pane after an output that did not run: the reason, and an
 /// empty output editor with no highlight.
 fn Model::not_shown(self : Model, reason : String) -> (Model, Array[Effect]) {
-  ({ ..self, output: NotShown(reason) }, [ShowOutput(text="", highlight=[])])
+  ({ ..self, output: NotShown(reason), }, [ShowOutput(text="", highlight=[])])
 }
 
 ///|
@@ -121,14 +121,14 @@ fn Model::checked(
   } else {
     self.pane
   }
-  let m = { ..self, findings: Found(items), pane }
+  let m = { ..self, findings: Found(items), pane, }
   let marked = [Mark(items=m.selected_findings())]
   match self.page.output {
     None => m.next(marked)
     Some(output) => {
       let errors = items.filter(is_error).length()
       if errors == 0 {
-        let (sent, more) = { ..m, waiting: false, retried: false }.send_transform()
+        let (sent, more) = { ..m, waiting: false, retried: false, }.send_transform()
         (sent, [..marked, ..more])
       } else {
         let (m, shown) = m.not_shown(errors_text(errors, output))
@@ -148,7 +148,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       let files = m.files.copy()
       files[m.selected] = { ..file, text, }
       let edits = m.edits + 1
-      let m = { ..m, files, edits, link_problem: None }
+      let m = { ..m, files, edits, link_problem: None, }
       let keep = if files == m.page.files {
         Clear(key=m.page.storage_key)
       } else {
@@ -160,7 +160,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
     SelectFile(index) =>
       match m.files.get(index) {
         Some(file) if index != m.selected => {
-          let m = { ..m, selected: index }
+          let m = { ..m, selected: index, }
           (m, [LoadEditor(text=file.text), Mark(items=m.selected_findings())])
         }
         _ => (m, [])
@@ -169,7 +169,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       if pane == OutputPane && m.page.output is None {
         (m, [])
       } else {
-        ({ ..m, pane, chosen: true }, [])
+        ({ ..m, pane, chosen: true, }, [])
       }
     Answered(seq~, answer~) => {
       guard seq == m.seq && m.waiting else { return (m, []) }
@@ -180,7 +180,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       match (m.inflight, answer) {
         (Validating, Checked(items)) => m.checked(items)
         (Validating, NotConverted(reason)) => {
-          let m = { ..m, findings: NotChecked(reason) }
+          let m = { ..m, findings: NotChecked(reason), }
           if m.page.output is Some(_) {
             let (m, shown) = m.not_shown(reason)
             m.next([Mark(items=[]), ..shown])
@@ -196,7 +196,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
             _ => ""
           }
           let highlight = changed_lines(before, text)
-          { ..m, output: Shown(text~, highlight~) }.next([
+          { ..m, output: Shown(text~, highlight~), }.next([
             ShowOutput(text~, highlight~),
           ])
         }
@@ -213,7 +213,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       if m.pending {
         // The files changed since: check the newest ones.
         let (sent, more) = m.send_validate()
-        ({ ..sent, retried: false }, [RestartWorker, ..more])
+        ({ ..sent, retried: false, }, [RestartWorker, ..more])
       } else if m.retried {
         // The second try also took too long: a model that is too slow would
         // restart the Worker again and again.
@@ -224,12 +224,12 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
             m.next([RestartWorker, ..shown])
           }
           (Validating, None) =>
-            { ..m, findings: NotChecked(timeout_text) }.next([
+            { ..m, findings: NotChecked(timeout_text), }.next([
               RestartWorker,
               Mark(items=[]),
             ])
           (Validating, Some(_)) => {
-            let (m, shown) = { ..m, findings: NotChecked(timeout_text) }.not_shown(
+            let (m, shown) = { ..m, findings: NotChecked(timeout_text), }.not_shown(
               timeout_text,
             )
             m.next([RestartWorker, Mark(items=[]), ..shown])
@@ -240,7 +240,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
           Validating => m.send_validate()
           Transforming => m.send_transform()
         }
-        ({ ..sent, retried: true }, [RestartWorker, ..more])
+        ({ ..sent, retried: true, }, [RestartWorker, ..more])
       }
     }
     Reset => {
@@ -261,14 +261,17 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       )
     }
     OpenPlayground => {
-      guard m.page.playground is Some(href) &&
-        m.files.get(0) is Some(file) else {
+      guard m.page.playground is Some(href) && m.files.get(0) is Some(file) else {
         return (m, [])
       }
       let state : @samples.ShareState = {
         model: file.text,
         transcript: "",
-        tab: if m.page.output is Some(_) { TransformTab } else { ValidateTab },
+        tab: if m.page.output is Some(_) {
+          TransformTab
+        } else {
+          ValidateTab
+        },
         output: m.page.output.unwrap_or(JsonAst),
         protocol: "",
         format: Markdown,
@@ -284,7 +287,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         ""
       }
       if fragment == "" || fragment.length() > @core.MAX_SHARE_LENGTH {
-        ({ ..m, link_problem: Some(too_large_text) }, [])
+        ({ ..m, link_problem: Some(too_large_text), }, [])
       } else {
         (m, [Navigate(url=href + "#" + fragment)])
       }
