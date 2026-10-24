@@ -335,6 +335,230 @@
       "lines": [
         "value.json: error[JsonInputLimit]: I expected JSON nesting depth no greater than 128."
       ]
+    },
+    {
+      "id": "rpc-call",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Calculator",
+        "--message",
+        "call.json",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "call.json",
+          "from": "examples/json-rpc/call.json"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "rpc-invalid",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Calculator",
+        "--message",
+        "invalid.json",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "invalid.json",
+          "from": "examples/json-rpc/invalid.json"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "invalid.json/params/1: error[TypeMismatch] example#SubtractInput$subtrahend: I expected a integer value, but found string."
+      ]
+    },
+    {
+      "id": "rpc-reply",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Replies",
+        "--response",
+        "reply.json",
+        "--method",
+        "subtract",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "reply.json",
+          "from": "examples/json-rpc/reply.json"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "rpc-error",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Replies",
+        "--response",
+        "error.json",
+        "--request",
+        "call.json",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "error.json",
+          "from": "examples/json-rpc/error.json"
+        },
+        {
+          "name": "call.json",
+          "from": "examples/json-rpc/call.json"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "rpc-reply-no-context",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Replies",
+        "--response",
+        "reply.json",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "reply.json",
+          "from": "examples/json-rpc/reply.json"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "reply.json: error[MissingContext] example#Replies: I expected explicit method, operation, original-request or envelope-only context."
+      ]
+    },
+    {
+      "id": "rpc-not-json",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Calculator",
+        "--message",
+        "bad.json",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "bad.json",
+          "text": "{1"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "bad.json:1: error[InvalidJson] example#Calculator: I expected one well-formed JSON value: Invalid character '1' at line 1, column 1"
+      ]
+    },
+    {
+      "id": "rpc-missing-service",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Nope",
+        "--message",
+        "call.json",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "call.json",
+          "from": "examples/json-rpc/call.json"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 2,
+      "lines": [
+        "--service: error[InvalidContract]: example#Nope: I expected an existing service shape."
+      ]
+    },
+    {
+      "id": "rpc-legacy-call",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "1.0",
+        "--service",
+        "example#Calculator",
+        "--message",
+        "legacy.json",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "legacy.json",
+          "text": "{\"method\":\"subtract\",\"params\":[42,23],\"id\":1}"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": []
     }
   ]
 }

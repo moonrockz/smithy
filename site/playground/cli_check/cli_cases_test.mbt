@@ -29,7 +29,8 @@ let expected_ids : Array[String] = [
   "value-consumer-valid", "value-consumer-invalid", "value-unknown-reject", "value-unknown-ignore",
   "value-json-names", "value-member-target", "value-not-json", "value-duplicate-key",
   "value-missing-target", "value-invalid-model", "value-unsupported-pattern", "value-unsupported-timestamp",
-  "value-json-limit",
+  "value-json-limit", "rpc-call", "rpc-invalid", "rpc-reply", "rpc-error", "rpc-reply-no-context",
+  "rpc-not-json", "rpc-missing-service", "rpc-legacy-call",
 ]
 
 ///|
@@ -106,15 +107,26 @@ fn file_of(files : Map[String, String], name : String) -> String raise {
 
 ///|
 /// The core request for the arguments of a CLI run, and the input file name
-/// that `cli_line` prints. It knows `validate value` with `--shape`, `--value`,
-/// `--unknown-members` and `--member-names`; any other argument is a model file.
+/// that `cli_line` prints. It knows `validate value` and `validate rpc`.
 fn request_of(
   args : Array[String],
   files : Map[String, String],
 ) -> (@core.Request, String) raise {
-  guard args is ["validate", "value", .. rest] else {
-    fail("the differential test does not know the command \{args.join(" ")}")
+  match args {
+    ["validate", "value", .. rest] => value_request_of(rest, files)
+    ["validate", "rpc", .. rest] => rpc_request_of(rest, files)
+    _ =>
+      fail("the differential test does not know the command \{args.join(" ")}")
   }
+}
+
+///|
+/// `validate value` with `--shape`, `--value`, `--unknown-members` and
+/// `--member-names`; any other argument is a model file.
+fn value_request_of(
+  rest : ArrayView[String],
+  files : Map[String, String],
+) -> (@core.Request, String) raise {
   let models : Array[(String, String)] = []
   let mut shape : String? = None
   let mut value : String? = None
@@ -170,6 +182,109 @@ fn request_of(
       member_names,
     }),
     value,
+  )
+}
+
+///|
+/// `validate rpc` for one message: `--version`, `--service`, `--message` or
+/// `--response`, the response context (`--method`, `--operation`, `--request`,
+/// `--envelope-only`), `--legacy-errors`, `--unknown-members` and
+/// `--member-names`; any other argument is a model file. The presence of
+/// `--legacy-errors` gives `Some`, its absence `None`, as the CLI tells them apart.
+fn rpc_request_of(
+  rest : ArrayView[String],
+  files : Map[String, String],
+) -> (@core.Request, String) raise {
+  let models : Array[(String, String)] = []
+  let mut version : @core.RpcVersion? = None
+  let mut service : String? = None
+  let mut message : String? = None
+  let mut response : String? = None
+  let mut context : @core.ResponseContext? = None
+  let mut legacy_errors : @core.LegacyErrors? = None
+  let mut unknown_members : @core.UnknownMembers = Reject
+  let mut member_names : @core.MemberNames = Smithy
+  let set_context = fn(next : @core.ResponseContext) -> Unit raise {
+    if context is Some(_) {
+      fail("a case needs at most one response context")
+    }
+    context = Some(next)
+  }
+  let mut i = 0
+  while i < rest.length() {
+    let option = rest[i]
+    if option == "--envelope-only" {
+      set_context(EnvelopeOnly)
+      i += 1
+      continue
+    }
+    if !option.has_prefix("--") {
+      models.push((option, file_of(files, option)))
+      i += 1
+      continue
+    }
+    guard i + 1 < rest.length() else {
+      fail("the option \{option} needs a value")
+    }
+    let argument = rest[i + 1]
+    match option {
+      "--version" =>
+        version = Some(
+          match argument {
+            "1.0" => V1_0
+            "2.0" => V2_0
+            other => fail("I do not know --version \{other}")
+          },
+        )
+      "--service" => service = Some(argument)
+      "--message" => message = Some(argument)
+      "--response" => response = Some(argument)
+      "--method" => set_context(Method(argument))
+      "--operation" => set_context(Operation(argument))
+      "--request" => set_context(OriginalRequest(file_of(files, argument)))
+      "--legacy-errors" =>
+        legacy_errors = Some(
+          match argument {
+            "opaque" => Opaque
+            "code-message-data" => CodeMessageData
+            other => fail("I do not know --legacy-errors \{other}")
+          },
+        )
+      "--unknown-members" =>
+        unknown_members = match argument {
+          "reject" => Reject
+          "ignore" => Ignore
+          other => fail("I do not know --unknown-members \{other}")
+        }
+      "--member-names" =>
+        member_names = match argument {
+          "smithy" => Smithy
+          "json" => JsonName
+          other => fail("I do not know --member-names \{other}")
+        }
+      _ => fail("the differential test does not know the option \{option}")
+    }
+    i += 2
+  }
+  guard version is Some(version) && service is Some(service) else {
+    fail("an rpc case needs --version and --service")
+  }
+  let (file, kind) = match (message, response) {
+    (Some(file), None) => (file, @core.MessageKind::RequestMessage)
+    (None, Some(file)) => (file, ResponseMessage(context~, legacy_errors~))
+    _ => fail("an rpc case needs exactly one of --message and --response")
+  }
+  (
+    CheckMessage(
+      seq=1,
+      files=models,
+      service~,
+      version~,
+      message=file_of(files, file),
+      kind~,
+      options={ unknown_members, member_names, },
+    ),
+    file,
   )
 }
 
