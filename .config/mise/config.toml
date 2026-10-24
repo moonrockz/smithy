@@ -141,8 +141,7 @@ run = "moonx scripts/reference-tour.mbtx"
 
 [tasks."tour:check"]
 description = "Check the tour lessons against the playground core and the committed Java reference results (no bun, Java or browser)"
-dir = "site"
-run = "moon test --target native -p moonrockz/smithy-site/tour/check"
+run = "moon -C site test --target native -p moonrockz/smithy-site/tour/check"
 
 [tasks."test:native-zig"]
 description = "Run the native tests with zig as the C compiler (the host wrapper of zig-cross)"

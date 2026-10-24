@@ -189,6 +189,8 @@ jobs:
       - name: Run the task script tests
         run: mise run test:scripts
 
+  # The task runs `moon -C site`, not in site/: a moon shim in site/ would read the untrusted site/mise.toml
+  # (bun, Lightpanda), and this job installs neither.
   tour:
     name: Check the tour lessons
     runs-on: ubuntu-latest
