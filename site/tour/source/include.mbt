@@ -69,11 +69,12 @@ pub fn tested_snippet(
 }
 
 ///|
-/// True when `rest` is exactly `status=N` with N from 1 to 125.
+/// True when `rest` is exactly `status=N` with N from 1 to 125 in plain digits (no sign, no leading zero).
+/// scripts/test-cli.mbtx, `doc_console_status`, uses the same rule.
 fn console_status_word(rest : String) -> Bool {
   guard rest.has_prefix("status=") else { return false }
   let digits = rest[7:].to_owned()
-  if digits.is_empty() || digits.length() > 3 {
+  if digits.is_empty() || digits.length() > 3 || digits[0] == '0' {
     return false
   }
   let mut n = 0

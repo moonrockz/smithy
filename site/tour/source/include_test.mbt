@@ -79,7 +79,11 @@ test "tested_snippet accepts only tested fences" {
     @source.tested_snippet("apps/smithy/README.md", failing, has_moon_pkg=false),
     Ok({ lang: "console", file: None, code: "$ x", }),
   )
-  for rest in ["status=x", "status=0", "status=126", "status="] {
+  for
+    rest in [
+      "status=x", "status=0", "status=126", "status=", "status=+1", "status=01",
+      "status=1 status=2",
+    ] {
     snippet_err(
       "apps/smithy/README.md",
       { lang: "console", rest, code: "$ x", },
@@ -456,4 +460,30 @@ test "the message for an untested fence names each CLI README" {
       "`LANG file=NAME` in \{file}",
     )
   }
+}
+
+///|
+test "a console status fence of a region is read, and a bad status is rejected" {
+  let inc : @markdown.Include = {
+    label: "L",
+    path: "apps/smithy/README.md",
+    name: "x",
+  }
+  let dir = "tour/source/testdata/status-readme"
+  assert_eq(
+    @source.resolve_include(dir, inc).map(snippets => {
+      snippets.map(s => (s.lang, s.code))
+    }),
+    Ok([("console", "$ smithy validate bad.smithy\n[ERROR] x | Y")]),
+  )
+  assert_eq(
+    @source.check_hand_written(
+      "# T\n\n```include\nL: apps/smithy/README.md#x\n```\n",
+    ),
+    Ok(()),
+  )
+  contains_all(
+    @source.resolve_include(dir, { ..inc, name: "y", }).map(_ => ()),
+    "a tested block",
+  )
 }

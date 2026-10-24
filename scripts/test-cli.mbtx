@@ -8,6 +8,7 @@ import {
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
+  "moonbitlang/core/string",
   "moonbitlang/core/encoding/utf8",
   "moonrockz/ion@0.6.0/text" @ion_text,
   "moonrockz/ion@0.6.0/binary" @ion_binary,
@@ -1460,36 +1461,45 @@ fn doc_path_leaves(word : String) -> Bool {
 }
 
 ///|
-/// The exit status that a console fence expects: 0, or N of an info word `status=N` with N from 1 to 125.
-fn doc_console_status(info : String) -> Result[Int32, String] {
-  let words = info.split(" ").collect()
-  for i = 1; i < words.length(); i = i + 1 {
-    let word : String = words[i].to_owned()
-    if word.has_prefix("status=") {
-      let digits : String = word[7:].to_owned()
-      let mut n = 0
-      let mut numeric = !digits.is_empty() && digits.length() <= 3
-      for c in digits {
-        if c >= '0' && c <= '9' {
-          n = n * 10 + (c.to_int() - 48)
-        } else {
-          numeric = false
-        }
-      }
-      if !numeric || n < 1 || n > 125 {
-        return Err(
-          "I expected status=N with N from 1 to 125 and found `\{word}`.",
-        )
-      }
-      // Int32 has no conversion from Int here, so count up.
-      let mut status : Int32 = 0
-      for _ in 0..<n {
-        status = status + 1
-      }
-      return Ok(status)
-    }
+/// True when an info string names a console fence: `console`, alone or followed by a character
+/// that is not a letter, digit, `_` or `-` (a space, a tab). Such a fence runs, or is an error.
+fn is_console_info(info : String) -> Bool {
+  guard info.has_prefix("console") else { return false }
+  if info.length() == 7 {
+    return true
   }
-  Ok(0)
+  let c = info[7]
+  let word = (c >= 'a' && c <= 'z') ||
+    (c >= 'A' && c <= 'Z') ||
+    (c >= '0' && c <= '9') ||
+    c == '_' ||
+    c == '-'
+  !word
+}
+
+///|
+/// The exit status that a console fence expects, from its info string. The info string is exactly
+/// `console`, with status 0, or `console status=N` with N from 1 to 125 in plain digits (no sign, no
+/// leading zero). Any other info word is an error, so no fence is skipped or read in two ways.
+/// `@source.tested_snippet` in site/tour/source/include.mbt must use the same rule.
+fn doc_console_status(info : String) -> Result[Int32, String] {
+  if info == "console" {
+    return Ok(0)
+  }
+  let found = "I expected `console` or `console status=N` with N from 1 to 125 and found `\{info}`."
+  guard info.has_prefix("console status=") else { return Err(found) }
+  let digits : String = info[15:].to_owned()
+  if digits.is_empty() ||
+    digits.length() > 3 ||
+    digits[0] == '0' ||
+    !digits.iter().all(c => c >= '0' && c <= '9') {
+    return Err(found)
+  }
+  let n = @string.parse_int(digits) catch { _ => 0 }
+  if n < 1 || n > 125 {
+    return Err(found)
+  }
+  Ok(n)
 }
 
 ///|
@@ -1570,16 +1580,10 @@ fn doc_steps(markdown : String) -> Result[Array[DocStep], String] {
     let line = lines[i]
     i += 1
     let first = line.trim_start().to_owned()
-    let info_first = fn(text : String) -> String {
-      let rest = text.trim_start(chars="`~").trim().to_owned()
-      match rest.split(" ").next() {
-        Some(word) => word.to_owned()
-        None => ""
-      }
-    }
     if !line.has_prefix("```") {
       if (first.has_prefix("```") || first.has_prefix("~~~")) &&
-        (info_first(first) == "console" || first.contains(" file=")) {
+        (is_console_info(first.trim_start(chars="`~").trim().to_owned()) ||
+        first.contains(" file=")) {
         return Err(
           "I found a console or file= fence that does not start at the start of a line: `\{line}`. I cannot tell whether a test runs it.",
         )
@@ -1608,7 +1612,7 @@ fn doc_steps(markdown : String) -> Result[Array[DocStep], String] {
     guard closed else {
       return Err("I found a fence that never closes: `\{line}`.")
     }
-    if info_first(info) == "console" {
+    if is_console_info(info) {
       let status = match doc_console_status(info) {
         Ok(status) => status
         Err(msg) => return Err(msg)
@@ -1634,51 +1638,97 @@ fn doc_steps(markdown : String) -> Result[Array[DocStep], String] {
 ///|
 /// Writes each fixture into a fresh `<runner.dir>/readme` and runs each command there.
 async fn check_readme(runner : Runner, root : String) -> Unit {
+  for file in readme_files {
+    check_readme_text(runner, file, @fs.read_file("\{root}/\{file}").text())
+  }
+}
+
+///|
+/// Runs the fences of one README text; `file` names it in the messages.
+async fn check_readme_text(
+  runner : Runner,
+  file : String,
+  text : String,
+) -> Unit {
   let dir = "\{runner.dir}/readme"
   let scratch = { ..runner, dir }
-  for file in readme_files {
-    let steps = match doc_steps(@fs.read_file("\{root}/\{file}").text()) {
-      Ok(steps) => steps
-      Err(msg) => fail("\{file}: \{msg}")
-    }
-    if @fs.exists(dir) {
-      @fs.rmdir(dir, recursive=true)
-    }
-    @fs.mkdir(dir, recursive=true, allow_exist=true)
-    let mut ran = 0
-    for step in steps {
-      match step {
-        Fixture(name~, text~) => @fs.write_file("\{dir}/\{name}", text)
-        Session(commands) => {
-          for command in commands {
-            ran += 1
-            let (out, err) = scratch.command(command.args, command.status)
-            if command.status == 0 {
-              assert_eq(
-                err,
-                "",
-                msg="\{file}: smithy \{command.args.join(" ")} wrote to stderr",
-              )
-              assert_eq(
-                out,
-                command.output,
-                msg="\{file}: smithy \{command.args.join(" ")}\nthe README shows:\n\{command.output}\nthe command wrote:\n\{out}",
-              )
-            } else {
-              // wasm-gc writes eprintln to stdout, so stdout then stderr is the same text on every target.
-              let text = out + err.replace_all(old="\r\n", new="\n")
-              assert_eq(
-                text,
-                command.output,
-                msg="\{file}: smithy \{command.args.join(" ")} (status \{command.status})\nthe README shows:\n\{command.output}\nthe command wrote:\n\{text}",
-              )
-            }
+  let steps = match doc_steps(text) {
+    Ok(steps) => steps
+    Err(msg) => fail("\{file}: \{msg}")
+  }
+  if @fs.exists(dir) {
+    @fs.rmdir(dir, recursive=true)
+  }
+  @fs.mkdir(dir, recursive=true, allow_exist=true)
+  let mut ran = 0
+  for step in steps {
+    match step {
+      Fixture(name~, text~) => @fs.write_file("\{dir}/\{name}", text)
+      Session(commands) => {
+        for command in commands {
+          ran += 1
+          let (out, err) = scratch.command(command.args, command.status)
+          if command.status == 0 {
+            assert_eq(
+              err,
+              "",
+              msg="\{file}: smithy \{command.args.join(" ")} wrote to stderr",
+            )
+            assert_eq(
+              out,
+              command.output,
+              msg="\{file}: smithy \{command.args.join(" ")}\nthe README shows:\n\{command.output}\nthe command wrote:\n\{out}",
+            )
+          } else {
+            // wasm-gc writes eprintln to stdout, so stdout then stderr is the same text on every target.
+            let text = out + err.replace_all(old="\r\n", new="\n")
+            assert_eq(
+              text,
+              command.output,
+              msg="\{file}: smithy \{command.args.join(" ")} (status \{command.status})\nthe README shows:\n\{command.output}\nthe command wrote:\n\{text}",
+            )
           }
         }
       }
     }
-    if ran == 0 {
-      fail("I found no console block in \{file}")
+  }
+  if ran == 0 {
+    fail("I found no console block in \{file}")
+  }
+}
+
+///|
+/// The non-zero status branch of `check_readme_text`: a README that shows the failure of a command
+/// passes; a README that expects a status the command does not give, or other text, fails.
+async fn check_readme_status(runner : Runner) -> Unit {
+  let model = "```smithy file=bad.smithy\n$version: \"2\"\nnamespace x\nstructure A { b: Missing }\n```\n\n"
+  let shown = "[ERROR] x#A$b: I could not resolve shape x#Missing, referenced by x#A$b. | Target.UnresolvedShape\n"
+  let good = model +
+    "```console status=1\n$ smithy validate bad.smithy\n\{shown}```\n"
+  check_readme_text(runner, "status-good.md", good)
+  let cases = [
+    // The command exits 1, and the README expects 0 (a plain fence).
+    ("status-plain.md", model + "```console\n$ smithy validate bad.smithy\n```\n", "validate bad.smithy"),
+    // The command exits 0, and the README expects 1.
+    ("status-zero.md", "```console status=1\n$ smithy version\n```\n", "version"),
+    // The status is right and the text is not.
+    (
+      "status-text.md",
+      model + "```console status=1\n$ smithy validate bad.smithy\n[ERROR] other\n```\n",
+      "(status 1)\nthe README shows:\n[ERROR] other\n",
+    ),
+  ]
+  for c in cases {
+    let (name, text, want) = c
+    let failed = try {
+      check_readme_text(runner, name, text)
+      None
+    } catch {
+      e => Some(e.to_string())
+    }
+    match failed {
+      Some(msg) => assert_true(msg.contains(want), msg="\{name}: \{msg} lacks \{want}")
+      None => fail("\{name}: the check passed, and I expected it to fail")
     }
   }
 }
@@ -2369,6 +2419,7 @@ async fn exercise(
   runner.command(["validate", "idl/example.smithy", "idl/other.smithy"], 0)
   |> ignore
   check_readme(runner, root)
+  check_readme_status(runner)
   println("CLI checks passed: \{target}")
 }
 
@@ -2436,17 +2487,17 @@ test "doc_steps reads the status of a console fence" {
       ]),
     ]),
   )
-  let md = "```console title=x status=125\n$ smithy version\n```\n"
+  let md = "```console status=125\n$ smithy version\n```\n"
   assert_true(doc_steps(md) is Ok([Session([{ status: 125, .. }])]))
 }
 
 ///|
 test "doc_steps rejects a bad status" {
-  for info in ["status=0", "status=x", "status=126", "status=", "status=1000", "status=-1"] {
+  for info in ["status=0", "status=x", "status=126", "status=", "status=1000", "status=-1", "status=+1", "status=01", "status=1 status=2"] {
     match doc_steps("```console \{info}\n$ smithy version\n```\n") {
       Err(msg) =>
         assert_true(
-          msg.contains("I expected status=N with N from 1 to 125"),
+          msg.contains("I expected `console` or `console status=N`"),
           msg="\{info}: \{msg}",
         )
       Ok(_) => fail("expected an error for \{info}")
@@ -2514,7 +2565,10 @@ test "shell_words rejects shell characters and an unclosed quote" {
 ///|
 test "doc_steps does not skip console and fixture fences in silence" {
   let cases = [
-    ("```console title=x\n$ smithy version\n0.6.0\n```", None),
+    ("```console title=x\n$ smithy version\n0.6.0\n```", Some("I expected `console` or `console status=N`")),
+    ("```console\tstatus=1\n$ smithy version\n```", Some("I expected `console` or `console status=N`")),
+    ("```console status=1 status=2\n$ smithy version\n```", Some("I expected `console` or `console status=N`")),
+    ("```console status=1\n$ smithy version\n```", None),
     ("  ```console\n  $ smithy version\n  ```", Some("does not start at the start of a line")),
     ("  ```smithy file=a.smithy\n  ```", Some("does not start at the start of a line")),
     ("```console\n```", Some("a console block with no command")),
