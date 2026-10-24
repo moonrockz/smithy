@@ -13,6 +13,6 @@ Now change the comment above `message` from `//` to `///`. The member `message` 
 Some rules for documentation comments:
 
 - Put the comment directly before the shape or the member.
-- Put the comment before the traits of the shape.
+- Put the comment before the traits of the shape. Try it: add the line `@deprecated` above `structure Greeting`. Then move the `///` line below `@deprecated`. Smithy ignores the comment, the Findings tab shows a warning, and `Greeting` has no `smithy.api#documentation` trait. The [specification](https://smithy.io/2.0/spec/idl.html#documentation-comment) states this rule.
 - Smithy joins two or more `///` lines into one value. A newline goes between the lines.
 - Write the text in CommonMark. You can use lists, links and code in it.

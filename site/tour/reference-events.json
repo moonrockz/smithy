@@ -76,6 +76,12 @@
                 }
             }
         },
+        "03-documentation/comment-after-traits": {
+            "digest": "bd05fc404b924298ae72602faa3bb5713fbf39a09d3e3e4bde86c4650f1272c3",
+            "events": [
+                "Model.BadDocumentationComment|WARNING|-"
+            ]
+        },
         "03-documentation/member-documentation": {
             "digest": "648b3bc6e0570f3a2e2511b74ec242e4097820434b71dd47cff4b0cb97a67172",
             "events": []
