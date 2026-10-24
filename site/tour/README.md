@@ -152,3 +152,13 @@ tour bundle; see `site/README.md`.
 | `tour/ui` | js: mounts the lesson page, runs the editors, the Worker and the timers |
 | `tour/editor` | JavaScript: the entry `main.js` of the bundle |
 | `tour/check` | native: the tests of the two checks |
+
+### The lesson page panes
+
+The right-hand column of a lesson page has two panes: the editor above, and the output with the Findings tab
+below. Each pane header has an expand button (class `tour-expand`, `aria-pressed`). "Expand the editor" or
+"Expand the output" makes that pane fill the column; the button then reads "Show both panes" and gives the split
+view back. The layout is the `Layout` value of the lesson model (`Split`, `EditorOnly`, `OutputOnly`). A pane
+that is not shown stays in the DOM and has `display: none`, because the editors own their elements. Reset keeps
+the layout. After a change of layout the page makes the editors measure their elements again (the `Remeasure`
+effect). A page that adds panes, such as a Diff pane, keeps this control.

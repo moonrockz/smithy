@@ -54,6 +54,11 @@ extern "js" fn editor_highlight(id : String, lines : String) -> Unit =
   #|(id, lines) => globalThis.smithyEditors.highlight(id, lines)
 
 ///|
+/// Make every editor measure its element again, after a change of layout.
+extern "js" fn editors_measure() -> Unit =
+  #|() => globalThis.smithyEditors.measure()
+
+///|
 /// The value of the key in localStorage, or "" when it has none. A browser
 /// that refuses storage gives "".
 extern "js" fn storage_read(key : String) -> String =

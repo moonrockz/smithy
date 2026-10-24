@@ -1,5 +1,5 @@
-// The first tour lesson on Chromium: the output, a changed line, a stored edit, Reset and a model with a
-// finding. Key input needs Chromium (README.md).
+// The first tour lesson on Chromium: the output, a changed line, a stored edit, Reset, a model with a
+// finding and the expand buttons of the two right-hand panes. Key input needs Chromium (README.md).
 import { expect, test } from "./fixtures.js";
 import { siteUrl } from "./site.js";
 
@@ -90,5 +90,77 @@ test("a model with no namespace shows the finding of the lesson", async ({ page 
   await page.getByRole("tab", { name: /JSON AST/ }).click();
   await expect(page.locator(".tour-err")).toBeVisible();
   await expect(page.locator("#tour-output .tour-changed")).toHaveCount(0);
+  expect(page.errors).toEqual([]);
+});
+
+const height = async (locator) => (await locator.boundingBox())?.height ?? 0;
+
+test("a pane expands to the right column and the split view comes back", async ({ page }) => {
+  await openLesson(page);
+  const edit = page.locator(".tour-pane.tour-edit");
+  const out = page.locator(".tour-pane.tour-out");
+  const editor = page.locator("#tour-editor");
+  const output = page.locator("#tour-output");
+  const panes = page.locator(".tour-panes");
+  const splitEditor = await height(editor);
+  expect(splitEditor).toBeGreaterThan(50);
+
+  // Change the model: replace the structure name.
+  await page.locator("#tour-editor .cm-content").getByText("Greeting").dblclick();
+  await page.keyboard.type("Welcome");
+  await settled(page);
+  await expect(page.locator("#tour-editor .cm-content")).toContainText("structure Welcome");
+
+  // The output fills the column; the editor pane stays in the DOM, hidden.
+  const expandOutput = page.getByRole("button", { name: "Expand the output" });
+  await expect(expandOutput).toHaveAttribute("aria-pressed", "false");
+  await expandOutput.click();
+  await expect(panes).toHaveClass(/tour-output-only/);
+  await expect(edit).toBeHidden();
+  await expect(edit).toHaveCount(1);
+  await expect(out).toBeVisible();
+  const columnHeight = await height(panes);
+  expect(await height(out)).toBeGreaterThan(columnHeight - 2);
+  const back = page.getByRole("button", { name: "Show both panes" });
+  await expect(back).toHaveAttribute("aria-pressed", "true");
+  await expect(back).toHaveCount(1);
+  await page.screenshot({ path: "../.dev/out/tour-expanded-output.png" });
+
+  // Both panes come back; the editor keeps the typed text and its undo history.
+  await back.click();
+  await expect(panes).not.toHaveClass(/tour-(editor|output)-only/);
+  await expect(edit).toBeVisible();
+  await expect(out).toBeVisible();
+  await expect(page.locator("#tour-editor .cm-content")).toContainText("structure Welcome");
+  await page.locator("#tour-editor .cm-content").click();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(page.locator("#tour-editor .cm-content")).not.toContainText("Welcome");
+  await expect(page.locator("#tour-editor .cm-content")).toContainText("structure Greeting");
+  await settled(page);
+
+  // The editor fills the column; its element is taller, and not blank.
+  await page.getByRole("button", { name: "Expand the editor" }).click();
+  await expect(panes).toHaveClass(/tour-editor-only/);
+  await expect(out).toBeHidden();
+  await expect(out).toHaveCount(1);
+  await expect(output).toHaveCount(1);
+  await expect(edit).toBeVisible();
+  await expect.poll(() => height(editor)).toBeGreaterThan(splitEditor + 20);
+  // CodeMirror drew into the new size: its scroller fills the element.
+  await expect.poll(async () => (await height(page.locator("#tour-editor .cm-scroller"))) >= (await height(editor)) - 2).toBe(true);
+  await expect(page.locator("#tour-editor .cm-content")).toContainText("structure Greeting");
+  await page.screenshot({ path: "../.dev/out/tour-expanded-editor.png" });
+
+  // The keyboard: Tab from the last file tab reaches the button; Space presses it.
+  await page.getByRole("button", { name: "Show both panes" }).click();
+  await expect(panes).not.toHaveClass(/tour-(editor|output)-only/);
+  await page.getByRole("tab", { name: "model.smithy" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Expand the editor" })).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(panes).toHaveClass(/tour-editor-only/);
+  await expect(page.getByRole("button", { name: "Show both panes" })).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(panes).not.toHaveClass(/tour-(editor|output)-only/);
   expect(page.errors).toEqual([]);
 });

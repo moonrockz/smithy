@@ -231,6 +231,10 @@ const editors = {
     const scroller = view.scrollDOM;
     scroller.scrollTop = Math.max(0, view.lineBlockAt(pos).top - scroller.clientHeight / 2);
   },
+  // Measure every editor again, after its element changed its size.
+  measure() {
+    for (const view of views.values()) view.requestMeasure();
+  },
   goTo(id, line, column) {
     const view = views.get(id);
     if (!view) return;
