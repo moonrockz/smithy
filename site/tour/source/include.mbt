@@ -246,16 +246,55 @@ fn is_api_call(line : String) -> Bool {
 }
 
 ///|
-/// The text of a line that looks like a CLI command of Smithy or an API call of a package, or
-/// `None`.
+/// `line` without a shell prompt: `$`, `%`, `#` or `>` and the spaces after it, or the text up
+/// to the first `>` of a PowerShell (`PS>`, `PS C:\\work>`) or a Windows (`C:\\work>`) prompt.
+fn without_prompt(line : String) -> String {
+  let cs = line.to_array()
+  if cs.length() > 0 &&
+    (cs[0] == '$' || cs[0] == '%' || cs[0] == '#' || cs[0] == '>') {
+    return line[1:].trim_start().to_owned()
+  }
+  let windows = cs.length() > 2 &&
+    cs[0].is_ascii_alphabetic() &&
+    cs[1] == ':' &&
+    cs[2] == '\\'
+  if line.has_prefix("PS") || windows {
+    if line.find(">") is Some(i) {
+      return line[i + 1:].trim_start().to_owned()
+    }
+  }
+  line
+}
+
+///|
+/// The text of a line that looks like a CLI command of Smithy (after an optional shell
+/// prompt) or an API call of a package, or `None`.
 fn smithy_use(code : String) -> String? {
   for line in code.split("\n") {
     let t = line.trim().to_owned()
-    if t.has_prefix("$ smithy") || t.has_prefix("smithy ") || is_api_call(t) {
+    let command = without_prompt(t)
+    if command.has_prefix("smithy ") || command == "smithy" || is_api_call(t) {
       return Some(t)
     }
   }
   None
+}
+
+///|
+/// `line` without its HTML tags.
+fn without_tags(line : String) -> String {
+  let buf = StringBuilder()
+  let mut in_tag = false
+  for c in line {
+    if c == '<' {
+      in_tag = true
+    } else if c == '>' && in_tag {
+      in_tag = false
+    } else if !in_tag {
+      buf.write_char(c)
+    }
+  }
+  buf.to_string()
 }
 
 ///|
@@ -290,6 +329,21 @@ pub fn check_hand_written(text : String) -> Result[Unit, String] {
       }
     }
   })
+  if found is None {
+    // The site does not show an HTML block, but GitHub shows the lesson file with it.
+    for html in @markdown.html_blocks(text) {
+      let plain = html
+        .split("\n")
+        .map(l => without_tags(l.to_owned()))
+        .join("\n")
+      if smithy_use(plain) is Some(line) {
+        found = Some(
+          "I found an HTML block with the line `\{line}`. A CLI or API block must come from a tested source: use an include block",
+        )
+        break
+      }
+    }
+  }
   match found {
     Some(e) => Err(e)
     None => Ok(())

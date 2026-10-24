@@ -324,3 +324,36 @@ pub fn walk_blocks(blocks : Array[Block], f : (Block) -> Unit) -> Unit {
     }
   }
 }
+
+///|
+fn collect_html(block : @cmark.Block, out : Array[String]) -> Unit {
+  match block {
+    Blocks({ v: bs, .. }) =>
+      for b in bs.iter() {
+        collect_html(b, out)
+      }
+    BlockQuote({ v: { block: inner, .. }, .. }) => collect_html(inner, out)
+    List({ v: { items, .. }, .. }) =>
+      for item in items.iter() {
+        collect_html(item.v.block, out)
+      }
+    HtmlBlock({ v: HtmlBlock(lines), .. }) => {
+      let text : Array[String] = []
+      for line in lines.iter() {
+        text.push(line.v)
+      }
+      out.push(text.join("\n"))
+    }
+    _ => ()
+  }
+}
+
+///|
+/// The text of each HTML block of `text`, at any depth. `parse` drops an HTML block, so
+/// the site does not show it, but GitHub does.
+pub fn html_blocks(text : String) -> Array[String] {
+  let doc = @cmark.Doc::from_string(strict=false, text)
+  let out : Array[String] = []
+  collect_html(doc.block, out)
+  out
+}

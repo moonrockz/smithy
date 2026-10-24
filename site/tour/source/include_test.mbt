@@ -380,3 +380,50 @@ test "check_expanded rejects an include block that was not expanded" {
     assert_eq(@source.check_expanded("# T\n\n" + text), Ok(()))
   }
 }
+
+///|
+/// A command after the prompt of another shell is a hand-copied command too.
+test "check_hand_written rejects a smithy command after any prompt" {
+  for
+    line in [
+      "% smithy convert --to json a.smithy", "# smithy version", "> smithy version",
+      "$smithy version", "PS> smithy validate a.smithy", "PS C:\\work> smithy validate a.smithy",
+      "C:\\work> smithy version",
+    ] {
+    for fence in ["", "text"] {
+      contains_all(
+        @source.check_hand_written("# T\n\n```\{fence}\n\{line}\n```\n"),
+        line,
+      )
+    }
+  }
+  // Model text and prose about the CLI stay legal.
+  assert_eq(
+    @source.check_hand_written(
+      "# T\n\n```smithy\n@required\nstring A\n```\n\n```text\n# Notes on smithy\n> the smithy-build.json file\n```\n",
+    ),
+    Ok(()),
+  )
+}
+
+///|
+/// The site does not show an HTML block, but GitHub shows the lesson file with it.
+test "check_hand_written rejects a command or an API use in an HTML block" {
+  for
+    html in [
+      "<pre>$ smithy convert --to json a.smithy</pre>\n", "<pre>\nsmithy validate a.smithy\n</pre>\n",
+      "<pre><code>let m = @smithy.parse(text)</code></pre>\n", "> <pre>$ smithy version</pre>\n",
+      "- <pre>% smithy version</pre>\n",
+    ] {
+    contains_all(
+      @source.check_hand_written("# T\n\n" + html),
+      "I found an HTML block with the line",
+    )
+  }
+  assert_eq(
+    @source.check_hand_written(
+      "# T\n\n<!-- a note on the smithy CLI -->\n\n<p>The smithy CLI reads @required traits.</p>\n",
+    ),
+    Ok(()),
+  )
+}
