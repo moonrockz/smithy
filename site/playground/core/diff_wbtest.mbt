@@ -117,3 +117,60 @@ test "a SUPPRESSED event is not in the answer" {
   assert_false(events.any(e => e.severity == "SUPPRESSED"))
   assert_false(events.any(e => e.id == "ChangedMemberOrder"))
 }
+
+///|
+test "the suppressed pair has a SUPPRESSED event in the library, not in the answer" {
+  let old = suppressions("a: String\nb: String\nc: String\n")
+  let new = suppressions("c: String\na: String\nb: String\n")
+  let library = @diff.compare(
+    load([("old.smithy", old)]).model.unwrap(),
+    load([("new.smithy", new)]).model.unwrap(),
+  )
+  assert_true(library.events.any(e => e.severity == "SUPPRESSED"))
+  guard diff_of(old, new) is Diffed(events=Some(events), ..) else {
+    fail("expected Diffed with events")
+  }
+  assert_eq(events.length(), 0)
+}
+
+///|
+test "events keep the order of the library" {
+  let old = base + "\nstructure C {}\nstructure D {}"
+  let new = base + "\nstructure B {}\nstructure D {}\nstructure E {}"
+  let library = @diff.compare(
+    load([("old.smithy", old)]).model.unwrap(),
+    load([("new.smithy", new)]).model.unwrap(),
+  )
+  guard diff_of(old, new) is Diffed(events=Some(events), ..) else {
+    fail("expected Diffed with events")
+  }
+  assert_true(events.length() >= 3)
+  assert_eq(
+    events.map(e => (e.id, e.shape)),
+    library.events.map(e => (e.id, e.shape.map(id => id.to_string()))),
+  )
+}
+
+///|
+test "a DANGER event is breaking" {
+  let old = "$version: \"2\"\nmetadata removed = \"x\"\nnamespace example\nstructure A { x: String }"
+  guard diff_of(old, base) is Diffed(events=Some(events), breaking~, ..) else {
+    fail("expected Diffed with events")
+  }
+  let danger = events.filter(e => e.severity == "DANGER")
+  assert_eq(danger.map(e => e.id), ["RemovedMetadata.removed"])
+  assert_true(breaking)
+}
+
+///|
+test "a load with no model and no error gives a finding with a reason" {
+  let loaded : @smithy.LoadResult = {
+    model: None,
+    diagnostics: [],
+    validation_findings: [],
+  }
+  let findings = diff_findings(loaded, [])
+  assert_eq(findings.length(), 1)
+  assert_eq(findings[0].code, "ModelNotBuilt")
+  assert_eq(findings[0].severity, "ERROR")
+}

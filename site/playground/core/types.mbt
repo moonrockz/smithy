@@ -283,8 +283,9 @@ pub(all) enum Response {
   DataChecked(seq~ : Int32, valid~ : Bool, findings~ : Array[DataFinding])
   /// The findings of each model, by file. `events` is `None` when a model has
   /// an ERROR or DANGER event or does not assemble: the CLI then does not
-  /// compare. SUPPRESSED events are left out. `breaking` is the result of the
-  /// CLI.
+  /// compare and exits 1: do not read `breaking` then (it is false), the reason is
+  /// in `old` and `new`. SUPPRESSED events are left out. With events, `breaking`
+  /// is the result of the CLI.
   Diffed(
     seq~ : Int32,
     old~ : Array[Diagnostic],
