@@ -178,35 +178,59 @@ test "check_hand_written" {
 /// it starts a line. The mbtx cannot be imported here, so the runner side is its own tests.
 test "every console and file fence of an included region is read by the CLI runner" {
   for file in @source.cli_doc_files {
-    let text = @fs.read_file_to_string("../\{file}")
-    let mut count = 0
-    for line in text.split("\n") {
-      let t = line.trim().to_owned()
-      let prefix = "<!-- tour:start "
-      if t.has_prefix(prefix) && t.has_suffix(" -->") {
-        let name = t[prefix.length():t.length() - 4].to_owned()
-        let snippets = match
-          @source.resolve_include("..", { label: "L", path: file, name, }) {
-          Ok(s) => s
-          Err(e) => fail("\{file}#\{name}: \{e}")
+    assert_runner_reads("..", file, "../\{file}")
+  }
+}
+
+///|
+/// Checks every marked region of `repo/file`. `path` is the file to read.
+fn assert_runner_reads(
+  repo : String,
+  file : String,
+  path : String,
+) -> Unit raise {
+  let text = @fs.read_file_to_string(path)
+  let mut count = 0
+  for line in text.split("\n") {
+    let t = line.trim().to_owned()
+    let prefix = "<!-- tour:start "
+    if t.has_prefix(prefix) && t.has_suffix(" -->") {
+      let name = t[prefix.length():t.length() - 4].to_owned()
+      let snippets = match
+        @source.resolve_include(repo, { label: "L", path: file, name, }) {
+        Ok(s) => s
+        Err(e) => fail("\{file}#\{name}: \{e}")
+      }
+      count += snippets.length()
+      // The full info string of each fence, as the runner reads it (`console status=1` too).
+      let fences = match @markdown.region(text, name) {
+        Ok(f) => f
+        Err(e) => fail("\{file}#\{name}: \{e}")
+      }
+      assert_eq(fences.length(), snippets.length())
+      for fence in fences {
+        let info = if fence.rest == "" {
+          fence.lang
+        } else {
+          "\{fence.lang} \{fence.rest}"
         }
-        count += snippets.length()
-        for s in snippets {
-          let info = match s.file {
-            Some(f) => "\{s.lang} file=\{f}"
-            None => s.lang
-          }
-          assert_true(
-            text
-            .split("\n")
-            .any(l => l.trim_end(chars="\r").to_owned() == "```\{info}"),
-            msg="\{file}#\{name}: no fence line starts with ```\{info}",
-          )
-        }
+        assert_true(
+          text
+          .split("\n")
+          .any(l => l.trim_end(chars="\r").to_owned() == "```\{info}"),
+          msg="\{file}#\{name}: no fence line starts with ```\{info}",
+        )
       }
     }
-    assert_true(count > 0, msg="\{file} has no included region")
   }
+  assert_true(count > 0, msg="\{file} has no included region")
+}
+
+///|
+test "the runner reads a console fence with a status of an included region" {
+  assert_runner_reads(
+    "tour/source/testdata/status-readme", "apps/smithy/README.md", "tour/source/testdata/status-readme/apps/smithy/README.md",
+  )
 }
 
 ///|
@@ -483,7 +507,10 @@ test "a console status fence of a region is read, and a bad status is rejected" 
     Ok(()),
   )
   contains_all(
-    @source.resolve_include(dir, { ..inc, name: "y", }).map(_ => ()),
+    @source.resolve_include("tour/source/testdata/status-bad-readme", {
+      ..inc,
+      name: "y",
+    }).map(_ => ()),
     "a tested block",
   )
 }
