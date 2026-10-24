@@ -4,7 +4,7 @@ The Smithy IDL has two kinds of comment.
 
 A [line comment](https://smithy.io/2.0/spec/idl.html#comments) starts with `//`. It can go at any place where whitespace can go. A newline ends it. A line comment does not change the model. Look at the JSON AST output: the member `message` has no traits.
 
-A documentation comment is a line that starts with `///`. Spaces can come before the `///`. The comment documents the shape or the member that comes directly after it. A documentation comment is the same as the trait `smithy.api#documentation`. The text of the comment becomes the value of the trait.
+A documentation comment is a line that starts with `///`. Whitespace can come before the `///`. The comment documents the shape or the member that comes directly after it. A documentation comment is the same as the trait `smithy.api#documentation`. The text of the comment becomes the value of the trait.
 
 Look at the structure `Greeting` in the JSON AST output. It has the trait `smithy.api#documentation`, with the value `"A greeting for one person."`. Smithy removes the space after `///`.
 

@@ -84,6 +84,10 @@
             "digest": "5e9cc1e2677bcfb09714b95afe5001240f5b34c14fdb5423d24084dd276f4077",
             "events": []
         },
+        "03-documentation/two-lines": {
+            "digest": "99f7f97b70e35a42d0a558de5120a4cc1a8922dab79893503e05a5c9888efb21",
+            "events": []
+        },
         "04-shape-ids/absolute-id": {
             "digest": "eeb681fbb9c45f11646d7cecbe597d1f955c7c2133947732f99a9d23a8b631ba",
             "events": []
@@ -102,6 +106,12 @@
             "digest": "7092c282a5516e9bd3540cb2beb1246e7069ccb5236a19b25cd35c4dd9aece3f",
             "events": [
                 "DeprecatedShape.example#Fahrenheit|WARNING|example#Reading$temperature"
+            ]
+        },
+        "05-reading-findings/suppress-error": {
+            "digest": "5f28eea878f9cc11c56df83d95b4c849a2f115236aec8910c7127d5303cdf857",
+            "events": [
+                "Target.UnresolvedShape|ERROR|example#Reading$place"
             ]
         },
         "05-reading-findings/suppressed": {
