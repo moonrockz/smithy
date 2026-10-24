@@ -15,6 +15,8 @@ import {
 }
 
 ///|
+/// The commit of pkgs/smithy/PRELUDE_SHA. site/tour/check/reference_test.mbt has the same value and compares it
+/// with that file.
 let reference_sha : String = "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
 
 ///|
@@ -28,7 +30,7 @@ let scratch : String = ".dev/out/reference-tour"
 
 ///|
 /// Reads the cases (`[{"id", "json_schema", "files": [{"name", "text"}]}]`) from args[0] and writes the results to
-/// args[1]. The digest is SHA-256 over the files sorted by name of name + NUL + text + NUL, in UTF-8.
+/// args[1], with args[2] as the reference SHA. The digest is SHA-256 over the files sorted by name of name + NUL + text + NUL, in UTF-8.
 let harness : String =
   #|import java.nio.charset.StandardCharsets;
   #|import java.nio.file.*;
@@ -83,7 +85,7 @@ let harness : String =
   #|      System.out.println("reference: " + id);
   #|    }
   #|    ObjectNode output = ObjectNode.builder()
-  #|        .withMember("reference_sha", "30bdab593f0c2cdf96036782cc3ce15c43a711ef")
+  #|        .withMember("reference_sha", args[2])
   #|        .withMember("cases", cases.build()).build();
   #|    Files.writeString(Path.of(args[1]), Node.prettyPrintJson(output.withDeepSortedKeys()) + "\n");
   #|  }
@@ -294,7 +296,7 @@ async fn main {
   let input = scratch + "/cases.json"
   @fs.write_file(input, Json::array(lesson_cases()).stringify(indent=2) + "\n")
   let output = scratch + "/reference-events.json"
-  println(checked("java", ["-cp", classes, "ReferenceTour", input, output]).trim_end())
+  println(checked("java", ["-cp", classes, "ReferenceTour", input, output, reference_sha]).trim_end())
   let actual = @fs.read_file(output).text()
   if options.check {
     let committed = if @fs.exists(results_path) { @fs.read_file(results_path).text() } else { "" }

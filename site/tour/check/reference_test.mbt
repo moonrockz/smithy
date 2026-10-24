@@ -11,7 +11,13 @@ let reference_path : String = "tour/reference-events.json"
 let allow_path : String = "tour/reference-allow.json"
 
 ///|
+/// The `smithy-lang/smithy` commit of the reference results. It is the commit
+/// of the vendored prelude, as for the other reference scripts.
 let reference_sha : String = "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
+
+///|
+/// The commit of the vendored prelude, written by `scripts/vendor-prelude.mbtx`.
+let prelude_sha_path : String = "../pkgs/smithy/PRELUDE_SHA"
 
 ///|
 /// The line that a lesson with a known difference must contain.
@@ -223,9 +229,14 @@ fn pointer_keys(pointer : String) -> Array[String] raise {
 }
 
 ///|
-/// The array index of a pointer key: decimal digits only.
+/// The array index of a pointer key: `0`, or decimal digits without a leading
+/// zero (RFC 6901).
 fn array_index(key : String) -> Int32? {
-  guard !key.is_empty() && key.length() < 10 else { return None }
+  guard !key.is_empty() &&
+    key.length() < 10 &&
+    (key == "0" || !key.has_prefix("0")) else {
+    return None
+  }
   let mut index = 0
   for c in key {
     guard c.is_ascii_digit() else { return None }
@@ -556,6 +567,11 @@ test "every allow list entry is used, has an issue, and its lesson says so" {
 }
 
 ///|
+test "the reference results use the commit of the vendored prelude" {
+  assert_eq(read_text(prelude_sha_path).trim().to_owned(), reference_sha)
+}
+
+///|
 /// Whether the text is a beads issue id: `smithy-` and then `[a-z0-9.]+`.
 fn is_issue(text : String) -> Bool {
   guard text.has_prefix("smithy-") && text.length() > 7 else { return false }
@@ -628,6 +644,17 @@ test "a JSON pointer removes one member or item, and reports a missing one" {
     json,
     parse_json("test", "{\"definitions\": {\"a/b\": {}, \"c~d\": [2]}}"),
   )
+}
+
+///|
+test "an array index of a JSON pointer is 0 or has no leading zero" {
+  assert_eq(array_index("0"), Some(0))
+  assert_eq(array_index("12"), Some(12))
+  assert_eq(array_index("01"), None)
+  assert_eq(array_index("00"), None)
+  assert_eq(array_index(""), None)
+  assert_eq(array_index("1a"), None)
+  assert_eq(array_index("-1"), None)
 }
 
 ///|

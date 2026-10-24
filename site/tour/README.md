@@ -83,8 +83,10 @@ checkout of `smithy-lang/smithy` at the commit `reference_sha`. The default is `
 script verifies every Java source file against the GitHub tree of that commit, compiles the sources with a small
 harness, and writes `site/tour/reference-events.json`. Generated code and classes stay in
 `.dev/out/reference-tour`. With `--check`, the script writes to a temporary file and fails when the committed file
-is different. To change the commit, change `reference_sha` in `scripts/reference-tour.mbtx` and in
-`site/tour/check/reference_test.mbt` together.
+is different. The script gives `reference_sha` to the harness as an argument, and the harness writes it into the
+file. To change the commit, change `reference_sha` in `scripts/reference-tour.mbtx` and in
+`site/tour/check/reference_test.mbt` together. A test requires it to be the commit in `pkgs/smithy/PRELUDE_SHA`,
+the commit of the vendored prelude and of the other reference scripts.
 
 ## The allow list
 
@@ -101,7 +103,9 @@ removes one copy of the event from the named side before the comparison. Use `ou
 the event, and `reference` when only the reference has it.
 
 A `kind` of `json_schema` has `pointer` (a JSON pointer, RFC 6901) and no `side`. A `side` on this kind is an
-error. The entry removes the value at the pointer from both JSON Schema documents.
+error. The entry removes the value at the pointer from both JSON Schema documents. The entries of one case
+apply in the order of the file, so a pointer sees the documents after the entries before it. For example, after
+an entry removes `/a/0`, the item that was at `/a/1` is at `/a/0`.
 
 Rules that the tests enforce:
 
