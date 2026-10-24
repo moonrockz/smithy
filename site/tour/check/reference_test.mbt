@@ -3,7 +3,11 @@
 let reference_path : String = "tour/reference-events.json"
 
 ///|
-/// The known differences from the Java reference.
+/// The known differences from the Java reference. Each entry has `case`
+/// (`<dir>/<case>`), `kind`, `reason` and `issue`. Kind `event` has `event`
+/// and `side` (`ours` or `reference`), and removes one copy of the event from
+/// that side. Kind `json_schema` has `pointer` and no `side`, and removes the
+/// value at the pointer from both JSON Schema documents.
 let allow_path : String = "tour/reference-allow.json"
 
 ///|
@@ -123,7 +127,15 @@ fn parse_allow(text : String) -> Array[Allowed] raise {
               )
           },
         )
-      "json_schema" => JsonSchema(pointer=string_member(entry, "pointer", where_))
+      "json_schema" => {
+        if entry is { "side": _, .. } {
+          fail(
+            where_ +
+            ": \"side\" is for kind \"event\" only; a json_schema entry removes the pointer from both sides",
+          )
+        }
+        JsonSchema(pointer=string_member(entry, "pointer", where_))
+      }
       other =>
         fail(
           where_ + ": \"kind\" must be \"event\" or \"json_schema\", not \"" +
@@ -188,8 +200,9 @@ fn array_index(key : String) -> Int? {
 }
 
 ///|
-/// Remove the value at the pointer. The result is false when no value is there.
-fn remove_pointer(json : Json, pointer : String) -> Bool raise {
+/// Remove the value at the pointer, and give it. The result is `None` when no
+/// value is there.
+fn remove_pointer(json : Json, pointer : String) -> Json? raise {
   let keys = pointer_keys(pointer)
   let mut node = json
   for i, key in keys {
@@ -197,10 +210,10 @@ fn remove_pointer(json : Json, pointer : String) -> Bool raise {
     match node {
       Object(members) =>
         match members.get(key) {
-          None => return false
-          Some(_) if last => {
+          None => return None
+          Some(value) if last => {
             members.remove(key)
-            return true
+            return Some(value)
           }
           Some(child) => node = child
         }
@@ -208,17 +221,33 @@ fn remove_pointer(json : Json, pointer : String) -> Bool raise {
         match array_index(key) {
           Some(index) if index < items.length() =>
             if last {
-              items.remove(index) |> ignore
-              return true
+              return Some(items.remove(index))
             } else {
               node = items[index]
             }
-          _ => return false
+          _ => return None
         }
-      _ => return false
+      _ => return None
     }
   }
-  false
+  None
+}
+
+///|
+/// Remove the value at the pointer from both documents. The result is true
+/// only when the values differ, or only one document has a value there.
+fn removes_difference(
+  ours : Json,
+  reference : Json,
+  pointer : String,
+) -> Bool raise {
+  remove_pointer(ours, pointer) != remove_pointer(reference, pointer)
+}
+
+///|
+/// The key as a JSON pointer token: `~` becomes `~0` and `/` becomes `~1`.
+fn pointer_token(key : String) -> String {
+  key.replace_all(old="~", new="~0").replace_all(old="/", new="~1")
 }
 
 ///|
@@ -228,9 +257,7 @@ fn json_differences(a : Json, b : Json, at : String) -> Array[String] {
     (Object(x), Object(y)) => {
       let result = []
       for key, value in x {
-        let path = at +
-          "/" +
-          key.replace_all(old="~", new="~0").replace_all(old="/", new="~1")
+        let path = at + "/" + pointer_token(key)
         match y.get(key) {
           Some(other) => result.append(json_differences(value, other, path))
           None => result.push(path + " (only ours)")
@@ -238,7 +265,7 @@ fn json_differences(a : Json, b : Json, at : String) -> Array[String] {
       }
       for key, _ in y {
         if !x.contains(key) {
-          result.push(at + "/" + key + " (only the reference)")
+          result.push(at + "/" + pointer_token(key) + " (only the reference)")
         }
       }
       result
@@ -310,23 +337,48 @@ fn inputs() -> (@model.Tour, Map[String, ReferenceCase], Array[Allowed]) raise {
 }
 
 ///|
+fn stale(where_ : String) -> String {
+  where_ +
+  ": the reference result is missing or stale; run `mise run reference:tour`"
+}
+
+///|
+/// Whether the reference must have a JSON Schema: the lesson output is JSON
+/// Schema, and the reference events have no ERROR or DANGER.
+fn needs_json_schema(output : @core.Output?, events : Array[String]) -> Bool {
+  output is Some(JsonSchema) &&
+  !events.any(e => e.contains("|ERROR|") || e.contains("|DANGER|"))
+}
+
+///|
+/// Fail when the reference result is not the result of these case files and
+/// this lesson output.
+fn check_fresh(
+  where_ : String,
+  entry : ReferenceCase,
+  digest : String,
+  output : @core.Output?,
+) -> Unit raise {
+  if entry.digest != digest ||
+    (entry.json_schema is Some(_)) != needs_json_schema(output, entry.events) {
+    fail(stale(where_))
+  }
+}
+
+///|
 fn reference_of(
   reference : Map[String, ReferenceCase],
   where_ : String,
 ) -> ReferenceCase raise {
   match reference.get(where_) {
     Some(entry) => entry
-    None =>
-      fail(
-        where_ +
-        ": the reference result is missing or stale; run `mise run reference:tour`",
-      )
+    None => fail(stale(where_))
   }
 }
 
 ///|
 /// Compare our events and JSON Schema with the reference for every case, and
-/// mark the allow list entries that remove something.
+/// mark the allow list entries that remove a difference.
 fn compare_all(
   tour : @model.Tour,
   reference : Map[String, ReferenceCase],
@@ -363,9 +415,7 @@ fn compare_all(
           entry.difference is JsonSchema(pointer~) else {
           continue
         }
-        let a = remove_pointer(mine, pointer)
-        let b = remove_pointer(theirs, pointer)
-        if a || b {
+        if removes_difference(mine, theirs, pointer) {
           used[i] = true
         }
       }
@@ -390,12 +440,12 @@ test "every lesson case has a fresh reference result" {
       let where_ = lesson.dir + "/" + case.name
       known.push(where_)
       let entry = reference_of(reference, where_)
-      if entry.digest != @model.digest(lesson.case_files(case)) {
-        fail(
-          where_ +
-          ": the reference result is missing or stale; run `mise run reference:tour`",
-        )
-      }
+      check_fresh(
+        where_,
+        entry,
+        @model.digest(lesson.case_files(case)),
+        lesson.output,
+      )
     }
   }
   for id, _ in reference {
@@ -427,7 +477,7 @@ test "every allow list entry is used, has an issue, and its lesson says so" {
   for i, entry in allow {
     let where_ = allow_path + " entry " + i.to_string() + " (" + entry.case_id + ")"
     if !used[i] {
-      fail(where_ + ": stale allow entry; it removes nothing")
+      fail(where_ + ": stale allow entry; it removes no difference")
     }
     if !is_issue(entry.issue) {
       fail(where_ + ": the issue \"" + entry.issue + "\" must match smithy-[a-z0-9.]+")
@@ -503,18 +553,70 @@ test "a JSON pointer removes one member or item, and reports a missing one" {
     "test",
     "{\"definitions\": {\"a/b\": {\"x\": 1}, \"c~d\": [1, 2]}}",
   )
-  assert_true(remove_pointer(json, "/definitions/a~1b/x"))
-  assert_true(remove_pointer(json, "/definitions/c~0d/0"))
-  assert_false(remove_pointer(json, "/definitions/missing"))
-  assert_false(remove_pointer(json, "/definitions/c~0d/5"))
+  assert_eq(remove_pointer(json, "/definitions/a~1b/x"), Some(Json::number(1)))
+  assert_eq(remove_pointer(json, "/definitions/c~0d/0"), Some(Json::number(1)))
+  assert_eq(remove_pointer(json, "/definitions/missing"), None)
+  assert_eq(remove_pointer(json, "/definitions/c~0d/5"), None)
   assert_eq(json, parse_json("test", "{\"definitions\": {\"a/b\": {}, \"c~d\": [2]}}"))
 }
 
 ///|
 test "the JSON differences name the pointers" {
-  let a = parse_json("test", "{\"a\": 1, \"b\": {\"c\": true}, \"d\": 2}")
-  let b = parse_json("test", "{\"a\": 1, \"b\": {\"c\": false}, \"e\": 2}")
+  let a = parse_json("test", "{\"a\": 1, \"b\": {\"c\": true}, \"d/~\": 2}")
+  let b = parse_json("test", "{\"a\": 1, \"b\": {\"c\": false}, \"e/~\": 2}")
   assert_eq(json_differences(a, b, ""), [
-    "/b/c", "/d (only ours)", "/e (only the reference)",
+    "/b/c", "/d~1~0 (only ours)", "/e~1~0 (only the reference)",
   ])
+}
+
+///|
+test "a JSON Schema lesson needs a reference schema unless the case has an error" {
+  let schema = Some(Json::object({}))
+  let entry = fn(events : Array[String], json_schema : Json?) -> ReferenceCase {
+    { digest: "d", events, json_schema }
+  }
+  check_fresh("a", entry([], schema), "d", Some(JsonSchema))
+  check_fresh("a", entry(["W|WARNING|-"], schema), "d", Some(JsonSchema))
+  check_fresh("a", entry(["E|ERROR|-"], None), "d", Some(JsonSchema))
+  check_fresh("a", entry(["E|DANGER|-"], None), "d", Some(JsonSchema))
+  check_fresh("a", entry([], None), "d", Some(JsonAst))
+  check_fresh("a", entry([], None), "d", None)
+  let stale_message = "a: the reference result is missing or stale; run `mise run reference:tour`"
+  for bad in [
+    (entry([], None), "d", Some(@core.Output::JsonSchema)),
+    (entry([], schema), "d", Some(@core.Output::JsonAst)),
+    (entry([], schema), "d", None),
+    (entry(["E|ERROR|-"], schema), "d", Some(@core.Output::JsonSchema)),
+    (entry([], None), "other", None),
+  ] {
+    try check_fresh("a", bad.0, bad.1, bad.2) catch {
+      Failure(message) => assert_true(message.has_suffix(stale_message))
+      e => fail("unexpected error: " + e.to_string())
+    } noraise {
+      _ => fail("a stale result passed")
+    }
+  }
+}
+
+///|
+test "a json_schema allow entry is used only when it removes a difference" {
+  let ours = parse_json("test", "{\"a\": 1, \"b\": 2, \"c\": 3}")
+  let theirs = parse_json("test", "{\"a\": 1, \"b\": 5}")
+  let used = ["/a", "/b", "/c", "/d"].map(pointer => {
+    removes_difference(ours, theirs, pointer)
+  })
+  assert_eq(used, [false, true, true, false])
+  assert_eq(ours, parse_json("test", "{}"))
+  assert_eq(theirs, parse_json("test", "{}"))
+}
+
+///|
+test "a json_schema allow entry must not name a side" {
+  let text = "[{\"case\": \"01-a/start\", \"kind\": \"json_schema\", \"pointer\": \"/a\", \"side\": \"ours\", \"reason\": \"r\", \"issue\": \"smithy-1\"}]"
+  try parse_allow(text) catch {
+    Failure(message) => assert_true(message.contains("\"side\" is for kind \"event\" only"))
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a json_schema entry with a side was accepted")
+  }
 }
