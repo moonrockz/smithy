@@ -412,13 +412,15 @@ fn Assembly::flatten_one(
       }
       match (if bound is Some(_) { bound } else { inherited }) {
         Some(target) => member_["target"] = Json::string(target)
-        None =>
+        None => {
           self.problem(
             "SM-MODEL-012",
             "I could not infer a target for the elided member \{raw.id}$\{name}.",
             self.locations.get(raw.id + "$" + name).unwrap_or(raw.source),
-            shape=raw.id,
+            shape=raw.id + "$" + name,
           )
+          continue
+        }
       }
     }
     self.merge_member(members, name, Json::object(member_), raw.source, raw.id)

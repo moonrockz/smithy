@@ -385,3 +385,15 @@ test "the reference documentation comment models give Smithy's events" {
     expected_invalid,
   )
 }
+
+///|
+test "an elided member that nothing defines is one Model error on the member, as in Smithy" {
+  assert_eq(
+    reference_keys(
+      "resource R {\n    identifiers: { id: String }\n    properties: { name: String }\n    read: Get\n}\n" +
+      "@readonly\noperation Get {\n    input := for R {\n        @required\n        $id\n    }\n" +
+      "    output := for R {\n        $population\n    }\n}",
+    ),
+    ["Model|ERROR|example#GetOutput$population"],
+  )
+}
