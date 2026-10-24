@@ -178,8 +178,11 @@ fn fence_of(line : String) -> (Char, Int, Int, String)? {
   if i >= line.length() {
     return None
   }
-  let ch = line[i].to_char().unwrap()
-  if ch != '`' && ch != '~' {
+  let ch = if line[i] == '`' {
+    '`'
+  } else if line[i] == '~' {
+    '~'
+  } else {
     return None
   }
   let mut j = i
@@ -189,7 +192,11 @@ fn fence_of(line : String) -> (Char, Int, Int, String)? {
   if j - i < 3 {
     return None
   }
-  Some((ch, j - i, i, line[j:].trim().to_owned()))
+  let info = line[j:].trim().to_owned()
+  if ch == '`' && info.contains("`") {
+    return None
+  }
+  Some((ch, j - i, i, info))
 }
 
 ///|

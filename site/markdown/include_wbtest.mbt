@@ -180,3 +180,31 @@ test "walk_blocks visits nested blocks" {
   )
   assert_eq(seen, ["a", "b"])
 }
+
+///|
+test "a line that starts with an emoji does not panic" {
+  let text = "😀 hi\n"
+  assert_eq(expand_includes(text, _ => Err("no")), Ok(text))
+}
+
+///|
+test "a backtick fence with a backtick in the info string is text" {
+  let text = "```include `x`\nCLI: a.md#x\n```\n"
+  assert_eq(expand_includes(text, _ => Err("resolve called")), Ok(text))
+}
+
+///|
+test "expand_includes reads CRLF text" {
+  let snippet : Snippet = { lang: "console", file: None, code: "$ smithy version" }
+  let r = expand_includes("A\r\n```include\r\nCLI: a.md#x\r\n```\r\nB\r\n", _ => Ok([
+    snippet,
+  ]))
+  assert_eq(
+    r,
+    Ok(
+      "A\r\n" +
+      tabs_fence([{ label: "CLI", snippets: [snippet] }]) +
+      "\nB\r\n",
+    ),
+  )
+}
