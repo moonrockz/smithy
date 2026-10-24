@@ -309,10 +309,10 @@ test "the Morphir FQName pattern validates within the default work limit" {
   assert_eq(codes(ok), [])
   let mixed = v.validate_json(Json::string("morphir/SdK:basics#int"))
   assert_eq(codes(mixed), ["Pattern"])
-  // 100000 / 1056 = 94: 93 units pass, 94 units reach the limit.
-  let at_limit = v.validate_json(Json::string("a:b#c" + "-c".repeat(44)))
+  // 100000 / 1376 = 72: 71 units pass, 72 units reach the limit.
+  let at_limit = v.validate_json(Json::string("a:b#c" + "-c".repeat(33)))
   assert_eq(codes(at_limit), [])
-  let over = v.validate_json(Json::string("a:b#cc" + "-c".repeat(44)))
+  let over = v.validate_json(Json::string("a:b#cc" + "-c".repeat(33)))
   assert_eq(codes(over), ["LimitExceeded"])
 }
 
@@ -324,7 +324,7 @@ test "the FQName pattern matches long values in linear work" {
       limits=@validation.Limits::new(work=10000000),
     ),
   )
-  let long = "a:b#c" + "-c".repeat(4000) // 8005 units, 8006 * 1056 = 8454336
+  let long = "a:b#c" + "-c".repeat(3000) // 6005 units, 6006 * 1376 = 8264256
   let ok = v.validate_json(Json::string(long))
   assert_true(ok.complete)
   assert_eq(codes(ok), [])

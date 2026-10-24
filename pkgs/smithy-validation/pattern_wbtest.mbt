@@ -27,13 +27,19 @@ test "pattern weight counts the copies the automaton builds" {
   for
     (pattern, weight) in [
       ("^[a-z]$", 24),
-      ("^[a-z0-9]+$", 48),
-      ("^a?$", 40),
+      ("^[a-z0-9]+$", 64), // a class counts its members
+      ("^a?$", 48), // ? counts two copies: core follows optional chains
       ("^(?:a*)*$", 64),
       ("^(?:a+)+$", 112), // control: + still counts two copies
       ("^[^a]$", 48), // control: a negated class keeps its source length
       (nested, 216), // 8 nested stars: linear, not 1276 units
-      (fqname_pattern, 1056),
+      (fqname_pattern, 1376),
+      ("^[\\d_]$", 32), // class escape counts its expanded members
+      ("^[\\w]$", 48),
+      ("^[\\s]$", 136),
+      ("^[\\u{1F600}]$", 104), // astral: source length
+      ("^[😀]$", 48), // literal astral character: source length
+      ("^[\\u00e9a-z]$", 32),
     ] {
     assert_eq(compile_pattern(pattern, id).weight, weight, msg=pattern)
   }
