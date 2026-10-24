@@ -510,6 +510,40 @@ fn reference_of(
 }
 
 ///|
+/// Compare our OpenAPI document with the reference one for a case. An allow
+/// entry of the case with kind `openapi` removes its pointer from both
+/// documents, and is marked used when that removes a difference. Fail on a
+/// difference that remains when `openapi` is true.
+fn compare_openapi(
+  case_id : @model.CaseId,
+  ours : Json?,
+  reference : Json,
+  allow : Array[Allowed],
+  used : Array[Bool],
+  openapi~ : Bool,
+) -> Unit raise {
+  let where_ = case_id.to_string()
+  guard document_pair(where_, ours, reference) is Some((mine, theirs)) else {
+    return
+  }
+  for i, entry in allow {
+    guard entry.case_id == case_id && entry.difference is OpenApi(pointer~) else {
+      continue
+    }
+    if removes_difference(mine, theirs, pointer) {
+      used[i] = true
+    }
+  }
+  if openapi && mine != theirs {
+    fail(
+      where_ +
+      ": our OpenAPI differs from the reference at " +
+      show(json_differences(mine, theirs, "")),
+    )
+  }
+}
+
+///|
 /// Compare our events and JSON Schema with the reference for every case, and
 /// mark the allow list entries that remove a difference.
 fn compare_all(
@@ -565,24 +599,7 @@ fn compare_all(
       if expected.openapi is Some(document) {
         let theirs = parse_json(reference_path, document.stringify())
         let mine = our_openapi(session, where_, lesson, files)
-        if document_pair(where_, mine, theirs) is Some((mine, theirs)) {
-          for i, entry in allow {
-            guard entry.case_id == case_id &&
-              entry.difference is OpenApi(pointer~) else {
-              continue
-            }
-            if removes_difference(mine, theirs, pointer) {
-              used[i] = true
-            }
-          }
-          if openapi && mine != theirs {
-            fail(
-              where_ +
-              ": our OpenAPI differs from the reference at " +
-              show(json_differences(mine, theirs, "")),
-            )
-          }
-        }
+        compare_openapi(case_id, mine, theirs, allow, used, openapi~)
       }
     }
   }
@@ -939,4 +956,100 @@ test "our OpenAPI agrees with the reference OpenAPI" {
       openapi=true,
     ),
   )
+}
+
+///|
+test "the OpenAPI comparison fails on a difference and honors the allow list" {
+  let json = (text : String) => parse_json("test", text)
+  let ours = json("{\"a\": 1, \"b\": 2}")
+  let theirs = json("{\"a\": 1, \"b\": 3}")
+  let start : @model.CaseId = { dir: "01-a", name: "start", }
+  let other : @model.CaseId = { dir: "01-a", name: "other", }
+  let allowed = (case_id : @model.CaseId, pointer : String) => {
+    case_id,
+    difference: OpenApi(pointer~),
+    reason: "r",
+    issue: "smithy-1",
+  }
+  // equal documents pass
+  compare_openapi(
+    start,
+    Some(json("{\"a\": 1}")),
+    json("{\"a\": 1}"),
+    [],
+    [],
+    openapi=true,
+  )
+  // different documents fail with the pointer
+  try compare_openapi(start, Some(ours), theirs, [], [], openapi=true) catch {
+    Failure(message) =>
+      assert_true(
+        message.contains(
+          "01-a/start: our OpenAPI differs from the reference at [/b",
+        ),
+      )
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a different document passed")
+  }
+  // a matching entry is used and the check passes
+  let allow = [allowed(start, "/b")]
+  let used = [false]
+  compare_openapi(
+    start,
+    Some(json("{\"a\": 1, \"b\": 2}")),
+    json("{\"a\": 1, \"b\": 3}"),
+    allow,
+    used,
+    openapi=true,
+  )
+  assert_eq(used, [true])
+  // a wrong case or pointer stays unused and the difference fails
+  for wrong in [allowed(other, "/b"), allowed(start, "/c")] {
+    let used = [false]
+    try
+      compare_openapi(
+        start,
+        Some(json("{\"a\": 1, \"b\": 2}")),
+        json("{\"a\": 1, \"b\": 3}"),
+        [wrong],
+        used,
+        openapi=true,
+      )
+    catch {
+      Failure(message) => assert_true(message.contains("our OpenAPI differs"))
+      e => fail("unexpected error: " + e.to_string())
+    } noraise {
+      _ => fail("a difference passed with a wrong allow entry")
+    }
+    assert_eq(used, [false])
+  }
+  // a blocked output and a failed conversion agree
+  compare_openapi(start, None, Json::null(), [], [], openapi=true)
+}
+
+///|
+test "our OpenAPI document is the .openapi.json file of the transform" {
+  let model = "$version: \"2\"\nnamespace example.web\nuse aws.protocols#restJson1\n@restJson1\nservice Weather { version: \"1\", operations: [GetCity] }\n@readonly\n@http(method: \"GET\", uri: \"/city\")\noperation GetCity { output: CityOutput }\nstructure CityOutput { name: String }\n"
+  let lesson : @model.Lesson = {
+    dir: "99-x",
+    number: 99,
+    slug: "x",
+    title: "x",
+    section: "x",
+    output: Some(OpenApi30),
+    selector: None,
+    spec: "",
+    text: "",
+    files: [],
+    cases: [],
+  }
+  let document = our_openapi(@core.Session::new(), "a", lesson, [
+    ("model.smithy", model),
+  ])
+  guard document
+    is Some({ "openapi": String("3.0.2"), "paths": Object(paths), .. }) else {
+    fail("the OpenAPI document is missing or has no version 3.0.2 and paths")
+  }
+  assert_true(paths.contains("/city"))
 }

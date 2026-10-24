@@ -29,8 +29,8 @@ let results_path : String = "site/tour/reference-events.json"
 let scratch : String = ".dev/out/reference-tour"
 
 ///|
-/// Reads the cases (`[{"id", "json_schema", "http_protocols", "files": [{"name", "text"}], "openapi"?}]`) from args[0] and writes the results to
-/// args[1], with args[2] as the reference SHA. The digest is SHA-256 over the files sorted by name of name + NUL + text + NUL, in UTF-8.
+/// Reads the cases (`[{"id", "json_schema", "http_protocols", "files": [{"name", "text"}], "openapi"?}]`) from
+/// args[0] and writes the results to args[1], with args[2] as the reference SHA. The digest is SHA-256 over the files sorted by name of name + NUL + text + NUL, in UTF-8.
 let harness : String =
   #|import java.nio.charset.StandardCharsets;
   #|import java.nio.file.*;
@@ -103,6 +103,7 @@ let harness : String =
   #|          try {
   #|            openapi = OpenApiConverter.create().config(OpenApiConfig.fromNode(settings)).convertToNode(model);
   #|          } catch (RuntimeException e) {
+  #|            System.err.println("reference: " + id + ": the OpenAPI conversion failed: " + e);
   #|            openapi = Node.nullNode();
   #|          }
   #|        }
