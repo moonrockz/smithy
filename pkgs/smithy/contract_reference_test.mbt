@@ -192,3 +192,148 @@ test "the selector check reports a contract trait on the wrong shape once" {
     )
   }
 }
+
+///|
+test "values in the model must match the contract conditions, as in Smithy" {
+  let size_trait = "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n@trait\n@conditions({\n    MinNotAboveMax: {\n        expression: \"min <= max\"\n        documentation: \"min must not be more than max.\"\n    }\n})\nstructure size {\n    @required\n    min: Integer\n    @required\n    max: Integer\n}\n"
+  assert_eq(
+    contract_keys(size_trait + "@size(min: 1, max: 2)\nstring Name\n"),
+    [],
+  )
+  assert_eq(
+    contract_keys(size_trait + "@size(min: 10, max: 2)\nstring Name\n"),
+    ["TraitValue.MinNotAboveMax|ERROR|example#Name"],
+  )
+  let city_id = "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n@conditions({\n    NoSpaces: {\n        expression: \"!contains(@, ' ')\"\n        documentation: \"A city ID has no spaces.\"\n    }\n})\nstring CityId\n"
+  assert_eq(
+    contract_keys(
+      city_id + "structure Search {\n    cityId: CityId = \"new-york\"\n}\n",
+    ),
+    [],
+  )
+  assert_eq(
+    contract_keys(
+      city_id + "structure Search {\n    cityId: CityId = \"new york\"\n}\n",
+    ),
+    ["DefaultTrait.NoSpaces|ERROR|example#Search$cityId"],
+  )
+}
+
+///|
+/// The events of `text` that come from a contract condition on a value.
+fn condition_events(text : String) -> Array[String] {
+  let result = @smithy.Loader::new().add_idl("model.smithy", text).assemble()
+  let events = result
+    .validation_events()
+    .filter(e => {
+      e.id.has_prefix("TraitValue.") ||
+      e.id.has_prefix("DefaultTrait.") ||
+      e.id.has_prefix("ExamplesTrait.")
+    })
+    .map(e => {
+      e.id +
+      "|" +
+      e.severity +
+      "|" +
+      e.shape.map(s => s.to_string()).unwrap_or("-") +
+      "|" +
+      e.message
+    })
+  events.sort_by(code_unit_order)
+  events
+}
+
+///|
+test "each shape that a value visits checks its own conditions, as in Smithy" {
+  let header = "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n"
+  // A member and its target both have conditions.
+  assert_eq(
+    condition_events(
+      header +
+      "@conditions({T: {expression: \"@ > `5`\", documentation: \"x\"}})\ninteger N\nstructure S {\n    @conditions({M: {expression: \"@ > `3`\", documentation: \"x\"}})\n    n: N = 1\n}\n",
+    ),
+    [
+      "DefaultTrait.M|ERROR|example#S$n|Error validating value: Value provided for `example#S$n` must match the M condition expression",
+      "DefaultTrait.T|ERROR|example#S$n|Error validating value: Value provided for `example#N` must match the T condition expression",
+    ],
+  )
+  // A list and its member, inside a trait value.
+  assert_eq(
+    condition_events(
+      header +
+      "@trait\nstructure t {\n    items: Items\n}\n@conditions({Short: {expression: \"length(@) < `2`\", documentation: \"x\"}})\nlist Items {\n    @conditions({NoX: {expression: \"@ != 'x'\", documentation: \"x\"}})\n    member: String\n}\n@t(items: [\"a\", \"x\", \"b\"])\nstring X\n",
+    ),
+    [
+      "TraitValue.NoX|ERROR|example#X|Error validating value/items/1: Value provided for `example#Items$member` must match the NoX condition expression",
+      "TraitValue.Short|ERROR|example#X|Error validating value/items: Value provided for `example#Items` must match the Short condition expression",
+    ],
+  )
+  // Map keys, map values, and two conditions on one shape.
+  assert_eq(
+    condition_events(
+      header +
+      "@trait\nmap t {\n    key: K\n    value: V\n}\n@conditions({KeyShort: {expression: \"length(@) < `3`\", documentation: \"x\"}})\nstring K\n@conditions({Pos: {expression: \"@ > `0`\", documentation: \"x\"}, Small: {expression: \"@ < `5`\", documentation: \"x\"}})\ninteger V\n@t(abcd: 9, ab: -1)\nstring X\n",
+    ).map(e => e.split("|").take(3).map(s => s.to_owned()).join("|")),
+    [
+      "TraitValue.KeyShort|ERROR|example#X", "TraitValue.Pos|ERROR|example#X", "TraitValue.Small|ERROR|example#X",
+    ],
+  )
+  // An enum, a timestamp, and a union value with two members.
+  assert_eq(
+    condition_events(
+      header +
+      "@conditions({Never: {expression: \"`false`\", documentation: \"x\"}})\nenum E {\n    A\n}\n@conditions({Never: {expression: \"`false`\", documentation: \"x\"}})\ntimestamp T\n@conditions({Never: {expression: \"`false`\", documentation: \"x\"}})\nunion U {\n    a: String\n    b: String\n}\nstructure S {\n    e: E = \"A\"\n    t: T = 0\n}\n@trait\nstructure tr { u: U }\n@tr(u: {a: \"x\", b: \"y\"})\nstring X\n",
+    ).map(e => e.split("|").take(3).map(s => s.to_owned()).join("|")),
+    [
+      "DefaultTrait.Never|ERROR|example#S$e", "DefaultTrait.Never|ERROR|example#S$t",
+      "TraitValue.Never|ERROR|example#X",
+    ],
+  )
+}
+
+///|
+test "a value that does not reach a shape skips its conditions, as in Smithy" {
+  let header = "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n@conditions({Never: {expression: \"`false`\", documentation: \"x\"}})\n"
+  // Document values are always valid.
+  assert_eq(
+    condition_events(
+      header + "document D\nstructure S {\n    d: D = \"x\"\n}\n",
+    ),
+    [],
+  )
+  // A value of the wrong type gives only the type event.
+  assert_eq(
+    condition_events(header + "integer N\nstructure S {\n    n: N = \"a\"\n}\n"),
+    [],
+  )
+  // A null default is not validated.
+  assert_eq(
+    condition_events(
+      header +
+      "integer N\nstructure S {\n    @conditions({M: {expression: \"`false`\", documentation: \"x\"}})\n    n: N = null\n}\n",
+    ),
+    [],
+  )
+}
+
+///|
+test "an example value that fails a condition has the examples event ID" {
+  let model = "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n@conditions({Small: {expression: \"@ < `10`\", documentation: \"x\"}})\ninteger N\nstructure In {\n    n: N\n}\n@examples([{title: \"one\", input: {n: 20}}])\noperation Op {\n    input: In\n}\n"
+  assert_eq(condition_events(model), [
+    "ExamplesTrait.Small|ERROR|example#Op|Example input of `one`.n: Value provided for `example#N` must match the Small condition expression",
+  ])
+  // allowConstraintErrors makes the event a warning.
+  let allowed = model
+    .replace(
+      old="input: {n: 20}}",
+      new="input: {n: 20}, allowConstraintErrors: true, error: {shapeId: Err, content: {}}}",
+    )
+    .replace(
+      old="    input: In\n}\n",
+      new="    input: In\n    errors: [Err]\n}\n",
+    ) +
+    "@error(\"client\")\nstructure Err {}\n"
+  assert_eq(condition_events(allowed), [
+    "ExamplesTrait.Small|WARNING|example#Op|Example input of `one`.n: Value provided for `example#N` must match the Small condition expression",
+  ])
+}
