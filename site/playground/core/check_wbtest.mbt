@@ -619,3 +619,17 @@ test "a bad response option is blocked before the model loads" {
     "I expected an application method name, but found 'rpc.x'.",
   )
 }
+
+///|
+test "a bad shape ID is blocked before the model loads" {
+  let model =
+    #|$version: "2"
+    #|namespace example
+    #|structure Input { x: Missing }
+  let response = check("{}", shape="Input", model~)
+  assert_eq(blocked_kind(response), Other)
+  assert_eq(
+    blocked_reason(response),
+    "I expected an absolute shape ID for the shape, but found 'Input'.",
+  )
+}

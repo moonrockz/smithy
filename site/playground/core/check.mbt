@@ -81,7 +81,8 @@ fn stopped(
 ///|
 /// Check a JSON value against a data shape, as `smithy validate value` does
 /// (`run_value_validation` in `apps/smithy/value_cli.mbt`), with the same
-/// library calls in the same order and the same codes and messages.
+/// library calls in the same order and the same codes and messages. As the
+/// CLI, it checks the shape ID before it loads the model.
 fn check_value(
   seq : Int32,
   files : Array[(String, String)],
@@ -89,15 +90,15 @@ fn check_value(
   value : String,
   options : ValueOptions,
 ) -> Response {
-  let model = match clean_model(load(files)) {
-    Ok(model) => model
-    Err((reason, kind)) => return Blocked(seq~, reason~, kind~)
-  }
   guard @smithy.ShapeId::parse(shape) is Some(target) else {
     return blocked(
       seq~,
       reason="I expected an absolute shape ID for the shape, but found '\{shape}'.",
     )
+  }
+  let model = match clean_model(load(files)) {
+    Ok(model) => model
+    Err((reason, kind)) => return Blocked(seq~, reason~, kind~)
   }
   let prepared = @validation.PreparedValidator::prepare(
     model,
