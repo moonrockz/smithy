@@ -1,6 +1,6 @@
 # Structures and members
 
-A structure is a fixed set of named members. The members are not ordered. Each member can have a value of a different type.
+A structure is a fixed set of named members. The members have no order. Each member can have a value of a different type.
 
 Write a member as a name, a colon and a target. The target is the shape of the member value.
 
@@ -21,4 +21,4 @@ phone: String
 
 The schema of `Customer` now has the property `phone`, with `"type": "string"`.
 
-When you [add a member](https://smithy.io/2.0/spec/aggregate-types.html#adding-new-structure-members) to a structure that is in use, add it at the end. Some programming languages need a fixed layout of the data. A new member at the end keeps the old layout the same.
+The specification recommends that you [add a new member](https://smithy.io/2.0/spec/aggregate-types.html#adding-new-structure-members) at the end of a structure that is in use. Some programming languages need a fixed layout of the data. A new member at the end keeps the old layout the same.
