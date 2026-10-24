@@ -252,7 +252,7 @@ fn compile_pattern(
         119 => Some("A-Za-z0-9_")
         115 =>
           Some(
-            "\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff",
+            "\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff",
           )
         _ => None
       }
@@ -276,12 +276,15 @@ fn compile_pattern(
             68 => "[^0-9]"
             87 => "[^A-Za-z0-9_]"
             _ =>
-              "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+              "[^\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
           },
         )
       } else {
         if escape == 98 && class is Some(_) {
           out.write_string("\\u0008")
+        } else if escape == 118 {
+          // Core has no \v escape; U+000B is what ECMA reads.
+          out.write_string("\\u000b")
         } else {
           guard [
             92, 46, 94, 36, 124, 63, 42, 43, 40, 41, 91, 93, 123, 125, 45, 47, 110,

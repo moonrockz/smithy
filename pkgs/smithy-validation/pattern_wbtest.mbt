@@ -90,3 +90,24 @@ test "a braced unicode escape is rejected" {
     assert_true(message.contains("\\u{"), msg=pattern)
   }
 }
+
+///|
+test "vertical tab matches \\s and \\v, and the letter v and a backslash do not" {
+  let id = @smithy.ShapeId::parse("example#String").unwrap()
+  for
+    (pattern, good, bad) in [
+      ("^\\s$", "\u{0b}", "v"),
+      ("^\\s$", "\u{0b}", "\\"),
+      ("^\\S$", "v", "\u{0b}"),
+      ("^\\S$", "\\", "\u{0b}"),
+      ("^[\\s]$", "\u{0b}", "v"),
+      ("^[\\s]$", "\u{0b}", "\\"),
+      ("^\\S+$", "value", "a\u{0b}b"),
+      ("^\\v$", "\u{0b}", "v"),
+      ("^[\\v]$", "\u{0b}", "v"),
+    ] {
+    let compiled = compile_pattern(pattern, id)
+    assert_true(compiled.execute(good), msg=pattern + " good")
+    assert_false(compiled.execute(bad), msg=pattern + " bad")
+  }
+}
