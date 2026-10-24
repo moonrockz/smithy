@@ -53,7 +53,7 @@ test "the core diff of every corpus pair equals the Java-verified events" {
           "message": String(message),
           ..
         } else {
-        return Some("invalid")
+        fail("\{old}: an event needs id, shape, severity and message")
       }
       if severity == "SUPPRESSED" {
         None

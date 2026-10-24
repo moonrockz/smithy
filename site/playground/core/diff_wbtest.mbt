@@ -174,3 +174,28 @@ test "a load with no model and no error gives a finding with a reason" {
   assert_eq(findings[0].code, "ModelNotBuilt")
   assert_eq(findings[0].severity, "ERROR")
 }
+
+///|
+test "ModelNotBuilt is a finding of its side and never an event" {
+  let unbuilt : @smithy.LoadResult = {
+    model: None,
+    diagnostics: [],
+    validation_findings: [],
+  }
+  for side in [0, 1] {
+    let clean = load([("model.smithy", base)])
+    let response = if side == 0 {
+      diff_loaded(1, unbuilt, [], clean, [("model.smithy", base)])
+    } else {
+      diff_loaded(1, clean, [("model.smithy", base)], unbuilt, [])
+    }
+    guard response is Diffed(old~, new~, events~, breaking~, ..) else {
+      fail("expected Diffed")
+    }
+    assert_eq(events, None)
+    assert_false(breaking)
+    let (own, other) = if side == 0 { (old, new) } else { (new, old) }
+    assert_eq(own.map(d => d.code), ["ModelNotBuilt"])
+    assert_eq(other, [])
+  }
+}

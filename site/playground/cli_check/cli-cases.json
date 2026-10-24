@@ -765,6 +765,30 @@
         "[NOTE] example.constraints#RangeMax: Added trait `smithy.api#range` with value \\n```\\n{\\n    \"max\": 10\\n}\\n```\\n | ModifiedTrait.Add.smithy.api#range",
         "[NOTE] example.constraints#RangeMin: Added trait `smithy.api#range` with value \\n```\\n{\\n    \"min\": -10\\n}\\n```\\n | ModifiedTrait.Add.smithy.api#range"
       ]
+    },
+    {
+      "id": "diff-removed-shape",
+      "args": [
+        "diff",
+        "--old",
+        "old.smithy",
+        "--new",
+        "new.smithy"
+      ],
+      "files": [
+        {
+          "name": "old.smithy",
+          "text": "$version: \"2\"\nnamespace example\nstructure A { x: String }\nstructure B { y: String }"
+        },
+        {
+          "name": "new.smithy",
+          "text": "$version: \"2\"\nnamespace example\nstructure A { x: String }"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "[ERROR] example#B: Removed structure `example#B` | RemovedShape"
+      ]
     }
   ]
 }

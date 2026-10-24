@@ -41,8 +41,18 @@ fn diff_models(
   old : Array[(String, String)],
   new : Array[(String, String)],
 ) -> Response {
-  let old_loaded = load(old)
-  let new_loaded = load(new)
+  diff_loaded(seq, load(old), old, load(new), new)
+}
+
+///|
+/// The answer for two loads of `diff_models`.
+fn diff_loaded(
+  seq : Int32,
+  old_loaded : @smithy.LoadResult,
+  old : Array[(String, String)],
+  new_loaded : @smithy.LoadResult,
+  new : Array[(String, String)],
+) -> Response {
   let old_findings = diff_findings(old_loaded, old)
   let new_findings = diff_findings(new_loaded, new)
   guard comparable(old_loaded) is Some(old_model) &&
