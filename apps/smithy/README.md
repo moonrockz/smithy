@@ -247,9 +247,14 @@ Diagnostics identify the condition and its expression-relative location.
 The events use the IDs of the Smithy reference: `Model` for a syntax error, `ConditionsTrait` for a function error
 or a result that is not boolean (DANGER), `ConditionsTrait.JmespathProblem.JmespathEventDanger.<Name>`,
 `ConditionsTrait.JmespathProblem.JmespathEventWarning.<Name>`, `TraitValue` and `TraitTarget`.
-Validation also evaluates the conditions on trait values, default values and examples. A value that
-fails a condition gives `TraitValue.<Name>`, `DefaultTrait.<Name>` or `ExamplesTrait.<Name>`, as in the
-Smithy reference. Conversion preserves expressions and documentation without evaluating contracts.
+Validation also evaluates the conditions on trait values, default values, examples, typed metadata and
+protocol test parameters. A value that fails a condition gives `TraitValue.<Name>`, `DefaultTrait.<Name>`,
+`ExamplesTrait.<Name>`, `TypedMetadata.<key>.<Name>` or the protocol test event ID plus the name, as in the
+Smithy reference. The event is an ERROR, or a WARNING for an example with `allowConstraintErrors`. A failed
+trait value prevents assembly, as every other `TraitValue` error does; for the other values the model still
+assembles. A result that is not boolean, or an evaluation error, also fails the condition, and the message
+says why; the Smithy reference stops the validation in these two cases.
+Conversion preserves expressions and documentation without evaluating contracts.
 `smithy validate value` does not evaluate conditions; it reports `UnsupportedConstraint`.
 
 IDL output uses Smithy 2, absolute references and flattened inherited contents.

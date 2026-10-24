@@ -12,8 +12,13 @@ fn code_unit_order(a : String, b : String) -> Int32 {
 
 ///|
 /// Sorted keys `id|SEVERITY|shape` of the WARNING, DANGER and ERROR events of `text`.
-fn contract_keys(text : String) -> Array[String] {
-  let result = @smithy.Loader::new().add_idl("model.smithy", text).assemble()
+fn contract_keys(
+  text : String,
+  protocol_tests~ : Bool = false,
+) -> Array[String] {
+  let result = @smithy.Loader::new(protocol_tests~)
+    .add_idl("model.smithy", text)
+    .assemble()
   let keys = result
     .validation_events()
     .filter(e => {
@@ -336,4 +341,60 @@ test "an example value that fails a condition has the examples event ID" {
   assert_eq(condition_events(allowed), [
     "ExamplesTrait.Small|WARNING|example#Op|Example input of `one`.n: Value provided for `example#N` must match the Small condition expression",
   ])
+}
+
+///|
+test "a typed metadata value that fails a condition has the metadata event ID" {
+  let model = "$version: \"2\"\nmetadata limits = {min: 10, max: 2}\nnamespace example\nuse smithy.contracts#conditions\n@metadata(key: \"limits\")\n@conditions({\n    MinNotAboveMax: {\n        expression: \"min <= max\"\n        documentation: \"min must not be more than max.\"\n    }\n})\nstructure Limits {\n    @required\n    min: Integer\n    @required\n    max: Integer\n}\n"
+  assert_eq(contract_keys(model), [
+    "TypedMetadata.limits.MinNotAboveMax|ERROR|-",
+  ])
+  assert_eq(
+    contract_keys(
+      model.replace(old="{min: 10, max: 2}", new="{min: 1, max: 2}"),
+    ),
+    [],
+  )
+}
+
+///|
+test "protocol test parameters that fail a condition have the protocol test event ID" {
+  let model = "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\nuse smithy.test#httpRequestTests\n\n@protocolDefinition\n@trait\nstructure testProtocol {}\n\n@testProtocol\nservice Svc {\n    version: \"1\"\n    operations: [Op]\n}\n\n@http(method: \"POST\", uri: \"/op\")\n@httpRequestTests([\n    {\n        id: \"OpBad\"\n        protocol: testProtocol\n        method: \"POST\"\n        uri: \"/op\"\n        params: {n: 20}\n    }\n])\noperation Op {\n    input: OpInput\n}\n\n@input\nstructure OpInput {\n    n: Small\n}\n\n@conditions({\n    Under10: {\n        expression: \"@ < `10`\"\n        documentation: \"Under ten.\"\n    }\n})\ninteger Small\n"
+  assert_eq(contract_keys(model, protocol_tests=true), [
+    "HttpRequestTestsInput.Under10|ERROR|example#Op",
+  ])
+  assert_eq(
+    contract_keys(
+      model.replace(old="params: {n: 20}", new="params: {n: 2}"),
+      protocol_tests=true,
+    ),
+    [],
+  )
+}
+
+///|
+test "a failed condition says why when the result is not boolean or the evaluation fails" {
+  // Smithy stops the validation in these cases; we fail the condition and say why.
+  let header = "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n"
+  let with_default = fn(expression : String) {
+    header +
+    "@conditions({C: {expression: " +
+    Json::string(expression).stringify() +
+    ", documentation: \"x\"}})\ninteger N\nstructure S {\n    n: N = 1\n}\n"
+  }
+  assert_eq(condition_events(with_default("@")), [
+    "DefaultTrait.C|ERROR|example#S$n|Error validating value: Value provided for `example#N` must match the C condition expression, but the result is a number, not a boolean",
+  ])
+  assert_eq(condition_events(with_default("length(@) > `0`")), [
+    "DefaultTrait.C|ERROR|example#S$n|Error validating value: Value provided for `example#N` must match the C condition expression, but I could not evaluate it: I expected string|array|object in JMESPath function length.",
+  ])
+  assert_eq(
+    condition_events(
+      header +
+      "@trait\n@conditions({HasA: {expression: \"a\", documentation: \"x\"}})\nstructure t {\n    a: Boolean\n}\n@t\nstring X\n",
+    ),
+    [
+      "TraitValue.HasA|ERROR|example#X|Error validating value: Value provided for `example#t` must match the HasA condition expression, but the result is null, not a boolean",
+    ],
+  )
 }

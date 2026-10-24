@@ -72,6 +72,31 @@ fn parsed_condition(
 }
 
 ///|
+/// Evaluate a condition on a value. `None` means the condition holds. A
+/// failure gives the text to add to the message: empty for a `false` result,
+/// as in Smithy, and the reason for a result that is not boolean or an
+/// evaluation error. Smithy stops the validation in these two cases.
+fn condition_failure(
+  expression : @jmespath.Expression,
+  value : NodeValue,
+) -> String? {
+  let result = expression.evaluate(@json.to_json(value)) catch {
+    @jmespath.JmespathError(diagnostic) =>
+      return Some(", but I could not evaluate it: " + diagnostic.message)
+  }
+  let kind = match result {
+    True => return None
+    False => return Some("")
+    Null => "null"
+    Number(_) => "a number"
+    String(_) => "a string"
+    Array(_) => "an array"
+    Object(_) => "an object"
+  }
+  Some(", but the result is " + kind + ", not a boolean")
+}
+
+///|
 /// Tell whether the value reaches the node validator plugins of a shape with
 /// this body, as in Smithy's `NodeValidationVisitor`: a member always, a
 /// document never, a timestamp always, and any other shape only when the value
@@ -303,12 +328,7 @@ fn Model::node_validation_events(
           parsed_condition(conditions_parsed, expression) is Some(parsed) else {
           continue
         }
-        let holds = try
-          parsed.evaluate(@json.to_json(value)) == Json::boolean(true)
-        catch {
-          _ => false
-        }
-        if !holds {
+        if condition_failure(parsed, value) is Some(reason) {
           emit(
             "." + name,
             constraint_severity,
@@ -316,7 +336,8 @@ fn Model::node_validation_events(
             target.to_string() +
             "` must match the " +
             name +
-            " condition expression",
+            " condition expression" +
+            reason,
           )
         }
       }
