@@ -1,6 +1,6 @@
 # Hello, Smithy
 
-A Smithy model has one or more files. You write each file in the Smithy IDL. This model has one file.
+A Smithy model has one or more files. A file uses the Smithy IDL or the JSON AST. This tour writes models in the Smithy IDL. This model has one file.
 
 An IDL file has three sections, in this order: the control section, the metadata section, and the shape section. Each section is optional. This file has no metadata section.
 

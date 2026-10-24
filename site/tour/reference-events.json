@@ -9,6 +9,104 @@
         "01-hello-smithy/start": {
             "digest": "9e02d76db2e3c58b3b4d8e8308ea1589a2ba9adc03f3fe514a7f6e95cbe6a23c",
             "events": []
+        },
+        "02-simple-shapes/count-as-string": {
+            "digest": "4b24fb4de1877a456dc4c74cb4c1e379382635d6bebe79e0957b4205d38d13c9",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "Reading": {
+                        "properties": {
+                            "count": {
+                                "type": "string"
+                            },
+                            "extra": {},
+                            "raw": {
+                                "type": "string"
+                            },
+                            "sensor": {
+                                "type": "string"
+                            },
+                            "takenAt": {
+                                "format": "date-time",
+                                "type": "string"
+                            },
+                            "valid": {
+                                "type": "boolean"
+                            },
+                            "value": {
+                                "type": "number"
+                            }
+                        },
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "02-simple-shapes/start": {
+            "digest": "7cd2a86e27880d938ba31c80b7ba18290297da5a5988abfc0e0a99d8c53efe68",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "Reading": {
+                        "properties": {
+                            "count": {
+                                "type": "number"
+                            },
+                            "extra": {},
+                            "raw": {
+                                "type": "string"
+                            },
+                            "sensor": {
+                                "type": "string"
+                            },
+                            "takenAt": {
+                                "format": "date-time",
+                                "type": "string"
+                            },
+                            "valid": {
+                                "type": "boolean"
+                            },
+                            "value": {
+                                "type": "number"
+                            }
+                        },
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "03-documentation/member-documentation": {
+            "digest": "648b3bc6e0570f3a2e2511b74ec242e4097820434b71dd47cff4b0cb97a67172",
+            "events": []
+        },
+        "03-documentation/start": {
+            "digest": "5e9cc1e2677bcfb09714b95afe5001240f5b34c14fdb5423d24084dd276f4077",
+            "events": []
+        },
+        "04-shape-ids/absolute-id": {
+            "digest": "eeb681fbb9c45f11646d7cecbe597d1f955c7c2133947732f99a9d23a8b631ba",
+            "events": []
+        },
+        "04-shape-ids/no-use": {
+            "digest": "7c41b40b9815d632a65737e02dfa1812609c94b910a9157e9ad6d063045b54c7",
+            "events": [
+                "Target.UnresolvedShape|ERROR|example.weather#Forecast$city"
+            ]
+        },
+        "04-shape-ids/start": {
+            "digest": "f2bf949a4c9ee3bec6cb10c5ef67d9f93279f65ee487d18bf5211022e09e6c4c",
+            "events": []
+        },
+        "05-reading-findings/start": {
+            "digest": "7092c282a5516e9bd3540cb2beb1246e7069ccb5236a19b25cd35c4dd9aece3f",
+            "events": [
+                "DeprecatedShape.example#Fahrenheit|WARNING|example#Reading$temperature"
+            ]
+        },
+        "05-reading-findings/suppressed": {
+            "digest": "25d4ee463a96a544578bdb7fa49c676d32007d87af4a112c700cf3d3a0ef2dca",
+            "events": []
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
