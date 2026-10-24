@@ -1,6 +1,6 @@
 # Defining your own traits
 
-You can [define a trait](https://smithy.io/2.0/spec/model.html#defining-traits) of your own. A trait is a shape with the trait `@trait`. The members of the trait shape are the values that a user of the trait gives. By convention, the name of a trait shape starts with a lower-case letter.
+You can [define a trait](https://smithy.io/2.0/spec/model.html#defining-traits) of your own. A trait is a shape with the trait `@trait`. The members of a structure trait are the values that a user of the trait gives. By convention, the name of a trait shape starts with a lower-case letter.
 
 In this model, `event` is a trait. It has one required member, `name`. The structure `CityCreated` uses the trait with `@event(name: "city-created")`.
 

@@ -1,1 +1,1 @@
-{"events": [], "output_contains": ["\"smithy.api#required\": {}", "\"smithy.api#tags\"", "\"smithy.api#length\"", "\"max\": 64", "\"smithy.api#documentation\": \"Degrees north of the equator.\""]}
+{"events": [], "output_contains": ["\"smithy.api#required\": {}", "\"smithy.api#tags\"", "\"smithy.api#length\"", "\"max\": 64", "\"smithy.api#documentation\": \"Degrees north of the equator.\"", "\"smithy.api#length\": {\n                            \"min\": 1,\n                            \"max\": 64\n                        }"]}

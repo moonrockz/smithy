@@ -11,7 +11,7 @@ This model uses four forms of trait value:
 
 The value must agree with the shape of the trait. The table of [trait node values](https://smithy.io/2.0/spec/model.html#trait-node-values) gives the value form for each type of shape.
 
-The [`apply` statement](https://smithy.io/2.0/spec/idl.html#apply-statement) puts a trait on a shape from outside the shape definition. Smithy treats this trait the same as a trait in the definition. In this model, `apply` gives the member `latitude` its documentation. Look at `latitude` in the JSON AST. It has `"smithy.api#documentation": "Degrees north of the equator."`.
+The [`apply` statement](https://smithy.io/2.0/spec/idl.html#apply-statement) puts a trait on a shape from outside the shape definition. Smithy [treats this trait](https://smithy.io/2.0/spec/model.html#applying-traits-externally) the same as a trait in the definition. In this model, `apply` gives the member `latitude` its documentation. Look at `latitude` in the JSON AST. It has `"smithy.api#documentation": "Degrees north of the equator."`.
 
 The definition of each trait tells which shapes can have it. Change `@range(min: -90, max: 90)` to `@length(min: 1)`. `@length` cannot go on a member that targets `Float`. The Findings tab shows an error with the event ID `TraitTarget` on `example#City$latitude`. Change it back.
 
