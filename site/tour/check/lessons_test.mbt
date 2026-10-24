@@ -113,6 +113,32 @@ test "every lesson case gives the findings and the output that its expect.json n
         Ok(runs) => runs
         Err(reason) => fail(where_ + ": output_contains cannot run: " + reason)
       }
+      match (case.expect.blocked, lesson.output) {
+        (Some(text), Some(output)) =>
+          match
+            @core.handle(
+              session,
+              TransformFiles(seq=3, files~, output~, selector=lesson.selector),
+            ) {
+            Blocked(reason~, kind=Other, ..) =>
+              if !reason.contains(text) {
+                fail(
+                  where_ +
+                  ": the block reason has no \"" +
+                  text +
+                  "\": " +
+                  reason,
+                )
+              }
+            Blocked(reason~, ..) =>
+              fail(
+                where_ + ": the output is blocked by model errors: " + reason,
+              )
+            _ =>
+              fail(where_ + ": I expected a blocked output, but the output ran")
+          }
+        _ => ()
+      }
       match lesson.output {
         Some(output) if runs => {
           let text = match

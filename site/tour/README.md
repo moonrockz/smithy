@@ -30,7 +30,7 @@ site/tour/lessons/NN-<slug>/
   a lesson file must end in `.smithy`, because the playground core reads every file as IDL. (Java picks the
   format by the extension. Remove this rule when the core does the same.)
 - The loader skips every name that starts with `.`, such as `.DS_Store`.
-- `expect.json` has `events` and, optionally, `output_contains`. Another key is an error.
+- `expect.json` has `events` and, optionally, `output_contains` or `blocked`. Another key is an error.
   - `events` lists the expected findings, each as `id|SEVERITY|shape`. `SEVERITY` is `WARNING`, `DANGER` or
     `ERROR`. A finding with no shape has `-` in its place, for example `Model|ERROR|-`.
     The list is the complete list. An empty list says that the case has no finding of these severities.
@@ -40,6 +40,10 @@ site/tour/lessons/NN-<slug>/
     A lesson that has an `output_contains` needs an `output`.
     Its `events` must have no `ERROR` and no `DANGER`, because the output does not run for a model with those
     events. When the output has more than one file, the check joins the text of the files with a newline.
+  - `blocked` is a text that the reason of a blocked output must contain, for example
+    `"blocked": "I found no service with a protocol trait"`. The check sends the transform and requires a blocked
+    output whose reason is not the model errors. A lesson that has a `blocked` needs an `output`. The case cannot
+    have `output_contains`, and its `events` must have no `ERROR` and no `DANGER`.
 
 ## The two checks
 

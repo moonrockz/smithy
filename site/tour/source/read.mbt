@@ -124,7 +124,7 @@ fn read_lesson(root : String, dir : String) -> @model.Lesson raise {
   if files.is_empty() {
     fail("\{dir}: I found no starting file in files/")
   }
-  let cases = read_cases(dir, "\{base}/cases")
+  let cases = read_cases(dir, "\{base}/cases", output is Some(_))
   {
     dir,
     number,
@@ -167,20 +167,29 @@ fn read_files(path : String, where_ : String) -> Array[@model.LessonFile] raise 
 }
 
 ///|
-fn read_cases(dir : String, path : String) -> Array[@model.Case] raise {
+fn read_cases(
+  dir : String,
+  path : String,
+  has_output : Bool,
+) -> Array[@model.Case] raise {
   if !@fs.path_exists("\{path}/start") {
     fail("\{dir}: I found no cases/start folder")
   }
   let names = list_dir(path).filter(n => n != "start" && is_dir("\{path}/\{n}"))
-  let cases = [read_case(dir, path, "start")]
+  let cases = [read_case(dir, path, "start", has_output)]
   for name in names {
-    cases.push(read_case(dir, path, name))
+    cases.push(read_case(dir, path, name, has_output))
   }
   cases
 }
 
 ///|
-fn read_case(dir : String, path : String, name : String) -> @model.Case raise {
+fn read_case(
+  dir : String,
+  path : String,
+  name : String,
+  has_output : Bool,
+) -> @model.Case raise {
   let base = "\{path}/\{name}"
   let expect_path = "\{base}/expect.json"
   if !@fs.path_exists(expect_path) {
@@ -207,10 +216,27 @@ fn read_case(dir : String, path : String, name : String) -> @model.Case raise {
       "\{dir}/cases/\{name}: a string of \"output_contains\" is empty, and an empty string matches every output",
     )
   }
+  let where_ = "\{dir}/cases/\{name}"
+  let blocked = optional_string_field(json, "blocked", where_)
+  if blocked is Some(_) {
+    if !output_contains.is_empty() {
+      fail(
+        "\{where_}: \"blocked\" and \"output_contains\" cannot be together, because a blocked output has no text",
+      )
+    }
+    if !has_output {
+      fail("\{where_}: \"blocked\" needs a lesson output")
+    }
+    if events.any(e => e.severity.blocks_output()) {
+      fail(
+        "\{where_}: \"blocked\" cannot have an ERROR or DANGER event, because the block reason would be the model errors",
+      )
+    }
+  }
   {
     name,
-    files: read_files("\{base}/files", "\{dir}/cases/\{name}/files"),
-    expect: { events, output_contains, },
+    files: read_files("\{base}/files", "\{where_}/files"),
+    expect: { events, output_contains, blocked, },
   }
 }
 
@@ -222,7 +248,7 @@ let lesson_keys : Array[String] = [
 
 ///|
 /// The keys of `expect.json`.
-let expect_keys : Array[String] = ["events", "output_contains"]
+let expect_keys : Array[String] = ["events", "output_contains", "blocked"]
 
 ///|
 /// Fail on a key that is not in `keys`. A misspelt key would otherwise drop

@@ -23,6 +23,9 @@ pub extend LessonFile with FromJson::{from_json}
 pub(all) struct Expectation {
   events : Array[EventKey]
   output_contains : Array[String]
+  /// A text that the reason of a blocked output must contain. The output must
+  /// be blocked for a reason other than model errors (`BlockKind::Other`).
+  blocked : String?
 }
 
 ///|

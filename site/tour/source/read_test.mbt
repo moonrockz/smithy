@@ -120,3 +120,32 @@ test "a sub-folder of the files of a case" {
 test "a lesson file whose name does not end in .smithy" {
   expect_err("not-smithy", ["01-a/files/model.json", ".smithy"])
 }
+
+///|
+test "a case that expects a blocked output" {
+  let tour = match read("blocked") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let cases = tour.lessons[0].cases
+  assert_eq(cases.map(c => c.name), ["start", "b"])
+  assert_eq(cases[0].expect.blocked, None)
+  assert_eq(cases[1].expect.blocked, Some("x"))
+}
+
+///|
+test "blocked together with output_contains" {
+  expect_err("blocked-and-contains", [
+    "01-a/cases/b", "blocked", "output_contains",
+  ])
+}
+
+///|
+test "blocked in a lesson without an output" {
+  expect_err("blocked-no-output", ["01-a/cases/b", "needs a lesson output"])
+}
+
+///|
+test "blocked with an ERROR event" {
+  expect_err("blocked-with-error", ["01-a/cases/b", "blocked", "ERROR"])
+}
