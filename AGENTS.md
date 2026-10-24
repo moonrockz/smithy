@@ -7,6 +7,10 @@ for the layout and the task list.
 
 - `mise` installs and pins every tool (`.config/mise/config.toml`). Run `mise trust` and then `mise install` once.
 - The MoonBit version is pinned there. Change it in the version field and in each URL together.
+- A MoonBit version bump must also re-vendor the regex engine in `pkgs/smithy-validation/internal/regex`
+  from the new core, and update the core version and commit in its README, its NOTICE and
+  `scripts/regex-vendor-check.mbtx`. `mise run regex:vendor:check` (part of `mise run validate`) proves
+  that the copy matches the new core; its README lists the steps.
 - `moon.work` lists the workspace members. `moon build`, `moon test`, `moon check` and `moon fmt` at the root act
   on all of them.
 

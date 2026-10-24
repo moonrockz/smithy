@@ -54,7 +54,7 @@ test "doc comments attach to shapes, members, enum members and inline shapes" {
 }
 
 ///|
-test "docs between the traits and the keyword are ordinary comments" {
+test "docs between the traits and the keyword are a warning, not documentation" {
   let r = dmodel(
     (
       #|@a
@@ -66,6 +66,177 @@ test "docs between the traits and the keyword are ordinary comments" {
   guard r.ast is Some(f) else { fail("no ast") }
   inspect(f.shapes()[0].docs.length(), content="0")
   inspect(r.has_errors(), content="false")
+  @expect.expect(r.diagnostics.map(d => d.code)).to_equal(["SM-PARSE-009"])
+  inspect(
+    r.diagnostics[0].message,
+    content="I ignored the documentation comment `/// late`, because it is not right before a shape or member and its traits",
+  )
+}
+
+///|
+test "the documentation comments ignored before one line break give one warning" {
+  let r = dmodel(
+    (
+      #|@tags([
+      #|    /// inside
+      #|    "a"
+      #|])
+      #|/// after
+      #|string S
+      #|
+    ),
+  )
+  @expect.expect(r.diagnostics.map(d => d.code)).to_equal(["SM-PARSE-009"])
+  let d = r.diagnostics[0]
+  @expect.expect_all(e => {
+    e
+    .expect(d.message)
+    .to_equal(
+      "I ignored 2 documentation comments, from `/// inside`, because they are not right before a shape or member and its traits",
+    )
+    e.expect(d.labels.map(l => l.text)).to_equal(["I also ignored this one"])
+  })
+}
+
+///|
+test "documentation comments after member traits, before a brace or on a statement line are warnings" {
+  @expect.expect_all(e => {
+    e
+    .expect(
+      dcodes(
+        (
+          #|structure S {
+          #|    @required
+          #|    /// x
+          #|    a: String
+          #|}
+          #|
+        ),
+      ),
+    )
+    .to_equal(["SM-PARSE-009"])
+    e
+    .expect(
+      dcodes(
+        (
+          #|structure S
+          #|/// x
+          #|{}
+          #|
+        ),
+      ),
+    )
+    .to_equal(["SM-PARSE-009"])
+    e
+    .expect(
+      dcodes(
+        (
+          #|string S /// x
+          #|string T
+          #|
+        ),
+      ),
+    )
+    .to_equal(["SM-PARSE-009"])
+    e
+    .expect(
+      dcodes(
+        (
+          #|enum E {
+          #|    A = "a" /// x
+          #|    B
+          #|}
+          #|
+        ),
+      ),
+    )
+    .to_equal(["SM-PARSE-009"])
+    e
+    .expect(
+      dcodes(
+        (
+          #|string Foo
+          #|apply Foo {
+          #|    @deprecated
+          #|    /// x
+          #|}
+          #|
+        ),
+      ),
+    )
+    .to_equal(["SM-PARSE-009"])
+  })
+}
+
+///|
+test "documentation comments that Smithy reads or drops are not warnings" {
+  @expect.expect_all(e => {
+    // On the line before a member: Smithy reads it, the AST keeps it as a comment.
+    let r = dmodel(
+      (
+        #|structure S {
+        #|    a: String /// x
+        #|    b: String
+        #|}
+        #|
+      ),
+    )
+    e.expect(r.diagnostics.length()).to_equal(0)
+    guard r.ast is Some(f) && f.shapes()[0].shape is Aggregate(members~, ..) else {
+      fail("no members")
+    }
+    // Smithy documents `S$b` with `x` here (smithy-2qe.41.20). Change this
+    // expectation when the AST follows it.
+    e.expect(members[1].docs.length()).to_equal(0)
+    // Before `:=`.
+    e
+    .expect(
+      dcodes(
+        (
+          #|operation O {
+          #|    /// x
+          #|    input := {}
+          #|}
+          #|
+        ),
+      ),
+    )
+    .to_equal([])
+  })
+}
+
+///|
+test "a documentation comment at the end of a file without a shape is its own warning" {
+  // Smithy drops it without an event, so it has a code of its own.
+  let r = dmodel(
+    (
+      #|/// x
+      #|/// y
+      #|
+    ),
+  )
+  @expect.expect(r.diagnostics.map(d => d.code)).to_equal(["SM-PARSE-016"])
+  @expect.expect_all(e => {
+    e.expect(r.has_errors()).to_be_false()
+    e
+    .expect(r.diagnostics[0].message)
+    .to_equal(
+      "I ignored 2 documentation comments, from `/// x`, because no shape follows them",
+    )
+  })
+}
+
+///|
+test "a statement that fails keeps no warning for the documentation comments it read" {
+  @expect.expect(
+    dcodes(
+      (
+        #|@deprecated
+        #|/// x
+        #|
+      ),
+    ),
+  ).to_equal(["SM-PARSE-004"])
 }
 
 ///|

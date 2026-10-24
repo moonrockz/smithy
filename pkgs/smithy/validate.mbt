@@ -247,6 +247,7 @@ fn Assembly::validate(
             "I could not resolve trait \{trait_id} on \{id}.",
             shape.source,
             shape=id.to_string(),
+            event_id="Model.UnresolvedTrait",
           )
         }
         continue
@@ -266,8 +267,8 @@ fn Assembly::validate(
         self.problem(
           "SM-MODEL-011",
           "I expected a trait definition for \{trait_id}, applied to \{id}.",
-          shape.source,
-          shape=id.to_string(),
+          definition.source,
+          shape=trait_id.to_string(),
         )
       } else {
         let factory_error = match (trait_id.to_string(), value) {

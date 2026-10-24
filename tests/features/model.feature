@@ -266,3 +266,20 @@ Feature: Semantic model assembly
     Then the model has no errors
     And the assembled model exports and reloads unchanged
     And converting the model to IDL and back preserves the JSON AST
+
+  Scenario: A documentation comment that documents nothing is a warning, as in Smithy
+    Given the IDL model file "docs.smithy":
+      """smithy
+      $version: "2"
+      namespace example
+
+      @sensitive
+      /// The name.
+      string Name
+
+      /// Read as an ordinary comment, because apply takes no documentation.
+      apply Name @deprecated
+      """
+    When I assemble the semantic model
+    Then the model has no errors
+    And the validation events are "Model.BadDocumentationComment|WARNING|-"

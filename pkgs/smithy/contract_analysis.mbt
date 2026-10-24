@@ -1,4 +1,15 @@
 ///|
+/// The kind of a contract finding. It selects the diagnostic code, the event ID
+/// and the severity of Smithy's ConditionsTraitValidator.
+priv enum ContractEvent {
+  Syntax
+  NotBoolean
+  Error
+  Danger
+  Warning
+}
+
+///|
 priv struct ContractAnalysis {
   assembly : Assembly
   model : Model
@@ -13,9 +24,27 @@ fn ContractAnalysis::problem(
   self : ContractAnalysis,
   span : @jmespath.Span,
   message : String,
-  code~ : String = "SM-MODEL-016",
-  severity~ : @syntax.Severity = Error,
+  event~ : ContractEvent,
 ) -> Unit {
+  let (code, event_id, severity, report) = match event {
+    Syntax => ("SM-MODEL-015", "Model", @syntax.Severity::Error, Event)
+    NotBoolean => ("SM-MODEL-017", "ConditionsTrait", Error, DangerEvent)
+    Error => ("SM-MODEL-016", "ConditionsTrait", Error, Event)
+    Danger =>
+      (
+        "SM-MODEL-016",
+        "ConditionsTrait.JmespathProblem.JmespathEventDanger.\{self.condition}",
+        Error,
+        DangerEvent,
+      )
+    Warning =>
+      (
+        "SM-MODEL-016",
+        "ConditionsTrait.JmespathProblem.JmespathEventWarning.\{self.condition}",
+        Warning,
+        Event,
+      )
+  }
   let key = "\{code}:\{span.start}:\{span.end}:\{message}"
   if self.reported.contains(key) {
     return
@@ -25,8 +54,9 @@ fn ContractAnalysis::problem(
   let (line, column) = location.line_column(self.expression)
   self.assembly.diagnostics.push({
     code,
-    event_id: code,
+    event_id,
     severity,
+    report,
     message: "I found a problem in JMESPath condition \{Json::string(self.condition).stringify()} on \{self.owner.id} at expression \{line}:\{column} (UTF-16 offsets \{span.start}..\{span.end}): \{message}",
     source: {
       ..self.owner.source,
@@ -58,6 +88,7 @@ fn ContractAnalysis::elements(
     }
     found => {
       self.problem(
+        event=Danger,
         node.span,
         "I expected \{if object { "an object" } else { "an array" }} for this JMESPath operation, but found \{found.name(self.model)}.",
       )
@@ -84,13 +115,18 @@ fn ContractAnalysis::function_result(
   args : Array[ContractType],
 ) -> ContractType {
   guard contract_signature(name) is Some(signature) else {
-    self.problem(node.span, "I could not resolve JMESPath function \{name}.")
+    self.problem(
+      node.span,
+      "I could not resolve JMESPath function \{name}.",
+      event=Error,
+    )
     return Unknown
   }
   let variadic = name == "merge" || name == "not_null"
   if args.length() < signature.length() ||
     (!variadic && args.length() != signature.length()) {
     self.problem(
+      event=Error,
       node.span,
       "I expected \{if variadic { "at least " } else { "" }}\{signature.length()} arguments for JMESPath function \{name}, but found \{args.length()}.",
     )
@@ -101,6 +137,7 @@ fn ContractAnalysis::function_result(
     let expected = signature[if variadic { 0 } else { i }]
     if !expected.accepts(arg, self.model) {
       self.problem(
+        event=Error,
         nodes[i].span,
         "I expected \{expected.description()} for argument \{i + 1} of JMESPath function \{name}, but found \{arg.name(self.model)}.",
       )
@@ -109,6 +146,7 @@ fn ContractAnalysis::function_result(
   let first = args[0].resolve(self.model)
   if name == "contains" && first is String && !Text.accepts(args[1], self.model) {
     self.problem(
+      event=Error,
       nodes[1].span,
       "I expected a string search value for JMESPath function contains, but found \{args[1].name(self.model)}.",
     )
@@ -227,6 +265,7 @@ fn ContractAnalysis::analyze(
                       Some(type_) => type_
                       None => {
                         self.problem(
+                          event=Danger,
                           node.span,
                           "I could not resolve member \{Json::string(name).stringify()} in the JMESPath object.",
                         )
@@ -237,6 +276,7 @@ fn ContractAnalysis::analyze(
               Unknown => Unknown
               found => {
                 self.problem(
+                  event=Danger,
                   node.span,
                   "I expected an object when selecting JMESPath member \{Json::string(name).stringify()}, but found \{found.name(self.model)}.",
                 )
@@ -280,12 +320,6 @@ fn ContractAnalysis::analyze(
         }
       Then(right) => {
         let input = values.pop().unwrap()
-        if input is Reference(_) {
-          self.problem(
-            right.span,
-            "I expected a JSON value before this JMESPath subexpression, but found an expression reference.",
-          )
-        }
         tasks.push(Analyze(right, input))
       }
       Project(node) => {
@@ -320,6 +354,7 @@ fn ContractAnalysis::analyze(
         if name == "map" {
           if type_ is Reference(_) {
             self.problem(
+              event=Error,
               node.span,
               "I expected a JSON value from the JMESPath map expression, but found an expression reference.",
             )
@@ -329,6 +364,7 @@ fn ContractAnalysis::analyze(
           let kind = type_.name(self.model)
           if kind != "unknown" && kind != "number" && kind != "string" {
             self.problem(
+              event=Error,
               node.span,
               "I expected a number or string from the expression reference in JMESPath function \{name}, but found \{kind}.",
             )
@@ -342,13 +378,6 @@ fn ContractAnalysis::analyze(
           reversed.push(values.pop().unwrap())
         }
         let args = reversed.rev_iter().to_array()
-        if !(node.kind is Function(_, _)) &&
-          args.iter().any(t => t is Reference(_)) {
-          self.problem(
-            node.span,
-            "I expected JSON values for this JMESPath operation, but found an expression reference.",
-          )
-        }
         let result : ContractType = match node.kind {
           Not(_) => Boolean
           Binary(And | Or as op, _, _) =>
@@ -361,13 +390,7 @@ fn ContractAnalysis::analyze(
                 }
               None => contract_join(args, self.model)
             }
-          Binary(op, _, _) => {
-            if args.iter().any(t => t is Reference(_)) {
-              self.problem(
-                node.span,
-                "I expected JSON values for a JMESPath comparison, but found an expression reference.",
-              )
-            }
+          Binary(op, _, _) =>
             if op is (Equal | NotEqual) {
               Boolean
             } else {
@@ -379,16 +402,15 @@ fn ContractAnalysis::analyze(
                 })
               if invalid {
                 self.problem(
+                  event=Warning,
                   node.span,
                   "I expected numbers for an ordering comparison, but found \{args[0].name(self.model)} and \{args[1].name(self.model)}; the JMESPath result is null.",
-                  severity=Warning,
                 )
                 Null
               } else {
                 Boolean
               }
             }
-          }
           Index(_, index) => {
             let elements = self.elements(args[0], node)
             match args[0].resolve(self.model) {
@@ -407,15 +429,9 @@ fn ContractAnalysis::analyze(
               _ => contract_join(elements, self.model)
             }
           }
-          Slice(_, _, _, step) => {
-            if step == Some(0) {
-              self.problem(
-                node.span,
-                "I expected a non-zero JMESPath slice step, but found zero.",
-              )
-            }
+          Slice(_, _, _, _) =>
+            // Smithy accepts a zero step and reports nothing.
             Array(self.elements(args[0], node), exact=false)
-          }
           Flatten(_) => {
             let types = []
             for type_ in self.elements(args[0], node) {
@@ -489,7 +505,7 @@ fn Assembly::analyze_condition(
   }
   let parsed = @jmespath.parse(expression) catch {
     @jmespath.JmespathError(diagnostic) => {
-      analysis.problem(diagnostic.span, diagnostic.message, code="SM-MODEL-015")
+      analysis.problem(diagnostic.span, diagnostic.message, event=Syntax)
       return
     }
   }
@@ -498,7 +514,7 @@ fn Assembly::analyze_condition(
     analysis.problem(
       parsed.root.span,
       "I expected this condition to return a boolean, but statically found \{type_.name(model)}.",
-      code="SM-MODEL-017",
+      event=NotBoolean,
     )
   }
 }

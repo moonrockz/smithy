@@ -6,6 +6,15 @@ priv struct Context {
 }
 
 ///|
+/// A `///` comment in source order. A trailing one follows a token on the
+/// same line: Smithy reads it like any other, but the AST keeps it as an
+/// ordinary comment.
+priv struct SourceDoc {
+  comment : @ast.DocComment
+  trailing : Bool
+}
+
+///|
 /// The parser state over a token stream. `Error` tokens are holes: `peek`
 /// skips them (the scanner already reported them).
 priv struct Parser {
@@ -17,8 +26,12 @@ priv struct Parser {
   contexts : Array[Context]
   diagnostics : Array[@diagnostic.Diagnostic]
   /// Every doc comment in order, and the first one not yet taken.
-  doc_comments : Array[@ast.DocComment]
+  doc_comments : Array[SourceDoc]
   mut doc_head : Int32
+  /// The doc comments taken that document nothing and are not reported
+  /// yet: Smithy's pending documentation lines, which it reports as one
+  /// `Model.BadDocumentationComment` when it clears them.
+  stray_docs : Array[@ast.DocComment]
   mut version : Version?
   /// Set when a recovery before the namespace may have eaten the
   /// `$version` statement: the file *might* have declared
@@ -40,11 +53,14 @@ priv struct Parser {
 
 ///|
 fn Parser::new(stream : @scanner.TokenStream) -> Parser {
-  let doc_comments : Array[@ast.DocComment] = []
+  let doc_comments : Array[SourceDoc] = []
   fn gather(trivia : ArrayView[@scanner.Trivia]) {
     for t in trivia {
       if t is Comment(c) && c.kind == Doc {
-        doc_comments.push({ text: c.text, span: c.span, })
+        doc_comments.push({
+          comment: { text: c.text, span: c.span, },
+          trailing: false,
+        })
       }
     }
   }
@@ -52,12 +68,15 @@ fn Parser::new(stream : @scanner.TokenStream) -> Parser {
   gather(stream.trivia)
   for token in stream.tokens {
     gather(token.trivia_before)
-    // A comment after a token on the same line is an ordinary comment,
-    // even when it starts with three slashes.
+    // A comment after a token on the same line is an ordinary comment in
+    // the AST, even when it starts with three slashes.
     let mut next_line = false
     for trivia in token.trivia_after {
-      if next_line && trivia is Comment(c) && c.kind == Doc {
-        doc_comments.push({ text: c.text, span: c.span, })
+      if trivia is Comment(c) && c.kind == Doc {
+        doc_comments.push({
+          comment: { text: c.text, span: c.span, },
+          trailing: !next_line,
+        })
       }
       if trivia.is_newline() {
         next_line = true
@@ -76,6 +95,7 @@ fn Parser::new(stream : @scanner.TokenStream) -> Parser {
     diagnostics: [],
     doc_comments,
     doc_head: 0,
+    stray_docs: [],
     version: None,
     version_unknown: false,
     version_reported: false,
@@ -126,7 +146,7 @@ fn Parser::advance(self : Parser) -> @scanner.Token? {
   if t is Some(_) {
     // Documentation not claimed before consuming its next token belongs to
     // an expression or another construct that cannot accept documentation.
-    self.take_docs_before(t.unwrap().span.start) |> ignore
+    self.stray_docs_before(t.unwrap().span.start)
     self.pos += 1
     self.skip_holes()
   }
@@ -380,6 +400,7 @@ fn Parser::expect_sp_present(
 /// The grammar's `BR`: after a statement there must be a line break or a
 /// comment before the next token (or the end of the file).
 fn Parser::expect_br(self : Parser) -> Unit raise ParseError {
+  self.end_line()
   guard self.pos > 0 else { return }
   guard self.peek() is Some(next) else { return }
   if !self.has_br_before() {
@@ -416,14 +437,14 @@ fn Parser::leave(self : Parser) -> Unit {
 }
 
 ///|
-/// The pending doc comments that start before `offset`, in order.
+/// The doc comments not yet taken that start before `offset`, in order.
 fn Parser::take_docs_before(
   self : Parser,
   offset : @span.Offset,
-) -> Array[@ast.DocComment] {
+) -> Array[SourceDoc] {
   let out = []
   while self.doc_head < self.doc_comments.length() &&
-        self.doc_comments[self.doc_head].span.start < offset {
+        self.doc_comments[self.doc_head].comment.span.start < offset {
     out.push(self.doc_comments[self.doc_head])
     self.doc_head += 1
   }
@@ -431,21 +452,86 @@ fn Parser::take_docs_before(
 }
 
 ///|
-/// Report every pending doc comment before `offset` as detached.
-fn Parser::detach_docs_before(self : Parser, offset : @span.Offset) -> Unit {
-  for d in self.take_docs_before(offset) {
-    self.report(
-      "SM-PARSE-009",
-      Warning,
-      "DETACHED DOC COMMENT",
-      "this documentation comment is not followed by a shape or member",
-      d.span,
-      notes=[
-        "A `///` comment documents the shape, member or enum member that comes right after it. Nothing here can take documentation, so I ignored it.",
-      ],
-      hint="Move it right before the shape it documents, or make it a `//` comment.",
-    )
+/// The documentation of the construct that starts at `offset`: the doc
+/// comments right before it. When there are some, Smithy also reads the
+/// stray doc comments into that documentation, so they are not reported.
+/// Trailing comments stay ordinary comments in the AST.
+fn Parser::claim_docs_before(
+  self : Parser,
+  offset : @span.Offset,
+) -> Array[@ast.DocComment] {
+  let docs = self.take_docs_before(offset)
+  if docs.length() > 0 {
+    self.stray_docs.clear()
   }
+  docs.filter(d => !d.trailing).map(d => d.comment)
+}
+
+///|
+/// Mark the doc comments before `offset` as stray: they document nothing.
+fn Parser::stray_docs_before(self : Parser, offset : @span.Offset) -> Unit {
+  for d in self.take_docs_before(offset) {
+    self.stray_docs.push(d.comment)
+  }
+}
+
+///|
+/// Smithy clears its pending documentation at each line break of a
+/// statement or a value (`BR`): the doc comment on the line just read is
+/// stray too, and all the stray comments get one warning.
+fn Parser::end_line(self : Parser) -> Unit {
+  let next = match self.peek() {
+    Some(t) => t.span.start
+    None => self.text_end.next()
+  }
+  while self.doc_head < self.doc_comments.length() &&
+        self.doc_comments[self.doc_head].trailing &&
+        self.doc_comments[self.doc_head].comment.span.start < next {
+    self.stray_docs.push(self.doc_comments[self.doc_head].comment)
+    self.doc_head += 1
+  }
+  self.report_stray_docs()
+}
+
+///|
+/// Report the stray doc comments as one warning, as Smithy reports its
+/// pending documentation lines when it clears them. `why_one` and
+/// `why_many` end the message for one comment and for more.
+fn Parser::report_stray_docs(
+  self : Parser,
+  code~ : String = "SM-PARSE-009",
+  why_one~ : String = "because it is not right before a shape or member and its traits",
+  why_many~ : String = "because they are not right before a shape or member and its traits",
+) -> Unit {
+  guard self.stray_docs.length() > 0 else { return }
+  let first = self.stray_docs[0]
+  let message = if self.stray_docs.length() == 1 {
+    "I ignored the documentation comment `///\{first.text}`, \{why_one}"
+  } else {
+    "I ignored \{self.stray_docs.length()} documentation comments, from `///\{first.text}`, \{why_many}"
+  }
+  let labels = self.stray_docs[1:]
+    .iter()
+    .map(d => @diagnostic.Label::{
+      span: d.span,
+      text: "I also ignored this one",
+    })
+    .collect()
+  self.diagnostics.push(
+    @diagnostic.Diagnostic::new(
+      code~,
+      severity=Warning,
+      title="DETACHED DOC COMMENT",
+      message~,
+      span=first.span,
+      labels~,
+      notes=[
+        "A `///` comment documents the shape, member or enum member that starts right after it, and it must come before their traits. I read this one as an ordinary comment.",
+      ],
+      hint="Move it right before the traits of the shape or member it documents, or make it a `//` comment.",
+    ),
+  )
+  self.stray_docs.clear()
 }
 
 ///|

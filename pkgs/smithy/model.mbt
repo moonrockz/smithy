@@ -41,11 +41,31 @@ pub fn SourceLocation::is_builtin(self : SourceLocation) -> Bool {
 }
 
 ///|
+/// How the validation events report a diagnostic.
+pub(all) enum DiagnosticReport {
+  /// An event with the severity of the diagnostic.
+  Event
+  /// An event with severity DANGER. The diagnostic severity stays Error.
+  DangerEvent
+  /// No event: the selector check of the trait definition reports the same finding.
+  CoveredBySelector
+  /// No event: a hint for tools, for which Smithy reports no event.
+  HintOnly
+} derive(Eq, Debug)
+
+///|
+/// Whether the validation events report the diagnostic.
+pub fn DiagnosticReport::has_event(self : DiagnosticReport) -> Bool {
+  !(self is (CoveredBySelector | HintOnly))
+}
+
+///|
 /// An assembly error. Syntax diagnostics retain their original code and span.
 pub(all) struct ModelDiagnostic {
   code : String
   event_id : String
   severity : @syntax.Severity
+  report : DiagnosticReport
   message : String
   source : SourceLocation
   shape : ShapeId?

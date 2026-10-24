@@ -89,7 +89,7 @@ run = "moonx scripts/lint-yaml.mbtx"
 
 [tasks.validate]
 description = "Run all validation checks"
-depends = ["validate:packages", "validate:versions"]
+depends = ["validate:packages", "validate:versions", "regex:vendor:check"]
 
 [tasks."validate:packages"]
 description = "Verify the workspace package structure against moon.work"
@@ -150,6 +150,10 @@ run = "moonx scripts/vendor-prelude.mbtx"
 [tasks."jmespath:vendor"]
 description = "Vendor and embed the official JMESPath compliance tests (args: git ref)"
 run = "moonx scripts/vendor-jmespath.mbtx"
+
+[tasks."regex:vendor:check"]
+description = "Check the regex engine that smithy-validation copies from core against the core of the pinned toolchain (args: --diff, a core directory)"
+run = "moonx scripts/regex-vendor-check.mbtx"
 
 [tasks."test:scripts"]
 description = "Run the tests of the task scripts (scripts/*.mbtx that have a scripts/features/*.feature)"

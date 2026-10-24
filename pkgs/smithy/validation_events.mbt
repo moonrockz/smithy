@@ -805,7 +805,9 @@ fn Model::trait_validator_events(
 pub fn Model::validation_events(self : Model) -> Array[ValidationEvent] {
   let assembly = Assembly::new()
   assembly.validate(self, check_trait_definitions=false)
-  self.collect_validation_events(assembly.diagnostics.map(diagnostic_event))
+  self.collect_validation_events(
+    assembly.diagnostics.filter(d => d.report.has_event()).map(diagnostic_event),
+  )
 }
 
 ///|
@@ -828,6 +830,7 @@ fn validation_is_critical(event : ValidationEvent) -> Bool {
 ///|
 fn validation_is_loading_event(event : ValidationEvent) -> Bool {
   event.id == "Model" ||
+  event.id == "Model.BadDocumentationComment" ||
   event.id == "ModelDeprecation" ||
   event.id.has_prefix("UnknownValidator_") ||
   event.id.has_prefix("SM-")
@@ -844,9 +847,9 @@ fn Model::collect_validation_events(
       .map(e => self.decorate_validation_event(e))
   }
   let events : Array[ValidationEvent] = []
+  let graph = SelectorGraph::new(self)
   events.append(initial)
   events.append(self.validation_metadata_events())
-  let graph = SelectorGraph::new(self)
   events.append(self.trait_target_events(graph))
   events.append(self.trait_validator_events(graph))
   events.append(self.constraint_trait_events())
@@ -911,7 +914,11 @@ fn diagnostic_event(d : ModelDiagnostic) -> ValidationEvent {
   {
     id: d.event_id,
     severity: if d.severity == Error {
-      "ERROR"
+      if d.report == DangerEvent {
+        "DANGER"
+      } else {
+        "ERROR"
+      }
     } else {
       "WARNING"
     },

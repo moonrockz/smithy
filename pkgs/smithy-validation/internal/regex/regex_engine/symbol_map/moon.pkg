@@ -1,0 +1,8 @@
+import {
+  "moonbitlang/core/sorted_set",
+  "moonrockz/smithy-validation/internal/regex/shared_types",
+}
+
+import {
+  "moonrockz/smithy-validation/internal/regex/shared_types/rechar_set",
+} for "test"

@@ -304,8 +304,17 @@ fn Assembly::flatten_one(
     seen.add(id)
     guard finished.get(id) is Some(base) else { continue }
     let base_traits = object_field(base.fields, "traits")
-    if !base_traits.contains("smithy.api#mixin") ||
-      string_field(base.fields, "type") != Some(kind) {
+    if !base_traits.contains("smithy.api#mixin") {
+      self.problem(
+        "SM-MODEL-008",
+        "I expected a \{kind} mixin for \{raw.id}, but found \{id}.",
+        raw.source,
+        shape=raw.id,
+        event_id="Target",
+      )
+      continue
+    }
+    if string_field(base.fields, "type") != Some(kind) {
       self.problem(
         "SM-MODEL-008",
         "I expected a \{kind} mixin for \{raw.id}, but found \{id}.",
@@ -403,13 +412,15 @@ fn Assembly::flatten_one(
       }
       match (if bound is Some(_) { bound } else { inherited }) {
         Some(target) => member_["target"] = Json::string(target)
-        None =>
+        None => {
           self.problem(
             "SM-MODEL-012",
             "I could not infer a target for the elided member \{raw.id}$\{name}.",
             self.locations.get(raw.id + "$" + name).unwrap_or(raw.source),
-            shape=raw.id,
+            shape=raw.id + "$" + name,
           )
+          continue
+        }
       }
     }
     self.merge_member(members, name, Json::object(member_), raw.source, raw.id)

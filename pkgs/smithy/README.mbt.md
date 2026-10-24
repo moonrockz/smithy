@@ -220,8 +220,12 @@ Syntax errors use `SM-MODEL-015`, invalid operations and function calls use
 `SM-MODEL-016`, and non-boolean results use `SM-MODEL-017`. Invalid ordering
 comparisons produce a warning because JMESPath evaluates them to null; a null
 final result also produces `SM-MODEL-017`. Other static failures prevent
-assembly. These errors cover upstream `ConditionsTraitValidator` errors and
-danger events using this library's existing Error/Warning severities.
+assembly. The validation events use the IDs of the Smithy reference: `Model`,
+`ConditionsTrait` (DANGER for a result that is not boolean),
+`ConditionsTrait.JmespathProblem.JmespathEventDanger.<Name>`,
+`ConditionsTrait.JmespathProblem.JmespathEventWarning.<Name>`, `TraitValue` and
+`TraitTarget`. `<Name>` is the condition name. The diagnostic severity stays
+Error for a DANGER event, so the model does not assemble.
 
 Diagnostics retain the owning shape's source location and add a JSON Pointer
 to the condition's expression. The message contains the condition name,
@@ -234,7 +238,13 @@ Serialization and default-value validation do not evaluate contracts.
 `LoadResult` contains diagnostics and an optional model. Errors prevent a
 partial model from being returned; warnings permit a model. Each diagnostic
 has a stable code, severity, message, source and optional shape ID. IDL parser
-diagnostics keep their original codes and UTF-16 spans. JSON codec errors keep
+diagnostics keep their original codes and UTF-16 spans. Their validation events
+have the ID `Model`, except a documentation comment that documents nothing
+(`SM-PARSE-009`), which is the `Model.BadDocumentationComment` warning with no
+shape, as in Smithy. A documentation comment before `apply` (`SM-PARSE-008`)
+and one at the end of a file without a shape (`SM-PARSE-016`) stay
+diagnostics for tools with the report `HintOnly`, and give no event: Smithy
+drops the first event and never reads the second comment. JSON codec errors keep
 their JSON Pointer paths. `diagnostic_codes()` lists the assembly codes.
 
 ## Export a model

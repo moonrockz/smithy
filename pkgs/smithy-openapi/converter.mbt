@@ -242,7 +242,11 @@ fn Context::operation(
   if !parameters.is_empty() {
     out["parameters"] = Json::array(parameters)
   }
-  if self.body_content(input, operation, false, operation) is Some(body) {
+  let unit = "smithy.api#Unit"
+  let rpc_unit_input = self.protocol == RpcV2Json && input.to_string() == unit
+  let rpc_unit_output = self.protocol == RpcV2Json && output.to_string() == unit
+  if !rpc_unit_input &&
+    self.body_content(input, operation, false, operation) is Some(body) {
     let request : Map[String, Json] = { "content": body.content }
     if body.required {
       request["required"] = Json::boolean(true)
@@ -252,40 +256,42 @@ fn Context::operation(
     }
     out["requestBody"] = Json::object(request)
   }
-  let responses : Map[String, Json] = Map([])
-  let status = if self.protocol == RpcV2Json {
-    200
-  } else {
-    http_code(operation)
-  }
-  responses[status.to_string()] = self.response(
-    output, operation, status, operation,
-  )
-  let all_errors : Array[@smithy.ShapeId] = []
-  let seen : Set[@smithy.ShapeId] = Set([])
-  let service_errors = if self.config.combine_error_responses {
-    []
-  } else {
-    match self.service.body {
-      @smithy.Service(errors~, ..) => errors
-      _ => []
+  if !rpc_unit_output {
+    let responses : Map[String, Json] = Map([])
+    let status = if self.protocol == RpcV2Json {
+      200
+    } else {
+      http_code(operation)
     }
-  }
-  for error_id in errors + service_errors {
-    if !seen.contains(error_id) {
-      seen.add(error_id)
-      all_errors.push(error_id)
+    responses[status.to_string()] = self.response(
+      output, operation, status, operation,
+    )
+    let all_errors : Array[@smithy.ShapeId] = []
+    let seen : Set[@smithy.ShapeId] = Set([])
+    let service_errors = if self.config.combine_error_responses {
+      []
+    } else {
+      match self.service.body {
+        @smithy.Service(errors~, ..) => errors
+        _ => []
+      }
     }
-  }
-  for error_id in all_errors {
-    if self.model.shapes.get(error_id) is Some(error) {
-      let status = error_code(error)
-      responses[status.to_string()] = self.response(
-        error_id, error, status, operation,
-      )
+    for error_id in errors + service_errors {
+      if !seen.contains(error_id) {
+        seen.add(error_id)
+        all_errors.push(error_id)
+      }
     }
+    for error_id in all_errors {
+      if self.model.shapes.get(error_id) is Some(error) {
+        let status = error_code(error)
+        responses[status.to_string()] = self.response(
+          error_id, error, status, operation,
+        )
+      }
+    }
+    out["responses"] = Json::object(responses)
   }
-  out["responses"] = Json::object(responses)
   let tags = self.tags(operation)
   if !tags.is_empty() {
     out["tags"] = Json::array(tags.map(Json::string))

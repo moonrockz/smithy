@@ -1319,6 +1319,52 @@ async fn exercise_rpc_traits(runner : Runner, root : String) -> Unit {
 }
 
 ///|
+/// A documentation comment that documents nothing is Smithy's
+/// Model.BadDocumentationComment warning, with no shape, in `validate`. `build`
+/// shows the warning while it loads the model. Its build report has no such
+/// event, as in Smithy, which validates the loaded model again for the report.
+async fn exercise_bad_doc_comment(runner : Runner) -> Unit {
+  let dir = runner.dir
+  @fs.write_file(
+    dir + "/docs.smithy",
+    "$version: \"2\"\nnamespace example\n\n@sensitive\n/// The name.\nstring Name\n",
+  )
+  let (out, err) = runner.command(["validate", "docs.smithy"], 0)
+  let shown = (out + err).trim_end().to_owned()
+  assert_true(shown.has_prefix("[WARNING] -: "), msg=shown)
+  assert_true(shown.has_suffix(" | Model.BadDocumentationComment"), msg=shown)
+  assert_eq(shown.split("\n").count(), 1)
+  @fs.write_file(
+    dir + "/docs-build.json",
+    "{\"version\":\"1.0\",\"sources\":[\"docs.smithy\"],\"outputDirectory\":\"docs-build\"}",
+  )
+  let (build_out, build_err) = runner.command(["build", "--config", "docs-build.json"], 0)
+  let build_shown = build_out + build_err
+  assert_true(build_shown.contains("warning[SM-PARSE-009]"), msg=build_shown)
+  let info = @json.parse(
+    @fs.read_file(dir + "/docs-build/source/build-info/smithy-build-info.json").text(),
+  )
+  guard info is { "validationEvents": Array(events), .. } else {
+    fail("no validationEvents in the build report")
+  }
+  assert_true(
+    !events.iter().any(e => e is { "id": String("Model.BadDocumentationComment"), .. }),
+    msg=info.stringify(),
+  )
+  runner.command(["clean", "--config", "docs-build.json"], 0) |> ignore
+  // Smithy reports no event for a doc comment before `apply`; the CLI still
+  // shows the hint where it prints diagnostics.
+  @fs.write_file(
+    dir + "/apply-docs.smithy",
+    "$version: \"2\"\nnamespace example\n\nstring Name\n\n/// Ignored.\napply Name @sensitive\n",
+  )
+  let (validate_out, validate_err) = runner.command(["validate", "apply-docs.smithy"], 0)
+  assert_eq((validate_out + validate_err).trim_end(), "")
+  let (ast_out, ast_err) = runner.command(["ast", "apply-docs.smithy"], 0)
+  assert_true((ast_out + ast_err).contains("warning[SM-PARSE-008]"), msg=ast_err)
+}
+
+///|
 async fn exercise(
   root : String,
   target : String,
@@ -1363,6 +1409,7 @@ async fn exercise(
   exercise_rpc_log_streams(runner, root, skip_stdin)
   exercise_rpc_log_files(runner, root)
   exercise_ion(runner, skip_stdin)
+  exercise_bad_doc_comment(runner)
   @fs.write_file(
     "\{dir}/broken.smithy",
     "$version: \"2\"\nnamespace example\nstructure Broken { x: Missing }",

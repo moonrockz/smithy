@@ -179,3 +179,29 @@ test "prepare rejects empty enums and collection references that are not members
   }
   assert_true(rejected)
 }
+
+///|
+test "a member pattern may end a class with a literal dash" {
+  let m = model(
+    "@pattern(\"^[A-Za-z0-9/-]+:[A-Za-z0-9/-]+#[A-Za-z0-9-]+$\")\nstring FQName\nstructure Value { name: FQName }",
+  )
+  let v = @validation.PreparedValidator::prepare(m, target("Value"))
+  let result = v.validate_json(
+    Json::object({ "name": Json::string("morphir/SDK:basics#int") }),
+  )
+  assert_true(result.complete)
+  assert_true(result.findings.is_empty())
+}
+
+///|
+test "prepare rejects a class range that ends in a class escape" {
+  let m = model("@pattern(\"^[0-\\\\d]$\")\nstring Value")
+  let mut message = ""
+  ignore(@validation.PreparedValidator::prepare(m, target("Value"))) catch {
+    @validation.UnsupportedConstraint(_, text) => message = text
+    _ => fail("Expected UnsupportedConstraint")
+  }
+  assert_eq(
+    message, "I expected one character after '-' in a character class range, but found a class escape.",
+  )
+}

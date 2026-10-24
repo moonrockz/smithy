@@ -59,6 +59,7 @@ test "a warning renders with the warning header" {
   let (d, source) = first_error(
     (
       #|namespace a
+      #|string S
       #|/// lost
       #|
     ),
@@ -211,6 +212,7 @@ test "render_all ends with a summary" {
     (
       #|namespace a
       #|use Foo
+      #|string S
       #|/// x
       #|
     ),

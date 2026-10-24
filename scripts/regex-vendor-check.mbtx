@@ -1,0 +1,259 @@
+///|
+/// Check the regex engine that smithy-validation copies from MoonBit core
+/// (`pkgs/smithy-validation/internal/regex`) against the core of the pinned toolchain.
+///
+/// The script copies the core packages into a scratch module under `_build/`, points their imports at
+/// the vendored packages and formats them with `moon fmt`, as the repository's checks format the copy.
+/// It then removes the "Modified for moonrockz/smithy-validation" comment of each vendored file and
+/// compares the files:
+///
+/// - A file with budget hooks (`hooked`) may differ; `--diff` prints how.
+/// - Every other copied file must be equal to the formatted core file.
+/// - Every core file must have a copy, and every other vendored file must be one that the copy adds.
+/// - The core must be the version that `internal/regex/README.md` names.
+///
+/// Usage: `mise run regex:vendor:check [-- --diff] [-- CORE_DIRECTORY]`, or
+/// `moonx scripts/regex-vendor-check.mbtx`. The default core is `$(mise where http:moonbit)/lib/core`.
+/// It exits with 0 when the copy matches, else with 1.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let vendored : String = "pkgs/smithy-validation/internal/regex"
+
+///|
+let import_base : String = "moonrockz/smithy-validation/internal/regex"
+
+///|
+/// The core version whose bundled core the copy comes from.
+let core_version : String = "0.10.15+943464bfa"
+
+///|
+/// Core package directories and their place in the copy.
+let packages : Array[(String, String)] = [
+  ("internal/regex_engine/automata", "automata"),
+  ("internal/regex_engine/shared_types", "shared_types"),
+  ("internal/regex_engine/shared_types/rechar_set", "shared_types/rechar_set"),
+  ("string/internal/regex_engine", "regex_engine"),
+  ("string/internal/regex_engine/ast", "regex_engine/ast"),
+  ("string/internal/regex_engine/symbol_map", "regex_engine/symbol_map"),
+  ("string/internal/regex_parser", "regex_parser"),
+]
+
+///|
+/// Single core files and their place in the copy.
+let single_files : Array[(String, String)] = [
+  ("string/regex_profile.mbt", "regex_profile.mbt"),
+  ("string/regex_utf16.mbt", "regex_utf16.mbt"),
+]
+
+///|
+/// Copied files that carry budget hooks.
+let hooked : Array[String] = [
+  "automata/context.mbt", "automata/delta.mbt", "automata/slot_book.mbt", "automata/thread_set.mbt",
+  "regex_engine/execute.mbt", "regex_engine/regex.mbt", "regex_engine/states.mbt",
+]
+
+///|
+/// Files that the copy adds.
+let added : Array[String] = [
+  "LICENSE", "NOTICE", "README.md", "moon.pkg", "regex.mbt", "regex_law_test.mbt",
+  "automata/meter.mbt", "regex_engine/meter.mbt",
+]
+
+///|
+/// Point the core imports of a `moon.pkg` at the vendored packages, and drop the implicit builtin import.
+fn rewrite_imports(text : String) -> String {
+  let lines = []
+  for line in text.split("\n") {
+    guard !line.contains("\"moonbitlang/core/builtin\"") else { continue }
+    lines.push(
+      line
+      .replace_all(old="moonbitlang/core/internal/regex_engine/", new=import_base + "/")
+      .replace_all(old="moonbitlang/core/string/internal/", new=import_base + "/"),
+    )
+  }
+  lines.join("\n")
+}
+
+///|
+/// Remove the "Modified for moonrockz/smithy-validation" comment: the `//` line before it and the
+/// comment lines after it, up to the first line that is not a comment.
+fn strip_note(text : String) -> String {
+  let lines = text.split("\n").map(line => line.to_owned()).to_array()
+  let kept = []
+  let mut i = 0
+  while i < lines.length() {
+    if lines[i] == "//" &&
+      i + 1 < lines.length() &&
+      lines[i + 1].has_prefix("// Modified for moonrockz/smithy-validation:") {
+      i += 2
+      while i < lines.length() && lines[i].has_prefix("// ") {
+        i += 1
+      }
+      continue
+    }
+    kept.push(lines[i])
+    i += 1
+  }
+  kept.join("\n")
+}
+
+///|
+test "rewrite_imports points core imports at the copy and drops builtin" {
+  let text = "import {\n  \"moonbitlang/core/builtin\",\n  \"moonbitlang/core/internal/regex_engine/automata\",\n  \"moonbitlang/core/string/internal/regex_parser\" @p,\n  \"moonbitlang/core/list\",\n}"
+  assert_eq(
+    rewrite_imports(text),
+    "import {\n  \"moonrockz/smithy-validation/internal/regex/automata\",\n  \"moonrockz/smithy-validation/internal/regex/regex_parser\" @p,\n  \"moonbitlang/core/list\",\n}",
+  )
+}
+
+///|
+test "strip_note removes the note and keeps the rest" {
+  let text = "// limitations under the License.\n//\n// Modified for moonrockz/smithy-validation: a hook\n// on two lines.\n\n///|\nfn f() -> Unit {}"
+  assert_eq(strip_note(text), "// limitations under the License.\n\n///|\nfn f() -> Unit {}")
+  assert_eq(strip_note("// a\n//\n// b\n"), "// a\n//\n// b\n")
+}
+
+///|
+async fn read_text(path : String) -> String {
+  @fs.read_file(path).text()
+}
+
+///|
+async fn write_text(path : String, text : String) -> Unit {
+  @fs.write_file(path, text)
+}
+
+///|
+/// The `.mbt` files and `moon.pkg` of a directory, without subdirectories.
+async fn package_files(dir : String) -> Array[String] {
+  let names = []
+  for name in @fs.readdir(dir, sort=true) {
+    let path = "\{dir}/\{name}"
+    guard @fs.kind(path) is Regular else { continue }
+    if name.has_suffix(".mbt") || name == "moon.pkg" {
+      names.push(name)
+    }
+  }
+  names
+}
+
+///|
+/// Every file of the copy, relative to it.
+async fn vendored_files(dir : String, prefix : String) -> Array[String] {
+  let found = []
+  for name in @fs.readdir(dir, sort=true) {
+    let path = "\{dir}/\{name}"
+    let relative = if prefix == "" { name } else { "\{prefix}/\{name}" }
+    if @fs.kind(path) is Directory {
+      found.push_iter(vendored_files(path, relative).iter())
+    } else {
+      found.push(relative)
+    }
+  }
+  found
+}
+
+///|
+async fn default_core() -> String {
+  let (code, out, err) = @process.collect_output("mise", ["where", "http:moonbit"])
+  if code != 0 {
+    eprintln("❌ ERROR: mise where http:moonbit failed: \{err.text()}")
+    @sys.exit(1)
+  }
+  out.text().trim(chars=" \r\n").to_owned() + "/lib/core"
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let show_diff = args.contains("--diff")
+  let rest = args[1:].to_owned().filter(arg => arg != "--diff")
+  let core = if rest.length() > 0 { rest[0] } else { default_core() }
+  let mut errors = 0
+  let error = fn(message : String) {
+    println("❌ ERROR: \{message}")
+    errors += 1
+  }
+  let manifest = read_text("\{core}/moon.mod")
+  if !manifest.contains("version = \"\{core_version}\"") {
+    error("\{core}/moon.mod is not core \{core_version}")
+  }
+  // A scratch module that `moon fmt` formats as the repository formats the copy.
+  let scratch = "_build/regex-vendor-check"
+  if @fs.exists(scratch) {
+    @fs.rmdir(scratch, recursive=true)
+  }
+  let upstream = "\{scratch}/internal/regex"
+  @fs.mkdir(upstream, recursive=true)
+  write_text(
+    "\{scratch}/moon.mod",
+    "name = \"moonrockz/smithy-validation\"\n\nwarnings = \"-implicit_impl_as_method\"\n",
+  )
+  write_text("\{upstream}/moon.pkg", read_text("\{vendored}/moon.pkg"))
+  let expected = []
+  for package_ in packages {
+    let (source, target) = package_
+    @fs.mkdir("\{upstream}/\{target}", recursive=true)
+    for name in package_files("\{core}/\{source}") {
+      let text = read_text("\{core}/\{source}/\{name}")
+      let text = if name == "moon.pkg" { rewrite_imports(text) } else { text }
+      write_text("\{upstream}/\{target}/\{name}", text)
+      expected.push("\{target}/\{name}")
+    }
+  }
+  for file in single_files {
+    let (source, target) = file
+    write_text("\{upstream}/\{target}", read_text("\{core}/\{source}"))
+    expected.push(target)
+  }
+  let formatted = @process.run("moon", ["fmt"], cwd=scratch)
+  if formatted != 0 {
+    error("moon fmt failed on the core copy in \{scratch}")
+  }
+  let mut equal = 0
+  for path in expected {
+    let copy = "\{vendored}/\{path}"
+    if !@fs.exists(copy) {
+      error("\{path} is in core but not in the copy")
+      continue
+    }
+    let theirs = read_text("\{upstream}/\{path}")
+    let ours = strip_note(read_text(copy))
+    if theirs == ours {
+      equal += 1
+      if hooked.contains(path) {
+        error("\{path} is listed as hooked but equals core")
+      }
+    } else if hooked.contains(path) {
+      if show_diff {
+        write_text("\{scratch}/ours.mbt", ours)
+        ignore(
+          @process.run("git", [
+            "--no-pager", "diff", "--no-index", "\{upstream}/\{path}", "\{scratch}/ours.mbt",
+          ]),
+        )
+      }
+    } else {
+      error("\{path} differs from core but has no budget hook")
+    }
+  }
+  for path in vendored_files(vendored, "") {
+    if !expected.contains(path) && !added.contains(path) {
+      error("\{path} is in the copy but neither in core nor in the added files")
+    }
+  }
+  if errors > 0 {
+    println("❌ The vendored regex engine does not match core \{core_version}.")
+    @sys.exit(1)
+  }
+  println(
+    "✅ The vendored regex engine matches core \{core_version}: \{equal} files equal, \{hooked.length()} with budget hooks, \{added.length()} added.",
+  )
+}

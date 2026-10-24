@@ -203,15 +203,19 @@ fn[V : ValueView] check_constraints(
     }
   }
   if c.pattern is Some(pattern) && node is String(text) {
-    let units = if text.length() >= budget.limits.work / pattern.weight {
-      budget.limits.work + 1
-    } else {
-      (text.length() + 1) * pattern.weight
+    if !budget.complete {
+      return
+    }
+    // The matcher counts its own work and stops when it needs more than is left.
+    let work = budget.limits.work - budget.used
+    let (matched, units) = match pattern.matches(text, work~) {
+      Some(result) => result
+      None => (true, work + 1)
     }
     if !budget.charge(path, shape.id, units~) {
       return
     }
-    if !pattern.execute(text) {
+    if !matched {
       emit(Pattern, "I expected the string to match the modeled pattern.")
     }
   }

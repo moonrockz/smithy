@@ -69,12 +69,13 @@ test "with_context prepends a label and a note and keeps the rest" {
 ///|
 test "every code has a description and the table is in order" {
   let codes = @diagnostic.codes()
-  inspect(codes.length(), content="22")
+  inspect(codes.length(), content="23")
   inspect(codes[0], content="SM-SCAN-001")
   inspect(codes[7], content="SM-PARSE-001")
   inspect(codes[17], content="SM-PARSE-011")
   inspect(codes[20], content="SM-PARSE-014")
   inspect(codes[21], content="SM-PARSE-015")
+  inspect(codes[22], content="SM-PARSE-016")
   for c in codes {
     inspect(@diagnostic.description(c) is Some(_), content="true")
   }

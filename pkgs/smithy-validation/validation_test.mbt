@@ -1,4 +1,7 @@
 ///|
+let fqname_pattern = "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*:([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*#([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$"
+
+///|
 fn validator(
   source : String,
   config~ : @validation.Config = @validation.Config::new(),
@@ -296,4 +299,31 @@ test "defaults never change input or excuse a missing required member" {
   let input = Json::object(Map([]))
   assert_eq(codes(prepared.validate_json(input)), ["RequiredMember"])
   assert_eq(input, Json::object(Map([])))
+}
+
+///|
+test "the Morphir FQName pattern validates within the default work limit" {
+  let v = validator("@pattern(\"" + fqname_pattern + "\")\nstring Value")
+  let ok = v.validate_json(Json::string("morphir/SDK:basics#int"))
+  assert_true(ok.complete)
+  assert_eq(codes(ok), [])
+  let mixed = v.validate_json(Json::string("morphir/SdK:basics#int"))
+  assert_eq(codes(mixed), ["Pattern"])
+  // Each code unit costs one step, so the default limit stops a value of
+  // 100,000 units before the matcher reads it.
+  let long = v.validate_json(Json::string("a:b#c" + "-c".repeat(5000)))
+  assert_eq(codes(long), [])
+  let over = v.validate_json(Json::string("a:b#c" + "-c".repeat(50000)))
+  assert_eq(codes(over), ["LimitExceeded"])
+}
+
+///|
+test "the FQName pattern matches long values in linear work" {
+  // 6005 units cost about one work unit each, far below the default limit.
+  let v = validator("@pattern(\"" + fqname_pattern + "\")\nstring Value")
+  let long = "a:b#c" + "-c".repeat(3000)
+  let ok = v.validate_json(Json::string(long))
+  assert_true(ok.complete)
+  assert_eq(codes(ok), [])
+  assert_eq(codes(v.validate_json(Json::string(long + "-"))), ["Pattern"])
 }

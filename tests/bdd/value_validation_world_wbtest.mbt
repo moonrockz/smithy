@@ -48,6 +48,13 @@ impl @moonspec.World for ValueValidationWorld with fn configure(self, setup) {
   setup.given0("a value model with an unsupported pattern", fn() raise {
     self.model = Some(value_model("@pattern(\"(?=a)a\")\nstring Input"))
   })
+  setup.given1("a value model whose input has the pattern {string}", fn(
+    pattern : String,
+  ) raise {
+    self.model = Some(
+      value_model("@pattern(\"" + pattern + "\")\nstring Input"),
+    )
+  })
   setup.when0("I prepare the value validator", fn() raise {
     try {
       self.prepared = Some(

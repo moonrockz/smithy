@@ -379,6 +379,9 @@ fn[T] Parser::parse_block_items(
           } else {
             self.expect_separator()
           }
+        } else if strict {
+          // Smithy reads the `BR` of a value assignment before `}` too.
+          self.end_line()
         }
       }
       Err(e) => {
@@ -386,7 +389,10 @@ fn[T] Parser::parse_block_items(
           ignore(self.contexts.pop())
         }
         self.depth = depth0
-        if self.recover_member(start_pos) {
+        let recovered = self.recover_member(start_pos)
+        // The failed member reports its error, not its doc comments.
+        self.stray_docs.clear()
+        if recovered {
           self.diagnostics.push(e.diagnostic())
         } else {
           raise e
@@ -394,7 +400,9 @@ fn[T] Parser::parse_block_items(
       }
     }
   }
-  self.detach_docs_before(self.here().start)
+  // Doc comments before `}` document no member.
+  self.stray_docs_before(self.here().start)
+  self.report_stray_docs()
   items
 }
 
@@ -405,6 +413,9 @@ fn Parser::parse_members(
   self : Parser,
   owner : String,
 ) -> Array[@ast.Member] raise ParseError {
+  // Smithy reports the doc comments of the shape statement before `{`.
+  self.stray_docs_before(self.here().start)
+  self.report_stray_docs()
   let open = self.expect_kind(LBrace, "`{` to start the members of \{owner}")
   self.enter()
   let members = self.parse_block_items(
@@ -437,10 +448,11 @@ fn Parser::parse_member(self : Parser) -> @ast.Member raise ParseError {
       self.here(),
     )
   }
-  let docs = self.take_docs_before(first.span.start)
+  let docs = self.claim_docs_before(first.span.start)
   let traits = self.parse_traits()
   // Documentation must precede the first trait, not follow its body.
-  self.take_docs_before(self.here().start) |> ignore
+  self.stray_docs_before(self.here().start)
+  self.report_stray_docs()
   // A column-1 shape keyword after a member's leading traits means those
   // traits belong to the *next* shape, not to a member here: the block
   // was left open, not a member with an odd name.
@@ -553,9 +565,10 @@ fn Parser::parse_enum_member(self : Parser) -> @ast.EnumMember raise ParseError 
       self.here(),
     )
   }
-  let docs = self.take_docs_before(first.span.start)
+  let docs = self.claim_docs_before(first.span.start)
   let traits = self.parse_traits()
-  self.take_docs_before(self.here().start) |> ignore
+  self.stray_docs_before(self.here().start)
+  self.report_stray_docs()
   if self.at_kind(Dollar) {
     let d = self.expect_kind(Dollar, "`$`")
     self.fail(
@@ -601,7 +614,7 @@ fn Parser::parse_inline_shape(
   walrus : @scanner.Token,
 ) -> @ast.InlineShape raise ParseError {
   self.require_v2("inline", walrus.span)
-  let docs = self.take_docs_before(self.here().start)
+  let docs = self.claim_docs_before(self.here().start)
   let traits = self.parse_traits()
   let for_resource = self.parse_for_resource()
   let mixins = self.parse_mixins(same_line=false)
@@ -663,9 +676,12 @@ fn Parser::parse_operation_body(
         ignore(self.advance())
         let target : @ast.OperationTarget = if self.at_kind(Walrus) {
           let w = self.expect_kind(Walrus, "`:=`")
+          // Smithy drops the doc comments it read before `:=`, without a
+          // warning.
+          self.stray_docs.clear()
           Inline(self.parse_inline_shape(w))
         } else {
-          self.detach_docs_before(key.span.start)
+          self.stray_docs_before(key.span.start)
           ignore(self.expect_kind(Colon, "`:` or `:=` after `\{key.lexeme}`"))
           Reference(self.parse_shape_id())
         }
@@ -680,7 +696,7 @@ fn Parser::parse_operation_body(
         )
       }
       "errors" => {
-        self.detach_docs_before(key.span.start)
+        self.stray_docs_before(key.span.start)
         ignore(self.advance())
         ignore(self.expect_kind(Colon, "`:` after `errors`"))
         ignore(self.expect_kind(LBracket, "`[` to start the error list"))
@@ -724,7 +740,7 @@ fn Parser::parse_operation_body(
       self.expect_separator()
     }
   }
-  self.detach_docs_before(self.here().start)
+  self.stray_docs_before(self.here().start)
   ignore(self.expect_kind(RBrace, "`}`"))
   self.leave()
   props
@@ -869,7 +885,7 @@ fn Parser::parse_apply(
       )
       ts.push(self.parse_trait())
     }
-    self.detach_docs_before(self.here().start)
+    self.stray_docs_before(self.here().start)
     ignore(self.expect_kind(RBrace, "`}` to close the apply block"))
     self.leave()
     (ts, true)
@@ -904,7 +920,7 @@ fn Parser::parse_shape_or_apply(
     )
   }
   let start = first.span.start
-  let docs = self.take_docs_before(start)
+  let docs = self.claim_docs_before(start)
   if self.at_keyword("apply") {
     if docs.length() > 0 {
       // An `apply` statement adds traits to a shape defined elsewhere, so it
@@ -934,7 +950,8 @@ fn Parser::parse_shape_or_apply(
     @ast.ShapeKind::of(k.lexeme) is Some(_) {
     self.keyword_index = self.pos
   }
-  self.take_docs_before(self.here().start) |> ignore
+  // Smithy reports doc comments after the traits at the end of the statement.
+  self.stray_docs_before(self.here().start)
   let s = self.parse_shape(docs, traits, start)
   self.expect_br()
   Shape(s)

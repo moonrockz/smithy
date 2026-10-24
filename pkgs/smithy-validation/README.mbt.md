@@ -86,15 +86,69 @@ See [RFC 3339 sections 4.3 and 5.7](https://www.rfc-editor.org/rfc/rfc3339).
 
 The portable pattern profile supports literals, classes/ranges, groups, alternation, repetitions,
 whole-input anchors and common digit/word/whitespace escapes. Dot excludes line terminators.
+A '-' at the start or end of a class, or after a range, is a literal, as in ECMA-262. A '-' after a class escape is a literal, so `[\d-a]` matches a digit, '-' or 'a'. A '-' before a class escape, as in `[a-\d]`, fails preparation.
+A class range cannot end in `\d`, `\w` or `\s`. A `\u{...}` escape fails preparation; write `\uXXXX`.
 Lookaround, backreferences, flags, Unicode properties, complement escapes inside classes and
 unsupported core regex constructs fail preparation. Matching searches unless anchored. This is
 not the full ECMA-262 language.
 
 Preparation limits patterns to 4,096 source UTF-16 units, 32 nested groups and 1,024 expanded
-expression units, counting repetition expansion and alternatives. Matching charges eight times
-the expanded estimate times the input UTF-16 length plus one against the call's work budget.
-Patterns exceeding the preparation caps raise `UnsupportedConstraint`; exhausted matching work
-returns `LimitExceeded` before executing the pattern.
+expression units. Each repetition counts the copies the automaton builds (`*` once, `?` and `+`
+twice, `{n}` n times, `{n,}` n+1 times, `{n,m}` m times). A positive BMP-only class counts its
+members, each single character or range as one and each class escape as the intervals it expands
+to. Any other class counts its source length. Patterns exceeding the preparation caps raise
+`UnsupportedConstraint`. The caps bound the size of the automaton, not the work of a match.
+
+The matcher is a copy of the lazy DFA of `@string.Regex` from moonbitlang/core, in
+`internal/regex` (see its README and NOTICE), and it matches as `@string.Regex` does. Budget hooks
+in the copy count its work while it runs and charge the count to the call's work budget:
+
+- Each input UTF-16 unit costs one unit, and the end of the input costs one, charged before the
+  search starts.
+- Building a transition computes a derivative. It costs one unit for each expression node and each
+  thread that the derivative visits, and five units for each thread that duplicate removal visits:
+  the visit, the slot scan, the slot assignment, the hash and the state-table comparison. It also
+  costs a share of table growth: 6 * (4 * symbols + 2) table cells, at 8 cells to the unit. Table
+  doubling allocates and copies at most that many cells for each state that it adds.
+- The automaton remembers each transition with what it cost to build. A search pays that cost the
+  first time it takes the transition, also when the automaton built it for an earlier value. Later
+  steps on the same transition in the same search cost only the step.
+
+So the units of a search depend only on the pattern and the value, never on the values that the
+prepared validator saw before, and a value gives the same result on a new and on a used validator.
+The count is a bound on the work: each search pays at least what a search on a new automaton does.
+A visit does constant work: the translated pattern captures only group 0, so a mark map holds at
+most two marks. The scratch set and the slot book of a derivative are reset in time proportional to
+what they hold. When a search needs more units than the call has left, it stops at once, also in
+the middle of a derivative, keeps no partial state, and the call returns `LimitExceeded`.
+
+The automaton keeps at most 4,096 states between searches, a power of two with at most about 2^17
+table cells. Before a search, a full automaton forgets all its states. Over the life of the
+automaton, the growth shares pay for all table growth. The first table doubling in a search
+allocates and copies at most 3 * states * (4 * symbols + 2) <= 3 * 2^17 cells, about 393,000 cells:
+about 0.03 ms native and 1 ms on js. The growth shares of earlier searches pay for that doubling,
+and the states that the search adds pay for its later doublings.
+
+A search can add more states than the cap, and each one is charged to it, so the work limit, not
+the cap, bounds the memory of one search. The tables hold about 4 bytes per cell and at most about
+5 cells per work unit: about 2 MB at the default limit of 100,000 units, and about 200 MB at the
+largest configurable limit of 10,000,000 units. The next search starts from empty tables again.
+
+Measured on an Apple M5 Max, one unit takes 12 to 20 ns; allocating or copying a table cell takes
+0.07 ns native, 0.4 ns wasm-gc and 2.4 ns js. The Morphir FQName pattern costs 2,295 units for a
+97-unit name, and 920 for `morphir/SDK:basics#int`. The pattern `^(a?){150}a{150}$` needs 899,611
+units for ten `a` characters, because each derivative visits the chain of optional items again. The
+default limit stops it after 100,000 units, in about 2 ms native and 1 ms wasm-gc and js.
+
+The copy adds a second regex engine to the builds, because `moonrockz/smithy` still uses
+`@string.Regex` for its model checks. Release builds, before and after the copy:
+
+| Build | Before | After | Change | Gzip change |
+|---|---|---|---|---|
+| CLI `smithy.wasm` (wasm) | 2,503,178 B | 2,586,211 B | +83,033 B (+3.3%) | +26,038 B (+2.9%) |
+| CLI `smithy-gc.wasm` (wasm-gc) | 2,082,278 B | 2,123,222 B | +40,944 B (+2.0%) | +18,720 B (+2.7%) |
+| Playground worker, `moon build` js | 5,337,424 B | 5,647,105 B | +309,681 B (+5.8%) | +30,483 B (+5.1%) |
+| Playground `worker.js`, bundled | 1,310,959 B | 1,386,063 B | +75,104 B (+5.7%) | +14,330 B (+4.3%) |
 
 ## Findings, adapters and limits
 

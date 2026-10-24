@@ -1,18 +1,25 @@
 ///|
 priv struct BoundedPattern {
-  regex : @string.Regex
-  weight : Int32
+  regex : @regex.Regex
 } derive(Debug)
 
 ///|
-fn BoundedPattern::execute(self : BoundedPattern, text : String) -> Bool {
-  self.regex.execute(text) is Some(_)
+/// Search `text`, spending at most `work` units. Returns whether it matched and
+/// the units it spent, or `None` when the search needs more than `work` units.
+fn BoundedPattern::matches(
+  self : BoundedPattern,
+  text : String,
+  work~ : Int32,
+) -> (Bool, Int32)? {
+  self.regex.matches(text, work~)
 }
 
 ///|
-/// Bound the expanded expression before the core parser/compiler can recurse or
+/// Bound the expanded expression before the parser and compiler can recurse or
 /// copy quantified subexpressions. Counts include every alternative and class.
-fn pattern_cost(
+/// `*` counts one copy; `?` and `+` count two, because the automaton follows
+/// chains of optional items in quadratic time.
+fn pattern_size(
   pattern : String,
   id : @smithy.ShapeId,
 ) -> Int32 raise PreparationError {
@@ -43,7 +50,7 @@ fn pattern_cost(
     }
     if c == 42 || c == 43 || c == 63 || c == 123 {
       guard last > 0 else { raise unsupported() }
-      let mut copies = 2
+      let mut copies = if c == 42 { 1 } else { 2 }
       if c == 123 {
         i += 1
         let start = i
@@ -115,7 +122,7 @@ fn pattern_cost(
         i += 1
       }
       guard i < pattern.length() else { raise unsupported() }
-      i - start + 1
+      class_cost(pattern, start, i + 1)
     } else {
       1
     }
@@ -125,24 +132,135 @@ fn pattern_cost(
     i += 1
   }
   guard groups.is_empty() else { raise unsupported() }
-  // UTF-16 lowering and Thompson instructions can expand a source atom.
-  Int32::max(1, total) * 8
+  total
 }
 
 ///|
-/// Compile the portable pattern profile. Unknown constructs are never ignored.
+/// Length of the class atom at `pattern[j:]`, or -1 when the atom has astral or
+/// surrogate members, which UTF-16 lowering expands into surrogate sequences.
+fn class_atom_length(pattern : String, j : Int32, end : Int32) -> Int32 {
+  let c = pattern.code_unit_at(j).to_int()
+  if c >= 0xD800 && c <= 0xDFFF {
+    return -1
+  }
+  if c != 92 || j + 1 >= end {
+    return 1
+  }
+  if pattern.code_unit_at(j + 1) != 117 {
+    return 2
+  }
+  if j + 2 < end && pattern.code_unit_at(j + 2) == 123 {
+    return -1
+  }
+  let mut value = 0
+  let mut k = j + 2
+  while k < j + 6 && k < end {
+    let h = pattern.code_unit_at(k).to_int()
+    let digit = if h >= 48 && h <= 57 {
+      h - 48
+    } else if h >= 97 && h <= 102 {
+      h - 87
+    } else if h >= 65 && h <= 70 {
+      h - 55
+    } else {
+      break
+    }
+    value = value * 16 + digit
+    k += 1
+  }
+  if value >= 0xD800 && value <= 0xDFFF {
+    return -1
+  }
+  k - j
+}
+
+///|
+/// Cost of the class `pattern[start:end]` (from `[` through `]`). The cost of a
+/// positive BMP-only class is its number of members, each single atom or range
+/// counting one, because core splits its alphabet at every member boundary. The
+/// translator has already expanded `\d`, `\w` and `\s` into members. A negated
+/// class, or one with astral or surrogate members, lowers to surrogate
+/// sequences, so it costs its source length.
+fn class_cost(pattern : String, start : Int32, end : Int32) -> Int32 {
+  let full = end - start
+  if pattern.code_unit_at(start + 1) == 94 {
+    return full
+  }
+  let close = end - 1
+  let mut members = 0
+  let mut j = start + 1
+  while j < close {
+    let n = class_atom_length(pattern, j, end)
+    if n < 0 {
+      return full
+    }
+    j += n
+    if j + 1 < close && pattern.code_unit_at(j) == 45 {
+      let m = class_atom_length(pattern, j + 1, end)
+      if m < 0 {
+        return full
+      }
+      j += 1 + m
+    }
+    members += 1
+  }
+  Int32::max(1, members)
+}
+
+///|
+/// Where the translator is inside a character class, after the last item.
+priv enum ClassSlot {
+  Start
+  AfterAtom
+  AfterRangeDash
+  AfterRange
+  AfterSet
+  AfterSetDash
+}
+
+///|
+/// The slot after one character: it completes a range when a range dash came before.
+fn ClassSlot::after_atom(self : ClassSlot) -> ClassSlot {
+  match self {
+    AfterRangeDash | AfterSetDash => AfterRange
+    Start | AfterAtom | AfterRange | AfterSet => AfterAtom
+  }
+}
+
+///|
+/// Compile the portable pattern profile, after its expanded size passes the cap.
 fn compile_pattern(
   pattern : String,
   id : @smithy.ShapeId,
 ) -> BoundedPattern raise PreparationError {
-  let unsupported = fn() {
-    UnsupportedConstraint(
-      id, "I could not compile the pattern in the portable regular-expression profile.",
-    )
+  let translated = translate_pattern(pattern, id)
+  ignore(pattern_size(translated, id))
+  let regex = @regex.Regex::compile(translated) catch {
+    _ => raise unsupported_pattern(id)
   }
+  { regex, }
+}
+
+///|
+fn unsupported_pattern(id : @smithy.ShapeId) -> PreparationError {
+  UnsupportedConstraint(
+    id, "I could not compile the pattern in the portable regular-expression profile.",
+  )
+}
+
+///|
+/// Translate the portable pattern profile to the matcher's syntax. Unknown
+/// constructs are never ignored. The matcher rejects a bare '-' at the edge of
+/// a class, so each literal class dash leaves as `\-` and only a range operator
+/// stays a bare '-'.
+fn translate_pattern(
+  pattern : String,
+  id : @smithy.ShapeId,
+) -> String raise PreparationError {
+  let unsupported = fn() { unsupported_pattern(id) }
   guard pattern.length() <= 4096 else { raise unsupported() }
   let out = StringBuilder()
-  let mut in_class = false
+  let mut class : ClassSlot? = None
   let mut i = 0
   while i < pattern.length() {
     let c = pattern.code_unit_at(i).to_int()
@@ -155,52 +273,100 @@ fn compile_pattern(
         119 => Some("A-Za-z0-9_")
         115 =>
           Some(
-            "\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff",
+            "\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff",
           )
         _ => None
       }
       if expansion is Some(expansion) {
-        out.write_string(
-          if in_class {
-            expansion
-          } else {
-            "[" + expansion + "]"
-          },
-        )
+        if class is Some(slot) {
+          if slot is AfterRangeDash {
+            raise UnsupportedConstraint(
+              id, "I expected one character after '-' in a character class range, but found a class escape.",
+            )
+          }
+          out.write_string(expansion)
+          // Annex B: a dash beside a class escape makes a union, not a range.
+          class = Some(if slot is AfterSetDash { AfterRange } else { AfterSet })
+        } else {
+          out.write_string("[" + expansion + "]")
+        }
       } else if escape == 68 || escape == 87 || escape == 83 {
-        guard !in_class else { raise unsupported() }
+        guard class is None else { raise unsupported() }
         out.write_string(
           match escape {
             68 => "[^0-9]"
             87 => "[^A-Za-z0-9_]"
             _ =>
-              "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+              "[^\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
           },
         )
-      } else if escape == 98 && in_class {
-        out.write_string("\\u0008")
       } else {
-        guard [
-          92, 46, 94, 36, 124, 63, 42, 43, 40, 41, 91, 93, 123, 125, 45, 47, 110,
-          114, 116, 102, 118, 98, 66, 117,
-        ].contains(escape) else {
-          raise unsupported()
+        if escape == 98 && class is Some(_) {
+          out.write_string("\\u0008")
+        } else if escape == 118 {
+          // Core has no \v escape; U+000B is what ECMA reads.
+          out.write_string("\\u000b")
+        } else {
+          guard [
+            92, 46, 94, 36, 124, 63, 42, 43, 40, 41, 91, 93, 123, 125, 45, 47, 110,
+            114, 116, 102, 118, 98, 66, 117,
+          ].contains(escape) else {
+            raise unsupported()
+          }
+          // A \u escape is one class atom: copy all of it.
+          let end = if escape == 117 {
+            // ECMA without the u flag reads \u{ as 'u' and text; Java rejects it.
+            if i + 1 < pattern.length() && pattern.code_unit_at(i + 1) == 123 {
+              raise UnsupportedConstraint(
+                id, "I could not read '\\u{' in the pattern. I accept only \\uXXXX with four hex digits.",
+              )
+            }
+            guard i + 4 < pattern.length() else { raise unsupported() }
+            i + 5
+          } else {
+            i + 1
+          }
+          out.write_string("\\")
+          out.write_string(pattern[i:end].to_owned())
+          i = end - 1
         }
-        out.write_string("\\")
-        out.write_string(pattern[i:i + 1].to_owned())
+        if class is Some(slot) {
+          class = Some(slot.after_atom())
+        }
       }
     } else if c == 91 {
-      guard !in_class else { raise unsupported() }
-      in_class = true
-      out.write_string("[")
+      guard class is None else { raise unsupported() }
+      class = Some(Start)
+      if i + 1 < pattern.length() && pattern.code_unit_at(i + 1) == 94 {
+        out.write_string("[^")
+        i += 1
+      } else {
+        out.write_string("[")
+      }
     } else if c == 93 {
-      in_class = false
+      class = None
       out.write_string("]")
-    } else if c == 46 && !in_class {
+    } else if c == 45 && class is Some(slot) {
+      let range_operator = slot is AfterAtom &&
+        i + 1 < pattern.length() &&
+        pattern.code_unit_at(i + 1) != 93
+      if range_operator {
+        out.write_string("-")
+        class = Some(AfterRangeDash)
+      } else if slot is AfterSet &&
+        i + 1 < pattern.length() &&
+        pattern.code_unit_at(i + 1) != 93 {
+        out.write_string("\\-")
+        class = Some(AfterSetDash)
+      } else {
+        out.write_string("\\-")
+        class = Some(slot.after_atom())
+      }
+    } else if c == 46 && class is None {
       out.write_string("[^\\n\\r\\u2028\\u2029]")
     } else {
       if c == 40 &&
-        !in_class &&
+        class is None &&
         i + 1 < pattern.length() &&
         pattern.code_unit_at(i + 1) == 63 {
         guard i + 2 < pattern.length() && pattern.code_unit_at(i + 2) == 58 else {
@@ -208,7 +374,7 @@ fn compile_pattern(
         }
       }
       if c == 40 &&
-        !in_class &&
+        class is None &&
         !(i + 1 < pattern.length() && pattern.code_unit_at(i + 1) == 63) {
         out.write_string("(?:")
         i += 1
@@ -220,17 +386,13 @@ fn compile_pattern(
         i + 1
       }
       out.write_string(pattern[i:end].to_owned())
+      if class is Some(slot) {
+        class = Some(slot.after_atom())
+      }
       i = end
       continue
     }
     i += 1
   }
-  let translated = out.to_string()
-  let weight = pattern_cost(translated, id)
-  let regex = @string.Regex::Regex(translated) catch {
-    _ => raise unsupported()
-  }
-  // Core compiles its automaton lazily; do that once, only after the cost guard.
-  ignore(regex.execute(""))
-  { regex, weight, }
+  out.to_string()
 }
