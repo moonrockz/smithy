@@ -1,0 +1,7 @@
+import {
+  "moonrockz/smithy-site/tour/model",
+  "moonrockz/smithy-site/tour/source",
+  "moonrockz/smithy-site/playground/core",
+} for "test"
+
+supported_targets = "native"
