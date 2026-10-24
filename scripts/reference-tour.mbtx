@@ -177,12 +177,22 @@ async fn collect_files(root : String, relative : String) -> Array[String] {
 }
 
 ///|
-/// The files directly in `path`, as (name, text).
+/// The names in `path`, sorted, without the names that start with `.`. The same rule as `list_dir` in
+/// site/tour/source/read.mbt.
+async fn list_dir(path : String) -> Array[String] {
+  @fs.readdir(path, sort=true).filter(name => !name.has_prefix("."))
+}
+
+///|
+/// The files directly in `path`, as (name, text). The loader in site/tour/source/read.mbt fails on a sub-folder and
+/// on a name that does not end in `.smithy`; this script fails on them too.
 async fn read_files(path : String) -> Array[(String, String)] {
   let files : Array[(String, String)] = []
   if !@fs.exists(path) { return files }
-  for name in @fs.readdir(path, sort=true) {
-    if @fs.kind(path + "/" + name) is Directory { continue }
+  for name in list_dir(path) {
+    if @fs.kind(path + "/" + name) is Directory || !name.has_suffix(".smithy") {
+      fail(path + "/" + name + ": a lesson file must be a .smithy file directly in its files folder")
+    }
     files.push((name, @fs.read_file(path + "/" + name).text()))
   }
   files
@@ -192,12 +202,12 @@ async fn read_files(path : String) -> Array[(String, String)] {
 /// The cases of every lesson, in the input format of the harness.
 async fn lesson_cases() -> Array[Json] {
   let cases : Array[Json] = []
-  for dir in @fs.readdir(lessons_root, sort=true) {
+  for dir in list_dir(lessons_root) {
     let base = lessons_root + "/" + dir
     if !(@fs.kind(base) is Directory) { continue }
     let json_schema = @json.parse(@fs.read_file(base + "/lesson.json").text()) is { "output": String("JsonSchema"), .. }
     let start = read_files(base + "/files")
-    for name in @fs.readdir(base + "/cases", sort=true) {
+    for name in list_dir(base + "/cases") {
       if !(@fs.kind(base + "/cases/" + name) is Directory) { continue }
       let files = merge_files(start, read_files(base + "/cases/" + name + "/files"))
       cases.push(Json::object({

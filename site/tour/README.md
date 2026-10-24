@@ -17,19 +17,25 @@ site/tour/lessons/NN-<slug>/
 ```
 
 - Lesson numbers start at 01 and have no gap. The folder name is `NN-<slug>`, and `<slug>` is the `slug` of
-  `lesson.json`. Two lessons cannot have the same slug.
+  `lesson.json`. Two lessons cannot have the same number or the same slug.
 - `lesson.json` has the keys `slug`, `title`, `section`, `spec`, and optionally `output` and `selector`.
-  `section` groups consecutive lessons on the contents page. `spec` is the link to the smithy.io section that the
-  lesson teaches. `output` is one of `JsonAst`, `Idl`, `Selector`, `JsonSchema`, `OpenApi30`, `OpenApi31` or
-  `OpenRpc`. `selector` is the selector for the `Selector` output.
+  Another key is an error. `section` groups consecutive lessons on the contents page. `spec` is the link to the
+  smithy.io section that the lesson teaches. `output` is one of `JsonAst`, `Idl`, `Selector`, `JsonSchema`,
+  `OpenApi30`, `OpenApi31` or `OpenRpc`. `selector` is the selector for the `Selector` output, and is an error
+  with another output.
 - `lesson.md` starts with the line `# <title>`, with the `title` of `lesson.json`.
 - A case runs the starting files with its own `files/` on top. A case file replaces a starting file of the same
   name, or adds a new file.
-- `expect.json` has `events` and, optionally, `output_contains`.
+- A lesson file is directly in `files/` or in `cases/<case>/files/`. A sub-folder there is an error. The name of
+  a lesson file must end in `.smithy`, because the playground core reads every file as IDL. (Java picks the
+  format by the extension. Remove this rule when the core does the same.)
+- The loader skips every name that starts with `.`, such as `.DS_Store`.
+- `expect.json` has `events` and, optionally, `output_contains`. Another key is an error.
   - `events` lists the expected findings, each as `id|SEVERITY|shape`. `SEVERITY` is `WARNING`, `DANGER` or
     `ERROR`. A finding with no shape has `-` in its place, for example `Model|ERROR|-`.
     The list is the complete list. An empty list says that the case has no finding of these severities.
   - `output_contains` lists strings (needles). Each string must be a substring of the output text of the case.
+    An empty string is an error, because it matches every output.
     A lesson that has an `output_contains` needs an `output`.
     Its `events` must have no `ERROR` and no `DANGER`, because the output does not run for a model with those
     events. When the output has more than one file, the check joins the text of the files with a newline.

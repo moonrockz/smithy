@@ -1,11 +1,8 @@
 import {
   "moonrockz/smithy-site/tour/model",
+  "moonrockz/smithy-site/playground/samples",
   "moonbitlang/x/fs",
   "moonbitlang/core/json",
 }
-
-import {
-  "moonrockz/smithy-site/playground/samples",
-} for "test"
 
 supported_targets = "native"
