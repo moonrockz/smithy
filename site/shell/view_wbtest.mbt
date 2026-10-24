@@ -804,3 +804,20 @@ async test "a lesson route without its tour data is not found" {
   let html = render_route(Lesson("nope"), None)
   assert_true(html.contains("Page not found"))
 }
+
+///|
+#cfg(not(target="js"))
+async test "the docs sidebar links to the tour" {
+  let html = render_route(Doc("cli"), Some("# smithy CLI\n"))
+  guard html.find("class=\"ms-sidebar\"") is Some(sidebar) else {
+    fail("no sidebar")
+  }
+  let rest = html[sidebar:].to_owned()
+  guard rest.find("</aside>") is Some(end) else { fail("no sidebar end") }
+  let aside = rest[:end].to_owned()
+  assert_true(
+    aside.contains(
+      "href=\"/smithy/tour/\" target=\"_self\" class=\"ms-side-link\">Tour</a>",
+    ),
+  )
+}

@@ -24,6 +24,21 @@ pub extend Channel with ToJson::{to_json}
 pub extend Channel with FromJson::{from_json}
 
 ///|
+/// The name of the channel on the command line and in storage keys.
+pub fn Channel::name(self : Channel) -> String {
+  match self {
+    Release => "release"
+    Next => "next"
+  }
+}
+
+///|
+/// The channel of `name`, or `None` for another name.
+pub fn Channel::parse(name : String) -> Channel? {
+  [Release, Next].iter().find_first(c => c.name() == name)
+}
+
+///|
 /// One built version of the site.
 pub(all) struct SiteConfig {
   /// Base path of this version, for example "/smithy/next/".

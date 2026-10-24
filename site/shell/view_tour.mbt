@@ -100,20 +100,19 @@ fn lesson_view(m : Model, page : @model.LessonPage) -> Html {
 ///|
 /// A tour route: its page when the site data holds it, else not found.
 fn tour_view(m : Model) -> Html {
-  match (m.route, m.tour) {
-    (Tour, Some(Contents(contents))) => tour_contents_view(m, contents)
-    (Lesson(slug), Some(Page(page))) if page.slug == slug =>
-      lesson_view(m, page)
-    _ => not_found_view(m)
+  match current_tour(m.route, m.tour) {
+    Some(Contents(contents)) => tour_contents_view(m, contents)
+    Some(Page(page)) => lesson_view(m, page)
+    None => not_found_view(m)
   }
 }
 
 ///|
 /// The title of a tour route, or `None` when the site data lacks its page.
 fn tour_title(m : Model) -> String? {
-  match (m.route, m.tour) {
-    (Tour, Some(Contents(_))) => Some("Tour")
-    (Lesson(slug), Some(Page(page))) if page.slug == slug => Some(page.title)
-    _ => None
+  match current_tour(m.route, m.tour) {
+    Some(Contents(_)) => Some("Tour")
+    Some(Page(page)) => Some(page.title)
+    None => None
   }
 }

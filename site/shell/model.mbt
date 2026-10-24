@@ -168,6 +168,20 @@ let closed_search : SearchState = {
 }
 
 ///|
+/// The tour data when it is the data of `route`: the contents for `Tour`, the
+/// lesson of the slug for `Lesson`. `None` for any other pair.
+fn current_tour(
+  route : @route.Route,
+  tour : @model.TourPage?,
+) -> @model.TourPage? {
+  match (route, tour) {
+    (Tour, Some(Contents(_))) => tour
+    (Lesson(slug), Some(Page(page))) if page.slug == slug => tour
+    _ => None
+  }
+}
+
+///|
 /// The repository path of the Markdown file that a route shows, or `None`
 /// for a route with no such file (the landing page, the examples index, the
 /// tour contents, 404). A lesson has one only on its own page: `tour` holds it.
@@ -179,10 +193,9 @@ fn source_of(
 ) -> String? {
   match route {
     Example(dir) => @content.Example::find(examples, dir).map(e => e.source())
-    Lesson(slug) =>
-      match tour {
-        Some(Page(page)) if page.slug == slug =>
-          Some(@model.lesson_source(page.number, page.slug))
+    Lesson(_) =>
+      match current_tour(route, tour) {
+        Some(Page(page)) => Some(@model.lesson_source(page.number, page.slug))
         _ => None
       }
     _ => manifest.find(route).map(p => p.source)

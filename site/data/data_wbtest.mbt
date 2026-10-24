@@ -197,3 +197,13 @@ test "a tour page round-trips" {
   }
   assert_eq(SiteData::decode(data.encode()), Some(data))
 }
+
+///|
+test "channel names round-trip" {
+  assert_eq(Release.name(), "release")
+  assert_eq(Next.name(), "next")
+  for c in [Release, Next] {
+    assert_eq(Channel::parse(c.name()), Some(c))
+  }
+  assert_eq(Channel::parse("beta"), None)
+}

@@ -17,15 +17,6 @@ fn tour_contents(tour : @model.Tour) -> @model.TourContents {
 }
 
 ///|
-/// The channel part of the storage key.
-fn channel_key(channel : @data.Channel) -> String {
-  match channel {
-    Release => "release"
-    Next => "next"
-  }
-}
-
-///|
 /// The data of the page of `lesson`.
 fn lesson_page(
   config : @data.SiteConfig,
@@ -47,10 +38,7 @@ fn lesson_page(
     previous: previous.map(link_of),
     next: next.map(link_of),
     worker: worker_url(config),
-    storage_key: "smithy-tour:" +
-    channel_key(config.channel) +
-    ":" +
-    lesson.slug,
+    storage_key: "smithy-tour:" + config.channel.name() + ":" + lesson.slug,
     // The playground holds one model.
     playground: if lesson.files.length() == 1 {
       Some(@route.href(config.base, Playground))

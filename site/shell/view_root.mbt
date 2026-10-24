@@ -82,7 +82,7 @@ pub fn view(m : Model, emit : @rabbita.Emit[Msg], site_json : String) -> Html {
         @html.nothing
       },
       // A lesson loads the tour script, which mounts the lesson component.
-      if m.route is Lesson(_) && tour_title(m) is Some(_) {
+      if current_tour(m.route, m.tour) is Some(Page(_)) {
         script(
           src=m.config.versioned(base + "tour/ui.js"),
           type_="module",

@@ -532,3 +532,32 @@ test "a link into or out of a tour page is a full page load" {
     link_action(lesson, "/smithy/tour/simple-shapes/#simple-shapes") is Push,
   )
 }
+
+///|
+test "current_tour gives the tour data only for its own route" {
+  let contents : @model.TourPage = Contents({ sections: [], })
+  let page : @model.TourPage = Page({
+    slug: "a",
+    title: "A",
+    section: "Basics",
+    number: 1,
+    total: 1,
+    output: None,
+    selector: None,
+    spec: "https://smithy.io/2.0/",
+    files: [],
+    digest: "d",
+    previous: None,
+    next: None,
+    worker: "w",
+    storage_key: "k",
+    playground: None,
+  })
+  assert_eq(current_tour(Tour, Some(contents)), Some(contents))
+  assert_eq(current_tour(Tour, Some(page)), None)
+  assert_eq(current_tour(Lesson("a"), Some(page)), Some(page))
+  assert_eq(current_tour(Lesson("b"), Some(page)), None)
+  assert_eq(current_tour(Lesson("a"), Some(contents)), None)
+  assert_eq(current_tour(Lesson("a"), None), None)
+  assert_eq(current_tour(Doc("cli"), Some(page)), None)
+}
