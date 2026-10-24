@@ -540,6 +540,11 @@ test "a timeout restarts the worker and sends the request again" {
 }
 
 ///|
+test "the timeout text names the time limit" {
+  assert_true(timeout_text.has_prefix("The check took more than 10 s,"))
+}
+
+///|
 test "a timeout of a transform sends the transform again" {
   let (m, _) = Model::start(page(), None)
   let (m, _) = update(m, Answered(seq=1, answer=Checked([])))
@@ -574,6 +579,24 @@ test "a timeout of a lesson without an output stops the findings only" {
 test "a timeout after an edit checks the newest files" {
   let (m, _) = Model::start(page(), None)
   let (m, _) = run(m, [TimedOut(1), Edited("namespace a\n"), Debounced(1)])
+  let (m, effects) = update(m, TimedOut(2))
+  assert_eq(effects, [
+    RestartWorker,
+    SendValidate(seq=3, files=[("model.smithy", "namespace a\n")]),
+    Wait(ms=10000, msg=TimedOut(3)),
+  ])
+  assert_false(m.retried)
+}
+
+///|
+test "a timeout of a transform after an edit checks the edited files" {
+  let (m, _) = Model::start(page(), None)
+  // The transform of the starting files runs, and the wait of the edit has
+  // not ended.
+  let (m, _) = run(m, [
+    Answered(seq=1, answer=Checked([])),
+    Edited("namespace a\n"),
+  ])
   let (m, effects) = update(m, TimedOut(2))
   assert_eq(effects, [
     RestartWorker,

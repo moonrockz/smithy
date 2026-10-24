@@ -212,8 +212,10 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
     }
     TimedOut(seq) => {
       guard seq == m.seq && m.waiting else { return (m, []) }
-      if m.pending {
-        // The files changed since: check the newest ones.
+      if m.pending || m.edits != m.sent_edits {
+        // The files changed since: check the newest ones. A transform of the
+        // edited files would show an output for files whose findings the
+        // page does not show.
         let (sent, more) = m.send_validate()
         ({ ..sent, retried: false, }, [RestartWorker, ..more])
       } else if m.retried {

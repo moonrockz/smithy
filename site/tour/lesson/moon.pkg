@@ -12,6 +12,9 @@ import {
   "moonbitlang/async",
 } for "wbtest"
 
+// `-unused_package` is for `moonbitlang/async` only: the view tests that use
+// it run on native, so the js tests do not use it.
+
 warnings = "-alert_experimental-unused_package"
 
 supported_targets = "js+native"
