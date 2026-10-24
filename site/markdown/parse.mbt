@@ -5,13 +5,14 @@ priv struct Conv {
   ids : Map[String, Int32]
   toc : Array[TocEntry]
   mut title : String?
+  mut tabs : Int
 }
 
 ///|
 /// Parses Markdown and rewrites its links for the site.
 pub fn parse(src : String, ctx : LinkContext) -> Document {
   let doc = @cmark.Doc::from_string(heading_auto_ids=true, strict=false, src)
-  let conv = Conv::{ ctx, defs: doc.defs, ids: {}, toc: [], title: None, }
+  let conv = Conv::{ ctx, defs: doc.defs, ids: {}, toc: [], title: None, tabs: 0, }
   let blocks = conv.blocks(doc.block)
   { title: conv.title.unwrap_or(""), blocks, toc: conv.toc, }
 }
@@ -177,8 +178,22 @@ fn Conv::blocks(self : Conv, block : @cmark.Block) -> Array[Block] {
       [Heading(level, unique, content)]
     }
     Paragraph({ v: { inline, .. }, .. }) => [Paragraph(self.inlines(inline))]
-    CodeBlock({ v: cb, .. }) | ExtMathBlock({ v: cb, .. }) =>
-      [CodeBlock(code_language(cb), code_source(cb))]
+    CodeBlock({ v: cb, .. }) | ExtMathBlock({ v: cb, .. }) => {
+      let lang = code_language(cb)
+      let code = code_source(cb)
+      if lang == "tabs" {
+        let decoded : Array[Tab]? = try {
+          Some(@json.from_json(@json.parse(code)))
+        } catch {
+          _ => None
+        }
+        if decoded is Some(tabs) {
+          self.tabs += 1
+          return [Tabs("tabs-\{self.tabs}", tabs)]
+        }
+      }
+      [CodeBlock(lang, code)]
+    }
     BlockQuote({ v: { block: inner, .. }, .. }) => [Quote(self.blocks(inner))]
     List({ v: { ty, items, .. }, .. }) => {
       let xs : Array[Array[Block]] = []

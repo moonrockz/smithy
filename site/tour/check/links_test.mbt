@@ -36,7 +36,8 @@ fn links_of(blocks : Array[@markdown.Block]) -> Array[@markdown.Target] {
         head.each(inlines)
         rows.each(row => row.each(inlines))
       }
-      CodeBlock(_, _) | Rule => ()
+      // A tab holds a label and code snippets: plain text with no link.
+      CodeBlock(_, _) | Rule | Tabs(_, _) => ()
     }
   }
   result

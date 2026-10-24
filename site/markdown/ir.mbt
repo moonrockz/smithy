@@ -37,6 +37,46 @@ pub extend Inline with Eq::{equal, not_equal}
 pub extend Inline with @debug.Debug::{to_repr}
 
 ///|
+/// One code block of a tab.
+pub(all) struct Snippet {
+  lang : String
+  /// A file name shown above the code, or `None`.
+  file : String?
+  code : String
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend Snippet with Eq::{equal, not_equal}
+
+///|
+pub extend Snippet with @debug.Debug::{to_repr}
+
+///|
+pub extend Snippet with ToJson::{to_json}
+
+///|
+pub extend Snippet with FromJson::{from_json}
+
+///|
+/// One tab of a tab group: a label and the code blocks under it.
+pub(all) struct Tab {
+  label : String
+  snippets : Array[Snippet]
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend Tab with Eq::{equal, not_equal}
+
+///|
+pub extend Tab with @debug.Debug::{to_repr}
+
+///|
+pub extend Tab with ToJson::{to_json}
+
+///|
+pub extend Tab with FromJson::{from_json}
+
+///|
 pub(all) enum Block {
   /// Level, unique id, content.
   Heading(Int32, String, Array[Inline])
@@ -50,6 +90,8 @@ pub(all) enum Block {
   /// Header cells and rows of cells.
   Table(Array[Array[Inline]], Array[Array[Array[Inline]]])
   Rule
+  /// A tab group: its id (`tabs-N`, N from 1 in document order) and its tabs.
+  Tabs(String, Array[Tab])
 } derive(Eq, Debug)
 
 ///|
@@ -137,5 +179,15 @@ pub fn block_text(block : Block) -> String {
       parts.join(" ")
     }
     Rule => ""
+    Tabs(_, tabs) => {
+      let parts : Array[String] = []
+      for tab in tabs {
+        parts.push(tab.label)
+        for snippet in tab.snippets {
+          parts.push(snippet.code)
+        }
+      }
+      parts.join(" ")
+    }
   }
 }

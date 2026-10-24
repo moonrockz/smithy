@@ -2,4 +2,5 @@ import {
   "moonrockz/smithy-site/route",
   "moonbit-community/cmark/cmark",
   "moonbitlang/core/debug",
+  "moonbitlang/core/json",
 }

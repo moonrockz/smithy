@@ -3,6 +3,7 @@ package "moonrockz/smithy-site/markdown"
 
 import {
   "moonbitlang/core/debug",
+  "moonbitlang/core/json",
   "moonrockz/smithy-site/route",
 }
 
@@ -19,6 +20,8 @@ pub fn resolve_path(String, String) -> String
 
 pub fn rewrite_link(String, LinkContext) -> Target
 
+pub fn tabs_fence(Array[Tab]) -> String
+
 pub fn title_of(String) -> String
 
 // Errors
@@ -33,6 +36,7 @@ pub(all) enum Block {
   OrderedList(Int, Array[Array[Block]])
   Table(Array[Array[Inline]], Array[Array[Array[Inline]]])
   Rule
+  Tabs(String, Array[Tab])
 } derive(Eq, @debug.Debug)
 pub fn Block::equal(Self, Self) -> Bool
 pub fn Block::not_equal(Self, Self) -> Bool
@@ -67,6 +71,27 @@ pub(all) struct LinkContext {
   repo_url : String
   git_ref : String
 }
+
+pub(all) struct Snippet {
+  lang : String
+  file : String?
+  code : String
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Snippet::equal(Self, Self) -> Bool
+pub fn Snippet::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+pub fn Snippet::not_equal(Self, Self) -> Bool
+pub fn Snippet::to_json(Self) -> Json
+pub fn Snippet::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Tab {
+  label : String
+  snippets : Array[Snippet]
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Tab::equal(Self, Self) -> Bool
+pub fn Tab::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+pub fn Tab::not_equal(Self, Self) -> Bool
+pub fn Tab::to_json(Self) -> Json
+pub fn Tab::to_repr(Self) -> @debug.Repr
 
 pub(all) enum Target {
   Internal(@route.Route, String?)

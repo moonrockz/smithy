@@ -846,3 +846,34 @@ async test "a lesson page with a docs link names it the documentation" {
   let icons = html.split("ms-ext").count()
   assert_eq(spec_html.split("ms-ext").count(), icons + 1)
 }
+
+///|
+#cfg(not(target="js"))
+async test "a tab group renders radio tabs that work without JavaScript" {
+  let tabs : Array[@markdown.Tab] = [
+    {
+      label: "CLI",
+      snippets: [
+        { lang: "smithy", file: Some("greeting.smithy"), code: "namespace a" },
+        { lang: "console", file: None, code: "$ smithy version" },
+      ],
+    },
+    {
+      label: "MoonBit",
+      snippets: [{ lang: "mbt", file: None, code: "test {}" }],
+    },
+  ]
+  let html = render_route(
+    Doc("smithy-syntax"),
+    Some("# T\n\n" + @markdown.tabs_fence(tabs) + "\n"),
+  )
+  for
+    part in [
+      "type=\"radio\"", "name=\"tabs-1\"", "id=\"tabs-1-1\"", "id=\"tabs-1-2\"", "for=\"tabs-1-2\"",
+      "class=\"ms-tab-panel\"", "class=\"ms-codelabel\">greeting.smithy<",
+    ] {
+    assert_true(html.contains(part))
+  }
+  let checked = html.split("checked").to_array().length() - 1
+  assert_eq(checked, 1)
+}
