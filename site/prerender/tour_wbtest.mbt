@@ -120,3 +120,13 @@ test "a lesson spec that is a docs path links to the docs page" {
   let web = lesson_page(config, tour, tour.lessons[1])
   assert_eq(web.spec, "https://smithy.io/2.0/spec/idl.html")
 }
+
+///|
+test "a lesson with an OpenAPI output has no playground link" {
+  let tour = fixture_tour()
+  for output in [@samples.Output::OpenApi30, @samples.Output::OpenApi31] {
+    let lesson = { ..tour.lessons[0], output: Some(output), }
+    let page = lesson_page(fixture_config("next"), tour, lesson)
+    assert_eq(page.playground, None)
+  }
+}

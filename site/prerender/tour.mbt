@@ -49,8 +49,10 @@ fn lesson_page(
     next: next.map(link_of),
     worker: worker_url(config),
     storage_key: "smithy-tour:" + config.channel.name() + ":" + lesson.slug,
-    // The playground holds one model.
-    playground: if lesson.files.length() == 1 {
+    // The playground holds one model. It validates without the protocol
+    // definitions, so it marks an OpenAPI model with an error (smithy-2qe.41.22).
+    playground: if lesson.files.length() == 1 &&
+      !(lesson.output is Some(OpenApi30 | OpenApi31)) {
       Some(@route.href(config.base, Playground))
     } else {
       None
