@@ -263,6 +263,49 @@ test {
 }
 ```
 
+`encode_json_ast` gives the JSON text that `smithy convert --to json` writes.
+
+<!-- tour:start convert-json-api -->
+```mbt check
+///|
+test {
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "greeting.smithy",
+    (
+      #|$version: "2"
+      #|
+      #|namespace example
+      #|
+      #|structure Greeting {
+      #|    message: String
+      #|}
+    ),
+  )
+  .assemble().model.unwrap()
+  let json = @syntax.encode_json_ast(model.to_json_ast()).stringify(indent=4)
+  assert_eq(
+    json,
+    (
+      #|{
+      #|    "smithy": "2.0",
+      #|    "shapes": {
+      #|        "example#Greeting": {
+      #|            "type": "structure",
+      #|            "members": {
+      #|                "message": {
+      #|                    "target": "smithy.api#String"
+      #|                }
+      #|            }
+      #|        }
+      #|    }
+      #|}
+    ),
+  )
+}
+```
+<!-- tour:end convert-json-api -->
+
 `Model::to_json_ast` exports Smithy 2.0 with inherited contents flattened into
 each shape. Built-in prelude and contract definitions are omitted unless
 `include_prelude=true`. Exact node
