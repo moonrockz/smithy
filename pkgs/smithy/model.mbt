@@ -46,6 +46,8 @@ pub(all) struct ModelDiagnostic {
   code : String
   event_id : String
   severity : @syntax.Severity
+  /// The event severity is DANGER. The diagnostic severity stays Error.
+  danger : Bool
   message : String
   source : SourceLocation
   shape : ShapeId?

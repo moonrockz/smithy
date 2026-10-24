@@ -1,14 +1,13 @@
 ///|
-/// Order by code unit, as the Java reference does. `String::compare` orders by length first.
+/// Order by UTF-16 code unit, as Java `String.compareTo` does. `String::compare` orders by length first.
 fn code_unit_order(a : String, b : String) -> Int32 {
-  let x = a.to_array()
-  let y = b.to_array()
-  for i in 0..<(if x.length() < y.length() { x.length() } else { y.length() }) {
-    if x[i] != y[i] {
-      return x[i].to_int() - y[i].to_int()
+  let n = if a.length() < b.length() { a.length() } else { b.length() }
+  for i in 0..<n {
+    if a.code_unit_at(i) != b.code_unit_at(i) {
+      return a.code_unit_at(i).to_int() - b.code_unit_at(i).to_int()
     }
   }
-  x.length() - y.length()
+  a.length() - b.length()
 }
 
 ///|
@@ -135,5 +134,39 @@ test "the Java errorfiles of the contract traits" {
   ])
   assert_eq(contract_keys(invalid_jmespath_syntax), [
     "Model|ERROR|smithy.example#FooBar",
+  ])
+}
+
+///|
+/// The model of tour lesson 25 with an `items` member, for the slice case.
+fn items_model(expression : String) -> String {
+  time_range(expression).replace(
+    old="    end: Timestamp\n",
+    new="    end: Timestamp\n    items: Items\n",
+  ) +
+  "list Items {\n    member: String\n}\n"
+}
+
+///|
+test "a warning has the ID of a Smithy warning" {
+  // Java: Invalid comparator '<' for string, a WARNING.
+  let model = "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n@conditions({Ordered: {expression: \"a < b\", documentation: \"x\"}})\nstructure S {\n    a: String\n    b: String\n}\n"
+  assert_true(
+    contract_keys(model).contains(
+      "ConditionsTrait.JmespathProblem.JmespathEventWarning.Ordered|WARNING|example#S",
+    ),
+  )
+}
+
+///|
+test "a zero slice step has no static event, as in Smithy" {
+  assert_eq(contract_keys(items_model("length(items[::0]) == `0`")), [])
+}
+
+///|
+test "each trait target of an operation is reported once" {
+  let text = "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n@conditions({Never: {expression: \"`false`\", documentation: \"x\"}})\n@error(\"client\")\noperation Ping {}\n"
+  assert_eq(contract_keys(text), [
+    "TraitTarget|ERROR|example#Ping", "TraitTarget|ERROR|example#Ping",
   ])
 }

@@ -26,21 +26,23 @@ fn ContractAnalysis::problem(
   message : String,
   event~ : ContractEvent,
 ) -> Unit {
-  let (code, event_id, severity) = match event {
-    Syntax => ("SM-MODEL-015", "Model", @syntax.Severity::Error)
-    NotBoolean => ("SM-MODEL-017", "ConditionsTrait", Error)
-    Error => ("SM-MODEL-016", "ConditionsTrait", Error)
+  let (code, event_id, severity, danger) = match event {
+    Syntax => ("SM-MODEL-015", "Model", @syntax.Severity::Error, false)
+    NotBoolean => ("SM-MODEL-017", "ConditionsTrait", Error, true)
+    Error => ("SM-MODEL-016", "ConditionsTrait", Error, false)
     Danger =>
       (
         "SM-MODEL-016",
         "ConditionsTrait.JmespathProblem.JmespathEventDanger.\{self.condition}",
         Error,
+        true,
       )
     Warning =>
       (
         "SM-MODEL-016",
         "ConditionsTrait.JmespathProblem.JmespathEventWarning.\{self.condition}",
         Warning,
+        false,
       )
   }
   let key = "\{code}:\{span.start}:\{span.end}:\{message}"
@@ -54,6 +56,7 @@ fn ContractAnalysis::problem(
     code,
     event_id,
     severity,
+    danger,
     message: "I found a problem in JMESPath condition \{Json::string(self.condition).stringify()} on \{self.owner.id} at expression \{line}:\{column} (UTF-16 offsets \{span.start}..\{span.end}): \{message}",
     source: {
       ..self.owner.source,
@@ -319,7 +322,7 @@ fn ContractAnalysis::analyze(
         let input = values.pop().unwrap()
         if input is Reference(_) {
           self.problem(
-            event=Error,
+            event=Danger,
             right.span,
             "I expected a JSON value before this JMESPath subexpression, but found an expression reference.",
           )
@@ -382,14 +385,6 @@ fn ContractAnalysis::analyze(
           reversed.push(values.pop().unwrap())
         }
         let args = reversed.rev_iter().to_array()
-        if !(node.kind is Function(_, _)) &&
-          args.iter().any(t => t is Reference(_)) {
-          self.problem(
-            event=Error,
-            node.span,
-            "I expected JSON values for this JMESPath operation, but found an expression reference.",
-          )
-        }
         let result : ContractType = match node.kind {
           Not(_) => Boolean
           Binary(And | Or as op, _, _) =>
@@ -403,14 +398,19 @@ fn ContractAnalysis::analyze(
               None => contract_join(args, self.model)
             }
           Binary(op, _, _) => {
-            if args.iter().any(t => t is Reference(_)) {
+            // Smithy compares a reference with a reference only: the result is
+            // null, so it warns. A reference and another type compare as false.
+            let references = args.iter().filter(t => t is Reference(_)).count()
+            if references == 2 {
               self.problem(
-                event=Error,
+                event=Warning,
                 node.span,
-                "I expected JSON values for a JMESPath comparison, but found an expression reference.",
+                "I expected JSON values for a JMESPath comparison, but found two expression references; the JMESPath result is null.",
               )
-            }
-            if op is (Equal | NotEqual) {
+              Null
+            } else if references == 1 {
+              Boolean
+            } else if op is (Equal | NotEqual) {
               Boolean
             } else {
               let invalid = args
@@ -449,16 +449,9 @@ fn ContractAnalysis::analyze(
               _ => contract_join(elements, self.model)
             }
           }
-          Slice(_, _, _, step) => {
-            if step == Some(0) {
-              self.problem(
-                event=Error,
-                node.span,
-                "I expected a non-zero JMESPath slice step, but found zero.",
-              )
-            }
+          Slice(_, _, _, _) =>
+            // Smithy accepts a zero step and reports nothing.
             Array(self.elements(args[0], node), exact=false)
-          }
           Flatten(_) => {
             let types = []
             for type_ in self.elements(args[0], node) {

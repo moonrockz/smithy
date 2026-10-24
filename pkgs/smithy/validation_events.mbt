@@ -847,12 +847,18 @@ fn Model::collect_validation_events(
   let events : Array[ValidationEvent] = []
   let graph = SelectorGraph::new(self)
   let target_events = self.trait_target_events(graph)
-  // The loader reports a trait on a service, operation or resource itself.
-  // The selector check of the trait definition reports the same finding.
+  // The loader reports `conditions` on a service, operation or resource itself.
+  // The selector check of the trait definition reports the same finding for
+  // the same shape and trait.
   events.append(
     initial.filter(e => {
       !(e.id == "TraitTarget" &&
-      target_events.iter().any(t => t.shape == e.shape))
+      target_events
+      .iter()
+      .any(t => {
+        t.shape == e.shape &&
+        t.message.contains("`smithy.contracts#conditions`")
+      }))
     }),
   )
   events.append(self.validation_metadata_events())
@@ -920,10 +926,7 @@ fn diagnostic_event(d : ModelDiagnostic) -> ValidationEvent {
   {
     id: d.event_id,
     severity: if d.severity == Error {
-      if (d.event_id == "ConditionsTrait" && d.code == "SM-MODEL-017") ||
-        d.event_id.has_prefix(
-          "ConditionsTrait.JmespathProblem.JmespathEventDanger.",
-        ) {
+      if d.danger {
         "DANGER"
       } else {
         "ERROR"
