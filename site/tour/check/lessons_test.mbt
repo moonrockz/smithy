@@ -25,6 +25,39 @@ fn show(items : Array[String]) -> String {
 }
 
 ///|
+/// Whether the output of a case runs. A case that names output strings must
+/// be able to run it, or the claim would never be checked.
+fn output_plan(
+  has_output : Bool,
+  events : Array[String],
+  output_contains : Array[String],
+) -> Result[Bool, String] {
+  let blocked = events.any(e => e.contains("|ERROR|") || e.contains("|DANGER|"))
+  let runs = has_output && !blocked
+  if output_contains.length() > 0 && !runs {
+    Err(
+      if has_output {
+        "the expected events have an ERROR or a DANGER"
+      } else {
+        "the lesson has no output"
+      },
+    )
+  } else {
+    Ok(runs)
+  }
+}
+
+///|
+test "output strings need an output that can run" {
+  assert_eq(output_plan(true, [], ["x"]), Ok(true))
+  assert_eq(output_plan(true, ["A|ERROR|-"], []), Ok(false))
+  assert_eq(output_plan(false, [], []), Ok(false))
+  assert_true(output_plan(false, [], ["x"]) is Err(_))
+  assert_true(output_plan(true, ["A|DANGER|-"], ["x"]) is Err(_))
+  assert_true(output_plan(true, ["A|ERROR|-"], ["x"]) is Err(_))
+}
+
+///|
 test "the tour has lessons" {
   match @source.read_tour(lessons_root) {
     Ok(tour) => assert_true(tour.lessons.length() > 0)
@@ -64,9 +97,13 @@ test "every lesson case gives the findings and the output that its expect.json n
           show(actual),
         )
       }
-      let failing = expected.filter(e => e.contains("|ERROR|") || e.contains("|DANGER|"))
+      let runs = match
+        output_plan(lesson.output is Some(_), expected, case.expect.output_contains) {
+        Ok(runs) => runs
+        Err(reason) => fail(where_ + ": output_contains cannot run: " + reason)
+      }
       match lesson.output {
-        Some(output) if failing.length() == 0 => {
+        Some(output) if runs => {
           let text = match
             @core.handle(
               session,
