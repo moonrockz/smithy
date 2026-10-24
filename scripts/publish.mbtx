@@ -88,19 +88,30 @@ fn fail_with(message : String) -> Unit {
 }
 
 ///|
-/// Run `action` again after a transient failure: attempts at once, then after 5, 20 and 60 seconds.
+/// The waits between the attempts of a network command, in milliseconds.
+let network_waits : Array[Int32] = [5000, 20000, 60000]
+
+///|
+/// The waits between the attempts of the published CLI check, in milliseconds: about 18 minutes in
+/// all. mooncakes.io lists a new version before its prebuilt Wasm asset exists, and in v0.1.0, v0.5.0
+/// and v0.6.0 the asset came after the 85 seconds of `network_waits`. The publish job allows 30
+/// minutes, and the steps before this one take about 2.
+let cli_waits : Array[Int32] = [5000, 20000, 60000, 120000, 300000, 600000]
+
+///|
+/// Run `action` again after a transient failure: attempts at once, then after each of `waits`.
 /// It stops early on a failure that a retry does not fix.
 async fn with_retry(
   label : String,
   action : async () -> (Int32, String),
+  waits~ : Array[Int32] = network_waits,
 ) -> (Int32, String) {
-  let waits = [5000, 20000, 60000]
   let mut result = action()
   for i, wait in waits {
     if !is_transient(result.0, result.1) {
       break
     }
-    eprintln("↻ \{label}: attempt \{i + 2}/4")
+    eprintln("↻ \{label}: attempt \{i + 2}/\{waits.length() + 1}")
     @async.sleep(wait)
     result = action()
   }
@@ -160,9 +171,9 @@ async fn publish_all() -> Unit {
 
 ///|
 /// Registry metadata can become visible before moonx can fetch the Wasm asset.
-/// Retry that exact availability error with the same bounded network backoff.
+/// Retry that exact availability error with the longer waits of `cli_waits`.
 async fn verify_cli(version : String) -> Unit {
-  let (code, out) = with_retry("verify published CLI", () => {
+  let (code, out) = with_retry("verify published CLI", waits=cli_waits, () => {
     output_in(".", "moonx", ["moonrockz/smithy-cli@\{version}", "version"])
   })
   if code != 0 {
@@ -233,7 +244,9 @@ fn list_entry_text(entry : (String, String)) -> String {
 
 ///|
 impl @moonspec.World for PublishWorld with fn configure(self, setup) {
-  setup.then1("the published modules are {string}", fn(expected : String) raise {
+  setup.then1("the published modules are {string}", fn(
+    expected : String,
+  ) raise {
     @expect.expect(publish_list.map(entry => entry.1).join(", ")).to_equal(
       expected,
     )
@@ -282,6 +295,16 @@ impl @moonspec.World for PublishWorld with fn configure(self, setup) {
     let expected : Array[String] = publish_list.map(list_entry_text)
     @expect.expect(found).to_equal(expected)
   })
+}
+
+///|
+test "the CLI check waits longer than a network retry and ends inside the publish job" {
+  let total = (waits : Array[Int32]) => {
+    waits.fold(init=0, (sum, wait) => sum + wait)
+  }
+  assert_eq(total(network_waits), 85000)
+  assert_true(total(cli_waits) >= 15 * 60000)
+  assert_true(total(cli_waits) <= 20 * 60000)
 }
 
 ///|
