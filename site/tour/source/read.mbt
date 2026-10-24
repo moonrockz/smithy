@@ -157,10 +157,15 @@ fn read_lesson(
 
 ///|
 fn text_of(dir : String, repo : String, raw : String) -> String raise {
-  match @markdown.expand_includes(raw, inc => resolve_include(repo, inc)) {
+  let text = match
+    @markdown.expand_includes(raw, inc => resolve_include(repo, inc)) {
     Ok(text) => text
     Err(e) => fail("\{dir}/lesson.md: \{e}")
   }
+  if check_expanded(text) is Err(e) {
+    fail("\{dir}/lesson.md: \{e}")
+  }
+  text
 }
 
 ///|

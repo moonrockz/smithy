@@ -295,3 +295,29 @@ pub fn check_hand_written(text : String) -> Result[Unit, String] {
     None => Ok(())
   }
 }
+
+///|
+/// Err when the expanded `text` still has a code block of the language `include`, at any
+/// depth. `@markdown.expand_includes` reads only a ```` ```include ```` fence at the start of a
+/// line, so any other include block would show its raw text and its file would not be read.
+pub fn check_expanded(text : String) -> Result[Unit, String] {
+  let doc = @markdown.parse(text, {
+    source: "",
+    resolve: _ => None,
+    repo_url: "",
+    git_ref: "",
+  })
+  let mut found = false
+  @markdown.walk_blocks(doc.blocks, block => {
+    if block is CodeBlock(lang, _) && lang.to_lower() == "include" {
+      found = true
+    }
+  })
+  if found {
+    Err(
+      "I found an include block that I cannot expand: write it as ```include at the start of a line, outside a quote or a list, with no other word after `include`",
+    )
+  } else {
+    Ok(())
+  }
+}

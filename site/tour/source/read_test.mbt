@@ -210,3 +210,10 @@ test "an include of a missing marker" {
 test "a hand-written console block" {
   expect_err("hand-written", ["lesson.md", "`console`"])
 }
+
+///|
+test "an include block that the reader cannot expand" {
+  expect_err("include-unexpanded", [
+    "01-hello/lesson.md", "I found an include block that I cannot expand",
+  ])
+}

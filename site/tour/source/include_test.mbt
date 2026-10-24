@@ -356,3 +356,27 @@ test "a trait name at the end of a sentence is not an API call" {
     Ok(()),
   )
 }
+
+///|
+/// `expand_includes` reads only a ```include fence at the start of a line. Any other
+/// include block would show its raw text, and no check would read its file.
+test "check_expanded rejects an include block that was not expanded" {
+  for
+    text in [
+      "~~~include\nCLI: apps/smithy/NOPE.md#x\n~~~\n", "```include extra\nCLI: apps/smithy/NOPE.md#x\n```\n",
+      "> ```include\n> CLI: apps/smithy/NOPE.md#x\n> ```\n", "- ```include\n  CLI: apps/smithy/NOPE.md#x\n  ```\n",
+      "```INCLUDE\nCLI: apps/smithy/NOPE.md#x\n```\n",
+    ] {
+    contains_all(
+      @source.check_expanded("# T\n\n" + text),
+      "I found an include block that I cannot expand",
+    )
+  }
+  // An include example in a longer fence or in an indented code block is text.
+  for
+    text in [
+      "````markdown\n```include\nCLI: a.md#x\n```\n````\n", "Like this:\n\n    ```include\n    CLI: a.md#x\n    ```\n",
+    ] {
+    assert_eq(@source.check_expanded("# T\n\n" + text), Ok(()))
+  }
+}
