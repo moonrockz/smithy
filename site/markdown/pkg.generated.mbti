@@ -10,11 +10,17 @@ import {
 // Values
 pub fn block_text(Block) -> String
 
+pub fn expand_includes(String, (Include) -> Result[Array[Snippet], String]) -> Result[String, String]
+
 pub fn image_src(String, LinkContext) -> String
 
 pub fn inline_text(Array[Inline]) -> String
 
 pub fn parse(String, LinkContext) -> Document
+
+pub fn parse_include(String) -> Result[Array[Include], String]
+
+pub fn region(String, String) -> Result[Array[Fence], String]
 
 pub fn resolve_path(String, String) -> String
 
@@ -23,6 +29,8 @@ pub fn rewrite_link(String, LinkContext) -> Target
 pub fn tabs_fence(Array[Tab]) -> String
 
 pub fn title_of(String) -> String
+
+pub fn walk_blocks(Array[Block], (Block) -> Unit) -> Unit
 
 // Errors
 
@@ -50,6 +58,18 @@ pub(all) struct Document {
 pub fn Document::equal(Self, Self) -> Bool
 pub fn Document::not_equal(Self, Self) -> Bool
 pub fn Document::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Fence {
+  lang : String
+  rest : String
+  code : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Include {
+  label : String
+  path : String
+  name : String
+} derive(Eq, @debug.Debug)
 
 pub(all) enum Inline {
   Text(String)
