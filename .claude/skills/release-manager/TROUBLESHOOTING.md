@@ -232,5 +232,10 @@ then run `mise run release:refresh`. `mise run test:changelog` checks the real t
 Cause: registry metadata can appear before the executable asset is available. During v0.1.0,
 all four module publications succeeded and the same pinned moonx command worked shortly afterward.
 Fix: re-run failed jobs on the original run. Published versions are skipped and the already-tested
-dist artifact is reused. `release:verify-cli` retries this exact availability error after 5, 20
-and 60 seconds; authorization errors and non-transient failures still stop at once.
+dist artifact is reused. `release:verify-cli` retries this exact availability error for about 18
+minutes (`cli_waits` in `scripts/publish.mbtx`: 5 s, 20 s, 60 s, 2 min, 5 min and 10 min; it was
+85 seconds until v0.6.0, which failed this way). Authorization errors and non-transient failures
+still stop at once. Before the re-run, check the asset by hand with the CLI package, not the
+library module: `moonx moonrockz/smithy-cli@X.Y.Z version` must print the version.
+`moonx moonrockz/smithy@X.Y.Z` always gives this error, because `moonrockz/smithy` has no
+executable.
