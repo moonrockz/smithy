@@ -691,6 +691,605 @@
             "events": [
                 "Target|ERROR|example#Place$audit"
             ]
+        },
+        "16-services-and-operations/add-operation": {
+            "digest": "3e38e21c1fc9d6636bab060bda5cf13b50964e87f9caf9ccde6dece1532d4a11",
+            "events": [],
+            "openapi": {
+                "components": {
+                    "schemas": {
+                        "GetCityRequestContent": {
+                            "properties": {
+                                "cityId": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "cityId"
+                            ],
+                            "type": "object"
+                        },
+                        "GetCityResponseContent": {
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "name"
+                            ],
+                            "type": "object"
+                        },
+                        "GetForecastRequestContent": {
+                            "properties": {
+                                "cityId": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "cityId"
+                            ],
+                            "type": "object"
+                        },
+                        "GetForecastResponseContent": {
+                            "properties": {
+                                "chanceOfRain": {
+                                    "format": "float",
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "chanceOfRain"
+                            ],
+                            "type": "object"
+                        }
+                    }
+                },
+                "info": {
+                    "description": "Gives the weather of a city.",
+                    "title": "Weather",
+                    "version": "2024-01-01"
+                },
+                "openapi": "3.0.2",
+                "paths": {
+                    "/service/Weather/operation/GetCity": {
+                        "post": {
+                            "description": "Gives the name of a city.",
+                            "operationId": "GetCity",
+                            "requestBody": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "$ref": "#/components/schemas/GetCityRequestContent"
+                                        }
+                                    }
+                                },
+                                "description": "Request Object"
+                            },
+                            "responses": {
+                                "200": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "$ref": "#/components/schemas/GetCityResponseContent"
+                                            }
+                                        }
+                                    },
+                                    "description": "Response Object"
+                                }
+                            }
+                        }
+                    },
+                    "/service/Weather/operation/GetForecast": {
+                        "post": {
+                            "description": "Gives the forecast for one city.",
+                            "operationId": "GetForecast",
+                            "requestBody": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "$ref": "#/components/schemas/GetForecastRequestContent"
+                                        }
+                                    }
+                                },
+                                "description": "Request Object"
+                            },
+                            "responses": {
+                                "200": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "$ref": "#/components/schemas/GetForecastResponseContent"
+                                            }
+                                        }
+                                    },
+                                    "description": "Response Object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "16-services-and-operations/input-not-structure": {
+            "digest": "8855cffde1e28688d96f6a63bb7f307efed3285d343236fc8c2df5d1ba321929",
+            "events": [
+                "Target|ERROR|example#GetForecast"
+            ]
+        },
+        "16-services-and-operations/no-protocol": {
+            "digest": "a2074ff8fd1d1a7f6565f34757c8baf2bf9fb7d6a0e28a2198591cb07ec841fe",
+            "events": [],
+            "openapi": null
+        },
+        "16-services-and-operations/start": {
+            "digest": "201fe367d25ce226387b3715c2b679fbca4c29bbc5024be4f3ababfd47391bf1",
+            "events": [],
+            "openapi": {
+                "components": {
+                    "schemas": {
+                        "GetForecastRequestContent": {
+                            "properties": {
+                                "cityId": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "cityId"
+                            ],
+                            "type": "object"
+                        },
+                        "GetForecastResponseContent": {
+                            "properties": {
+                                "chanceOfRain": {
+                                    "format": "float",
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "chanceOfRain"
+                            ],
+                            "type": "object"
+                        }
+                    }
+                },
+                "info": {
+                    "description": "Gives the weather of a city.",
+                    "title": "Weather",
+                    "version": "2024-01-01"
+                },
+                "openapi": "3.0.2",
+                "paths": {
+                    "/service/Weather/operation/GetForecast": {
+                        "post": {
+                            "description": "Gives the forecast for one city.",
+                            "operationId": "GetForecast",
+                            "requestBody": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "$ref": "#/components/schemas/GetForecastRequestContent"
+                                        }
+                                    }
+                                },
+                                "description": "Request Object"
+                            },
+                            "responses": {
+                                "200": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "$ref": "#/components/schemas/GetForecastResponseContent"
+                                            }
+                                        }
+                                    },
+                                    "description": "Response Object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "17-errors/default-status": {
+            "digest": "dbe7d0bfce2d73d988e61843144786c9e1c59e276b7f67dd31310ec0b6218fcf",
+            "events": [],
+            "openapi": {
+                "components": {
+                    "schemas": {
+                        "CityNotFoundErrorContent": {
+                            "description": "The city does not exist.",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ],
+                            "type": "object"
+                        },
+                        "GetForecastRequestContent": {
+                            "properties": {
+                                "cityId": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "cityId"
+                            ],
+                            "type": "object"
+                        },
+                        "GetForecastResponseContent": {
+                            "properties": {
+                                "chanceOfRain": {
+                                    "format": "float",
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "chanceOfRain"
+                            ],
+                            "type": "object"
+                        },
+                        "ServiceUnavailableErrorContent": {
+                            "description": "The service cannot answer now. Try again later.",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "info": {
+                    "title": "Weather",
+                    "version": "2024-01-01"
+                },
+                "openapi": "3.0.2",
+                "paths": {
+                    "/service/Weather/operation/GetForecast": {
+                        "post": {
+                            "operationId": "GetForecast",
+                            "requestBody": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "$ref": "#/components/schemas/GetForecastRequestContent"
+                                        }
+                                    }
+                                },
+                                "description": "Request Object"
+                            },
+                            "responses": {
+                                "200": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "$ref": "#/components/schemas/GetForecastResponseContent"
+                                            }
+                                        }
+                                    },
+                                    "description": "Response Object"
+                                },
+                                "400": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "$ref": "#/components/schemas/CityNotFoundErrorContent"
+                                            }
+                                        }
+                                    },
+                                    "description": "Response Object"
+                                },
+                                "500": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "$ref": "#/components/schemas/ServiceUnavailableErrorContent"
+                                            }
+                                        }
+                                    },
+                                    "description": "Response Object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "17-errors/not-an-error": {
+            "digest": "ee5e463559a866ed2fe354d8c60d2730e6689ae1415370c4fcac479d246e37d3",
+            "events": [
+                "Target|ERROR|example#GetForecast"
+            ]
+        },
+        "17-errors/start": {
+            "digest": "2b38671f27370eb9ea22a8bf6d550dd882e9fa585c7a8e7fc07ab3e8c728b910",
+            "events": [],
+            "openapi": {
+                "components": {
+                    "schemas": {
+                        "CityNotFoundErrorContent": {
+                            "description": "The city does not exist.",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ],
+                            "type": "object"
+                        },
+                        "GetForecastRequestContent": {
+                            "properties": {
+                                "cityId": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "cityId"
+                            ],
+                            "type": "object"
+                        },
+                        "GetForecastResponseContent": {
+                            "properties": {
+                                "chanceOfRain": {
+                                    "format": "float",
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "chanceOfRain"
+                            ],
+                            "type": "object"
+                        },
+                        "ServiceUnavailableErrorContent": {
+                            "description": "The service cannot answer now. Try again later.",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "info": {
+                    "title": "Weather",
+                    "version": "2024-01-01"
+                },
+                "openapi": "3.0.2",
+                "paths": {
+                    "/service/Weather/operation/GetForecast": {
+                        "post": {
+                            "operationId": "GetForecast",
+                            "requestBody": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "$ref": "#/components/schemas/GetForecastRequestContent"
+                                        }
+                                    }
+                                },
+                                "description": "Request Object"
+                            },
+                            "responses": {
+                                "200": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "$ref": "#/components/schemas/GetForecastResponseContent"
+                                            }
+                                        }
+                                    },
+                                    "description": "Response Object"
+                                },
+                                "404": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "$ref": "#/components/schemas/CityNotFoundErrorContent"
+                                            }
+                                        }
+                                    },
+                                    "description": "Response Object"
+                                },
+                                "500": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "$ref": "#/components/schemas/ServiceUnavailableErrorContent"
+                                            }
+                                        }
+                                    },
+                                    "description": "Response Object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "17-errors/success-status": {
+            "digest": "eb616c29b9a62a562f569ca6126c95aa42ad2aeeee6ba7294e5dcc69ac724cfa",
+            "events": [
+                "HttpResponseCodeSemantics|DANGER|example#CityNotFound"
+            ]
+        },
+        "18-resources/missing-identifier": {
+            "digest": "ee3b21c4073b4bc8adc8b9ceb08cc7eb96c7dde845713015b93ec8a758b757ac",
+            "events": [
+                "ResourceIdentifierBinding|ERROR|example#GetCity"
+            ]
+        },
+        "18-resources/read-not-readonly": {
+            "digest": "3f4df87a661cca7687f325e8c83cf8135af956142b650e942185e1b911654bea",
+            "events": [
+                "ResourceLifecycle|ERROR|example#City"
+            ]
+        },
+        "18-resources/start": {
+            "digest": "c9747838a986cd7a5f62e13f20932ca3db0c0ded17955625f27c906700326829",
+            "events": [],
+            "openapi": {
+                "components": {
+                    "schemas": {
+                        "CreateCityRequestContent": {
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "name"
+                            ],
+                            "type": "object"
+                        },
+                        "CreateCityResponseContent": {
+                            "properties": {
+                                "cityId": {
+                                    "pattern": "^[a-z0-9-]+$",
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "cityId"
+                            ],
+                            "type": "object"
+                        },
+                        "GetCityRequestContent": {
+                            "properties": {
+                                "cityId": {
+                                    "pattern": "^[a-z0-9-]+$",
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "cityId"
+                            ],
+                            "type": "object"
+                        },
+                        "GetCityResponseContent": {
+                            "properties": {
+                                "cityId": {
+                                    "pattern": "^[a-z0-9-]+$",
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "cityId",
+                                "name"
+                            ],
+                            "type": "object"
+                        },
+                        "ListCitiesResponseContent": {
+                            "properties": {
+                                "cityIds": {
+                                    "items": {
+                                        "pattern": "^[a-z0-9-]+$",
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "required": [
+                                "cityIds"
+                            ],
+                            "type": "object"
+                        }
+                    }
+                },
+                "info": {
+                    "title": "Weather",
+                    "version": "2024-01-01"
+                },
+                "openapi": "3.0.2",
+                "paths": {
+                    "/service/Weather/operation/CreateCity": {
+                        "post": {
+                            "operationId": "CreateCity",
+                            "requestBody": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "$ref": "#/components/schemas/CreateCityRequestContent"
+                                        }
+                                    }
+                                },
+                                "description": "Request Object"
+                            },
+                            "responses": {
+                                "200": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "$ref": "#/components/schemas/CreateCityResponseContent"
+                                            }
+                                        }
+                                    },
+                                    "description": "Response Object"
+                                }
+                            }
+                        }
+                    },
+                    "/service/Weather/operation/GetCity": {
+                        "post": {
+                            "operationId": "GetCity",
+                            "requestBody": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "$ref": "#/components/schemas/GetCityRequestContent"
+                                        }
+                                    }
+                                },
+                                "description": "Request Object"
+                            },
+                            "responses": {
+                                "200": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "$ref": "#/components/schemas/GetCityResponseContent"
+                                            }
+                                        }
+                                    },
+                                    "description": "Response Object"
+                                }
+                            }
+                        }
+                    },
+                    "/service/Weather/operation/ListCities": {
+                        "post": {
+                            "operationId": "ListCities",
+                            "responses": {
+                                "200": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "$ref": "#/components/schemas/ListCitiesResponseContent"
+                                            }
+                                        }
+                                    },
+                                    "description": "Response Object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "18-resources/unknown-property": {
+            "digest": "333e1dbacf5d0e39485a5e0b53c6c4e846542932885efe5208ba41aea12d538d",
+            "events": [
+                "Model|ERROR|example#GetCityOutput$population"
+            ]
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
