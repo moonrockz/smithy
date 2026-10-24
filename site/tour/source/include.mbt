@@ -194,13 +194,32 @@ fn hand_written_error(lang : String) -> String {
 }
 
 ///|
+/// Whether `line` starts with `@smithy.`, an identifier and `(`: a call of the API. A qualified
+/// shape ID such as `@smithy.api#documentation("x")` has a `#` before the `(`, so it is not a call.
+fn is_api_call(line : String) -> Bool {
+  if !line.has_prefix("@smithy.") {
+    return false
+  }
+  let rest = line[8:].to_owned()
+  let name = rest
+    .iter()
+    .take_while(c => {
+      (c >= 'a' && c <= 'z') ||
+      (c >= 'A' && c <= 'Z') ||
+      c.is_ascii_digit() ||
+      c == '_' ||
+      c == '.'
+    })
+    .count()
+  name > 0 && rest[name:].to_owned().has_prefix("(")
+}
+
+///|
 /// The text of a line that looks like a CLI command or an API call of Smithy, or `None`.
 fn smithy_use(code : String) -> String? {
   for line in code.split("\n") {
     let t = line.trim().to_owned()
-    if t.has_prefix("$ smithy") ||
-      t.has_prefix("smithy ") ||
-      t.has_prefix("@smithy.") {
+    if t.has_prefix("$ smithy") || t.has_prefix("smithy ") || is_api_call(t) {
       return Some(t)
     }
   }

@@ -258,3 +258,21 @@ test "a console fence that is not at the start of a line is rejected" {
     "does not start at the start of a line",
   )
 }
+
+///|
+test "a qualified trait in a model fence is not an API call" {
+  assert_eq(
+    @source.check_hand_written(
+      "# T\n\n```smithy\n@smithy.api#documentation(\"x\")\nstring A\n\n@smithy.example#x\nstring B\n```\n",
+    ),
+    Ok(()),
+  )
+  for fence in ["", "text"] {
+    contains_all(
+      @source.check_hand_written(
+        "# T\n\n```\{fence}\n@smithy.parse(text)\n```\n",
+      ),
+      "@smithy.parse(text)",
+    )
+  }
+}
