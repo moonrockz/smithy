@@ -237,7 +237,8 @@ test "a value lesson reads its setup and the findings of a case" {
   assert_eq(lesson.files.map(f => f.name), ["model.smithy", "order.json"])
   assert_eq(lesson.cases[0].expect.findings, [])
   assert_eq(lesson.cases[1].expect.findings, [
-    "Range|error|/quantity|example#Order", "InvalidJson|stopped|-",
+    "Range|error|/quantity|example#Order", "InvalidJson|stopped|-", "Hint|advisory||example#Order",
+    "InvalidTarget|stopped|--shape",
   ])
   assert_eq(lesson.cases[1].expect.output_contains, ["Range"])
   let merged = lesson.case_files(lesson.cases[1])

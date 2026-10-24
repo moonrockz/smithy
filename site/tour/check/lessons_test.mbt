@@ -75,6 +75,17 @@ fn check_blocked(
 }
 
 ///|
+/// Whether `f` fails with a message that has `text`. Any other failure is a
+/// broken fixture, not the failure that the test wants.
+fn raises_with(text : String, f : () -> Unit raise) -> Bool {
+  try f() catch {
+    e => e.to_string().contains(text)
+  } noraise {
+    _ => false
+  }
+}
+
+///|
 fn raises(f : () -> Unit raise) -> Bool {
   try f() catch {
     _ => true
@@ -310,12 +321,18 @@ test "a value lesson case gives the findings that its expect.json names" {
       findings: ["Range|error|/quantity|example#Order"],
     },
   }
-  assert_true(raises(() => check_case(session, lesson, wrong)))
+  assert_true(
+    raises_with("findings differ", () => check_case(session, lesson, wrong)),
+  )
   let wrong_text : @model.Case = {
     ..start,
     expect: { ..start.expect, output_contains: ["no such text"], },
   }
-  assert_true(raises(() => check_case(session, lesson, wrong_text)))
+  assert_true(
+    raises_with("the output has no", () => {
+      check_case(session, lesson, wrong_text)
+    }),
+  )
 }
 
 ///|
@@ -337,12 +354,29 @@ test "a value case with an ERROR or a DANGER cannot claim findings" {
       findings: ["Range|error|/quantity|example#Order"],
     },
   }
-  assert_true(raises(() => check_case(@core.Session::new(), lesson, claims)))
+  assert_true(
+    raises_with("output_contains cannot run", () => {
+      check_case(@core.Session::new(), lesson, claims)
+    }),
+  )
   let says : @model.Case = {
     ..case,
     expect: { ..case.expect, output_contains: ["Range"], },
   }
-  assert_true(raises(() => check_case(@core.Session::new(), lesson, says)))
+  assert_true(
+    raises_with("output_contains cannot run", () => {
+      check_case(@core.Session::new(), lesson, says)
+    }),
+  )
+}
+
+///|
+/// The folders of the value and message lessons whose text has no extension
+/// note.
+fn lessons_without_note(tour : @model.Tour) -> Array[String] {
+  tour.lessons
+  .filter(l => !(l.engine is Model) && !l.text.contains(@model.extension_note))
+  .map(l => l.dir)
 }
 
 ///|
@@ -351,15 +385,50 @@ test "a value or message lesson says that the check is our extension" {
     Ok(tour) => tour
     Err(e) => fail("I cannot read the tour: " + e)
   }
-  for lesson in tour.lessons {
-    if lesson.engine is Model {
-      continue
-    }
-    if !lesson.text.contains(@model.extension_note) {
-      fail(
-        lesson.dir + ": the text has no \"" + @model.extension_note + "\" note",
-      )
-    }
+  assert_eq(lessons_without_note(tour), [])
+  // The fixture has the note; the same lesson without the note is found.
+  let fixture = match
+    @source.read_tour("tour/source/testdata/value-level1", repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the fixture: " + e)
+  }
+  assert_eq(lessons_without_note(fixture), [])
+  let stripped : @model.Tour = {
+    lessons: fixture.lessons.map(l => {
+      ..l,
+      text: l.text.replace_all(old=@model.extension_note, new="> Note:"),
+    }),
+  }
+  assert_eq(lessons_without_note(stripped), ["01-order", "02-member"])
+}
+
+///|
+test "a value check stops with the source that the CLI names" {
+  let tour = match
+    @source.read_tour("tour/source/testdata/value-level1", repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the fixture: " + e)
+  }
+  let lesson = tour.lessons[0]
+  let session = @core.Session::new()
+  let i = lesson.cases.search_by(c => c.name == "missing-target")
+  guard i is Some(i) else { fail("the fixture has no missing-target case") }
+  check_case(session, lesson, lesson.cases[i])
+}
+
+///|
+test "a value lesson can name a member as its target" {
+  let tour = match
+    @source.read_tour("tour/source/testdata/value-level1", repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the fixture: " + e)
+  }
+  let lesson = tour.lessons[1]
+  guard lesson.engine is Value(setup) else { fail("not a value lesson") }
+  assert_eq(setup.shape, "example#Order$quantity")
+  let session = @core.Session::new()
+  for case in lesson.cases {
+    check_case(session, lesson, case)
   }
 }
 

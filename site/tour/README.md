@@ -186,8 +186,10 @@ A lesson has at most one of `output`, `value`, `message` and `diff`.
 
 - `file` is a starting file in `files/` that ends in `.json`. It holds the
   value. A case can replace it by name, as it replaces any file.
-- `shape` is the absolute ID of the target shape. A member ID is not valid
-  here; the CLI option `--shape` takes the same form.
+- `shape` is the absolute ID of the target: a shape ID (`example#Order`) or
+  a member ID (`example#Order$quantity`). The CLI option `--shape` takes both.
+  A finding key holds the shape ID that the CLI prints. For a member target the
+  value is the member, so its pointer is empty (the root of the value).
 - `unknown_members` (`reject` or `ignore`) and `member_names` (`smithy` or
   `json`) are optional. The defaults are the defaults of the CLI.
 - Other keys are an error.
