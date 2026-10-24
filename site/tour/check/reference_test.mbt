@@ -21,6 +21,12 @@ let reference_sha : String = "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
 let prelude_sha_path : String = "../pkgs/smithy/PRELUDE_SHA"
 
 ///|
+/// The smithy.rpc trait definitions that `scripts/reference-tour.mbtx` adds to
+/// a Java case whose files name the namespace, as the playground core always
+/// loads them.
+let smithy_rpc_path : String = "tour/smithy-rpc-traits.smithy"
+
+///|
 /// The line that a lesson with a known difference must contain.
 let difference_note : String = "> **Reference difference:**"
 
@@ -715,6 +721,11 @@ test "every allow list entry is used, has an issue, and its lesson says so" {
 ///|
 test "the reference results use the commit of the vendored prelude" {
   assert_eq(read_text(prelude_sha_path).trim().to_owned(), reference_sha)
+}
+
+///|
+test "the reference loads the smithy.rpc definitions that the core loads" {
+  assert_eq(read_text(smithy_rpc_path), @rpc.trait_definitions())
 }
 
 ///|

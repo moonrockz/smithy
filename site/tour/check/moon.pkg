@@ -4,6 +4,7 @@ import {
   "moonrockz/smithy-site/playground/core",
   "moonrockz/smithy-site/data",
   "moonrockz/smithy-site/markdown",
+  "moonrockz/smithy-validation/rpc",
   "moonbitlang/x/fs",
   "moonbitlang/core/json",
 } for "test"

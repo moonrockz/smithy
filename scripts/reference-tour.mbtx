@@ -29,8 +29,15 @@ let results_path : String = "site/tour/reference-events.json"
 let scratch : String = ".dev/out/reference-tour"
 
 ///|
-/// Reads the cases (`[{"id", "json_schema", "http_protocols", "files": [{"name", "text"}], "openapi"?}]`) from
-/// args[0] and writes the results to args[1], with args[2] as the reference SHA. The digest is SHA-256 over the files sorted by name of name + NUL + text + NUL, in UTF-8.
+/// The smithy.rpc trait definitions, the text of `@rpc.trait_definitions()`. site/tour/check/reference_test.mbt
+/// compares the two.
+let smithy_rpc_path : String = "site/tour/smithy-rpc-traits.smithy"
+
+///|
+/// Reads the cases (`[{"id", "json_schema", "http_protocols", "smithy_rpc", "files": [{"name", "text"}], "openapi"?}]`)
+/// from args[0] and writes the results to args[1], with args[2] as the reference SHA. A case with `smithy_rpc` also
+/// loads the smithy.rpc trait definitions from args[3]. The digest is SHA-256 over the case files sorted by name of
+/// name + NUL + text + NUL, in UTF-8.
 let harness : String =
   #|import java.nio.charset.StandardCharsets;
   #|import java.nio.file.*;
@@ -66,6 +73,9 @@ let harness : String =
   #|        String text = file.expectStringMember("text").getValue();
   #|        sha.update((name + '\0' + text + '\0').getBytes(StandardCharsets.UTF_8));
   #|        assembler.addUnparsedModel(name, text);
+  #|      }
+  #|      if (test.expectBooleanMember("smithy_rpc").getValue()) {
+  #|        assembler.addUnparsedModel("smithy-rpc-traits.smithy", Files.readString(Path.of(args[3])));
   #|      }
   #|      ValidatedResult<Model> result = assembler.assemble();
   #|      List<String> events = new ArrayList<>();
@@ -248,6 +258,13 @@ fn flags_of(output : String?) -> Flags {
 }
 
 ///|
+/// Whether a case uses the smithy.rpc traits: a file names the namespace. The playground core always loads them;
+/// the harness loads them only for these cases, so that the JSON Schema of other cases has no smithy.rpc shapes.
+fn uses_smithy_rpc(files : Array[(String, String)]) -> Bool {
+  files.iter().any(file => file.1.contains("smithy.rpc#"))
+}
+
+///|
 /// The cases of every lesson, in the input format of the harness.
 async fn lesson_cases() -> Array[Json] {
   let cases : Array[Json] = []
@@ -266,6 +283,7 @@ async fn lesson_cases() -> Array[Json] {
         "id": Json::string(dir + "/" + name),
         "json_schema": Json::boolean(flags.json_schema),
         "http_protocols": Json::boolean(flags.http_protocols),
+        "smithy_rpc": Json::boolean(uses_smithy_rpc(files)),
         "files": Json::array(files.map(f => Json::object({ "name": Json::string(f.0), "text": Json::string(f.1) }))),
       }
       if flags.openapi is Some(version) { entry["openapi"] = Json::string(version) }
@@ -351,7 +369,7 @@ async fn main {
   let input = scratch + "/cases.json"
   @fs.write_file(input, Json::array(lesson_cases()).stringify(indent=2) + "\n")
   let output = scratch + "/reference-events.json"
-  println(checked("java", ["-cp", classes, "ReferenceTour", input, output, reference_sha]).trim_end())
+  println(checked("java", ["-cp", classes, "ReferenceTour", input, output, reference_sha, smithy_rpc_path]).trim_end())
   let actual = @fs.read_file(output).text()
   if options.check {
     let committed = if @fs.exists(results_path) { @fs.read_file(results_path).text() } else { "" }
@@ -404,4 +422,10 @@ test "the lesson output gives the harness flags" {
     flags_of(Some("OpenApi31")),
     { json_schema: false, openapi: Some("3.1.0"), http_protocols: true },
   )
+}
+
+///|
+test "a case uses smithy.rpc when a file names the namespace" {
+  assert_true(uses_smithy_rpc([("a.smithy", "use smithy.rpc#jsonRpc")]))
+  assert_false(uses_smithy_rpc([("a.smithy", "namespace example")]))
 }

@@ -136,7 +136,7 @@ description = "Verify OpenAPI expectations against pinned Java sources (args: so
 run = "moonx scripts/reference-openapi.mbtx"
 
 [tasks."reference:tour"]
-description = "Write the Java reference results (events, JSON Schema and OpenAPI) of the tour lesson cases (requires a JDK; args: smithy checkout, --check)"
+description = "Write the Java reference results (events, JSON Schema and OpenAPI, with the smithy.rpc traits for a case that uses them) of the tour lesson cases (requires a JDK; args: smithy checkout, --check)"
 run = "moonx scripts/reference-tour.mbtx"
 
 [tasks."tour:check"]
