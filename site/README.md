@@ -252,7 +252,7 @@ results. CI runs it as the job `tour`.
 in a worktree of that tag. A new main therefore calls an old `site-build`. Keep the arguments of `site-build`
 backward-compatible: add optional flags, and never rename or remove one.
 
-## Tour lessons: tested blocks only
+## Include blocks in tour lessons
 
 A tour lesson (`site/tour/lessons/NN-slug/lesson.md`) must not hold a CLI or API block that no test runs.
 
@@ -260,6 +260,15 @@ A tour lesson (`site/tour/lessons/NN-slug/lesson.md`) must not hold a CLI or API
   `PATH` is relative to the repository root. The lesson reader replaces the fence with a tab group.
 - Mark the block in its source with `<!-- tour:start NAME -->` and `<!-- tour:end NAME -->`, each alone on its line.
   Between the markers put only fenced code blocks.
+- A missing file, a missing marker, a marker used twice, a region without a code block or an untested fence
+  fails `mise run site:check`, with a message that starts with the lesson file.
+
+| Fence | Where | Run by |
+| --- | --- | --- |
+| `mbt check` with a test | a `.mbt.md` file with a `moon.pkg` next to it | `moon test` |
+| `console` | `apps/smithy/README.md` | `mise run test:cli` |
+| `LANG file=NAME` | `apps/smithy/README.md` | `mise run test:cli` (writes the file) |
+
 - The reader accepts only tested fences: `mbt check` with a test in a `.mbt.md` file that has a `moon.pkg`
   next to it, and `console` or `LANG file=NAME` fences at the start of a line in `apps/smithy/README.md`
   (`scripts/test-cli.mbtx` runs them).

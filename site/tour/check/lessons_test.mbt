@@ -209,3 +209,39 @@ test "every lesson case gives the findings and the output that its expect.json n
     }
   }
 }
+
+///|
+test "lesson 01 includes its own starting model" {
+  let tour = match @source.read_tour(lessons_root, repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the tour: " + e)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(lesson.slug, "hello-smithy")
+  let doc = @markdown.parse(lesson.text, {
+    source: "",
+    resolve: _ => None,
+    repo_url: "",
+    git_ref: "",
+  })
+  let mut cli : @markdown.Snippet? = None
+  @markdown.walk_blocks(doc.blocks, block => {
+    if block is Tabs(_, tabs) {
+      for tab in tabs {
+        if tab.label == "CLI" {
+          for s in tab.snippets {
+            if s.file is Some(_) && cli is None {
+              cli = Some(s)
+            }
+          }
+        }
+      }
+    }
+  })
+  guard cli is Some(snippet) else {
+    fail("lesson 01 has no CLI tab with a file")
+  }
+  let model = lesson.files[0].text
+  // The README block has no final newline; the lesson file has one.
+  assert_eq(snippet.code, model.trim_end(chars="\n").to_owned())
+}
