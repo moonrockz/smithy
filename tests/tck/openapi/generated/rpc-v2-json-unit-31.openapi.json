@@ -1,0 +1,66 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Units",
+        "version": "2024-01-01"
+    },
+    "paths": {
+        "/service/Units/operation/Ping": {
+            "post": {
+                "operationId": "Ping"
+            }
+        },
+        "/service/Units/operation/Pull": {
+            "post": {
+                "operationId": "Pull",
+                "responses": {
+                    "200": {
+                        "description": "Response Object",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PullResponseContent"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/service/Units/operation/Push": {
+            "post": {
+                "operationId": "Push",
+                "requestBody": {
+                    "description": "Request Object",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PushRequestContent"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "PullResponseContent": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": "string"
+                    }
+                }
+            },
+            "PushRequestContent": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}

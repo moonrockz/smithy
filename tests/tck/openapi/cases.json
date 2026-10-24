@@ -1087,6 +1087,24 @@
         "onErrorStatusConflict": "oneOf"
       },
       "expected": "generated/synthetic-error-collision-31.openapi.json"
+    },
+    {
+      "id": "rpc-v2-json-unit",
+      "model": "local/rpc-v2-json-unit.smithy",
+      "settings": {
+        "service": "example.rpcunit#Units",
+        "version": "3.0.2"
+      },
+      "expected": "generated/rpc-v2-json-unit.openapi.json"
+    },
+    {
+      "id": "rpc-v2-json-unit-31",
+      "model": "local/rpc-v2-json-unit.smithy",
+      "settings": {
+        "service": "example.rpcunit#Units",
+        "version": "3.1.0"
+      },
+      "expected": "generated/rpc-v2-json-unit-31.openapi.json"
     }
   ],
   "excludedUpstreamOutputs": [
