@@ -54,6 +54,7 @@ pub fn handle(session : Session, request : Request) -> Response {
       check_value(seq, files, shape, value, options)
     CheckMessage(seq~, files~, service~, version~, message~, kind~, options~) =>
       check_message(seq, files, service, version, message, kind, options)
+    DiffModels(seq~, old~, new~) => diff_models(seq, old, new)
   }
 }
 

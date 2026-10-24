@@ -1,0 +1,49 @@
+///|
+/// The model of a load that the CLI compares: it assembles and has no ERROR or
+/// DANGER event.
+fn comparable(loaded : @smithy.LoadResult) -> @smithy.Model? {
+  if error_count(loaded) > 0 {
+    return None
+  }
+  loaded.model
+}
+
+///|
+/// Compare two models, as `smithy diff` does: load both, and compare only when
+/// both are clean. The answer has the findings of each model.
+fn diff_models(
+  seq : Int32,
+  old : Array[(String, String)],
+  new : Array[(String, String)],
+) -> Response {
+  let old_loaded = load(old)
+  let new_loaded = load(new)
+  let old_findings = diagnostics_of(old_loaded, old)
+  let new_findings = diagnostics_of(new_loaded, new)
+  guard comparable(old_loaded) is Some(old_model) &&
+    comparable(new_loaded) is Some(new_model) else {
+    return Diffed(
+      seq~,
+      old=old_findings,
+      new=new_findings,
+      events=None,
+      breaking=false,
+    )
+  }
+  let result = @diff.compare(old_model, new_model)
+  let events = result.events
+    .filter(event => event.severity != "SUPPRESSED")
+    .map(event => {
+      id: event.id,
+      severity: event.severity,
+      shape: event.shape.map(id => id.to_string()),
+      message: event.message,
+    })
+  Diffed(
+    seq~,
+    old=old_findings,
+    new=new_findings,
+    events=Some(events),
+    breaking=result.is_breaking(),
+  )
+}

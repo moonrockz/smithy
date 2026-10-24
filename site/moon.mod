@@ -10,6 +10,7 @@ import {
   "moonrockz/smithy@0.0.0",
   "moonrockz/smithy-syntax@0.0.0",
   "moonrockz/smithy-validation@0.0.0",
+  "moonrockz/smithy-diff@0.0.0",
   "moonrockz/smithy-jsonschema@0.0.0",
   "moonrockz/smithy-openapi@0.0.0",
   "moonrockz/smithy-openrpc@0.0.0",

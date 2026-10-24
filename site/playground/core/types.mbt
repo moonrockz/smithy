@@ -90,7 +90,35 @@ pub(all) enum Request {
     kind~ : MessageKind,
     options~ : ValueOptions
   )
+  /// Compare two models, as `smithy diff --old --new` does. `old` and `new`
+  /// are the model files of each side, as (name, text).
+  DiffModels(
+    seq~ : Int32,
+    old~ : Array[(String, String)],
+    new~ : Array[(String, String)]
+  )
 } derive(Eq, Debug, ToJson, FromJson)
+
+///|
+/// An event of a model diff, as the library writes it. `shape` is the shape ID
+/// or `None`, as the CLI prints `-`.
+pub(all) struct DiffEvent {
+  id : String
+  severity : String
+  shape : String?
+  message : String
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+/// The line that `smithy diff` prints for the event: line breaks of the
+/// message are written as `\n`.
+pub fn DiffEvent::cli_line(self : DiffEvent) -> String {
+  let shape = self.shape.unwrap_or("-")
+  let message = self.message
+    .replace_all(old="\r\n", new="\n")
+    .replace_all(old="\n", new="\\n")
+  "[\{self.severity}] \{shape}: \{message} | \{self.id}"
+}
 
 ///|
 /// A finding of the model, as the library writes it. `severity` and `code` are
@@ -253,4 +281,15 @@ pub(all) enum Response {
   /// The result of a value or message check. `valid` is the result of the
   /// CLI: false when a finding is an error or a problem stopped the check.
   DataChecked(seq~ : Int32, valid~ : Bool, findings~ : Array[DataFinding])
+  /// The findings of each model, by file. `events` is `None` when a model has
+  /// an ERROR or DANGER event or does not assemble: the CLI then does not
+  /// compare. SUPPRESSED events are left out. `breaking` is the result of the
+  /// CLI.
+  Diffed(
+    seq~ : Int32,
+    old~ : Array[Diagnostic],
+    new~ : Array[Diagnostic],
+    events~ : Array[DiffEvent]?,
+    breaking~ : Bool
+  )
 } derive(Eq, Debug, ToJson, FromJson)
