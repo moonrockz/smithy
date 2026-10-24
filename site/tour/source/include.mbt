@@ -206,9 +206,10 @@ fn is_word_char(c : Char) -> Bool {
 ///|
 /// Whether `line` uses the API of a package: an `@` at the start of the line or after a
 /// character that is not a letter, digit or `_`, then an alias `[a-z_][a-z0-9_]*`, then `.`,
-/// then `[A-Za-z0-9_.]*` and anything but `#`. A qualified shape ID such as
+/// then `[A-Za-z_][A-Za-z0-9_.]*` and anything but `#`. A qualified shape ID such as
 /// `@smithy.api#documentation("x")` has a `#` there, an unqualified trait such as
-/// `@length(min: 1)` has no `.` after its name, and an e-mail address has a letter before
+/// `@length(min: 1)` has no `.` after its name, a trait name at the end of a sentence such
+/// as `Add @required.` has no name after the `.`, and an e-mail address has a letter before
 /// the `@`, so model text stays legal.
 fn is_api_call(line : String) -> Bool {
   let cs = line.to_array()
@@ -228,6 +229,9 @@ fn is_api_call(line : String) -> Bool {
       continue
     }
     j = j + 1
+    if j >= n || cs[j].is_ascii_digit() || !is_word_char(cs[j]) {
+      continue
+    }
     while j < n && (is_word_char(cs[j]) || cs[j] == '.') {
       j = j + 1
     }

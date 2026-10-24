@@ -269,9 +269,10 @@ A tour lesson (`site/tour/lessons/NN-slug/lesson.md`) must not hold a CLI or API
   or `smithy `, or with a package API use at any position of a line.
 - The API rule runs on every fence except `include`, also on `smithy` and `json` fences. A package API use is
   an `@` at the start of the line or after a character that is not a letter, digit or `_`, then a lowercase
-  alias `[a-z_][a-z0-9_]*`, then `.`, then `[A-Za-z0-9_.]*`, and then any character other than `#` (or the end
-  of the line). It guards every package alias, such as `@smithy.`, `@syntax.`, `@openapi.` and `@validation.`.
+  alias `[a-z_][a-z0-9_]*`, then `.`, then a name `[A-Za-z_][A-Za-z0-9_.]*`, and then any character other than
+  `#` (or the end of the line). It guards every package alias, such as `@smithy.`, `@syntax.`, `@openapi.` and `@validation.`.
   These stay legal: a qualified trait such as `@smithy.api#documentation("x")` or `@example.ns#x` (a `#`
-  follows the name), an unqualified trait such as `@length(min: 1)` or `@required` (no `.` after the name), and
-  an e-mail address such as `a@example.com` (a letter comes before the `@`). A doc comment such as
+  follows the name), an unqualified trait such as `@length(min: 1)` or `@required` (no `.` after the name),
+  a trait name at the end of a sentence such as `/// Add @required.` (no name follows the `.`), and an e-mail
+  address such as `a@example.com` (a letter comes before the `@`). A doc comment such as
   `/// see @smithy.api` in a `smithy` fence is rejected, because no `#` follows the name.

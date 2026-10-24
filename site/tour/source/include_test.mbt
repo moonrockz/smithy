@@ -322,3 +322,13 @@ test "an API use of any package is rejected in an untyped and a text fence" {
     Ok(()),
   )
 }
+
+///|
+test "a trait name at the end of a sentence is not an API call" {
+  assert_eq(
+    @source.check_hand_written(
+      "# T\n\n```smithy\n/// Add @required.\n// see @deprecated. Next\nstring A\n```\n",
+    ),
+    Ok(()),
+  )
+}
