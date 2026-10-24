@@ -154,3 +154,15 @@ test "a static lesson page has no files and no playground link" {
   assert_eq(model.engine, Model)
   assert_true(!model.is_static())
 }
+
+///|
+test "the query file of a Selector lesson does not count as a model file for the playground link" {
+  let tour = fixture_tour()
+  let files : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: "namespace a\n", },
+    { name: "query.selector", text: "structure\n", },
+  ]
+  let lesson = { ..fixture_lesson(4, "S", files), output: Some(Selector), }
+  let page = lesson_page(fixture_config("next"), tour, lesson)
+  assert_true(page.playground is Some(_))
+}

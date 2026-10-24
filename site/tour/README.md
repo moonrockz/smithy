@@ -23,14 +23,26 @@ site/tour/lessons/NN-<slug>/
   the lesson teaches: a URL that starts with `https://smithy.io/`, or the repository path of a docs page, such as
   `pkgs/smithy-openrpc/README.mbt.md`. The reader rejects any other value. A docs path links to the page on the
   site, with the text "Read the documentation of this feature". `output` is one of `JsonAst`, `Idl`, `Selector`,
-  `JsonSchema`, `OpenApi30`, `OpenApi31` or `OpenRpc`. `selector` is the selector for the `Selector` output, and
-  is an error with another output.
+  `JsonSchema`, `OpenApi30`, `OpenApi31` or `OpenRpc`. `selector` is the fixed selector for the `Selector` output,
+  and is an error with another output. The output `Selector` needs a selector: `selector` in `lesson.json`, or a
+  query file (see below).
 - `lesson.md` starts with the line `# <title>`, with the `title` of `lesson.json`.
 - A case runs the starting files with its own `files/` on top. A case file replaces a starting file of the same
   name, or adds a new file.
 - A lesson file is directly in `files/` or in `cases/<case>/files/`. A sub-folder there is an error. The name of
   a lesson file must end in `.smithy`, because the playground core reads every file as IDL. (Java picks the
-  format by the extension. Remove this rule when the core does the same.)
+  format by the extension. Remove this rule when the core does the same.) The exceptions are the data file of a
+  value lesson and the query file.
+- **The query file.** A lesson with the output `Selector` can keep its selector in a starting file whose name ends
+  in `.selector` (lesson 23: `query.selector`). The file is an editor tab as a model file is, in plain text. The
+  reader can change the query. A case can replace the file as any file; it cannot add another query file. A lesson
+  has at most one query file, and the query file needs the output `Selector`. The query file and `selector` in
+  `lesson.json` together are an error. The page does not send the query file as a model file: the Worker gets the
+  other files, and the text of the query file as the selector of the transform (`query_of` and `model_files` in
+  `tour/model`). An empty query shows the reason of the core, "I expected a selector. Write one, for example:
+  structure". The reference script keeps the query file in the digest, does not load it as a model, and writes the
+  selector of each case as `"selector"` in its input. The playground link counts the model files only and carries
+  the current query.
 - The loader skips every name that starts with `.`, such as `.DS_Store`.
 - `expect.json` has `events` and, optionally, `output_contains` or `blocked`. Another key is an error.
   - `events` lists the expected findings, each as `id|SEVERITY|shape`. `SEVERITY` is `WARNING`, `DANGER` or

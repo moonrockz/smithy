@@ -171,7 +171,31 @@ fn read_lesson(
       )
     }
   }
-  let cases = read_cases(dir, "\{base}/cases", output is Some(_), engine)
+  let queries = files.filter(f => @model.is_query_file(f.name))
+  if queries.length() > 1 {
+    fail(
+      "\{dir}: I found more than one query file in files/ (\{queries.map(f => f.name).join(", ")}). A lesson has one",
+    )
+  }
+  let is_selector = output is Some(@samples.Output::Selector)
+  if !queries.is_empty() {
+    if !is_selector {
+      fail(
+        "\{dir}: the query file \"\{queries[0].name}\" needs the output Selector",
+      )
+    }
+    if selector is Some(_) {
+      fail(
+        "\{dir}: I found both a query file and \"selector\" in lesson.json. Use one of them",
+      )
+    }
+  } else if is_selector && selector is None {
+    fail(
+      "\{dir}: the output Selector needs a selector: a query file in files/ or \"selector\" in lesson.json",
+    )
+  }
+  let query = queries.get(0).map(f => f.name)
+  let cases = read_cases(dir, "\{base}/cases", output is Some(_), engine, query)
   {
     dir,
     number,
@@ -305,9 +329,11 @@ fn read_files(
         "\{where_}/\{name}: I found a folder in the files of a lesson. Put each file directly in \{where_}",
       )
     }
-    if !name.has_suffix(".smithy") && !data.contains(name) {
+    if !name.has_suffix(".smithy") &&
+      !data.contains(name) &&
+      !@model.is_query_file(name) {
       fail(
-        "\{where_}/\{name}: the name of a lesson file must end in .smithy, because the playground core reads every file as IDL",
+        "\{where_}/\{name}: the name of a lesson file must end in .smithy (or in .selector for the query file of a Selector lesson), because the playground core reads every file as IDL",
       )
     }
     files.push({ name, text: io(file, () => @fs.read_file_to_string(file)), })
@@ -321,14 +347,15 @@ fn read_cases(
   path : String,
   has_output : Bool,
   engine : @model.Engine,
+  query : String?,
 ) -> Array[@model.Case] raise {
   if !@fs.path_exists("\{path}/start") {
     fail("\{dir}: I found no cases/start folder")
   }
   let names = list_dir(path).filter(n => n != "start" && is_dir("\{path}/\{n}"))
-  let cases = [read_case(dir, path, "start", has_output, engine)]
+  let cases = [read_case(dir, path, "start", has_output, engine, query)]
   for name in names {
-    cases.push(read_case(dir, path, name, has_output, engine))
+    cases.push(read_case(dir, path, name, has_output, engine, query))
   }
   cases
 }
@@ -340,6 +367,7 @@ fn read_case(
   name : String,
   has_output : Bool,
   engine : @model.Engine,
+  query : String?,
 ) -> @model.Case raise {
   let base = "\{path}/\{name}"
   let expect_path = "\{base}/expect.json"
@@ -407,9 +435,21 @@ fn read_case(
       )
     }
   }
+  let files = read_files(
+    "\{base}/files",
+    "\{where_}/files",
+    engine.data_files(),
+  )
+  for file in files {
+    if @model.is_query_file(file.name) && query != Some(file.name) {
+      fail(
+        "\{where_}/files/\{file.name}: a case can replace the query file of the lesson, but it cannot add another one",
+      )
+    }
+  }
   {
     name,
-    files: read_files("\{base}/files", "\{where_}/files", engine.data_files()),
+    files,
     expect: { events, output_contains, blocked, findings, diff, },
   }
 }

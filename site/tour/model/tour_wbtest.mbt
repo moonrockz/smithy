@@ -300,3 +300,33 @@ test "a static lesson has no data files and needs a note only when it is an exte
   assert_true({ ..static_, extension: true, }.needs_extension_note())
   assert_true(!base.needs_extension_note())
 }
+
+///|
+test "is_query_file" {
+  assert_true(is_query_file("query.selector"))
+  assert_false(is_query_file("model.smithy"))
+  assert_false(is_query_file("a.selector.smithy"))
+}
+
+///|
+test "model_files drops the query file and keeps the order" {
+  let files : Array[LessonFile] = [
+    { name: "b.smithy", text: "b", },
+    { name: "query.selector", text: "q", },
+    { name: "a.smithy", text: "a", },
+  ]
+  assert_eq(model_files(Model, files).map(f => f.name), ["b.smithy", "a.smithy"])
+}
+
+///|
+test "query_of prefers the query file" {
+  assert_eq(
+    query_of([{ name: "query.selector", text: "operation\n", }], fixed=None),
+    Some("operation\n"),
+  )
+  assert_eq(
+    query_of([{ name: "model.smithy", text: "", }], fixed=Some("structure")),
+    Some("structure"),
+  )
+  assert_eq(query_of([{ name: "model.smithy", text: "", }], fixed=None), None)
+}

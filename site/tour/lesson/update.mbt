@@ -11,7 +11,7 @@ fn Model::send_validate(self : Model) -> (Model, Array[Effect]) {
       pending: false,
     },
     [
-      SendValidate(seq~, files=pairs(self.files)),
+      SendValidate(seq~, files=model_pairs(self)),
       Wait(ms=TIMEOUT_MS, msg=TimedOut(seq)),
     ],
   )
@@ -35,9 +35,9 @@ fn Model::send_transform(self : Model) -> (Model, Array[Effect]) {
     [
       SendTransform(
         seq~,
-        files=pairs(self.files),
+        files=model_pairs(self),
         output~,
-        selector=self.page.selector,
+        selector=@model.query_of(self.files, fixed=self.page.selector),
       ),
       Wait(ms=TIMEOUT_MS, msg=TimedOut(seq)),
     ],
@@ -161,15 +161,9 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
     Debounced(edits) => if edits != m.edits { (m, []) } else { m.check_now() }
     SelectFile(index) =>
       match m.files.get(index) {
-        Some(file) if index != m.selected => {
+        Some(_) if index != m.selected => {
           let m = { ..m, selected: index, }
-          (
-            m,
-            [
-              LoadEditor(text=file.text, file=file.name, fresh=false),
-              Mark(items=m.selected_findings()),
-            ],
-          )
+          (m, [m.load_selected(fresh=false), Mark(items=m.selected_findings())])
         }
         _ => (m, [])
       }
@@ -263,17 +257,11 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         link_problem: None,
       }
       let (m, sent) = m.check_now()
-      (
-        m,
-        [
-          Clear(key=m.page.storage_key),
-          LoadEditor(text=m.selected_text(), file=m.selected_name(), fresh=true),
-          ..sent,
-        ],
-      )
+      (m, [Clear(key=m.page.storage_key), m.load_selected(fresh=true), ..sent])
     }
     OpenPlayground => {
-      guard m.page.playground is Some(href) && m.files.get(0) is Some(file) else {
+      let models = m.files.filter(f => !@model.is_query_file(f.name))
+      guard m.page.playground is Some(href) && models.get(0) is Some(file) else {
         return (m, [])
       }
       let state : @samples.ShareState = {
@@ -288,7 +276,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         protocol: "",
         format: Markdown,
         complete: false,
-        selector: m.page.selector,
+        selector: @model.query_of(m.files, fixed=m.page.selector),
         log_preset: None,
         version: None,
       }

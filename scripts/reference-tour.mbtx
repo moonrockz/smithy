@@ -78,6 +78,8 @@ let harness : String =
   #|        String name = file.expectStringMember("name").getValue();
   #|        String text = file.expectStringMember("text").getValue();
   #|        sha.update((name + '\0' + text + '\0').getBytes(StandardCharsets.UTF_8));
+  #|        // The query file of a Selector lesson is not a model file: it is in the digest only.
+  #|        if (name.endsWith(".selector")) continue;
   #|        // A lesson file name ends in .smithy; the definitions load as IDL under such a name.
   #|        assembler.addUnparsedModel(name.equals("<smithy-rpc-traits>") ? "smithy-rpc-traits.smithy" : name, text);
   #|      }
@@ -230,13 +232,13 @@ async fn list_dir(path : String) -> Array[String] {
 
 ///|
 /// The files directly in `path`, as (name, text). The loader in site/tour/source/read.mbt fails on a sub-folder and
-/// on a name that does not end in `.smithy`; this script fails on them too.
+/// on a name that does not end in `.smithy` or `.selector`; this script fails on them too.
 async fn read_files(path : String) -> Array[(String, String)] {
   let files : Array[(String, String)] = []
   if !@fs.exists(path) { return files }
   for name in list_dir(path) {
-    if @fs.kind(path + "/" + name) is Directory || !name.has_suffix(".smithy") {
-      fail(path + "/" + name + ": a lesson file must be a .smithy file directly in its files folder")
+    if @fs.kind(path + "/" + name) is Directory || !(name.has_suffix(".smithy") || name.has_suffix(".selector")) {
+      fail(path + "/" + name + ": a lesson file must be a .smithy or .selector file directly in its files folder")
     }
     files.push((name, @fs.read_file(path + "/" + name).text()))
   }
@@ -275,6 +277,16 @@ fn is_static(meta : Json) -> Bool {
 }
 
 ///|
+/// The selector of a case: the text of its query file (a name that ends with `.selector`), else the `selector` of
+/// `lesson.json`, else none. The same rule as `query_of` in site/tour/model.
+fn case_selector(files : Array[(String, String)], fixed : String?) -> String? {
+  for file in files {
+    if file.0.has_suffix(".selector") { return Some(file.1) }
+  }
+  fixed
+}
+
+///|
 /// The cases of every lesson, in the input format of the harness.
 async fn lesson_cases(root : String) -> Array[Json] {
   let cases : Array[Json] = []
@@ -289,6 +301,10 @@ async fn lesson_cases(root : String) -> Array[Json] {
       _ => None
     })
     let start = read_files(base + "/files")
+    let fixed = match meta {
+      { "selector": String(selector), .. } => Some(selector)
+      _ => None
+    }
     for name in list_dir(base + "/cases") {
       if !(@fs.kind(base + "/cases/" + name) is Directory) { continue }
       let files = merge_files(start, read_files(base + "/cases/" + name + "/files"))
@@ -300,6 +316,7 @@ async fn lesson_cases(root : String) -> Array[Json] {
         "files": Json::array(files.map(f => Json::object({ "name": Json::string(f.0), "text": Json::string(f.1) }))),
       }
       if flags.openapi is Some(version) { entry["openapi"] = Json::string(version) }
+      if case_selector(files, fixed) is Some(selector) { entry["selector"] = Json::string(selector) }
       cases.push(Json::object(entry))
     }
   }
@@ -414,6 +431,14 @@ test "a case replaces and adds files by name, sorted in code unit order" {
     ("a-long-name.smithy", "new"), ("b.smithy", "b"), ("model.smithy", "edited"),
   ])
   assert_eq(merge_files(start, []), [("b.smithy", "b"), ("model.smithy", "start")])
+}
+
+///|
+test "the selector of a case is its query file, else the lesson selector" {
+  let files = [("model.smithy", "m"), ("query.selector", "operation\n")]
+  assert_eq(case_selector(files, Some("string")), Some("operation\n"))
+  assert_eq(case_selector([("model.smithy", "m")], Some("string")), Some("string"))
+  assert_eq(case_selector([("model.smithy", "m")], None), None)
 }
 
 ///|

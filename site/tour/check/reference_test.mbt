@@ -587,7 +587,9 @@ fn compare_all(
     for case in lesson.cases {
       let case_id = lesson.case_id(case)
       let where_ = case_id.to_string()
-      let files = files_of(lesson.case_files(case))
+      let files = files_of(
+        @model.model_files(lesson.engine, lesson.case_files(case)),
+      )
       let expected = reference_of(reference, case_id)
       let ours = our_events(session, where_, files, lesson.output)
       let theirs = expected.events.copy()

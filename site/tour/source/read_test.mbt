@@ -341,3 +341,40 @@ test "a static lesson with an output" {
 test "extension is for a static lesson" {
   expect_err("extension-not-static", ["01-a", "\"extension\"", "static"])
 }
+
+///|
+test "a Selector lesson keeps its query in a file" {
+  let tour = match read("query-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(lesson.files.map(f => f.name), ["model.smithy", "query.selector"])
+  let merged = lesson.case_files(lesson.cases[1])
+  assert_eq(@model.query_of(merged, fixed=lesson.selector), Some("operation\n"))
+}
+
+///|
+test "a query file needs the output Selector" {
+  expect_err("query-no-output", ["01-a", "needs the output Selector"])
+}
+
+///|
+test "a query file and a selector together are an error" {
+  expect_err("query-and-selector", ["01-a", "both"])
+}
+
+///|
+test "the output Selector needs a query" {
+  expect_err("query-missing", ["01-a", "needs a selector"])
+}
+
+///|
+test "a lesson has at most one query file" {
+  expect_err("query-two", ["01-a", "more than one"])
+}
+
+///|
+test "a case cannot add a query file" {
+  expect_err("query-case-adds", ["01-a/cases/more", "other.selector"])
+}

@@ -173,9 +173,13 @@ const editors = {
   // the file that it shows is saved and the state of `key` is restored, so that Undo never crosses
   // files and a switch is not a change of the text. `fresh` drops every saved state first, and the
   // file gets a new state with `text`. Without a key this is an ordinary change of the text.
-  load(id, text, key, fresh) {
+  // The language is optional: with one, a new state or the changed text has that language (the tour
+  // has a query file). A restored state keeps the language that it had.
+  load(id, text, key, fresh, language) {
     const view = views.get(id);
     if (!view) return;
+    const effects =
+      language === undefined ? [] : [languageSlots.get(id).reconfigure((languages[language] ?? (() => []))())];
     if (key !== undefined) {
       const states = fileStates.get(id) ?? new Map();
       fileStates.set(id, states);
@@ -185,11 +189,14 @@ const editors = {
       currentFiles.set(id, key);
       const saved = states.get(key);
       view.setState(
-        saved ?? EditorState.create({ doc: text, selection: { anchor: 0 }, extensions: extensionSets.get(id) }),
+        saved ??
+          EditorState.create({ doc: text, selection: { anchor: 0 }, extensions: extensionSets.get(id) }).update({
+            effects,
+          }).state,
       );
       return;
     }
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, selection: { anchor: 0 } });
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, selection: { anchor: 0 }, effects });
   },
   // Replace the text and the language together. A language that the editor does not know is plain text.
   show(id, text, language) {

@@ -89,13 +89,33 @@ pub fn Engine::data_files(self : Engine) -> Array[String] {
 }
 
 ///|
-/// The files of the model: the files without the data files of the engine.
+/// True for the query file of a Selector lesson: a name that ends with
+/// ".selector".
+pub fn is_query_file(name : String) -> Bool {
+  name.has_suffix(".selector")
+}
+
+///|
+/// The files of the model: the files without the data files of the engine and
+/// without the query file of a Selector lesson, in the same order.
 pub fn model_files(
   engine : Engine,
   files : Array[LessonFile],
 ) -> Array[LessonFile] {
   let data = engine.data_files()
-  files.filter(f => !data.contains(f.name))
+  files.filter(f => !data.contains(f.name) && !is_query_file(f.name))
+}
+
+///|
+/// The selector for `files`: the text of the query file, else `fixed` (the
+/// "selector" of `lesson.json`).
+pub fn query_of(files : Array[LessonFile], fixed~ : String?) -> String? {
+  for file in files {
+    if is_query_file(file.name) {
+      return Some(file.text)
+    }
+  }
+  fixed
 }
 
 ///|

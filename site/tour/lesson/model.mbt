@@ -138,12 +138,12 @@ pub(all) enum Effect {
   )
   /// Send `msg` after `ms` milliseconds.
   Wait(ms~ : Int32, msg~ : Msg)
-  /// Put this text, of the selected file `file`, in the model editor (Smithy
-  /// mode). The editor keeps the text, cursor and undo history of each file
-  /// apart, so a switch to a file gives its state back and Undo never crosses
-  /// files. With `fresh`, every file starts with a new state (start and
-  /// Reset).
-  LoadEditor(text~ : String, file~ : String, fresh~ : Bool)
+  /// Put this text, of the selected file `file`, in the model editor, in
+  /// `language`. The editor keeps the text, cursor and undo history of each
+  /// file apart, so a switch to a file gives its state back and Undo never
+  /// crosses files. With `fresh`, every file starts with a new state (start
+  /// and Reset).
+  LoadEditor(text~ : String, file~ : String, fresh~ : Bool, language~ : String)
   /// Put this text in the output editor and highlight these lines, from 1.
   /// An empty list removes the highlight.
   ShowOutput(text~ : String, highlight~ : Array[Int32])
@@ -266,6 +266,25 @@ fn pairs(files : Array[@model.LessonFile]) -> Array[(String, String)] {
 }
 
 ///|
+/// The files that the Worker loads: all files without the query file.
+fn model_pairs(model : Model) -> Array[(String, String)] {
+  pairs(model.files.filter(f => !@model.is_query_file(f.name)))
+}
+
+///|
+/// The language of the editor for a file: `.smithy` is IDL, `.json` is JSON,
+/// every other name (the query file) is plain text.
+fn editor_language(name : String) -> String {
+  if name.has_suffix(".smithy") {
+    "smithy"
+  } else if name.has_suffix(".json") {
+    "json"
+  } else {
+    "text"
+  }
+}
+
+///|
 /// The stored files, when they come from these starting files: the same
 /// digest and the same file names in the same order. Else `None`.
 fn stored_files(
@@ -321,14 +340,7 @@ pub fn Model::start(
     link_problem: None,
   }
   let (m, sent) = m.send_validate()
-  (
-    m,
-    [
-      ..effects,
-      LoadEditor(text=m.selected_text(), file=m.selected_name(), fresh=true),
-      ..sent,
-    ],
-  )
+  (m, [..effects, m.load_selected(fresh=true), ..sent])
 }
 
 ///|
@@ -338,6 +350,19 @@ pub fn Model::selected_name(self : Model) -> String {
     Some(file) => file.name
     None => ""
   }
+}
+
+///|
+/// The effect that puts the selected file in the editor. With `fresh`, every
+/// file starts with a new editor state.
+fn Model::load_selected(self : Model, fresh~ : Bool) -> Effect {
+  let name = self.selected_name()
+  LoadEditor(
+    text=self.selected_text(),
+    file=name,
+    fresh~,
+    language=editor_language(name),
+  )
 }
 
 ///|

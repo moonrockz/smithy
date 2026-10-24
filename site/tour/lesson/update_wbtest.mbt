@@ -123,7 +123,12 @@ test "start sends a validate of the starting files" {
   assert_eq(m.findings, Unchecked)
   assert_eq(m.output, NoOutput)
   assert_eq(effects, [
-    LoadEditor(text=start_text, file="model.smithy", fresh=true),
+    LoadEditor(
+      text=start_text,
+      file="model.smithy",
+      fresh=true,
+      language="smithy",
+    ),
     SendValidate(seq=1, files=[("model.smithy", start_text)]),
     Wait(ms=10000, msg=TimedOut(1)),
   ])
@@ -138,7 +143,7 @@ test "start uses stored files whose digest matches" {
   )
   assert_eq(m.files, [{ name: "model.smithy", text: edited, }])
   assert_eq(effects, [
-    LoadEditor(text=edited, file="model.smithy", fresh=true),
+    LoadEditor(text=edited, file="model.smithy", fresh=true, language="smithy"),
     SendValidate(seq=1, files=[("model.smithy", edited)]),
     Wait(ms=10000, msg=TimedOut(1)),
   ])
@@ -153,7 +158,12 @@ test "start ignores and clears stored files with another digest" {
   assert_eq(m.files, page().files)
   assert_eq(effects, [
     Clear(key~),
-    LoadEditor(text=start_text, file="model.smithy", fresh=true),
+    LoadEditor(
+      text=start_text,
+      file="model.smithy",
+      fresh=true,
+      language="smithy",
+    ),
     SendValidate(seq=1, files=[("model.smithy", start_text)]),
     Wait(ms=10000, msg=TimedOut(1)),
   ])
@@ -266,7 +276,12 @@ test "a file tab change while a request runs keeps the newest answer" {
   let (m, _) = Model::start(page, None)
   let (m, effects) = update(m, SelectFile(1))
   assert_eq(effects, [
-    LoadEditor(text="namespace b\n", file="b.smithy", fresh=false),
+    LoadEditor(
+      text="namespace b\n",
+      file="b.smithy",
+      fresh=false,
+      language="smithy",
+    ),
     Mark(items=[]),
   ])
   // The editor echo of the loaded text changes nothing.
@@ -278,7 +293,12 @@ test "a file tab change while a request runs keeps the newest answer" {
   assert_eq(m.findings, Found(items))
   let (_, effects) = update(m, SelectFile(0))
   assert_eq(effects, [
-    LoadEditor(text="namespace a\n", file="a.smithy", fresh=false),
+    LoadEditor(
+      text="namespace a\n",
+      file="a.smithy",
+      fresh=false,
+      language="smithy",
+    ),
     Mark(items=[error_in("a.smithy", 1)]),
   ])
 }
@@ -437,7 +457,12 @@ test "Reset loads the starting files and clears the stored files" {
   assert_eq(m.files, page().files)
   assert_eq(effects, [
     Clear(key~),
-    LoadEditor(text=start_text, file="model.smithy", fresh=true),
+    LoadEditor(
+      text=start_text,
+      file="model.smithy",
+      fresh=true,
+      language="smithy",
+    ),
     SendValidate(seq=3, files=[("model.smithy", start_text)]),
     Wait(ms=10000, msg=TimedOut(3)),
   ])
@@ -454,7 +479,12 @@ test "Reset while a request runs checks the starting files after it" {
   let (m, effects) = update(m, Reset)
   assert_eq(effects, [
     Clear(key~),
-    LoadEditor(text=start_text, file="model.smithy", fresh=true),
+    LoadEditor(
+      text=start_text,
+      file="model.smithy",
+      fresh=true,
+      language="smithy",
+    ),
   ])
   let (_, effects) = update(m, Answered(seq=1, answer=Checked([])))
   assert_eq(effects, [
@@ -717,7 +747,122 @@ test "reset loads the selected file with a fresh state" {
   let (_, effects) = update(m, Reset)
   assert_true(
     effects.contains(
-      LoadEditor(text="namespace b\n", file="b.smithy", fresh=true),
+      LoadEditor(
+        text="namespace b\n",
+        file="b.smithy",
+        fresh=true,
+        language="smithy",
+      ),
     ),
   )
+}
+
+///|
+/// A Selector lesson: the model file and the query file.
+fn query_page() -> @model.LessonPage {
+  let files : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: start_text, },
+    { name: "query.selector", text: "operation\n", },
+  ]
+  {
+    ..page(),
+    output: Some(Selector),
+    files,
+    digest: @model.digest(files),
+    playground: Some("/smithy/playground/"),
+  }
+}
+
+///|
+test "a Selector lesson validates the model files and sends the query as the selector" {
+  let (m, effects) = Model::start(query_page(), None)
+  assert_eq(effects, [
+    LoadEditor(
+      text=start_text,
+      file="model.smithy",
+      fresh=true,
+      language="smithy",
+    ),
+    SendValidate(seq=1, files=[("model.smithy", start_text)]),
+    Wait(ms=10000, msg=TimedOut(1)),
+  ])
+  let (_, effects) = update(m, Answered(seq=1, answer=Checked([])))
+  assert_eq(
+    effects[1],
+    SendTransform(
+      seq=2,
+      files=[("model.smithy", start_text)],
+      output=Selector,
+      selector=Some("operation\n"),
+    ),
+  )
+}
+
+///|
+test "an edit of the query file transforms with the new selector" {
+  let (m, _) = Model::start(query_page(), None)
+  let m = run(m, [Answered(seq=1, answer=Checked([])), SelectFile(1)]).0
+  let (m, effects) = run(m, [
+    Answered(seq=2, answer=Converted("x")),
+    Edited("string\n"),
+    Debounced(1),
+  ])
+  assert_eq(effects, [
+    SendValidate(seq=3, files=[("model.smithy", start_text)]),
+    Wait(ms=10000, msg=TimedOut(3)),
+  ])
+  let (_, effects) = update(m, Answered(seq=3, answer=Checked([])))
+  assert_eq(
+    effects[1],
+    SendTransform(
+      seq=4,
+      files=[("model.smithy", start_text)],
+      output=Selector,
+      selector=Some("string\n"),
+    ),
+  )
+}
+
+///|
+test "an empty query shows the reason of the core" {
+  let (m, _) = Model::start(query_page(), None)
+  let m = run(m, [
+      Answered(seq=1, answer=Checked([])),
+      Answered(seq=2, answer=Converted("x")),
+      SelectFile(1),
+      Edited(""),
+      Debounced(1),
+      Answered(seq=3, answer=Checked([])),
+    ]).0
+  let reason = "I expected a selector. Write one, for example: structure"
+  let (m, _) = update(m, Answered(seq=4, answer=NotConverted(reason)))
+  assert_eq(m.output, NotShown(reason))
+  assert_eq(m.findings, Found([]))
+}
+
+///|
+test "the query file opens as plain text" {
+  let (m, _) = Model::start(query_page(), None)
+  let (_, effects) = update(m, SelectFile(1))
+  assert_eq(effects, [
+    LoadEditor(
+      text="operation\n",
+      file="query.selector",
+      fresh=false,
+      language="text",
+    ),
+    Mark(items=[]),
+  ])
+}
+
+///|
+test "Open in playground carries the query" {
+  let (m, _) = Model::start(query_page(), None)
+  let (m, _) = run(m, [SelectFile(1), Edited("string\n")])
+  let (_, effects) = update(m, OpenPlayground)
+  guard effects is [Navigate(url~)] else { fail("no navigation") }
+  let fragment = url["/smithy/playground/#".length():].to_owned()
+  guard @core.decode_share(fragment) is Ok(state) else { fail("bad link") }
+  assert_eq(state.selector, Some("string\n"))
+  assert_eq(state.model, start_text)
 }

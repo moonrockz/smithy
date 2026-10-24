@@ -148,8 +148,8 @@ fn Runtime::run(self : Runtime, effect : @lesson.Effect) -> Unit {
     SendTransform(seq~, files~, output~, selector~) =>
       self.post(seq, TransformFiles(seq~, files~, output~, selector~))
     Wait(ms~, msg~) => set_timeout(ms, () => (self.dispatch)(msg))
-    LoadEditor(text~, file~, fresh~) => {
-      editor_load_file(@lesson.EDITOR_ID, text, file, fresh)
+    LoadEditor(text~, file~, fresh~, language~) => {
+      editor_load_file(@lesson.EDITOR_ID, text, file, fresh, language)
       // The marks belong to the text before: a `Mark` follows with the
       // findings of this text.
       editor_mark(@lesson.EDITOR_ID, "[]")

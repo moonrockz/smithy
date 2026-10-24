@@ -175,6 +175,7 @@ fn check_case(
   let where_ = lesson.case_id(case).to_string()
   let all_files = lesson.case_files(case)
   let files = files_of(@model.model_files(lesson.engine, all_files))
+  let selector = @model.query_of(all_files, fixed=lesson.selector)
   let actual = match
     @core.handle(
       session,
@@ -211,10 +212,7 @@ fn check_case(
       check_blocked(
         where_,
         text,
-        @core.handle(
-          session,
-          TransformFiles(seq=3, files~, output~, selector=lesson.selector),
-        ),
+        @core.handle(session, TransformFiles(seq=3, files~, output~, selector~)),
       )
     _ => ()
   }
@@ -266,7 +264,7 @@ fn check_case(
           let text = match
             @core.handle(
               session,
-              TransformFiles(seq=2, files~, output~, selector=lesson.selector),
+              TransformFiles(seq=2, files~, output~, selector~),
             ) {
             Transformed(files=out, ..) => @model.output_text(out)
             Blocked(reason~, ..) =>

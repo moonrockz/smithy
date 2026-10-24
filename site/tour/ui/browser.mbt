@@ -32,14 +32,16 @@ extern "js" fn editor_text(id : String) -> String =
   #|(id) => globalThis.smithyEditors.text(id)
 
 ///|
-/// Show the file `file` in the editor, with its own state (see `LoadEditor`).
+/// Show the file `file` in the editor, with its own state, in `language`
+/// (see `LoadEditor`).
 extern "js" fn editor_load_file(
   id : String,
   text : String,
   file : String,
   fresh : Bool,
+  language : String,
 ) -> Unit =
-  #|(id, text, file, fresh) => globalThis.smithyEditors.load(id, text, file, fresh)
+  #|(id, text, file, fresh, language) => globalThis.smithyEditors.load(id, text, file, fresh, language)
 
 ///|
 extern "js" fn editor_show(
