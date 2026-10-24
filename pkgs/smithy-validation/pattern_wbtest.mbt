@@ -1,4 +1,7 @@
 ///|
+let fqname_pattern = "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*:([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*#([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$"
+
+///|
 test "portable patterns translate escapes without changing literals or classes" {
   let id = @smithy.ShapeId::parse("example#String").unwrap()
   for
@@ -14,5 +17,24 @@ test "portable patterns translate escapes without changing literals or classes" 
     let compiled = compile_pattern(pattern, id)
     assert_true(compiled.execute(good), msg=pattern)
     assert_false(compiled.execute(bad), msg=pattern)
+  }
+}
+
+///|
+test "pattern weight counts the copies the automaton builds" {
+  let id = @smithy.ShapeId::parse("example#String").unwrap()
+  let nested = "^" + "(?:".repeat(8) + "a" + ")*".repeat(8) + "$"
+  for
+    (pattern, weight) in [
+      ("^[a-z]$", 24),
+      ("^[a-z0-9]+$", 48),
+      ("^a?$", 40),
+      ("^(?:a*)*$", 64),
+      ("^(?:a+)+$", 112), // control: + still counts two copies
+      ("^[^a]$", 48), // control: a negated class keeps its source length
+      (nested, 216), // 8 nested stars: linear, not 1276 units
+      (fqname_pattern, 1056),
+    ] {
+    assert_eq(compile_pattern(pattern, id).weight, weight, msg=pattern)
   }
 }

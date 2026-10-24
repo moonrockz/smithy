@@ -12,6 +12,8 @@ fn BoundedPattern::execute(self : BoundedPattern, text : String) -> Bool {
 ///|
 /// Bound the expanded expression before the core parser/compiler can recurse or
 /// copy quantified subexpressions. Counts include every alternative and class.
+/// Repetition counts follow core's translate: one instance for `*` and `?`, two
+/// for `+`. A positive BMP-only class is one unit.
 fn pattern_cost(
   pattern : String,
   id : @smithy.ShapeId,
@@ -43,7 +45,7 @@ fn pattern_cost(
     }
     if c == 42 || c == 43 || c == 63 || c == 123 {
       guard last > 0 else { raise unsupported() }
-      let mut copies = 2
+      let mut copies = if c == 43 { 2 } else { 1 }
       if c == 123 {
         i += 1
         let start = i
@@ -115,7 +117,7 @@ fn pattern_cost(
         i += 1
       }
       guard i < pattern.length() else { raise unsupported() }
-      i - start + 1
+      class_cost(pattern, start, i + 1)
     } else {
       1
     }
@@ -127,6 +129,59 @@ fn pattern_cost(
   guard groups.is_empty() else { raise unsupported() }
   // UTF-16 lowering and Thompson instructions can expand a source atom.
   Int32::max(1, total) * 8
+}
+
+///|
+/// Cost of the class `pattern[start:end]` (from `[` through `]`). Core maps a
+/// positive BMP-only class to one symbol set. A negated class, or one with
+/// astral or surrogate members, lowers to surrogate sequences, so it costs its
+/// source length.
+fn class_cost(pattern : String, start : Int32, end : Int32) -> Int32 {
+  let full = end - start
+  if pattern.code_unit_at(start + 1) == 94 {
+    return full
+  }
+  let mut j = start + 1
+  while j < end {
+    let c = pattern.code_unit_at(j).to_int()
+    if c >= 0xD800 && c <= 0xDFFF {
+      return full
+    }
+    if c == 92 && j + 1 < end && pattern.code_unit_at(j + 1) == 117 {
+      if j + 2 < end && pattern.code_unit_at(j + 2) == 123 {
+        return full
+      }
+      let mut value = 0
+      let mut k = j + 2
+      while k < j + 6 && k < end {
+        let h = pattern.code_unit_at(k).to_int()
+        let digit = if h >= 48 && h <= 57 {
+          h - 48
+        } else if h >= 97 && h <= 102 {
+          h - 87
+        } else if h >= 65 && h <= 70 {
+          h - 55
+        } else {
+          -1
+        }
+        if digit < 0 {
+          break
+        }
+        value = value * 16 + digit
+        k += 1
+      }
+      if value >= 0xD800 && value <= 0xDFFF {
+        return full
+      }
+      j += 2
+      continue
+    }
+    if c == 92 {
+      j += 1
+    }
+    j += 1
+  }
+  1
 }
 
 ///|

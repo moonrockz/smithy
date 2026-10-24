@@ -91,7 +91,9 @@ unsupported core regex constructs fail preparation. Matching searches unless anc
 not the full ECMA-262 language.
 
 Preparation limits patterns to 4,096 source UTF-16 units, 32 nested groups and 1,024 expanded
-expression units, counting repetition expansion and alternatives. Matching charges eight times
+expression units. Each repetition counts the copies the automaton builds (`*` and `?` once,
+`+` twice, `{n}` n times, `{n,}` n+1 times, `{n,m}` m times); a positive BMP-only class counts
+one unit and any other class counts its source length. Matching charges eight times
 the expanded estimate times the input UTF-16 length plus one against the call's work budget.
 Patterns exceeding the preparation caps raise `UnsupportedConstraint`; exhausted matching work
 returns `LimitExceeded` before executing the pattern.
