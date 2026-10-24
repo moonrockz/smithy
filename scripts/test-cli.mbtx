@@ -1512,7 +1512,8 @@ fn doc_session(body : Array[String]) -> Result[DocStep, String] {
 ///
 /// THE RULE (`@source` in site/tour/source/include.mbt must use the same one):
 /// - A fence starts at the start of a line with three or more backticks. The info string is the rest of
-///   the line. A fence closes at the first line of at least as many backticks, with only spaces or tabs after.
+///   the line. A fence closes at the first line of at least as many backticks, after up to 3 spaces (as in
+///   CommonMark) and with only spaces or tabs after.
 /// - A console fence is a fence whose first info word is `console`, whatever words follow. Every
 ///   command of it runs, and a console fence with no command is an error.
 /// - A fixture fence is a fence with an info word `file=NAME`. Its text is written to NAME.
@@ -1556,9 +1557,10 @@ fn doc_steps(markdown : String) -> Result[Array[DocStep], String] {
     while i < lines.length() {
       let inner = lines[i]
       i += 1
-      let inner_ticks = inner.iter().take_while(c => c == '`').count()
-      let tail = inner[inner_ticks:].trim(chars=" \t")
-      if inner_ticks >= ticks && tail.is_empty() {
+      let indent = inner.iter().take(4).take_while(c => c == ' ').count()
+      let inner_ticks = inner[indent:].iter().take_while(c => c == '`').count()
+      let tail = inner[indent + inner_ticks:].trim(chars=" \t")
+      if indent <= 3 && inner_ticks >= ticks && tail.is_empty() {
         closed = true
         break
       }
@@ -2288,6 +2290,7 @@ test "doc_steps does not skip console and fixture fences in silence" {
     ("```console\n$ smithy cat 'a\\..\\x'\n```", Some("absolute path")),
     ("```console\n$ smithy cat C:x\n```", Some("absolute path")),
     ("```console\n$ smithy cat a/b.smithy ..x\n```", None),
+    ("~~~console\n$ smithy version\n~~~", Some("does not start at the start of a line")),
   ]
   for c in cases {
     let (md, want) = c
@@ -2304,5 +2307,36 @@ test "doc_steps does not skip console and fixture fences in silence" {
       "```console\n$ smithy version\n0.6.0\n```  \n\n```smithy file=a.smithy\nx\n```\n",
     ).map(steps => steps.length()),
     Ok(2),
+  )
+  // As in CommonMark, a closing fence can have up to 3 spaces of indent. The fence
+  // ends there, so the output of the command is only `0.6.0`.
+  for indent in [" ", "  ", "   "] {
+    assert_eq(
+      doc_steps(
+        "```console\n$ smithy version\n0.6.0\n\{indent}```\n\n```smithy file=a.smithy\nx\n```\n",
+      ),
+      Ok([
+        Session([{ args: ["version"], output: "0.6.0\n" }]),
+        Fixture(name="a.smithy", text="x\n"),
+      ]),
+      msg="indent \{indent.length()}",
+    )
+  }
+  // A closing fence with 4 spaces of indent is code of the fence.
+  assert_true(
+    doc_steps("```console\n$ smithy version\n    ```\n```\n")
+    is Ok([Session([{ output: "    ```\n", .. }])]),
+  )
+}
+
+///|
+/// A fence inside a longer fence is code: the runner skips it, as `@markdown.region`
+/// (site/markdown/include.mbt) does not see a region there.
+test "doc_steps skips a console fence inside a longer fence" {
+  assert_eq(
+    doc_steps(
+      "````markdown\n<!-- tour:start x -->\n```console\n$ smithy version\n```\n<!-- tour:end x -->\n````\n",
+    ),
+    Ok([]),
   )
 }
