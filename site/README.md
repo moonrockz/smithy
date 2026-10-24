@@ -266,4 +266,4 @@ A tour lesson (`site/tour/lessons/NN-slug/lesson.md`) must not hold a CLI or API
 - The reader rejects a lesson that has a fence in `console`, `shell`, `sh`, `bash`, `zsh`, `mbt`, `moonbit`,
   `shell-session`, `powershell`, `fish`, `cmd` or a similar terminal language (the case does not matter), a `tabs`
   fence, or a fence of any other language (also `text` or no language) with a line that starts with `$ smithy`,
-  `smithy ` or `@smithy.NAME(` (an API call). A qualified shape ID such as `@smithy.api#documentation("x")` is not a call: a `#` comes before the `(`.
+  `smithy `, or that has `@smithy.` at any position of a line. After `@smithy.` the reader skips letters, digits, `_` and `.`; only a `#` there makes a qualified shape ID such as `@smithy.api#documentation("x")`, which stays legal. Any other character is an API use.

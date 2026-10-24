@@ -276,3 +276,25 @@ test "a qualified trait in a model fence is not an API call" {
     )
   }
 }
+
+///|
+test "every MoonBit API use is rejected in an untyped and a text fence" {
+  for fence in ["", "text"] {
+    for
+      code in [
+        "@smithy.Loader::new()", "@smithy.Selector::parse(x)", "@smithy.parse (x)",
+        "let r = @smithy.Loader::new()", "x(@smithy.parse)",
+      ] {
+      contains_all(
+        @source.check_hand_written("# T\n\n```\{fence}\n\{code}\n```\n"),
+        "@smithy.",
+      )
+    }
+  }
+  assert_eq(
+    @source.check_hand_written(
+      "# T\n\n```smithy\n@smithy.api#documentation(\"x\")\n@smithy.example#x\nstring A\n```\n\n```json\n{\"target\": \"smithy.api#String\"}\n```\n",
+    ),
+    Ok(()),
+  )
+}

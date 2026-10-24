@@ -194,24 +194,31 @@ fn hand_written_error(lang : String) -> String {
 }
 
 ///|
-/// Whether `line` starts with `@smithy.`, an identifier and `(`: a call of the API. A qualified
-/// shape ID such as `@smithy.api#documentation("x")` has a `#` before the `(`, so it is not a call.
+/// Whether `line` uses the API: `@smithy.` at any position, followed by `[A-Za-z0-9_.]*` and
+/// anything but `#`. A qualified shape ID such as `@smithy.api#documentation("x")` has a `#`
+/// there, so model text stays legal.
 fn is_api_call(line : String) -> Bool {
-  if !line.has_prefix("@smithy.") {
-    return false
+  let marker = "@smithy."
+  let mut from = 0
+  while from < line.length() {
+    guard line[from:].find(marker) is Some(i) else { break }
+    let rest = line[from + i + marker.length():].to_owned()
+    let name = rest
+      .iter()
+      .take_while(c => {
+        (c >= 'a' && c <= 'z') ||
+        (c >= 'A' && c <= 'Z') ||
+        c.is_ascii_digit() ||
+        c == '_' ||
+        c == '.'
+      })
+      .count()
+    if !(name < rest.length() && rest[name] == '#') {
+      return true
+    }
+    from = from + i + marker.length()
   }
-  let rest = line[8:].to_owned()
-  let name = rest
-    .iter()
-    .take_while(c => {
-      (c >= 'a' && c <= 'z') ||
-      (c >= 'A' && c <= 'Z') ||
-      c.is_ascii_digit() ||
-      c == '_' ||
-      c == '.'
-    })
-    .count()
-  name > 0 && rest[name:].to_owned().has_prefix("(")
+  false
 }
 
 ///|
