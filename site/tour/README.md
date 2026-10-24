@@ -71,10 +71,13 @@ commit that made them. For each case, the check:
 
 1. requires a fresh reference result. The digest in the file must match the case files. The result has a
    reference JSON Schema if and only if the lesson output is `JsonSchema` and the reference events have no
-   `ERROR` and no `DANGER`;
+   `ERROR` and no `DANGER`. It has a reference OpenAPI entry if and only if the lesson output is `OpenApi30` or
+   `OpenApi31` and the reference events have no `ERROR` and no `DANGER`;
 2. requires the events of the playground core to be equal to the reference events (after the allow list);
 3. for a lesson with the output `JsonSchema`, requires the JSON Schema of the playground core to be equal to the
-   reference JSON Schema (after the allow list).
+   reference JSON Schema (after the allow list);
+4. for a lesson with the output `OpenApi30` or `OpenApi31`, requires the OpenAPI document of the playground core
+   to be equal to the reference OpenAPI document (after the allow list).
 
 The check also fails for a reference result of a case that does not exist.
 
@@ -102,7 +105,7 @@ the commit of the vendored prelude and of the other reference scripts.
 It is a JSON array. Each entry has:
 
 - `case`: `<lesson folder>/<case>`
-- `kind`: `event` or `json_schema`
+- `kind`: `event`, `json_schema` or `openapi`
 - `reason`: why the two differ
 - `issue`: a beads issue id, `smithy-` followed by lower-case letters, digits and dots (for example `smithy-2qe.4`)
 
@@ -114,6 +117,14 @@ A `kind` of `json_schema` has `pointer` (a JSON pointer, RFC 6901) and no `side`
 error. The entry removes the value at the pointer from both JSON Schema documents. The entries of one case
 apply in the order of the file, so a pointer sees the documents after the entries before it. For example, after
 an entry removes `/a/0`, the item that was at `/a/1` is at `/a/0`.
+
+A `kind` of `openapi` is the same for the OpenAPI documents: it has `pointer`, no `side`, and removes the value at
+the pointer from both documents.
+
+The reference OpenAPI entry is `null` when the Java conversion fails. Our output must then be blocked. A document
+on one side and a failure on the other side fails the check. The Java harness converts the one service of the
+model that has a trait with the `protocolDefinition` trait. A case with more than one such service fails the
+harness. The model loads with the bundled protocol definitions, as the transform loads it.
 
 Rules that the tests enforce:
 

@@ -29,7 +29,7 @@ let results_path : String = "site/tour/reference-events.json"
 let scratch : String = ".dev/out/reference-tour"
 
 ///|
-/// Reads the cases (`[{"id", "json_schema", "files": [{"name", "text"}]}]`) from args[0] and writes the results to
+/// Reads the cases (`[{"id", "json_schema", "http_protocols", "files": [{"name", "text"}], "openapi"?}]`) from args[0] and writes the results to
 /// args[1], with args[2] as the reference SHA. The digest is SHA-256 over the files sorted by name of name + NUL + text + NUL, in UTF-8.
 let harness : String =
   #|import java.nio.charset.StandardCharsets;
@@ -42,7 +42,10 @@ let harness : String =
   #|import software.amazon.smithy.model.loader.*;
   #|import software.amazon.smithy.model.node.*;
   #|import software.amazon.smithy.model.shapes.*;
+  #|import software.amazon.smithy.model.traits.ProtocolDefinitionTrait;
   #|import software.amazon.smithy.model.validation.*;
+  #|import software.amazon.smithy.openapi.*;
+  #|import software.amazon.smithy.openapi.fromsmithy.*;
   #|
   #|public final class ReferenceTour {
   #|  public static void main(String[] args) throws Exception {
@@ -55,7 +58,9 @@ let harness : String =
   #|      List<ObjectNode> files = new ArrayList<>(test.expectArrayMember("files").getElementsAs(ObjectNode.class));
   #|      files.sort(Comparator.comparing(file -> file.expectStringMember("name").getValue()));
   #|      MessageDigest sha = MessageDigest.getInstance("SHA-256");
-  #|      ModelAssembler assembler = Model.assembler();
+  #|      ModelAssembler assembler = test.expectBooleanMember("http_protocols").getValue()
+  #|          ? Model.assembler().discoverModels(ReferenceTour.class.getClassLoader())
+  #|          : Model.assembler();
   #|      for (ObjectNode file : files) {
   #|        String name = file.expectStringMember("name").getValue();
   #|        String text = file.expectStringMember("text").getValue();
@@ -80,6 +85,28 @@ let harness : String =
   #|      if (test.expectBooleanMember("json_schema").getValue() && !blocked) {
   #|        entry.withMember("json_schema",
   #|            JsonSchemaConverter.builder().model(result.unwrap()).build().convert().toNode());
+  #|      }
+  #|      if (test.getMember("openapi").isPresent() && !blocked) {
+  #|        List<ShapeId> services = new ArrayList<>();
+  #|        Model model = result.unwrap();
+  #|        for (ServiceShape service : model.getServiceShapes()) {
+  #|          boolean hasProtocol = service.getAllTraits().keySet().stream().anyMatch(t ->
+  #|              model.getShape(t).map(d -> d.hasTrait(ProtocolDefinitionTrait.ID)).orElse(false));
+  #|          if (hasProtocol) services.add(service.getId());
+  #|        }
+  #|        if (services.size() > 1) throw new IllegalStateException(id + ": more than one service with a protocol trait");
+  #|        Node openapi = Node.nullNode();
+  #|        if (services.size() == 1) {
+  #|          ObjectNode settings = Node.objectNodeBuilder()
+  #|              .withMember("service", services.get(0).toString())
+  #|              .withMember("version", test.expectStringMember("openapi").getValue()).build();
+  #|          try {
+  #|            openapi = OpenApiConverter.create().config(OpenApiConfig.fromNode(settings)).convertToNode(model);
+  #|          } catch (RuntimeException e) {
+  #|            openapi = Node.nullNode();
+  #|          }
+  #|        }
+  #|        entry.withMember("openapi", openapi);
   #|      }
   #|      cases.withMember(id, entry.build());
   #|      System.out.println("reference: " + id);
@@ -202,22 +229,46 @@ async fn read_files(path : String) -> Array[(String, String)] {
 }
 
 ///|
+/// What the harness writes for a case, from the lesson output name.
+struct Flags {
+  json_schema : Bool
+  openapi : String?
+  http_protocols : Bool
+} derive(Eq, Debug)
+
+///|
+fn flags_of(output : String?) -> Flags {
+  match output {
+    Some("JsonSchema") => { json_schema: true, openapi: None, http_protocols: false }
+    Some("OpenApi30") => { json_schema: false, openapi: Some("3.0.2"), http_protocols: true }
+    Some("OpenApi31") => { json_schema: false, openapi: Some("3.1.0"), http_protocols: true }
+    _ => { json_schema: false, openapi: None, http_protocols: false }
+  }
+}
+
+///|
 /// The cases of every lesson, in the input format of the harness.
 async fn lesson_cases() -> Array[Json] {
   let cases : Array[Json] = []
   for dir in list_dir(lessons_root) {
     let base = lessons_root + "/" + dir
     if !(@fs.kind(base) is Directory) { continue }
-    let json_schema = @json.parse(@fs.read_file(base + "/lesson.json").text()) is { "output": String("JsonSchema"), .. }
+    let flags = flags_of(match @json.parse(@fs.read_file(base + "/lesson.json").text()) {
+      { "output": String(output), .. } => Some(output)
+      _ => None
+    })
     let start = read_files(base + "/files")
     for name in list_dir(base + "/cases") {
       if !(@fs.kind(base + "/cases/" + name) is Directory) { continue }
       let files = merge_files(start, read_files(base + "/cases/" + name + "/files"))
-      cases.push(Json::object({
+      let entry : Map[String, Json] = {
         "id": Json::string(dir + "/" + name),
-        "json_schema": Json::boolean(json_schema),
+        "json_schema": Json::boolean(flags.json_schema),
+        "http_protocols": Json::boolean(flags.http_protocols),
         "files": Json::array(files.map(f => Json::object({ "name": Json::string(f.0), "text": Json::string(f.1) }))),
-      }))
+      }
+      if flags.openapi is Some(version) { entry["openapi"] = Json::string(version) }
+      cases.push(Json::object(entry))
     }
   }
   cases
@@ -243,7 +294,10 @@ async fn compile_reference(source : String, classes : String) -> Unit {
   let sources = [harness_path]
   let resources : Map[String, String] = Map([])
   let verified : Array[Json] = []
-  for module_ in ["smithy-utils", "smithy-jmespath", "smithy-model", "smithy-jsonschema"] {
+  for module_ in [
+    "smithy-utils", "smithy-jmespath", "smithy-model", "smithy-build", "smithy-diff",
+    "smithy-protocol-traits", "smithy-aws-traits", "smithy-jsonschema", "smithy-openapi-traits", "smithy-openapi",
+  ] {
     let java_prefix = module_ + "/src/main/java"
     let resource_prefix = module_ + "/src/main/resources"
     let paths = collect_files(source, java_prefix) + collect_files(source, resource_prefix)
@@ -333,4 +387,20 @@ test "a case replaces and adds files by name, sorted in code unit order" {
 ///|
 test "javac argument files quote spaces and Windows path separators" {
   assert_eq(java_quote("C:\\source files\\Test.java"), "\"C:\\\\source files\\\\Test.java\"")
+}
+
+///|
+test "the lesson output gives the harness flags" {
+  let none = { json_schema: false, openapi: None, http_protocols: false }
+  assert_eq(flags_of(None), none)
+  assert_eq(flags_of(Some("JsonAst")), none)
+  assert_eq(flags_of(Some("JsonSchema")), { ..none, json_schema: true })
+  assert_eq(
+    flags_of(Some("OpenApi30")),
+    { json_schema: false, openapi: Some("3.0.2"), http_protocols: true },
+  )
+  assert_eq(
+    flags_of(Some("OpenApi31")),
+    { json_schema: false, openapi: Some("3.1.0"), http_protocols: true },
+  )
 }
