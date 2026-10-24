@@ -57,8 +57,14 @@ test("the lesson shows its output, marks a changed line, keeps an edit and reset
   await settled(page);
   expect(await editorText(page)).not.toContain("Welcome");
   await expect(page.locator("#tour-output .cm-content")).toContainText("example#Greeting");
-  // The output changed back, so its name line is marked as changed against the edited output.
   expect(await outputText(page)).not.toContain("Welcome");
+  // The output changed back, so exactly the lines that hold the old name are marked as changed against the
+  // edited output.
+  const resetLines = await output.locator(".cm-line").allInnerTexts();
+  const changedBack = resetLines.filter((line) => line.includes("Greeting"));
+  expect(changedBack.length).toBeGreaterThan(0);
+  await expect(page.locator("#tour-output .cm-line.tour-changed")).toHaveCount(changedBack.length);
+  expect(await page.locator("#tour-output .cm-line.tour-changed").allInnerTexts()).toEqual(changedBack);
   expect(page.errors).toEqual([]);
 });
 
