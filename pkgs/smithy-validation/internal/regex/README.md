@@ -46,11 +46,20 @@ The upstream tests are copied too and run with the package tests.
 
 The default meter is unlimited, so the upstream tests see the upstream behavior.
 
+## Check
+
+`mise run regex:vendor:check` (part of `mise run validate`) copies the core packages of the pinned
+toolchain into `_build/`, points their imports here, formats them with `moon fmt`, removes the
+"Modified for" comments of this copy and compares the files. It fails when a file without budget
+hooks differs, when a file is missing, or when a file is neither copied nor listed as added. Add
+`-- --diff` to print the hooks.
+
 ## Update
 
 1. Copy the paths in the table from the new core commit, with the tests and `moon.pkg` files.
 2. Point the imports in each `moon.pkg` to `moonrockz/smithy-validation/internal/regex/...`.
 3. Apply the hooks again; the list of changed files above is complete.
-4. Run `mise run format`, then `moon test` in `pkgs/smithy-validation`. The law tests compare this
-   copy with `@string.Regex` of the installed toolchain.
-5. Update the commit and version here and in `NOTICE`.
+4. Run `mise run format`, `mise run regex:vendor:check -- --diff`, then `moon test` in
+   `pkgs/smithy-validation`. The law tests compare this copy with `@string.Regex` of the installed
+   toolchain.
+5. Update the commit and version here, in `NOTICE` and in `scripts/regex-vendor-check.mbtx`.
