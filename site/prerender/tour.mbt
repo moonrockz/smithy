@@ -20,10 +20,9 @@ fn tour_contents(tour : @model.Tour) -> @model.TourContents {
 /// The href of the `spec` of a lesson: a smithy.io URL as it is, or the docs
 /// page of a repository path.
 fn spec_href(config : @data.SiteConfig, spec : String) -> String {
-  match @content.classify(spec) {
-    Some((route, _)) if !spec.has_prefix(@model.spec_url_prefix) =>
-      @route.href(config.base, route)
-    _ => spec
+  match @content.doc_route(spec) {
+    Some(route) => @route.href(config.base, route)
+    None => spec
   }
 }
 

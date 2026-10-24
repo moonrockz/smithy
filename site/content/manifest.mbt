@@ -188,6 +188,16 @@ pub fn classify(path : String) -> (@route.Route, Group)? {
 }
 
 ///|
+/// The docs route of a published source file, or `None` when the file is not
+/// published or has another kind of route.
+pub fn doc_route(path : String) -> @route.Route? {
+  match classify(path) {
+    Some((Doc(slug), _)) => Some(Doc(slug))
+    _ => None
+  }
+}
+
+///|
 fn fixed_rank(route : @route.Route) -> Int32 {
   for i, page in fixed_pages {
     if @route.Route::Doc(page.0) == route {

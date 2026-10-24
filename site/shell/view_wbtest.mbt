@@ -836,11 +836,13 @@ async test "a lesson page with a docs link names it the documentation" {
   assert_true(html.contains("href=\"/smithy/docs/smithy-openrpc/\""))
   assert_true(html.contains("Read the documentation of this feature"))
   assert_true(!html.contains("Read this subject in the Smithy specification"))
-  // The top bar has one external icon; the spec link adds none.
+  // The top bar has its own external icon, so count the icons: the spec
+  // link adds one on a smithy.io page and none on a docs page.
   let spec_html = render_tour(
     Lesson("simple-shapes"),
     Page(simple_shapes_page()),
     Some("# Simple shapes\n\nText.\n"),
   )
-  assert_eq(spec_html.split("ms-ext").count(), html.split("ms-ext").count() + 1)
+  let icons = html.split("ms-ext").count()
+  assert_eq(spec_html.split("ms-ext").count(), icons + 1)
 }

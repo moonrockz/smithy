@@ -165,3 +165,18 @@ test "a spec that is the repository path of a docs page" {
     Err(msg) => fail(msg)
   }
 }
+
+///|
+fn expect_bad_spec(name : String, spec : String) -> Unit raise {
+  expect_err(name, [
+    "01-a: \"spec\" must be a smithy.io URL or the repository path of a docs page, not \"\{spec}\"",
+  ])
+}
+
+///|
+test "a spec that is the path of a file that the site does not publish" {
+  expect_bad_spec(
+    "unpublished-spec", "site/tour/lessons/01-hello-smithy/lesson.md",
+  )
+  expect_bad_spec("working-doc-spec", "docs/superpowers/plan.md")
+}
