@@ -31,6 +31,9 @@ pub fn Meter::left(self : Meter) -> Int32 {
 ///|
 /// Spend `units`, or raise `Exhausted` and spend nothing when too few are left.
 pub fn Meter::spend(self : Meter, units : Int32) -> Unit raise Exhausted {
+  guard units >= 0 else {
+    abort("I expected a non-negative number of work units.")
+  }
   if units > self.left {
     raise Exhausted
   }
@@ -41,6 +44,12 @@ pub fn Meter::spend(self : Meter, units : Int32) -> Unit raise Exhausted {
 /// Spend `units` from the meter of the running match.
 pub fn Context::spend(self : Context, units : Int32) -> Unit raise Exhausted {
   self.meter.spend(units)
+}
+
+///|
+/// The units left on the meter of the running match.
+pub fn Context::left(self : Context) -> Int32 {
+  self.meter.left
 }
 
 ///|

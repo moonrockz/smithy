@@ -1,13 +1,29 @@
-The packages under this directory, except the files listed as added in
-README.md, are copied from MoonBit core:
+The packages under this directory, except the files that README.md lists as
+added, are copied from MoonBit core:
 
   https://github.com/moonbitlang/core
   commit d3c49d103fbe7bcfe86a2299250bdfe52654e70d
   (the core bundled with moonc 0.10.15+943464bfa, 2026-10-12)
-  Licensed under the Apache License, Version 2.0.
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-MoonBit core
-Copyright 2026 International Digital Economy Academy
+MoonBit core NOTICE:
 
-Each changed file keeps its licence header and states the change in a
-"Modified for moonrockz/smithy-validation" comment below it.
+This product includes software developed at
+International Digital Economy Academy (https://www.idea.edu.cn/).
+
+Statement of changes:
+
+- Every copied file has new import paths in its moon.pkg, and the syntax that
+  `moon fmt` writes (Int32 and UInt32 for Int and UInt, `..<=` for `..=`, `~`
+  for optional arguments with a default). No behavior changes from these.
+- Seven files have budget hooks, so that a search counts its work, stops when
+  its limit runs out, charges the same work for the same input, and keeps a
+  bounded number of states: automata/context.mbt, automata/delta.mbt,
+  automata/slot_book.mbt, automata/thread_set.mbt, regex_engine/execute.mbt,
+  regex_engine/regex.mbt, regex_engine/states.mbt.
+- Each changed file states its change in a "Modified for
+  moonrockz/smithy-validation" comment below its licence header.
+- string/regex.mbt is not copied. regex.mbt here takes its place with only
+  compilation and a metered match, and it rejects capturing groups.
+- Nothing else is left out: positions.mbt, extends.mbt and the upstream tests
+  are copied.

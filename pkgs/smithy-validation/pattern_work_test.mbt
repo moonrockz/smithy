@@ -103,3 +103,42 @@ test "a chain of 200 optional items exceeds the preparation caps" {
   }
   assert_true(rejected)
 }
+
+///|
+/// `count` pseudo-random letters `a` and `b`, from `seed`.
+fn random_ab(count : Int32, seed : Int32) -> String {
+  let text = StringBuilder()
+  let mut x = seed
+  for _ in 0..<count {
+    x = (x * 1103515245 + 12345) & 0x7fffffff
+    text.write_char(if (x >> 16) % 2 == 0 { 'a' } else { 'b' })
+  }
+  text.to_string()
+}
+
+///|
+test "a validator that has seen many values gives the results of a fresh one" {
+  let source = "@pattern(\"a(a|b){10}c\")\nstring Value"
+  let warm = validator(source)
+  for i in 0..<400 {
+    ignore(warm.validate_json(Json::string(random_ab(2000, i + 1))))
+  }
+  for i in 0..<50 {
+    let value = Json::string(random_ab(60, 1000 + i))
+    assert_eq(
+      codes(warm.validate_json(value)),
+      codes(validator(source).validate_json(value)),
+      msg="value \{i}",
+    )
+  }
+}
+
+///|
+test "the same value gives the same result on every call" {
+  let v = validator("@pattern(\"^(a?){60}a{60}$\")\nstring Value")
+  let value = Json::string("a".repeat(60))
+  let first = codes(v.validate_json(value))
+  for i in 0..<12 {
+    assert_eq(codes(v.validate_json(value)), first, msg="call \{i}")
+  }
+}

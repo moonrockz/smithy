@@ -13,15 +13,15 @@
 // limitations under the License.
 //
 // Modified for moonrockz/smithy-validation: the context holds the work meter of
-// the running match.
+// the running match, `seen` is replaced instead of cleared, and the slot book
+// needs no dirty flag.
 
 ///|
 struct Context {
   mut next_expr_id : Int32
   mut book : SlotBook
-  mut book_dirty : Bool
-  /// Scratch set for `remove_duplicates`, cleared before each use.
-  seen : @hashset.HashSet[ExprId]
+  /// Scratch set for `remove_duplicates`, replaced before each use.
+  mut seen : @hashset.HashSet[ExprId]
   /// The work meter of the running match.
   mut meter : Meter
 }
@@ -33,7 +33,6 @@ pub fn Context::Context() -> Context {
   {
     next_expr_id: EXPR_ID_RESERVED + 1,
     book: SlotBook::empty(),
-    book_dirty: false,
     seen: HashSet([]),
     meter: Meter::unlimited(),
   }

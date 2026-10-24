@@ -11,6 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// Modified for moonrockz/smithy-validation: `mark_unused` clears one slot,
+// in place of `clear`, which cleared the whole book.
 
 ///|
 /// A bitmap-based allocator for tracking slot usage during automaton execution.
@@ -40,6 +43,13 @@ fn SlotBook::empty() -> SlotBook {
 }
 
 ///|
+fn SlotBook::mark_unused(self : SlotBook, slot : Slot) -> Unit {
+  let index = slot.index / 32
+  let bit = slot.index % 32
+  self.0[index] = self.0[index] & (1 << bit).lnot()
+}
+
+///|
 fn SlotBook::mark_used(self : SlotBook, slot : Slot) -> Unit {
   debug_assert(() => slot.is_assigned())
   let index = slot.index / 32
@@ -56,12 +66,6 @@ fn SlotBook::find_unused(self : SlotBook) -> Slot {
     }
   }
   Slot::from_index(self.0.length() * 32)
-}
-
-///|
-fn SlotBook::clear(self : SlotBook) -> Unit {
-  self.0.fill(0)
-  self.0[0] = 1 // Reserve index 0 as unassigned slot
 }
 
 ///|

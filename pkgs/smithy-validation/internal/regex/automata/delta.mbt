@@ -13,7 +13,8 @@
 // limitations under the License.
 //
 // Modified for moonrockz/smithy-validation: each expression node and thread
-// that a derivative visits spends one work unit from the meter.
+// that a derivative visits spends one work unit from the meter. The scratch
+// set and the slot book are reset in time proportional to what they hold.
 
 ///|
 /// Brzozowski derivative computation for the regex automaton.
@@ -192,9 +193,6 @@ fn delta_threads(
 /// in the descriptor, then finds an unused slot. If no unassigned marks
 /// exist in any thread, returns an unassigned slot (no tracking needed).
 fn find_slot(ctx~ : Context, desc : ThreadSet) -> Slot {
-  if ctx.book_dirty {
-    ctx.book.clear()
-  }
   let mut has_unassigned_slots = false
   desc.each_marks(marks => {
     if marks.has_unassigned {
@@ -206,19 +204,24 @@ fn find_slot(ctx~ : Context, desc : ThreadSet) -> Slot {
       }
     }
   })
-  // The loop above may have marked slots even when nothing needs one, so the
-  // book must be cleared before its next use either way.
-  ctx.book_dirty = true
-  if !has_unassigned_slots {
-    Slot::unassigned()
+  let slot = if has_unassigned_slots {
+    ctx.book.find_unused()
   } else {
-    let slot = ctx.book.find_unused()
-    if ctx.book.need_grow(slot) {
-      ctx.book = ctx.book.grow()
-      ctx.book_dirty = false
-    }
-    slot
+    Slot::unassigned()
   }
+  // Unmark what the loop above marked, so the next use finds the book clear
+  // without a pass over all of it.
+  desc.each_marks(marks => {
+    for used in marks.slots {
+      if used.is_assigned() {
+        ctx.book.mark_unused(used)
+      }
+    }
+  })
+  if ctx.book.need_grow(slot) {
+    ctx.book = ctx.book.grow()
+  }
+  slot
 }
 
 ///|
@@ -240,7 +243,8 @@ pub fn delta(
   let prev_cat = state.cat
   let rem = []
   delta_threads(state.desc, { prev_cat, next_cat, c, meter: ctx.meter, }, rem)
-  ctx.seen.clear()
+  // A new set costs what it holds; `clear` would cost its largest capacity.
+  ctx.seen = HashSet([])
   remove_duplicates(rem, e_eps, ctx.seen, ctx.meter)
   let desc = ThreadSet(rem)
   let slot = find_slot(ctx~, desc)

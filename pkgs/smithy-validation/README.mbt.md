@@ -104,25 +104,45 @@ The matcher is a copy of the lazy DFA of `@string.Regex` from moonbitlang/core, 
 in the copy count its work while it runs and charge the count to the call's work budget:
 
 - Each input UTF-16 unit costs one unit, and the end of the input costs one, charged before the
-  search starts. A step on a transition that the automaton already built is one table lookup.
-- A step that needs a new state computes a derivative. It costs one unit for each expression node
-  and each thread that the derivative visits, and five units for each thread that duplicate removal
-  visits: the visit, the slot scan, the slot assignment, the hash and the state-table comparison.
-- When the state tables grow, the growth costs 1.5 times the cells of the new tables, for the
-  allocation and the copy of the old cells.
+  search starts.
+- Building a transition computes a derivative. It costs one unit for each expression node and each
+  thread that the derivative visits, and five units for each thread that duplicate removal visits:
+  the visit, the slot scan, the slot assignment, the hash and the state-table comparison. It also
+  costs a share of table growth: 6 * (4 * symbols + 2) table cells, at 8 cells to the unit. Table
+  doubling allocates and copies at most that many cells for each state that it adds.
+- The automaton remembers each transition with what it cost to build. A search pays that cost the
+  first time it takes the transition, also when the automaton built it for an earlier value. Later
+  steps on the same transition in the same search cost only the step.
 
-These counts cover every loop of the matcher, so the charge is a bound on its work, not an
-estimate. A visit does constant work: the translated pattern captures only group 0, so a mark map
-holds at most two marks. The automaton keeps its states for the life of the prepared validator, so
-values of a known shape cost about one unit for each UTF-16 unit. When a search needs more units
-than the call has left, it stops at once, also in the middle of a derivative, keeps no partial
-state, and the call returns `LimitExceeded`.
+So the units of a search depend only on the pattern and the value, never on the values that the
+prepared validator saw before, and a value gives the same result on a new and on a used validator.
+The count is a bound on the work: each search pays at least what a search on a new automaton does.
+A visit does constant work: the translated pattern captures only group 0, so a mark map holds at
+most two marks. The scratch set and the slot book of a derivative are reset in time proportional to
+what they hold. When a search needs more units than the call has left, it stops at once, also in
+the middle of a derivative, keeps no partial state, and the call returns `LimitExceeded`.
 
-Measured on an Apple M5 Max, one unit takes about 20 ns on the native target and about 12 ns on
-wasm-gc. The Morphir FQName pattern costs 3,585 units the first time for a 97-unit name and 98
-units after that. The pattern `^(a?){150}a{150}$` needs 899,826 units for ten `a` characters,
-because each derivative visits the chain of optional items again. The default limit stops it after
-100,000 units, in about 2 ms.
+The automaton keeps at most 4,096 states, and at most about 2^18 table cells, between searches.
+Before a search, a full automaton forgets all its states. A search can add more states than that,
+but each one is charged to it. Over the life of the automaton, the growth shares pay for all table
+growth. One search that crosses a doubling does that copy at once; the cell bound keeps it below
+about 400,000 cells, under 1 ms on js and 0.03 ms native.
+
+Measured on an Apple M5 Max, one unit takes 12 to 20 ns; allocating or copying a table cell takes
+0.07 ns native, 0.4 ns wasm-gc and 2.4 ns js. The Morphir FQName pattern costs 2,295 units for a
+97-unit name, and 920 for `morphir/SDK:basics#int`. The pattern `^(a?){150}a{150}$` needs 899,611
+units for ten `a` characters, because each derivative visits the chain of optional items again. The
+default limit stops it after 100,000 units, in about 2 ms native and 1 ms wasm-gc and js.
+
+The copy adds a second regex engine to the builds, because `moonrockz/smithy` still uses
+`@string.Regex` for its model checks. Release builds, before and after the copy:
+
+| Build | Before | After | Change | Gzip change |
+|---|---|---|---|---|
+| CLI `smithy.wasm` (wasm) | 2,503,178 B | 2,586,211 B | +83,033 B (+3.3%) | +26,038 B (+2.9%) |
+| CLI `smithy-gc.wasm` (wasm-gc) | 2,082,278 B | 2,123,222 B | +40,944 B (+2.0%) | +18,720 B (+2.7%) |
+| Playground worker, `moon build` js | 5,337,424 B | 5,647,105 B | +309,681 B (+5.8%) | +30,483 B (+5.1%) |
+| Playground `worker.js`, bundled | 1,310,959 B | 1,386,063 B | +75,104 B (+5.7%) | +14,330 B (+4.3%) |
 
 ## Findings, adapters and limits
 

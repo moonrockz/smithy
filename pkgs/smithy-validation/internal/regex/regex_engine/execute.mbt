@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Modified for moonrockz/smithy-validation: a search may raise `Exhausted`,
-// and it spends one work unit for each step and one for the end of the input.
+// Modified for moonrockz/smithy-validation: a search may raise `Exhausted`.
+// It spends one work unit for each step and one for the end of the input, and
+// the first time it takes a transition, what that transition cost to build,
+// so that it spends the same units whatever the tables already hold.
 
 ///|
 /// NOTE: `derive(@debug.Debug)` is used here so this file doesn’t need a local `using @debug { ... }` import.
@@ -57,7 +59,16 @@ pub fn Regex::execute(
   last_index : Int32,
 ) -> MatchResult? raise @automata.Exhausted {
   guard last_index >= 0 && last_index <= input.length() else { panic() }
-  self.ctx.spend(input.length() - last_index + 1)
+  if self.search == 0x7fffffff {
+    // Stamps of old searches could repeat; start again from empty tables.
+    self.reset()
+    self.search = 0
+  }
+  self.search += 1
+  let search = self.search
+  // The steps, the end of the input, and the start state with its share of
+  // table growth.
+  self.ctx.spend(input.length() - last_index + 1 + self.growth_units())
   let symbol_table = self.symbol_table
   let prev_cat = category_from_symbol(
     profile=self.profile,
@@ -90,13 +101,20 @@ pub fn Regex::execute(
     let transition_index = base + symbol
     let mut next = transition_table.unsafe_get(transition_index)
     if next == -1 {
+      let before = self.ctx.left()
+      self.ctx.spend(self.growth_units())
       let next_id = self.stablize_next_state(StateId(base), symbol)
       transition_table = self.transition_table
       slot_table = self.slot_table
       next = next_id.0
       transition_table[transition_index] = next
       slot_table[transition_index] = self.get_state(next_id).slot().index
+      self.cost_table[transition_index] = before - self.ctx.left()
+      self.stamp_table[transition_index] = search
       buf = positions.ensure(self.max_slot)
+    } else if self.stamp_table.unsafe_get(transition_index) != search {
+      self.ctx.spend(self.cost_table.unsafe_get(transition_index))
+      self.stamp_table[transition_index] = search
     }
     // Every slot in `slot_table` is <= `max_slot` and `buf` covers it.
     // Slot::unassigned() is index 0, so writing it is harmless and keeps this

@@ -13,8 +13,8 @@
 // limitations under the License.
 //
 // Modified for moonrockz/smithy-validation: building a state may raise
-// `Exhausted`, and growing the tables spends work units for the cells that it
-// allocates and copies.
+// `Exhausted`, the tables grow with the cost and stamp tables, and a final
+// state records the work units it cost.
 
 ///|
 fn Regex::get_state(self : Regex, state_id : StateId) -> @automata.State {
@@ -27,10 +27,7 @@ fn Regex::state_index(self : Regex, state_id : StateId) -> Int32 {
 }
 
 ///|
-fn Regex::stablize_start_state(
-  self : Regex,
-  prev_cat : Category,
-) -> StateId raise @automata.Exhausted {
+fn Regex::stablize_start_state(self : Regex, prev_cat : Category) -> StateId {
   for start_state in self.start_states {
     let (cat, state_id) = start_state
     if cat == prev_cat {
@@ -45,19 +42,7 @@ fn Regex::stablize_start_state(
 }
 
 ///|
-fn Regex::stablize_state(
-  self : Regex,
-  state : @automata.State,
-) -> StateId raise @automata.Exhausted {
-  if self.state_table.get(state) is Some(state_id) {
-    return state_id
-  }
-  if self.num_states >= self.states.length() {
-    // Growing allocates the four tables at twice their size, 2 * (symbols + 1)
-    // cells for each state, and copies the old half.
-    let new_states_len = Int32::max(self.states.length() * 2, 4)
-    self.ctx.spend(3 * new_states_len * (self.num_symbols() + 1))
-  }
+fn Regex::stablize_state(self : Regex, state : @automata.State) -> StateId {
   self.state_table.get_or_init(state, () => {
     let index = self.num_states
     self.num_states += 1
@@ -78,6 +63,10 @@ fn Regex::stablize_state(
       )
       let new_slot_table = FixedArray::make(new_states_len * num_symbols, 0)
       self.slot_table.blit_to(new_slot_table, len=self.slot_table.length())
+      let new_cost_table = FixedArray::make(new_states_len * num_symbols, 0)
+      self.cost_table.blit_to(new_cost_table, len=self.cost_table.length())
+      let new_stamp_table = FixedArray::make(new_states_len * num_symbols, 0)
+      self.stamp_table.blit_to(new_stamp_table, len=self.stamp_table.length())
 
       let new_final_table = FixedArray::make(new_states_len, @list.List([]))
       self.final_table.blit_to(new_final_table, len=self.final_table.length())
@@ -85,6 +74,8 @@ fn Regex::stablize_state(
       self.states = new_states
       self.transition_table = new_transition_table
       self.slot_table = new_slot_table
+      self.cost_table = new_cost_table
+      self.stamp_table = new_stamp_table
       self.final_table = new_final_table
     }
     self.states[index] = state
@@ -123,6 +114,7 @@ fn Regex::stablize_final(
   for entry = self.final_table[state_index] {
     match entry {
       Empty => {
+        let before = self.ctx.left()
         let next_state = @automata.delta(
           ctx=self.ctx,
           state,
@@ -133,13 +125,15 @@ fn Regex::stablize_final(
         let status = next_state.status()
         self.max_slot = Int32::max(self.max_slot, slot.index)
         self.final_table[state_index] = @list.cons(
-          (next_cat, slot, status),
+          (next_cat, slot, status, before - self.ctx.left()),
           self.final_table[state_index],
         )
         break (slot, status)
       }
       More(head, tail~) =>
         if head.0 == next_cat {
+          // A search ends once, so it always pays what the final state cost.
+          self.ctx.spend(head.3)
           break (head.1, head.2)
         } else {
           continue tail

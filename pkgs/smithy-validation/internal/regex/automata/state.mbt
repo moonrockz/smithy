@@ -11,6 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// Modified for moonrockz/smithy-validation: syntax that `moon fmt` writes
+// (Int32 and UInt32 for Int and UInt, `..<=` for `..=`, `~` for optional
+// arguments with a default). No behavior change.
 
 ///|
 /// A state in the regex automaton representing the current execution status.

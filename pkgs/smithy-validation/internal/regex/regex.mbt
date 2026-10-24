@@ -29,13 +29,22 @@ pub impl @debug.Debug for Regex with fn to_repr(self) {
 }
 
 ///|
+/// Raised when a pattern has a capturing group.
+pub suberror CapturingGroup
+
+///|
 /// Compile `pattern` as `@string.Regex(pattern)` does, then lower it to UTF-16.
+/// A capturing group raises `CapturingGroup`: the work of one visit is constant
+/// only when the automaton tracks no group but the whole match.
 pub fn Regex::compile(pattern : StringView) -> Regex raise {
   let pat = @regex_parser.parse(
     profile=re_profile_unicode,
     pattern,
     mode=String,
   )
+  if has_capture(pat) {
+    raise CapturingGroup
+  }
   {
     source: pattern.to_owned(),
     re: @re.compile(profile=re_profile_utf16, re_lower_to_utf16(pat)),
@@ -52,4 +61,15 @@ pub fn Regex::matches(
   work~ : Int32,
 ) -> (Bool, Int32)? {
   self.re.matches(input, work~)
+}
+
+///|
+/// Whether `pattern` has a capturing group. The parser bounds the nesting.
+fn has_capture(pattern : @re.Pattern) -> Bool {
+  match pattern.desc {
+    Capture(_, ..) => true
+    Char(_) | Assertion(_) => false
+    Sequence(items) | Alternation(items) => items.iter().any(has_capture)
+    Quantifier(_, item) | Preference(_, item) => has_capture(item)
+  }
 }
