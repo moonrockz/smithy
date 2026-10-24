@@ -34,9 +34,10 @@ fn output_plan(
   has_output : Bool,
   events : Array[@model.EventKey],
   output_contains : Array[String],
+  blocked~ : String? = None,
 ) -> Result[Bool, String] {
-  let blocked = events.any(e => e.severity.blocks_output())
-  let runs = has_output && !blocked
+  let model_errors = events.any(e => e.severity.blocks_output())
+  let runs = has_output && !model_errors && blocked is None
   if output_contains.length() > 0 && !runs {
     Err(
       if has_output {
@@ -48,6 +49,65 @@ fn output_plan(
   } else {
     Ok(runs)
   }
+}
+
+///|
+/// The answer to a case that expects a blocked output must be a block for a
+/// reason other than model errors, and the reason must have the text.
+fn check_blocked(
+  where_ : String,
+  text : String,
+  response : @core.Response,
+) -> Unit raise {
+  match response {
+    Blocked(reason~, kind=Other, ..) =>
+      if !reason.contains(text) {
+        fail(where_ + ": the block reason has no \"" + text + "\": " + reason)
+      }
+    Blocked(reason~, ..) =>
+      fail(where_ + ": the output is blocked by model errors: " + reason)
+    _ => fail(where_ + ": I expected a blocked output, but the output ran")
+  }
+}
+
+///|
+fn raises(f : () -> Unit raise) -> Bool {
+  try f() catch {
+    _ => true
+  } noraise {
+    _ => false
+  }
+}
+
+///|
+test "a blocked case does not run the output" {
+  assert_eq(output_plan(true, [], [], blocked=Some("x")), Ok(false))
+  assert_eq(output_plan(true, [], []), Ok(true))
+  assert_true(output_plan(true, [], ["y"], blocked=Some("x")) is Err(_))
+}
+
+///|
+test "check_blocked accepts only a matching Other block" {
+  let other = @core.Response::Blocked(
+    seq=1,
+    reason="I found no service",
+    kind=Other,
+  )
+  check_blocked("w", "no service", other)
+  assert_true(raises(() => check_blocked("w", "another", other)))
+  let errors = @core.Response::Blocked(
+    seq=1,
+    reason="no service",
+    kind=ModelErrors,
+  )
+  assert_true(raises(() => check_blocked("w", "no service", errors)))
+  let ran = @core.Response::Transformed(
+    seq=1,
+    files=[],
+    warnings=[],
+    service=None,
+  )
+  assert_true(raises(() => check_blocked("w", "x", ran)))
 }
 
 ///|
@@ -109,34 +169,21 @@ test "every lesson case gives the findings and the output that its expect.json n
           lesson.output is Some(_),
           expected,
           case.expect.output_contains,
+          blocked=case.expect.blocked,
         ) {
         Ok(runs) => runs
         Err(reason) => fail(where_ + ": output_contains cannot run: " + reason)
       }
       match (case.expect.blocked, lesson.output) {
         (Some(text), Some(output)) =>
-          match
+          check_blocked(
+            where_,
+            text,
             @core.handle(
               session,
               TransformFiles(seq=3, files~, output~, selector=lesson.selector),
-            ) {
-            Blocked(reason~, kind=Other, ..) =>
-              if !reason.contains(text) {
-                fail(
-                  where_ +
-                  ": the block reason has no \"" +
-                  text +
-                  "\": " +
-                  reason,
-                )
-              }
-            Blocked(reason~, ..) =>
-              fail(
-                where_ + ": the output is blocked by model errors: " + reason,
-              )
-            _ =>
-              fail(where_ + ": I expected a blocked output, but the output ran")
-          }
+            ),
+          )
         _ => ()
       }
       match lesson.output {
