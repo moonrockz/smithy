@@ -253,7 +253,9 @@ protocol test parameters. A value that fails a condition gives `TraitValue.<Name
 Smithy reference. The event is an ERROR, or a WARNING for an example with `allowConstraintErrors`. A failed
 trait value prevents assembly, as every other `TraitValue` error does; for the other values the model still
 assembles. A result that is not boolean, or an evaluation error, also fails the condition, and the message
-says why; the Smithy reference stops the validation in these two cases.
+says why; the Smithy reference stops the validation in these two cases. Protocol test parameters need
+`smithy validate --protocol-tests`, which loads the `smithy.test` traits; without it the protocol test traits
+do not resolve, and that is an error.
 Conversion preserves expressions and documentation without evaluating contracts.
 `smithy validate value` does not evaluate conditions; it reports `UnsupportedConstraint`.
 

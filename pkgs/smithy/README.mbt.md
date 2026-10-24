@@ -245,7 +245,9 @@ protocol test IDs. The severity is ERROR, or WARNING for an example with
 `TraitValue` error does; the other values give validation events, and the
 model still assembles. A result that is not boolean and an evaluation error
 also fail the condition, and the message says why; the Smithy reference stops
-the validation in these two cases. Serialization does not evaluate contracts,
+the validation in these two cases. Protocol test parameters need the
+protocol test traits, `Loader::new(protocol_tests=true)`; without them the
+protocol test traits do not resolve, and that is an error. Serialization does not evaluate contracts,
 and value validation in
 [`moonrockz/smithy-validation`](../smithy-validation/README.mbt.md) reports
 `UnsupportedConstraint` for a condition.
