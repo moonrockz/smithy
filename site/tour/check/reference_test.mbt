@@ -27,6 +27,27 @@ let prelude_sha_path : String = "../pkgs/smithy/PRELUDE_SHA"
 let smithy_rpc_path : String = "tour/smithy-rpc-traits.smithy"
 
 ///|
+/// The name of the smithy.rpc definitions in the digest of a case that uses
+/// them. A lesson file name ends in `.smithy`, so no case file has this name.
+let smithy_rpc_source : String = "<smithy-rpc-traits>"
+
+///|
+/// The digest of the reference result of a case: `@model.digest` of the case
+/// files and, when a file names `smithy.rpc#`, of the definitions as the file
+/// `smithy_rpc_source`. A change of the definitions then makes the result
+/// stale, as `scripts/reference-tour.mbtx` computes it.
+fn reference_digest(
+  files : Array[@model.LessonFile],
+  definitions : String,
+) -> String {
+  if files.any(f => f.text.contains("smithy.rpc#")) {
+    @model.digest(files + [{ name: smithy_rpc_source, text: definitions, }])
+  } else {
+    @model.digest(files)
+  }
+}
+
+///|
 /// The line that a lesson with a known difference must contain.
 let difference_note : String = "> **Reference difference:**"
 
@@ -615,6 +636,7 @@ fn compare_all(
 ///|
 test "every lesson case has a fresh reference result" {
   let (tour, reference, _) = inputs()
+  let definitions = read_text(smithy_rpc_path)
   let known : Array[@model.CaseId] = []
   for lesson in tour.lessons {
     for case in lesson.cases {
@@ -624,7 +646,7 @@ test "every lesson case has a fresh reference result" {
       check_fresh(
         case_id.to_string(),
         entry,
-        @model.digest(lesson.case_files(case)),
+        reference_digest(lesson.case_files(case), definitions),
         lesson.output,
       )
     }
@@ -726,6 +748,23 @@ test "the reference results use the commit of the vendored prelude" {
 ///|
 test "the reference loads the smithy.rpc definitions that the core loads" {
   assert_eq(read_text(smithy_rpc_path), @rpc.trait_definitions())
+}
+
+///|
+test "the digest of a smithy.rpc case changes when the definitions change" {
+  let rpc : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: "use smithy.rpc#jsonRpc", },
+  ]
+  let plain : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: "namespace example", },
+  ]
+  assert_true(reference_digest(rpc, "a") != reference_digest(rpc, "b"))
+  assert_eq(
+    reference_digest(rpc, "a"),
+    @model.digest(rpc + [{ name: smithy_rpc_source, text: "a", }]),
+  )
+  assert_eq(reference_digest(plain, "a"), @model.digest(plain))
+  assert_eq(reference_digest(plain, "b"), @model.digest(plain))
 }
 
 ///|

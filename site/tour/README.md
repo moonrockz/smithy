@@ -102,8 +102,9 @@ the commit of the vendored prelude and of the other reference scripts.
 The playground core always loads the smithy.rpc trait definitions. The harness loads them only for a case whose
 files contain `smithy.rpc#`, so that the JSON Schema of the other cases has no smithy.rpc shapes. It reads them
 from `site/tour/smithy-rpc-traits.smithy`. A test of `reference_test.mbt` requires that file to be the text of
-`@rpc.trait_definitions()`; when the definitions change, copy the new text into the file. The digest covers the
-case files only.
+`@rpc.trait_definitions()`; when the definitions change, copy the new text into the file. The digest of such a
+case also covers the definitions, as the file `<smithy-rpc-traits>`, so a change of the definitions makes its
+reference result stale. The digest of another case covers the case files only.
 
 ## The allow list
 

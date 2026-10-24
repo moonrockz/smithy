@@ -36,8 +36,10 @@ let smithy_rpc_path : String = "site/tour/smithy-rpc-traits.smithy"
 ///|
 /// Reads the cases (`[{"id", "json_schema", "http_protocols", "smithy_rpc", "files": [{"name", "text"}], "openapi"?}]`)
 /// from args[0] and writes the results to args[1], with args[2] as the reference SHA. A case with `smithy_rpc` also
-/// loads the smithy.rpc trait definitions from args[3]. The digest is SHA-256 over the case files sorted by name of
-/// name + NUL + text + NUL, in UTF-8.
+/// loads the smithy.rpc trait definitions from args[3]. The digest is SHA-256 over the files sorted by name of
+/// name + NUL + text + NUL, in UTF-8: the case files and, for a `smithy_rpc` case, the definitions as the file
+/// `<smithy-rpc-traits>` (`reference_digest` in site/tour/check/reference_test.mbt), so that a change of the
+/// definitions makes the result stale.
 let harness : String =
   #|import java.nio.charset.StandardCharsets;
   #|import java.nio.file.*;
@@ -63,6 +65,10 @@ let harness : String =
   #|      ObjectNode test = node.expectObjectNode();
   #|      String id = test.expectStringMember("id").getValue();
   #|      List<ObjectNode> files = new ArrayList<>(test.expectArrayMember("files").getElementsAs(ObjectNode.class));
+  #|      if (test.expectBooleanMember("smithy_rpc").getValue()) {
+  #|        files.add(Node.objectNodeBuilder().withMember("name", "<smithy-rpc-traits>")
+  #|            .withMember("text", Files.readString(Path.of(args[3]))).build());
+  #|      }
   #|      files.sort(Comparator.comparing(file -> file.expectStringMember("name").getValue()));
   #|      MessageDigest sha = MessageDigest.getInstance("SHA-256");
   #|      ModelAssembler assembler = test.expectBooleanMember("http_protocols").getValue()
@@ -72,10 +78,8 @@ let harness : String =
   #|        String name = file.expectStringMember("name").getValue();
   #|        String text = file.expectStringMember("text").getValue();
   #|        sha.update((name + '\0' + text + '\0').getBytes(StandardCharsets.UTF_8));
-  #|        assembler.addUnparsedModel(name, text);
-  #|      }
-  #|      if (test.expectBooleanMember("smithy_rpc").getValue()) {
-  #|        assembler.addUnparsedModel("smithy-rpc-traits.smithy", Files.readString(Path.of(args[3])));
+  #|        // A lesson file name ends in .smithy; the definitions load as IDL under such a name.
+  #|        assembler.addUnparsedModel(name.equals("<smithy-rpc-traits>") ? "smithy-rpc-traits.smithy" : name, text);
   #|      }
   #|      ValidatedResult<Model> result = assembler.assemble();
   #|      List<String> events = new ArrayList<>();
