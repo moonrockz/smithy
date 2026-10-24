@@ -1,8 +1,8 @@
 /// A standalone consumer of an ordinary MoonBit module source tree or ZIP.
 /// Run after the module's normal release, or through test-resource-consumer.mbtx locally.
 import {
-  "moonrockz/artifact-resources@0.5.0" @resources,
-  "moonrockz/artifact-resources@0.5.0/local" @local_resources,
+  "moonrockz/artifact-resources@0.6.0" @resources,
+  "moonrockz/artifact-resources@0.6.0/local" @local_resources,
   "moonbitlang/core/env",
   "moonbitlang/x@0.5.5/sys",
 }

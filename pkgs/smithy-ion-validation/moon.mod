@@ -1,6 +1,6 @@
 name = "moonrockz/smithy-ion-validation"
 
-version = "0.5.0"
+version = "0.6.0"
 
 description = "Direct immutable Ion value validation against Smithy shapes"
 
@@ -13,7 +13,7 @@ readme = "README.mbt.md"
 warnings = "-implicit_impl_as_method"
 
 import {
-  "moonrockz/smithy@0.5.0",
-  "moonrockz/smithy-validation@0.5.0",
+  "moonrockz/smithy@0.6.0",
+  "moonrockz/smithy-validation@0.6.0",
   "moonrockz/ion@0.6.0",
 }
