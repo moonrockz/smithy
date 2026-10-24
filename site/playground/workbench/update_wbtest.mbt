@@ -58,6 +58,7 @@ test "start: the playground checks the selected sample at once" {
   assert_eq(effects, [
     SendValidate(seq=1),
     Wait(ms=timeout_ms, then=TimedOut(seq=1)),
+    Wait(ms=TICK_MS, then=Ticked(seq=1)),
   ])
 }
 
@@ -88,6 +89,7 @@ test "edit: only the wait of the last change sends a request" {
   assert_eq(effects, [
     SendValidate(seq=2),
     Wait(ms=timeout_ms, then=TimedOut(seq=2)),
+    Wait(ms=TICK_MS, then=Ticked(seq=2)),
   ])
 }
 
@@ -195,6 +197,7 @@ test "timeout: the next change checks again with the new Worker" {
   assert_eq(effects, [
     SendValidate(seq=2),
     Wait(ms=timeout_ms, then=TimedOut(seq=2)),
+    Wait(ms=TICK_MS, then=Ticked(seq=2)),
   ])
 }
 
@@ -313,6 +316,7 @@ test "queue: the answer then posts the newest text once" {
   assert_eq(effects, [
     SendValidate(seq=2),
     Wait(ms=timeout_ms, then=TimedOut(seq=2)),
+    Wait(ms=TICK_MS, then=Ticked(seq=2)),
   ])
   let (m, effects) = update(
     m,
@@ -337,6 +341,7 @@ test "queue: an answer before the wait of a change ends lets the wait send" {
   assert_eq(effects, [
     SendValidate(seq=2),
     Wait(ms=timeout_ms, then=TimedOut(seq=2)),
+    Wait(ms=TICK_MS, then=Ticked(seq=2)),
   ])
 }
 
@@ -354,6 +359,7 @@ test "queue: a timeout with a pending change posts the newest text to the new Wo
     Mark([]),
     SendValidate(seq=2),
     Wait(ms=timeout_ms, then=TimedOut(seq=2)),
+    Wait(ms=TICK_MS, then=Ticked(seq=2)),
   ])
 }
 
@@ -381,6 +387,7 @@ test "failure: a Worker error with a pending change posts the newest text" {
     Mark([]),
     SendValidate(seq=2),
     Wait(ms=timeout_ms, then=TimedOut(seq=2)),
+    Wait(ms=TICK_MS, then=Ticked(seq=2)),
   ])
 }
 
@@ -421,6 +428,7 @@ test "transform: Run sends the output and, for a selector, the selector" {
   assert_eq(effects, [
     SendTransform(seq=2, output=JsonAst, selector=None),
     Wait(ms=timeout_ms, then=TimedOut(seq=2)),
+    Wait(ms=TICK_MS, then=Ticked(seq=2)),
   ])
   let m = answered()
   let (m, _) = run(m, [OutputChosen(Selector), SelectorEdited("string")])
@@ -515,7 +523,7 @@ test "queue: Run while a check runs waits, and goes before the pending check" {
     Answered(seq=1, answer=Validated(items=[], shapes=1, protocols=[])),
   )
   // The answer is for older text, so it does not show.
-  assert_eq(effects.length(), 2)
+  assert_eq(effects.length(), 3)
   assert_eq(effects[0], SendTransform(seq=2, output=JsonAst, selector=None))
   assert_false(m.run_pending)
   assert_true(m.pending)
@@ -529,6 +537,7 @@ test "queue: Run while a check runs waits, and goes before the pending check" {
     ShowFile(seq=2, index=0),
     SendValidate(seq=3),
     Wait(ms=timeout_ms, then=TimedOut(seq=3)),
+    Wait(ms=TICK_MS, then=Ticked(seq=3)),
   ])
   assert_eq(m.inflight, Validating)
   assert_false(m.pending)
@@ -572,7 +581,7 @@ test "queue: a transform that times out restarts the Worker and keeps the check"
   assert_eq(m.check, check)
   assert_false(m.waiting)
   // Run again works at once.
-  assert_eq(update(m, RunClicked).1.length(), 2)
+  assert_eq(update(m, RunClicked).1.length(), 3)
 }
 
 ///|
@@ -731,4 +740,45 @@ test "stale status: a stopped check with no change is not marked as checking" {
   let (m, _) = update(m, TimedOut(seq=1))
   assert_eq(m.check, Stopped)
   assert_false(m.checking())
+}
+
+///|
+test "elapsed: each second of the request that runs counts, and a new request starts at zero" {
+  let (m, _) = Model::start(data())
+  assert_eq(m.elapsed, 0)
+  let (m, effects) = update(m, Ticked(seq=1))
+  assert_eq(m.elapsed, 1)
+  assert_eq(effects, [Wait(ms=TICK_MS, then=Ticked(seq=1))])
+  let m = update(m, Ticked(seq=1)).0
+  assert_eq(m.elapsed, 2)
+  // A tick of an older request changes nothing.
+  let (same, effects) = update(m, Ticked(seq=0))
+  assert_eq(same, m)
+  assert_eq(effects, [])
+  // After the answer, the ticks stop.
+  let m = update(
+      m,
+      Answered(seq=1, answer=Validated(items=[], shapes=1, protocols=[])),
+    ).0
+  let (same, effects) = update(m, Ticked(seq=1))
+  assert_eq(same, m)
+  assert_eq(effects, [])
+  // The next request counts from zero.
+  let (m, _) = run(m, [Edited, Debounced(edits=1)])
+  assert_true(m.waiting)
+  assert_eq(m.elapsed, 0)
+}
+
+///|
+test "group: the playground groups repeats by default, and the button turns it off and on and keeps the choice" {
+  let m = answered()
+  assert_true(m.grouped)
+  let (m, effects) = update(m, GroupToggled)
+  assert_false(m.grouped)
+  assert_eq(effects, [StoreGrouped(false)])
+  let (m, effects) = update(m, GroupToggled)
+  assert_true(m.grouped)
+  assert_eq(effects, [StoreGrouped(true)])
+  // The choice that the browser kept wins over the default.
+  assert_false(answered().with_grouped(false).grouped)
 }

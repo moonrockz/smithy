@@ -57,3 +57,19 @@ test "picker: every output has its own key and label" {
     "OpenAPI 3.1.0", "OpenRPC 1.3.2",
   ])
 }
+
+///|
+test "elapsed: the status bar shows the seconds from 1 s, and the limit from 5 s" {
+  assert_eq(elapsed_text(0), "")
+  assert_eq(elapsed_text(1), " · 1 s")
+  assert_eq(elapsed_text(4), " · 4 s")
+  assert_eq(elapsed_text(5), " · 5 s of 10 s")
+  assert_eq(elapsed_text(9), " · 9 s of 10 s")
+}
+
+///|
+test "busy: each kind of request names what the Worker does" {
+  assert_eq(busy_label(Validating), "checking")
+  assert_eq(busy_label(Transforming), "running the transform")
+  assert_eq(busy_label(Transcribing), "checking the transcript")
+}

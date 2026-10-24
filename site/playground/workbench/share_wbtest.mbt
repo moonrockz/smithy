@@ -24,7 +24,7 @@ fn opened(state : @samples.ShareState) -> Model {
 ///|
 test "share: the page opens with the state of a link" {
   let (m, effects) = Model::start_with(tr_data(), Shared(shared_state()))
-  assert_eq(effects.length(), 2)
+  assert_eq(effects.length(), 3)
   assert_eq(m.tab, TranscriptTab)
   assert_eq(m.output, Selector)
   assert_eq(m.selector, "structure")

@@ -357,8 +357,13 @@ fn Runtime::run(self : Runtime, effect : @workbench.Effect) -> Unit {
       editor_load(@workbench.EDITOR_ID, text)
     }
     Mark(items) => editor_mark(@workbench.EDITOR_ID, mark_json(items))
+    // A click that ends a text selection in the list does not move the cursor.
     MoveCursor(line~, column~) =>
-      editor_go_to(@workbench.EDITOR_ID, line, column)
+      if !has_selection() {
+        editor_go_to(@workbench.EDITOR_ID, line, column)
+      }
+    StoreGrouped(on) => store_grouped(on)
+    StoreFolded(folded) => store_folded(folded.render())
     SendTranscriptStart(seq~, settings~) =>
       self.post(
         TranscriptStart(
@@ -425,6 +430,9 @@ fn app(
   let (model, emit) = @rabbita.create_state_with_init(
     init=emit => {
       let (m, effects) = @workbench.Model::start_with(data, opened)
+      let m = m
+        .with_grouped(read_grouped())
+        .with_folded(@workbench.Folded::parse(read_folded()))
       let start = @cmd.custom_cmd(scheduler => {
         runtime.dispatch = msg => scheduler.add((emit.0)(msg))
         editor_create(

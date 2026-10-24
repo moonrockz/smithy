@@ -244,6 +244,8 @@ pub(all) struct Model {
   check_edits : Int32
   /// True while the newest request has no answer.
   waiting : Bool
+  /// The whole seconds that the newest request has run, while it runs.
+  elapsed : Int32
   /// The kind of the newest request.
   inflight : Kind
   /// True when the text changed and its wait ended while a request ran.
@@ -291,6 +293,10 @@ pub(all) struct Model {
   /// True when the Worker could not read the newest request: the page and
   /// the Worker script come from different builds. A reload fixes it.
   mismatch : Bool
+  /// True when the Validate list shows the repeats of a diagnostic in one row.
+  grouped : Bool
+  /// The tabs whose controls are folded away.
+  folded : Folded
 } derive(Eq, Debug)
 
 ///|
@@ -309,6 +315,8 @@ pub(all) enum Msg {
   Answered(seq~ : Int32, answer~ : Answer)
   /// The time for the request with this number ended.
   TimedOut(seq~ : Int32)
+  /// One more second of the request with this number passed.
+  Ticked(seq~ : Int32)
   /// The Worker stopped with an error; the text is the message of the browser.
   WorkerFailed(String)
   /// The Worker could not read a request, or the page could not read its
@@ -354,6 +362,10 @@ pub(all) enum Msg {
   ResetClicked
   /// An entry of the list: its place in the transcript text.
   EntryChosen(line~ : Int32, column~ : Int32)
+  /// The "Group repeats" button of the Validate tab.
+  GroupToggled
+  /// The fold button of the controls of a tab.
+  FoldToggled(@samples.Tab)
 } derive(Eq, Debug)
 
 ///|
@@ -417,6 +429,10 @@ pub(all) enum Effect {
   FollowTranscript(line~ : Int32)
   /// Move the cursor of the transcript editor to a place and focus it.
   GoToTranscript(line~ : Int32, column~ : Int32)
+  /// Keep the choice of "Group repeats" in the browser for the next visit.
+  StoreGrouped(Bool)
+  /// Keep the folds of the tabs in the browser for the next visit.
+  StoreFolded(Folded)
 } derive(Eq, Debug)
 
 ///|
@@ -432,6 +448,10 @@ pub const DEBOUNCE_MS : Int32 = 250
 ///|
 /// The time that the Worker has for one request, in milliseconds.
 pub let timeout_ms : Int32 = 10000
+
+///|
+/// The time between two `Ticked` messages of a request, in milliseconds.
+pub const TICK_MS : Int32 = 1000
 
 ///|
 /// The selector that the Selector output starts with.
@@ -502,6 +522,7 @@ pub fn Model::start_with(
     sent_edits: 0,
     check_edits: 0,
     waiting: false,
+    elapsed: 0,
     inflight: Validating,
     pending: false,
     run_pending: false,
@@ -531,8 +552,16 @@ pub fn Model::start_with(
     },
     incoming: None,
     mismatch: false,
+    grouped: true,
+    folded: no_fold,
   }
   m.send_validate()
+}
+
+///|
+/// The model with the choice of "Group repeats" that the browser kept.
+pub fn Model::with_grouped(self : Model, grouped : Bool) -> Model {
+  { ..self, grouped, }
 }
 
 ///|
@@ -553,10 +582,15 @@ fn Model::send_validate(self : Model) -> (Model, Array[Effect]) {
       seq,
       sent_edits: self.edits,
       waiting: true,
+      elapsed: 0,
       inflight: Validating,
       pending: false,
     },
-    [SendValidate(seq~), Wait(ms=timeout_ms, then=TimedOut(seq~))],
+    [
+      SendValidate(seq~),
+      Wait(ms=timeout_ms, then=TimedOut(seq~)),
+      Wait(ms=TICK_MS, then=Ticked(seq~)),
+    ],
   )
 }
 
@@ -576,6 +610,7 @@ fn Model::send_transform(self : Model) -> (Model, Array[Effect]) {
       tx_output: self.output,
       tx_selector: self.selector,
       waiting: true,
+      elapsed: 0,
       inflight: Transforming,
       run_pending: false,
       tx: TxRunning,
@@ -584,6 +619,7 @@ fn Model::send_transform(self : Model) -> (Model, Array[Effect]) {
     [
       SendTransform(seq~, output=self.output, selector~),
       Wait(ms=timeout_ms, then=TimedOut(seq~)),
+      Wait(ms=TICK_MS, then=Ticked(seq~)),
     ],
   )
 }
@@ -745,6 +781,14 @@ fn Model::reopen(
 
 ///|
 pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
+  let (next, effects) = update_state(m, msg)
+  (next.open_for_notices(m), effects)
+}
+
+///|
+/// The model and the effects after a message, before folded controls with a
+/// notice open again.
+fn update_state(m : Model, msg : Msg) -> (Model, Array[Effect]) {
   match msg {
     Edited => {
       let edits = m.edits + 1
@@ -810,6 +854,11 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         // An answer of the other kind cannot come; the request ends.
         _ => m.next([])
       }
+    }
+    // The seconds of the request that runs, so the page shows that it works.
+    Ticked(seq~) => {
+      guard seq == m.seq && m.waiting else { return (m, []) }
+      ({ ..m, elapsed: m.elapsed + 1, }, [Wait(ms=TICK_MS, then=Ticked(seq~))])
     }
     TimedOut(seq~) => {
       guard seq == m.seq && m.waiting else { return (m, []) }
@@ -879,6 +928,14 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         None => (m, [])
       }
     TabChosen(tab) => ({ ..m, tab, }, [])
+    FoldToggled(tab) => {
+      let folded = m.folded.toggle(tab)
+      ({ ..m, folded, }, [StoreFolded(folded)])
+    }
+    GroupToggled => {
+      let grouped = !m.grouped
+      ({ ..m, grouped, }, [StoreGrouped(grouped)])
+    }
     CursorMoved(line~, column~) => ({ ..m, line, column, }, [])
     // A row of an older result names a place in older text.
     DiagnosticChosen(line~, column~) =>

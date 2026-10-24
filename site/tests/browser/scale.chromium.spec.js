@@ -47,8 +47,29 @@ test("a 1 MB model gives its diagnostics in the Validate tab inside the Worker l
   const elapsed = Date.now() - started;
   await settled(page);
   await expect(page.locator(".pg-notice")).toHaveCount(0);
-  // The list shows the first 200 diagnostics and counts the others. The status bar does not count NOTE
+  // Repeats are grouped by default: the Marked.NoBlob warnings all name the one Payload blob, so they
+  // are one row of the first 200. The list counts the diagnostics that are not in it.
+  const rows = total - events.noBlob + 1;
+  await expect(page.locator("#pg-group")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".pg-listbar")).toContainText(`${total} diagnostics in ${rows} rows`);
+  await expect(page.locator(".pg-diag")).toHaveCount(200);
+  const group = page.locator(".pg-diag", { has: page.locator(".pg-repeat") });
+  await expect(group).toHaveCount(1);
+  await expect(group.locator(".pg-repeat")).toHaveText(`×${events.noBlob}`);
+  await expect(group.locator(".pg-code")).toHaveText("Marked.NoBlob");
+  await group.locator(".pg-repeats summary").click();
+  // The open group lists 200 of the other messages, and counts the rest.
+  await expect(group.locator(".pg-repeat-list li")).toHaveCount(201);
+  await expect(group.locator(".pg-repeat-list li").last()).toHaveText(`${events.noBlob - 1 - 200} more messages`);
+  await expect(page.locator(".pg-validate")).toContainText(
+    `${total - 199 - events.noBlob} more diagnostics are not in the list. The editor marks all of them.`,
+  );
+  // Without grouping, the list shows the first 200 diagnostics. The status bar does not count NOTE
   // events, so the total proves the Documented NOTE of each unit.
+  await page.locator("#pg-group").click();
+  await expect(page.locator("#pg-group")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".pg-listbar")).toHaveText(`${total} diagnosticsGroup repeats`);
+  await expect(page.locator(".pg-repeat")).toHaveCount(0);
   await expect(page.locator(".pg-diag")).toHaveCount(200);
   await expect(page.locator(".pg-validate")).toContainText(
     `${total - 200} more diagnostics are not in the list. The editor marks all of them.`,
@@ -76,7 +97,11 @@ test("the JSON AST of a 1 MB model has several MB and shows with Copy and Downlo
   await page.selectOption("#pg-output-kind", "json-ast");
   const started = Date.now();
   await page.getByRole("button", { name: "Run", exact: true }).click();
+  // While the transform runs, the tab and the status bar show a turning ring.
+  await expect(page.locator(".pg-transform .pg-spinner")).toBeVisible();
+  await expect(page.locator(".pg-status .pg-busy")).toContainText("running the transform");
   await expect(page.locator("#pg-copy")).toBeEnabled({ timeout: outputTimeout });
+  await expect(page.locator(".pg-spinner")).toHaveCount(0);
   const elapsed = Date.now() - started;
   await expect(page.locator("#pg-download-output")).toBeEnabled();
   await expect(page.locator(".pg-notices .pg-notice")).toHaveCount(0);

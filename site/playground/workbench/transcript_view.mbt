@@ -64,6 +64,40 @@ fn example_button(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
 }
 
 ///|
+/// The Step and Run all buttons of the Transcript tab. The controls have them,
+/// and the tab row has them too while the controls are folded; `suffix` keeps
+/// their `id`s apart.
+fn step_buttons(
+  m : Model,
+  emit : @rabbita.Emit[Msg],
+  suffix : String,
+) -> Array[Html] {
+  let running = m.tr_running()
+  let ready = !m.protocols.is_empty()
+  let done = m.tr_current() && m.tr is TrChecked({ done: true, .. })
+  [
+    @html.button(
+      id="pg-step" + suffix,
+      class="pg-btn",
+      disabled=!ready || running || done,
+      on_click=emit(StepClicked),
+      "▶ Step",
+    ),
+    @html.button(
+      id="pg-runall" + suffix,
+      class="pg-btn pg-btn-primary",
+      disabled=!ready || running || done,
+      on_click=emit(RunAllClicked),
+      if running {
+        "Running"
+      } else {
+        "⏭ Run all"
+      },
+    ),
+  ]
+}
+
+///|
 fn transcript_controls(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   let samples = m.data.transcripts.mapi((i, sample) => {
     @html.option(value=i.to_string(), selected=i == m.transcript, sample.title)
@@ -84,76 +118,61 @@ fn transcript_controls(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   })
   let running = m.tr_running()
   let ready = !m.protocols.is_empty()
-  let done = m.tr_current() && m.tr is TrChecked({ done: true, .. })
-  @html.div(class="pg-rowctl", [
-    @html.label(class="pg-hint", for_="pg-transcript-sample", "Transcript"),
-    @html.select(
-      id="pg-transcript-sample",
-      class="pg-select",
-      on_change=emit.map(value => {
-        TranscriptSampleChosen(@string.parse_int(value) catch { _ => -1 })
-      }),
-      samples,
-    ),
-    @html.label(class="pg-hint", for_="pg-protocol", "Protocol"),
-    @html.select(
-      id="pg-protocol",
-      class="pg-select",
-      disabled=!ready,
-      on_change=emit.map(value => ProtocolChosen(value)),
-      protocols,
-    ),
-    @html.select(
-      id="pg-format",
-      class="pg-select",
-      attrs=@html.Attrs::build().aria_label("Format"),
-      on_change=emit.map(key => {
-        FormatChosen(format_of_key(key).unwrap_or(m.settings.format))
-      }),
-      format_options,
-    ),
-    @html.label(
-      class="pg-hint pg-checkbox",
-      title="Check the transcript as complete, as --complete does: a call without a reply is an error. When clear, the document decides.",
-      [
-        @html.input(
-          id="pg-complete",
-          input_type=Checkbox,
-          checked=m.settings.complete,
-          on_change=emit.map(_ => CompleteChosen(!m.settings.complete)),
-        ),
-        @html.text(" complete"),
-      ],
-    ),
-    @html.span(class="pg-spacer", ([] : Array[Html])),
-    @html.button(
-      id="pg-step",
-      class="pg-btn",
-      disabled=!ready || running || done,
-      on_click=emit(StepClicked),
-      "▶ Step",
-    ),
-    @html.button(
-      id="pg-runall",
-      class="pg-btn pg-btn-primary",
-      disabled=!ready || running || done,
-      on_click=emit(RunAllClicked),
-      if running {
-        "Running"
-      } else {
-        "⏭ Run all"
-      },
-    ),
-    @html.button(
-      id="pg-reset",
-      class="pg-btn",
-      title="Reset",
-      attrs=@html.Attrs::build().aria_label("Reset"),
-      disabled=m.tr == TrIdle && !running,
-      on_click=emit(ResetClicked),
-      "↺",
-    ),
-  ])
+  @html.div(
+    class="pg-rowctl",
+    [
+      @html.label(class="pg-hint", for_="pg-transcript-sample", "Transcript"),
+      @html.select(
+        id="pg-transcript-sample",
+        class="pg-select",
+        on_change=emit.map(value => {
+          TranscriptSampleChosen(@string.parse_int(value) catch { _ => -1 })
+        }),
+        samples,
+      ),
+      @html.label(class="pg-hint", for_="pg-protocol", "Protocol"),
+      @html.select(
+        id="pg-protocol",
+        class="pg-select",
+        disabled=!ready,
+        on_change=emit.map(value => ProtocolChosen(value)),
+        protocols,
+      ),
+      @html.select(
+        id="pg-format",
+        class="pg-select",
+        attrs=@html.Attrs::build().aria_label("Format"),
+        on_change=emit.map(key => {
+          FormatChosen(format_of_key(key).unwrap_or(m.settings.format))
+        }),
+        format_options,
+      ),
+      @html.label(
+        class="pg-hint pg-checkbox",
+        title="Check the transcript as complete, as --complete does: a call without a reply is an error. When clear, the document decides.",
+        [
+          @html.input(
+            id="pg-complete",
+            input_type=Checkbox,
+            checked=m.settings.complete,
+            on_change=emit.map(_ => CompleteChosen(!m.settings.complete)),
+          ),
+          @html.text(" complete"),
+        ],
+      ),
+      @html.span(class="pg-spacer", ([] : Array[Html])),
+      ..step_buttons(m, emit, ""),
+      @html.button(
+        id="pg-reset",
+        class="pg-btn",
+        title="Reset",
+        attrs=@html.Attrs::build().aria_label("Reset"),
+        disabled=m.tr == TrIdle && !running,
+        on_click=emit(ResetClicked),
+        "↺",
+      ),
+    ],
+  )
 }
 
 ///|

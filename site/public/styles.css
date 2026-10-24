@@ -150,28 +150,71 @@ code, pre, kbd { font-family: var(--mono); }
 .pg-spacer { flex: 1; }
 .pg-pill { padding: 2px 8px; border-radius: 99px; background: var(--soft); color: var(--accent); font-size: 0.6875rem;
   font-weight: 700; }
+.pg { --pg-head: 42px; }
 .pg-bench { display: grid; grid-template-columns: minmax(0, 1.15fr) 6px minmax(0, 1fr); flex: 1; min-height: 0; }
 .pg-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--surface); }
 .pg-splitter { background: var(--border); }
-.pg-panehead { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--border);
-  color: var(--muted); font-size: 0.75rem; }
+/* The header of the model and the tab row of the results have one height, so a tab with its controls
+   folded starts its code view on the same line as the model editor. */
+.pg-panehead { display: flex; flex: none; align-items: center; gap: 8px; height: var(--pg-head); padding: 0 12px;
+  border-bottom: 1px solid var(--border); color: var(--muted); font-size: 0.75rem; }
 .pg-panehead b { color: var(--fg); }
 .pg-editor { flex: 1; min-height: 0; overflow: hidden; background: var(--code-bg); }
-.pg-status { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 5px 12px; border-top: 1px solid var(--border);
-  color: var(--muted); font-size: 0.75rem; }
+.pg-status, .pg-rstatus { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 5px 12px;
+  border-top: 1px solid var(--border); color: var(--muted); font-size: 0.75rem; }
+/* A request runs in the Worker: the ring turns, and the page stays usable. */
+.pg-busy { color: var(--fg); }
+.pg-spinner { display: inline-block; width: 0.75em; height: 0.75em; margin-right: 5px; vertical-align: -0.1em;
+  border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%;
+  animation: pg-spin 0.9s linear infinite; }
+@keyframes pg-spin { to { transform: rotate(360deg); } }
+@keyframes pg-fade { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) {
+  .pg-spinner { border-right-color: var(--accent); animation: pg-fade 2s ease-in-out infinite; }
+}
 .pg-err { color: var(--err); font-weight: 700; }
 .pg-ok { color: var(--ok); font-weight: 700; }
-.pg-tabs { display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--border); overflow-x: auto; }
-.pg-tab { padding: 10px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted);
-  font: inherit; font-weight: 700; cursor: pointer; }
+.pg-tabs { display: flex; flex: none; align-items: center; gap: 6px; height: var(--pg-head); padding: 0 10px;
+  border-bottom: 1px solid var(--border); overflow-x: auto; }
+.pg-tablist { display: flex; gap: 2px; align-self: stretch; }
+.pg-tab { padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted);
+  font: inherit; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.pg-tabs .pg-btn { padding: 3px 9px; font-size: 0.8125rem; white-space: nowrap; }
+.pg-fold { padding: 3px 8px; border: 1px solid var(--border); border-radius: 7px; background: none; color: var(--muted);
+  font: inherit; font-size: 0.75rem; white-space: nowrap; cursor: pointer; }
+.pg-fold[aria-expanded="false"] { color: var(--fg); }
+.pg-rstatus { flex: none; }
+/* Folded controls: the code view follows the tab row. With no output, the notices stay. */
+.pg-folded > .pg-rowctl, .pg-folded > .pg-cli, .pg-folded > .pg-notices, .pg-folded > .pg-warnings-slot,
+.pg-folded > .pg-files, .pg-folded > .pg-notes, .pg-folded > .pg-logslot, .pg-folded > .pg-hintslot,
+.pg-folded > .pg-trnotices { display: none; }
+.pg-folded-empty > .pg-notices { display: block; }
+.pg-folded > .pg-outwrap, .pg-folded > .pg-txwrap { border-top: 0; }
+.pg-folded > .pg-txwrap { flex-basis: 50%; }
 .pg-tab-on { color: var(--fg); border-bottom-color: var(--accent); }
 .pg-count { margin-left: 4px; padding: 1px 6px; border-radius: 99px; background: var(--err-soft); color: var(--err);
   font-size: 0.6875rem; }
 .pg-panel { flex: 1; min-height: 0; overflow: auto; }
 .pg-diag { display: flex; gap: 10px; width: 100%; padding: 10px 14px; border: 0; border-bottom: 1px solid var(--border);
   background: none; color: var(--fg); font: inherit; text-align: left; }
-button.pg-diag { cursor: pointer; }
-button.pg-diag:hover, button.pg-diag:focus-visible { background: var(--soft); }
+.pg-diag-go .pg-diag-main { cursor: pointer; }
+.pg-diag-go:hover, .pg-diag-go:focus-within { background: var(--soft); }
+.pg-sevcol { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.pg-repeat { padding: 1px 6px; border-radius: 99px; background: var(--soft); color: var(--muted); font-size: 0.6875rem;
+  font-weight: 700; }
+.pg-diag-text { flex: 1; }
+.pg-ref { padding: 0 3px; border-radius: 4px; background: var(--soft); color: var(--accent); font-family: var(--mono);
+  font-size: 0.875em; overflow-wrap: anywhere; }
+.pg-repeats { margin-top: 6px; font-size: 0.8125rem; }
+.pg-repeats summary { color: var(--muted); cursor: pointer; }
+.pg-repeat-list { margin: 6px 0 0; padding-left: 18px; }
+.pg-repeat-list li { margin: 2px 0; }
+/* Go moves the cursor from the keyboard; the mouse can click anywhere on the row. */
+.pg-go { align-self: flex-start; padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px; background: none;
+  color: var(--muted); font: inherit; font-size: 0.75rem; cursor: pointer; opacity: 0; }
+.pg-diag-go:hover .pg-go, .pg-go:focus-visible { opacity: 1; }
+.pg-listbar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border); }
+.pg-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .pg-sev { height: fit-content; padding: 2px 7px; border-radius: 5px; background: var(--soft); color: var(--accent);
   font-size: 0.6875rem; font-weight: 800; }
 .pg-sev-error, .pg-sev-danger { background: var(--err-soft); color: var(--err); }
