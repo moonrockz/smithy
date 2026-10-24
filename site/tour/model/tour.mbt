@@ -18,10 +18,10 @@ pub extend LessonFile with ToJson::{to_json}
 pub extend LessonFile with FromJson::{from_json}
 
 ///|
-/// What a case must show. `events` use the key of `event_key`; each string of
-/// `output_contains` must be a substring of the output text.
+/// What a case must show: the complete list of its compared findings, and
+/// strings that must each be a substring of the output text.
 pub(all) struct Expectation {
-  events : Array[String]
+  events : Array[EventKey]
   output_contains : Array[String]
 }
 
@@ -140,15 +140,140 @@ pub fn output_text(files : Array[(String, String)]) -> String {
 }
 
 ///|
-/// `id|SEVERITY|shape`, with `-` for an event without a shape.
-pub fn event_key(id : String, severity : String, shape : String?) -> String {
-  id + "|" + severity + "|" + shape.unwrap_or("-")
+/// The severity of a finding that the tour compares. The tour does not
+/// compare NOTE and SUPPRESSED findings.
+pub(all) enum Severity {
+  Warning
+  Danger
+  Error
+} derive(Eq, Debug)
+
+///|
+pub extend Severity with Eq::{equal, not_equal}
+
+///|
+pub extend Severity with @debug.Debug::{to_repr}
+
+///|
+/// The severity of a name such as `WARNING`, or `None` for a severity that
+/// the tour does not compare.
+pub fn Severity::parse(name : String) -> Severity? {
+  [Warning, Danger, Error].iter().find_first(s => s.name() == name)
 }
 
 ///|
-/// Only these severities are compared with the reference.
-pub fn is_compared(severity : String) -> Bool {
-  severity == "WARNING" || severity == "DANGER" || severity == "ERROR"
+/// The name of the severity, as Smithy writes it.
+pub fn Severity::name(self : Severity) -> String {
+  match self {
+    Warning => "WARNING"
+    Danger => "DANGER"
+    Error => "ERROR"
+  }
+}
+
+///|
+/// Whether a finding of this severity stops the output. The playground core
+/// does not transform a model with an ERROR or a DANGER (`is_error_event` in
+/// `playground/core/model.mbt`), and the reference harness does the same
+/// (`blocked` in `scripts/reference-tour.mbtx`).
+pub fn Severity::blocks_output(self : Severity) -> Bool {
+  match self {
+    Warning => false
+    Danger | Error => true
+  }
+}
+
+///|
+/// A compared finding: its id, its severity and its shape.
+pub(all) struct EventKey {
+  id : String
+  severity : Severity
+  shape : String?
+} derive(Eq, Debug)
+
+///|
+pub extend EventKey with Eq::{equal, not_equal}
+
+///|
+pub extend EventKey with @debug.Debug::{to_repr}
+
+///|
+/// The key of a finding, or `None` when the tour does not compare its
+/// severity.
+pub fn EventKey::of_finding(
+  id : String,
+  severity : String,
+  shape : String?,
+) -> EventKey? {
+  Severity::parse(severity).map(severity => { id, severity, shape, })
+}
+
+///|
+/// The key of the text `id|SEVERITY|shape`, with `-` for no shape. `None`
+/// when the text has another form or a severity that the tour does not
+/// compare.
+pub fn EventKey::parse(text : String) -> EventKey? {
+  guard text.split("|").map(p => p.to_owned()).to_array()
+    is [id, severity, shape] &&
+    id != "" &&
+    shape != "" &&
+    Severity::parse(severity) is Some(severity) else {
+    return None
+  }
+  Some({ id, severity, shape: if shape == "-" { None } else { Some(shape) }, })
+}
+
+///|
+/// The text `id|SEVERITY|shape`, as `expect.json` and the reference results
+/// write it.
+pub fn EventKey::to_string(self : EventKey) -> String {
+  self.id + "|" + self.severity.name() + "|" + self.shape.unwrap_or("-")
+}
+
+///|
+/// The order of the event keys: their texts in code unit order.
+pub fn compare_events(a : EventKey, b : EventKey) -> Int32 {
+  compare_code_units(a.to_string(), b.to_string())
+}
+
+///|
+/// The id of a case: the folder of its lesson and the name of the case.
+pub(all) struct CaseId {
+  dir : String
+  name : String
+} derive(Eq, Hash, Debug)
+
+///|
+pub extend CaseId with Eq::{equal, not_equal}
+
+///|
+pub extend CaseId with Hash::{hash_combine}
+
+///|
+pub extend CaseId with @debug.Debug::{to_repr}
+
+///|
+/// The id of the text `<dir>/<name>`, or `None` for another form.
+pub fn CaseId::parse(text : String) -> CaseId? {
+  guard text.split("/").map(p => p.to_owned()).to_array() is [dir, name] &&
+    dir != "" &&
+    name != "" else {
+    return None
+  }
+  Some({ dir, name, })
+}
+
+///|
+/// The text `<dir>/<name>`, as the reference results and the allow list
+/// write it.
+pub fn CaseId::to_string(self : CaseId) -> String {
+  self.dir + "/" + self.name
+}
+
+///|
+/// The id of a case of this lesson.
+pub fn Lesson::case_id(self : Lesson, case : Case) -> CaseId {
+  { dir: self.dir, name: case.name, }
 }
 
 ///|

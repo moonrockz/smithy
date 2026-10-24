@@ -188,16 +188,15 @@ fn read_case(dir : String, path : String, name : String) -> @model.Case raise {
   }
   let json = read_json(expect_path)
   check_keys(json, expect_keys, "\{dir}/cases/\{name}/expect.json")
-  let events = string_array_field(json, "events", "\{dir}/cases/\{name}")
-  for event in events {
-    let parts = event.split("|").to_array()
-    if parts.length() != 3 ||
-      !(parts[1] == "WARNING" || parts[1] == "DANGER" || parts[1] == "ERROR") {
-      fail(
-        "\{dir}/cases/\{name}: the event \"\{event}\" must have the form id|SEVERITY|shape, and SEVERITY must be WARNING, DANGER or ERROR",
-      )
+  let events = string_array_field(json, "events", "\{dir}/cases/\{name}").map(event => {
+    match @model.EventKey::parse(event) {
+      Some(key) => key
+      None =>
+        fail(
+          "\{dir}/cases/\{name}: the event \"\{event}\" must have the form id|SEVERITY|shape, and SEVERITY must be WARNING, DANGER or ERROR",
+        )
     }
-  }
+  })
   let output_contains = match json {
     Object(m) if m.contains("output_contains") =>
       string_array_field(json, "output_contains", "\{dir}/cases/\{name}")

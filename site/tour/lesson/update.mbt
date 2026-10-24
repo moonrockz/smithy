@@ -95,8 +95,10 @@ fn errors_text(errors : Int32, output : @samples.Output) -> String {
 }
 
 ///|
+/// Whether the finding stops the output (`Severity::blocks_output`).
 fn is_error(d : @core.Diagnostic) -> Bool {
-  d.severity == "ERROR" || d.severity == "DANGER"
+  @model.Severity::parse(d.severity) is Some(severity) &&
+  severity.blocks_output()
 }
 
 ///|
@@ -116,7 +118,7 @@ fn Model::checked(
   // has findings that the lesson compares.
   let pane = if self.findings == Unchecked &&
     !self.chosen &&
-    items.any(d => @model.is_compared(d.severity)) {
+    items.any(d => @model.Severity::parse(d.severity) is Some(_)) {
     FindingsPane
   } else {
     self.pane

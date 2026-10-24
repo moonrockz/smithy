@@ -34,6 +34,7 @@ site/tour/lessons/NN-<slug>/
   - `events` lists the expected findings, each as `id|SEVERITY|shape`. `SEVERITY` is `WARNING`, `DANGER` or
     `ERROR`. A finding with no shape has `-` in its place, for example `Model|ERROR|-`.
     The list is the complete list. An empty list says that the case has no finding of these severities.
+    `ERROR` and `DANGER` stop the output (`Severity::blocks_output` in `tour/model`).
   - `output_contains` lists strings (needles). Each string must be a substring of the output text of the case.
     An empty string is an error, because it matches every output.
     A lesson that has an `output_contains` needs an `output`.
@@ -141,7 +142,7 @@ tour bundle; see `site/README.md`.
 
 | Package | Job |
 |---|---|
-| `tour/model` | the lesson and tour types, the digest and the event key |
+| `tour/model` | the lesson and tour types, the event key (`EventKey`, `Severity`), the case id (`CaseId`) and the digest |
 | `tour/source` | reads the lessons folder and checks its rules |
 | `tour/lesson` | the state of a lesson page (`Model`, `update`) and its view |
 | `tour/ui` | js: mounts the lesson page, runs the editors, the Worker and the timers |

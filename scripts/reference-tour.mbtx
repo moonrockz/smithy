@@ -66,6 +66,7 @@ let harness : String =
   #|      for (ValidationEvent event : result.getValidationEvents()) {
   #|        Severity severity = event.getSeverity();
   #|        if (severity != Severity.WARNING && severity != Severity.DANGER && severity != Severity.ERROR) continue;
+  #|        // ERROR and DANGER stop the output, as Severity::blocks_output in site/tour/model says.
   #|        if (severity != Severity.WARNING) blocked = true;
   #|        events.add(event.getId() + "|" + severity.name() + "|"
   #|            + event.getShapeId().map(ShapeId::toString).orElse("-"));

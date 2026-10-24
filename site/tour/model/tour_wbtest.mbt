@@ -57,21 +57,57 @@ test "case_files replaces a starting file and adds a new one, sorted by name" {
 }
 
 ///|
-test "event_key" {
-  assert_eq(
-    event_key("TraitTarget", "ERROR", Some("ex#A$b")),
-    "TraitTarget|ERROR|ex#A$b",
-  )
-  assert_eq(event_key("Model", "ERROR", None), "Model|ERROR|-")
+test "a severity has a name, and ERROR and DANGER block the output" {
+  assert_eq([Warning, Danger, Error].map(s => s.name()), [
+    "WARNING", "DANGER", "ERROR",
+  ])
+  assert_eq(Severity::parse("DANGER"), Some(Danger))
+  assert_eq(Severity::parse("NOTE"), None)
+  assert_eq(Severity::parse("SUPPRESSED"), None)
+  assert_eq(Severity::parse("error"), None)
+  assert_eq([Warning, Danger, Error].map(s => s.blocks_output()), [
+    false, true, true,
+  ])
 }
 
 ///|
-test "is_compared" {
-  assert_true(is_compared("WARNING"))
-  assert_true(is_compared("DANGER"))
-  assert_true(is_compared("ERROR"))
-  assert_false(is_compared("NOTE"))
-  assert_false(is_compared("SUPPRESSED"))
+test "an event key reads and writes id|SEVERITY|shape" {
+  let key : EventKey = {
+    id: "TraitTarget",
+    severity: Error,
+    shape: Some("ex#A$b"),
+  }
+  assert_eq(key.to_string(), "TraitTarget|ERROR|ex#A$b")
+  assert_eq(EventKey::parse("TraitTarget|ERROR|ex#A$b"), Some(key))
+  let none : EventKey = { id: "Model", severity: Error, shape: None, }
+  assert_eq(none.to_string(), "Model|ERROR|-")
+  assert_eq(EventKey::parse("Model|ERROR|-"), Some(none))
+  for
+    bad in [
+      "Model|NOTE|-", "Model|ERROR", "a|ERROR|b|c", "|ERROR|-", "a|ERROR|",
+    ] {
+    assert_eq(EventKey::parse(bad), None)
+  }
+}
+
+///|
+test "the key of a finding is None when its severity is not compared" {
+  assert_eq(
+    EventKey::of_finding("A", "WARNING", None),
+    Some({ id: "A", severity: Warning, shape: None, }),
+  )
+  assert_eq(EventKey::of_finding("A", "NOTE", None), None)
+  assert_eq(EventKey::of_finding("A", "SUPPRESSED", Some("ex#A")), None)
+}
+
+///|
+test "a case id is the lesson folder and the case name" {
+  let id : CaseId = { dir: "01-hello-smithy", name: "start", }
+  assert_eq(id.to_string(), "01-hello-smithy/start")
+  assert_eq(CaseId::parse("01-hello-smithy/start"), Some(id))
+  for bad in ["01-a", "01-a/", "/start", "01-a/b/c"] {
+    assert_eq(CaseId::parse(bad), None)
+  }
 }
 
 ///|

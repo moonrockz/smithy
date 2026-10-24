@@ -13,14 +13,29 @@ fn show(items : Array[String]) -> String {
 }
 
 ///|
+fn show_events(events : Array[@model.EventKey]) -> String {
+  show(events.map(e => e.to_string()))
+}
+
+///|
+/// The keys of the compared findings, sorted.
+fn compared(items : Array[@core.Diagnostic]) -> Array[@model.EventKey] {
+  let keys = items.filter_map(d => {
+    @model.EventKey::of_finding(d.code, d.severity, d.shape)
+  })
+  keys.sort_by(@model.compare_events)
+  keys
+}
+
+///|
 /// Whether the output of a case runs. A case that names output strings must
 /// be able to run it, or the claim would never be checked.
 fn output_plan(
   has_output : Bool,
-  events : Array[String],
+  events : Array[@model.EventKey],
   output_contains : Array[String],
 ) -> Result[Bool, String] {
-  let blocked = events.any(e => e.contains("|ERROR|") || e.contains("|DANGER|"))
+  let blocked = events.any(e => e.severity.blocks_output())
   let runs = has_output && !blocked
   if output_contains.length() > 0 && !runs {
     Err(
@@ -37,12 +52,16 @@ fn output_plan(
 
 ///|
 test "output strings need an output that can run" {
+  let event = fn(severity) -> @model.EventKey {
+    { id: "A", severity, shape: None, }
+  }
   assert_eq(output_plan(true, [], ["x"]), Ok(true))
-  assert_eq(output_plan(true, ["A|ERROR|-"], []), Ok(false))
+  assert_eq(output_plan(true, [event(Warning)], ["x"]), Ok(true))
+  assert_eq(output_plan(true, [event(Error)], []), Ok(false))
   assert_eq(output_plan(false, [], []), Ok(false))
   assert_true(output_plan(false, [], ["x"]) is Err(_))
-  assert_true(output_plan(true, ["A|DANGER|-"], ["x"]) is Err(_))
-  assert_true(output_plan(true, ["A|ERROR|-"], ["x"]) is Err(_))
+  assert_true(output_plan(true, [event(Danger)], ["x"]) is Err(_))
+  assert_true(output_plan(true, [event(Error)], ["x"]) is Err(_))
 }
 
 ///|
@@ -62,28 +81,23 @@ test "every lesson case gives the findings and the output that its expect.json n
   let session = @core.Session::new()
   for lesson in tour.lessons {
     for case in lesson.cases {
-      let where_ = lesson.dir + "/" + case.name
+      let where_ = lesson.case_id(case).to_string()
       let files = files_of(lesson.case_files(case))
-      let actual : Array[String] = match
-        @core.handle(session, ValidateFiles(seq=1, files~)) {
-        Diagnostics(items~, ..) =>
-          items
-          .filter(d => @model.is_compared(d.severity))
-          .map(d => @model.event_key(d.code, d.severity, d.shape))
+      let actual = match @core.handle(session, ValidateFiles(seq=1, files~)) {
+        Diagnostics(items~, ..) => compared(items)
         Blocked(reason~, ..) =>
           fail(where_ + ": validation was blocked: " + reason)
         _ => fail(where_ + ": unexpected answer")
       }
-      actual.sort_by(@model.compare_code_units)
       let expected = case.expect.events.copy()
-      expected.sort_by(@model.compare_code_units)
+      expected.sort_by(@model.compare_events)
       if actual != expected {
         fail(
           where_ +
           ": events differ.\n  expected: " +
-          show(expected) +
+          show_events(expected) +
           "\n  actual:   " +
-          show(actual),
+          show_events(actual),
         )
       }
       let runs = match

@@ -21,7 +21,7 @@ let difference_note : String = "> **Reference difference:**"
 /// The result of the Java reference for one case.
 struct ReferenceCase {
   digest : String
-  events : Array[String]
+  events : Array[@model.EventKey]
   json_schema : Json?
 }
 
@@ -35,7 +35,7 @@ enum Side {
 ///|
 enum Difference {
   /// The event is removed from the named side only.
-  Event(event~ : String, side~ : Side)
+  Event(event~ : @model.EventKey, side~ : Side)
   /// The value at the JSON pointer is removed from both JSON Schema documents.
   JsonSchema(pointer~ : String)
 }
@@ -43,7 +43,7 @@ enum Difference {
 ///|
 /// One entry of the allow list.
 struct Allowed {
-  case_id : String
+  case_id : @model.CaseId
   difference : Difference
   reason : String
   issue : String
@@ -72,7 +72,29 @@ fn string_member(json : Json, key : String, where_ : String) -> String raise {
 }
 
 ///|
-fn parse_reference(text : String) -> Map[String, ReferenceCase] raise {
+fn event_member(
+  json : Json,
+  key : String,
+  where_ : String,
+) -> @model.EventKey raise {
+  let text = string_member(json, key, where_)
+  match @model.EventKey::parse(text) {
+    Some(event) => event
+    None =>
+      fail(where_ + ": \"" + text + "\" is not an event id|SEVERITY|shape")
+  }
+}
+
+///|
+fn case_id_of(text : String, where_ : String) -> @model.CaseId raise {
+  match @model.CaseId::parse(text) {
+    Some(id) => id
+    None => fail(where_ + ": \"" + text + "\" is not a case <dir>/<case>")
+  }
+}
+
+///|
+fn parse_reference(text : String) -> Map[@model.CaseId, ReferenceCase] raise {
   guard parse_json(reference_path, text)
     is { "reference_sha": String(sha), "cases": Object(cases), .. } else {
     fail(reference_path + ": I expected \"reference_sha\" and \"cases\"")
@@ -86,18 +108,23 @@ fn parse_reference(text : String) -> Map[String, ReferenceCase] raise {
       reference_sha,
     )
   }
-  let result : Map[String, ReferenceCase] = Map([])
+  let result : Map[@model.CaseId, ReferenceCase] = Map([])
   for id, entry in cases {
     guard entry is { "digest": String(digest), "events": Array(events), .. } else {
       fail(reference_path + ": " + id + " needs \"digest\" and \"events\"")
     }
-    result[id] = {
+    result[case_id_of(id, reference_path)] = {
       digest,
       events: events.map(e => {
-        guard e is String(s) else {
-          fail(reference_path + ": " + id + ": an event must be a string")
+        guard e is String(s) && @model.EventKey::parse(s) is Some(event) else {
+          fail(
+            reference_path +
+            ": " +
+            id +
+            ": an event must be a string id|SEVERITY|shape",
+          )
         }
-        s
+        event
       }),
       json_schema: match entry {
         { "json_schema": schema, .. } => Some(schema)
@@ -115,11 +142,11 @@ fn parse_allow(text : String) -> Array[Allowed] raise {
   }
   entries.mapi((i, entry) => {
     let where_ = allow_path + " entry " + i.to_string()
-    let case_id = string_member(entry, "case", where_)
+    let case_id = case_id_of(string_member(entry, "case", where_), where_)
     let difference = match string_member(entry, "kind", where_) {
       "event" =>
         Event(
-          event=string_member(entry, "event", where_),
+          event=event_member(entry, "event", where_),
           side=match string_member(entry, "side", where_) {
             "ours" => Ours
             "reference" => Reference
@@ -162,9 +189,9 @@ fn parse_allow(text : String) -> Array[Allowed] raise {
 /// Remove one copy of each allowed event from the side that the entry names.
 /// `used[i]` becomes true when entry `i` removed an event.
 fn remove_allowed_events(
-  case_id : String,
-  ours : Array[String],
-  reference : Array[String],
+  case_id : @model.CaseId,
+  ours : Array[@model.EventKey],
+  reference : Array[@model.EventKey],
   allow : Array[Allowed],
   used : Array[Bool],
 ) -> Unit {
@@ -294,12 +321,9 @@ fn our_events(
   session : @core.Session,
   where_ : String,
   files : Array[(String, String)],
-) -> Array[String] raise {
+) -> Array[@model.EventKey] raise {
   match @core.handle(session, ValidateFiles(seq=1, files~)) {
-    Diagnostics(items~, ..) =>
-      items
-      .filter(d => @model.is_compared(d.severity))
-      .map(d => @model.event_key(d.code, d.severity, d.shape))
+    Diagnostics(items~, ..) => compared(items)
     Blocked(reason~, ..) => fail(where_ + ": validation was blocked: " + reason)
     _ => fail(where_ + ": unexpected answer")
   }
@@ -334,7 +358,7 @@ fn our_json_schema(
 
 ///|
 /// The tour, the reference results and the allow list.
-fn inputs() -> (@model.Tour, Map[String, ReferenceCase], Array[Allowed]) raise {
+fn inputs() -> (@model.Tour, Map[@model.CaseId, ReferenceCase], Array[Allowed]) raise {
   let tour = match @source.read_tour(lessons_root) {
     Ok(tour) => tour
     Err(e) => fail("I cannot read the tour: " + e)
@@ -355,9 +379,11 @@ fn stale(where_ : String) -> String {
 ///|
 /// Whether the reference must have a JSON Schema: the lesson output is JSON
 /// Schema, and the reference events have no ERROR or DANGER.
-fn needs_json_schema(output : @core.Output?, events : Array[String]) -> Bool {
-  output is Some(JsonSchema) &&
-  !events.any(e => e.contains("|ERROR|") || e.contains("|DANGER|"))
+fn needs_json_schema(
+  output : @core.Output?,
+  events : Array[@model.EventKey],
+) -> Bool {
+  output is Some(JsonSchema) && !events.any(e => e.severity.blocks_output())
 }
 
 ///|
@@ -377,12 +403,12 @@ fn check_fresh(
 
 ///|
 fn reference_of(
-  reference : Map[String, ReferenceCase],
-  where_ : String,
+  reference : Map[@model.CaseId, ReferenceCase],
+  case_id : @model.CaseId,
 ) -> ReferenceCase raise {
-  match reference.get(where_) {
+  match reference.get(case_id) {
     Some(entry) => entry
-    None => fail(stale(where_))
+    None => fail(stale(case_id.to_string()))
   }
 }
 
@@ -391,7 +417,7 @@ fn reference_of(
 /// mark the allow list entries that remove a difference.
 fn compare_all(
   tour : @model.Tour,
-  reference : Map[String, ReferenceCase],
+  reference : Map[@model.CaseId, ReferenceCase],
   allow : Array[Allowed],
   events~ : Bool,
   json_schema~ : Bool,
@@ -400,28 +426,29 @@ fn compare_all(
   let session = @core.Session::new()
   for lesson in tour.lessons {
     for case in lesson.cases {
-      let where_ = lesson.dir + "/" + case.name
+      let case_id = lesson.case_id(case)
+      let where_ = case_id.to_string()
       let files = files_of(lesson.case_files(case))
-      let expected = reference_of(reference, where_)
+      let expected = reference_of(reference, case_id)
       let ours = our_events(session, where_, files)
       let theirs = expected.events.copy()
-      remove_allowed_events(where_, ours, theirs, allow, used)
-      ours.sort_by(@model.compare_code_units)
-      theirs.sort_by(@model.compare_code_units)
+      remove_allowed_events(case_id, ours, theirs, allow, used)
+      ours.sort_by(@model.compare_events)
+      theirs.sort_by(@model.compare_events)
       if events && ours != theirs {
         fail(
           where_ +
           ": our events differ from the reference.\n  ours:      " +
-          show(ours) +
+          show_events(ours) +
           "\n  reference: " +
-          show(theirs),
+          show_events(theirs),
         )
       }
       guard expected.json_schema is Some(schema) else { continue }
       let mine = our_json_schema(session, where_, lesson, files)
       let theirs = parse_json(reference_path, schema.stringify())
       for i, entry in allow {
-        guard entry.case_id == where_ &&
+        guard entry.case_id == case_id &&
           entry.difference is JsonSchema(pointer~) else {
           continue
         }
@@ -444,14 +471,14 @@ fn compare_all(
 ///|
 test "every lesson case has a fresh reference result" {
   let (tour, reference, _) = inputs()
-  let known : Array[String] = []
+  let known : Array[@model.CaseId] = []
   for lesson in tour.lessons {
     for case in lesson.cases {
-      let where_ = lesson.dir + "/" + case.name
-      known.push(where_)
-      let entry = reference_of(reference, where_)
+      let case_id = lesson.case_id(case)
+      known.push(case_id)
+      let entry = reference_of(reference, case_id)
       check_fresh(
-        where_,
+        case_id.to_string(),
         entry,
         @model.digest(lesson.case_files(case)),
         lesson.output,
@@ -461,7 +488,7 @@ test "every lesson case has a fresh reference result" {
   for id, _ in reference {
     if !known.contains(id) {
       fail(
-        id +
+        id.to_string() +
         ": the reference has a result for a case that does not exist; run `mise run reference:tour`",
       )
     }
@@ -495,7 +522,7 @@ test "every allow list entry is used, has an issue, and its lesson says so" {
       " entry " +
       i.to_string() +
       " (" +
-      entry.case_id +
+      entry.case_id.to_string() +
       ")"
     if !used[i] {
       fail(where_ + ": stale allow entry; it removes no difference")
@@ -511,7 +538,7 @@ test "every allow list entry is used, has an issue, and its lesson says so" {
     if entry.reason.trim().is_empty() {
       fail(where_ + ": the entry has no reason")
     }
-    let dir = entry.case_id.split("/").next().unwrap_or("").to_owned()
+    let dir = entry.case_id.dir
     match tour.lessons.search_by(l => l.dir == dir) {
       Some(l) if tour.lessons[l].text.contains(difference_note) => ()
       Some(_) =>
@@ -548,38 +575,43 @@ test "an issue id is smithy- and lower-case letters, digits and dots" {
 
 ///|
 test "an allowed event is removed once, from the side that the entry names" {
+  let start : @model.CaseId = { dir: "01-a", name: "start", }
+  let other : @model.CaseId = { dir: "01-a", name: "other", }
+  let x : @model.EventKey = { id: "X", severity: Error, shape: None, }
+  let y : @model.EventKey = { id: "Y", severity: Warning, shape: None, }
+  let z : @model.EventKey = { id: "Z", severity: Error, shape: None, }
   let allow : Array[Allowed] = [
     {
-      case_id: "01-a/start",
-      difference: Event(event="X|ERROR|-", side=Ours),
+      case_id: start,
+      difference: Event(event=x, side=Ours),
       reason: "r",
       issue: "smithy-1",
     },
     {
-      case_id: "01-a/start",
-      difference: Event(event="Y|WARNING|-", side=Reference),
+      case_id: start,
+      difference: Event(event=y, side=Reference),
       reason: "r",
       issue: "smithy-1",
     },
     {
-      case_id: "01-a/other",
-      difference: Event(event="X|ERROR|-", side=Ours),
+      case_id: other,
+      difference: Event(event=x, side=Ours),
       reason: "r",
       issue: "smithy-1",
     },
     {
-      case_id: "01-a/start",
-      difference: Event(event="Z|ERROR|-", side=Ours),
+      case_id: start,
+      difference: Event(event=z, side=Ours),
       reason: "r",
       issue: "smithy-1",
     },
   ]
-  let ours = ["X|ERROR|-", "X|ERROR|-", "Y|WARNING|-"]
-  let theirs = ["X|ERROR|-", "Y|WARNING|-"]
+  let ours = [x, x, y]
+  let theirs = [x, y]
   let used = allow.map(_ => false)
-  remove_allowed_events("01-a/start", ours, theirs, allow, used)
-  assert_eq(ours, ["X|ERROR|-", "Y|WARNING|-"])
-  assert_eq(theirs, ["X|ERROR|-"])
+  remove_allowed_events(start, ours, theirs, allow, used)
+  assert_eq(ours, [x, y])
+  assert_eq(theirs, [x])
   assert_eq(used, [true, true, false, false])
 }
 
@@ -611,7 +643,11 @@ test "the JSON differences name the pointers" {
 test "a JSON Schema lesson needs a reference schema unless the case has an error" {
   let schema = Some(Json::object({}))
   let entry = fn(events : Array[String], json_schema : Json?) -> ReferenceCase {
-    { digest: "d", events, json_schema, }
+    {
+      digest: "d",
+      events: events.map(e => @model.EventKey::parse(e).unwrap()),
+      json_schema,
+    }
   }
   check_fresh("a", entry([], schema), "d", Some(JsonSchema))
   check_fresh("a", entry(["W|WARNING|-"], schema), "d", Some(JsonSchema))

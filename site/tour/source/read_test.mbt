@@ -31,7 +31,9 @@ test "valid tree of 2 lessons" {
   // A name that starts with `.` is not part of the lesson.
   assert_eq(first.files.map(f => f.name), ["model.smithy"])
   assert_eq(first.cases.map(c => c.name), ["start", "bad-name"])
-  assert_eq(first.cases[1].expect.events, ["TraitTarget|ERROR|example#A$b"])
+  assert_eq(first.cases[1].expect.events, [
+    { id: "TraitTarget", severity: Error, shape: Some("example#A$b"), },
+  ])
   assert_eq(first.cases[1].expect.output_contains, ["x"])
   let merged = first.case_files(first.cases[1])
   assert_eq(merged.map(f => f.text), ["namespace example\nstructure A {}\n"])
