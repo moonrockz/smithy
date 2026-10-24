@@ -422,6 +422,7 @@ fn Model::send_transcript(
       ..self,
       seq,
       waiting: true,
+      elapsed: 0,
       inflight: Transcribing,
       tr_request: request,
       tr_sent: {
@@ -430,7 +431,11 @@ fn Model::send_transcript(
         settings: self.settings,
       },
     },
-    [effect(seq), Wait(ms=timeout_ms, then=TimedOut(seq~))],
+    [
+      effect(seq),
+      Wait(ms=timeout_ms, then=TimedOut(seq~)),
+      Wait(ms=TICK_MS, then=Ticked(seq~)),
+    ],
   )
 }
 

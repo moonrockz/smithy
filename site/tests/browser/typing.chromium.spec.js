@@ -5,7 +5,7 @@ import { siteUrl } from "./site.js";
 
 test("typing fixes the model, and the status bar follows the cursor", async ({ page }) => {
   await openPlayground(page, siteUrl("playground/"));
-  await page.locator("button.pg-diag").click();
+  await page.locator(".pg-diag-main").click();
   await expect(page.locator(".pg-cursor")).toHaveText("Ln 46, Col 31");
   await expect(page.locator("#pg-editor .cm-content")).toBeFocused();
   await page.keyboard.press("End");

@@ -135,3 +135,30 @@ extern "js" fn Worker::post(self : Worker, text : String) -> Unit =
 ///|
 extern "js" fn Worker::stop(self : Worker) -> Unit =
   #|(worker) => worker.terminate()
+
+///|
+/// The choice of "Group repeats" that the browser kept: on, unless it kept
+/// "off". A browser that refuses storage gives the default.
+extern "js" fn read_grouped() -> Bool =
+  #|() => { try { return localStorage.getItem('smithy-playground-group-repeats') !== 'off' } catch (_) { return true } }
+
+///|
+extern "js" fn store_grouped(on : Bool) -> Unit =
+  #|(on) => { try { localStorage.setItem('smithy-playground-group-repeats', on ? 'on' : 'off') } catch (_) {} }
+
+///|
+/// True when the reader has selected text on the page, for example by a drag
+/// over a row of the Validate list. The click at the end of the drag then
+/// does not move the cursor.
+extern "js" fn has_selection() -> Bool =
+  #|() => { const s = window.getSelection(); return !!s && !s.isCollapsed && s.toString() !== '' }
+
+///|
+/// The folds of the tabs that the browser kept, as `Folded::render` gives
+/// them; empty when it kept none or refuses storage.
+extern "js" fn read_folded() -> String =
+  #|() => { try { return localStorage.getItem('smithy-playground-folded') ?? '' } catch (_) { return '' } }
+
+///|
+extern "js" fn store_folded(text : String) -> Unit =
+  #|(text) => { try { localStorage.setItem('smithy-playground-folded', text) } catch (_) {} }

@@ -57,3 +57,55 @@ test "picker: every output has its own key and label" {
     "OpenAPI 3.1.0", "OpenRPC 1.3.2",
   ])
 }
+
+///|
+test "elapsed: the status bar shows the seconds from 1 s, and the limit from 5 s" {
+  assert_eq(elapsed_text(0), "")
+  assert_eq(elapsed_text(1), " · 1 s")
+  assert_eq(elapsed_text(4), " · 4 s")
+  assert_eq(elapsed_text(5), " · 5 s of 10 s")
+  assert_eq(elapsed_text(9), " · 9 s of 10 s")
+}
+
+///|
+test "busy: each kind of request names what the Worker does" {
+  assert_eq(busy_label(Validating), "checking")
+  assert_eq(busy_label(Transforming), "running the transform")
+  assert_eq(busy_label(Transcribing), "checking the transcript")
+}
+
+///|
+test "stale: the results status bar warns when the output is older than the model" {
+  let (m, _) = update(answered(), TabChosen(TransformTab))
+  let (m, _) = update(m, RunClicked)
+  let (m, _) = update(
+    m,
+    Answered(
+      seq=m.seq,
+      answer=Transformed(files=["model.json"], warnings=[], service=None),
+    ),
+  )
+  assert_eq(results_status_text(m), "JSON AST · model.json")
+  assert_eq(results_stale_text(m), None)
+  let (m, _) = update(m, Edited)
+  assert_eq(results_stale_text(m), Some("older than the model: select Run"))
+}
+
+///|
+test "stale: the results status bar warns when the transcript check is older than the editors" {
+  let (m, _) = update(ready(), TabChosen(TranscriptTab))
+  let (m, _) = update(m, RunAllClicked)
+  let (m, _) = run(m, [
+    Answered(
+      seq=m.seq,
+      answer=progressed(checked=2, done=true, summary=Some(summary(2, 0))),
+    ),
+  ])
+  assert_eq(results_status_text(m), "2 entries checked · 0 findings")
+  assert_eq(results_stale_text(m), None)
+  let (m, _) = update(m, TranscriptEdited)
+  assert_eq(
+    results_stale_text(m),
+    Some("older than the editors: select Step or Run all"),
+  )
+}

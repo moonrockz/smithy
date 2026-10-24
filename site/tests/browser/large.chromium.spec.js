@@ -39,16 +39,20 @@ test("a 1 MB model keeps typing and the status bar live, and its check ends insi
   expect(roundTrip).toBeLessThan(500);
   await expect(page.locator(".pg-status")).toHaveAttribute("data-waiting", "true");
   // The result of the old sample stays, marked "checking". Its row names a place in the old text,
-  // so it is no longer a button that moves the cursor.
+  // so a click on it does not move the cursor.
   await expect(page.locator(".pg-check")).toContainText("checking");
+  // A ring turns and the seconds count while the Worker checks, so the page does not look stuck.
+  await expect(page.locator(".pg-check .pg-spinner")).toBeVisible();
+  await expect(page.locator(".pg-check .pg-elapsed")).toHaveText(/^ · \d+ s/, { timeout: 10_000 });
   await expect(page.locator(".pg-diag.pg-diag-stale")).toHaveCount(1);
-  await expect(page.locator("button.pg-diag")).toHaveCount(0);
+  await expect(page.locator(".pg-diag-go, .pg-go")).toHaveCount(0);
 
   // The check of the pasted text ends, and then the check of the text typed during it. Each one
   // ends inside the 10 second limit, so the page stops no Worker.
   await expect(page.locator(".pg-okbox")).toHaveText(/^✓ The model is valid\. \d+ shapes\.$/, { timeout: 25_000 });
   await expect(page.locator(".pg-status")).toHaveAttribute("data-waiting", "false");
   await expect(page.locator(".pg-notice")).toHaveCount(0);
+  await expect(page.locator(".pg-spinner")).toHaveCount(0);
 
   // The Worker answers the next model.
   await chooseSample(page, "Order");

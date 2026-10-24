@@ -140,9 +140,70 @@ fn share_status(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
 }
 
 ///|
+/// The seconds that a request has run, for the status bar: nothing in the
+/// first second, then the seconds, and from 5 seconds on also the limit, so a
+/// long request shows that it works and when the playground stops it.
+fn elapsed_text(seconds : Int32) -> String {
+  let limit = timeout_ms / 1000
+  if seconds <= 0 {
+    ""
+  } else if seconds < 5 {
+    " · \{seconds} s"
+  } else {
+    " · \{seconds} s of \{limit} s"
+  }
+}
+
+///|
+/// What the Worker does for a request of this kind, for the status bar.
+fn busy_label(kind : Kind) -> String {
+  match kind {
+    Validating => "checking"
+    Transforming => "running the transform"
+    Transcribing => "checking the transcript"
+  }
+}
+
+///|
+/// A turning ring that shows that the Worker works. It has no text, so the
+/// text of the status bar stays the same, and it takes no input.
+fn spinner() -> Html {
+  @html.span(
+    class="pg-spinner",
+    attrs=@html.Attrs::build().aria_hidden("true"),
+    ([] : Array[Html]),
+  )
+}
+
+///|
+/// The request that runs in the Worker, when it is not a check: a spinner,
+/// what the Worker does and the seconds. A check shows in `check_status`.
+fn busy_status(m : Model) -> Array[Html] {
+  guard m.waiting && m.inflight != Validating else { return [] }
+  [
+    @html.span(class="pg-busy", [
+      spinner(),
+      @html.text(busy_label(m.inflight) + elapsed_text(m.elapsed)),
+    ]),
+  ]
+}
+
+///|
 fn check_status(m : Model) -> Html {
   let checking = if m.checking() {
-    [@html.span(class="pg-hint", " · checking")]
+    // The Worker checks now: the spinner and the seconds show that it works.
+    // Otherwise the check waits for the end of a change or of a request.
+    let running = m.waiting && m.inflight == Validating
+    if running {
+      [
+        @html.span(class="pg-hint", " · "),
+        spinner(),
+        @html.span(class="pg-hint", "checking"),
+        @html.span(class="pg-hint pg-elapsed", elapsed_text(m.elapsed)),
+      ]
+    } else {
+      [@html.span(class="pg-hint", " · checking")]
+    }
   } else {
     []
   }
@@ -196,6 +257,7 @@ fn model_pane(m : Model) -> Html {
       ),
       [
         check_status(m),
+        ..busy_status(m),
         @html.span(class="pg-cursor", "Ln \{m.line}, Col \{m.column}"),
       ],
     ),
@@ -233,44 +295,167 @@ fn location(d : Diagnostic) -> String {
 }
 
 ///|
-/// A row of a result for older text names a place in that text, so a click
-/// on it does not move the cursor.
+/// A message with the names between backticks shown as code.
+fn message_html(message : String) -> Array[Html] {
+  message_parts(message).map(part => {
+    match part {
+      Text(text) => @html.text(text)
+      Name(name) => @html.code(class="pg-ref", name)
+    }
+  })
+}
+
+///|
+/// The other messages of a group, which the reader can open. They name other
+/// shapes for the same place, so the list shows the messages only.
+fn repeats_html(group : DiagnosticGroup) -> Array[Html] {
+  guard !group.repeats.is_empty() else { return [] }
+  let shown = group.repeats[:if group.repeats.length() > MAX_LISTED {
+      MAX_LISTED
+    } else {
+      group.repeats.length()
+    }]
+  let rest = group.repeats.length() - shown.length()
+  let tail = if rest > 0 {
+    [@html.li(class="pg-hint", plural(rest, "more message", "more messages"))]
+  } else {
+    []
+  }
+  [
+    @html.details(class="pg-repeats", [
+      @html.summary(
+        plural(
+          group.repeats.length(),
+          "more message for this place",
+          "more messages for this place",
+        ),
+      ),
+      @html.ul(
+        class="pg-repeat-list",
+        [
+          ..shown.iter().map(d => @html.li(message_html(d.message))).to_array(),
+          ..tail,
+        ],
+      ),
+    ]),
+  ]
+}
+
+///|
+/// A row of the Validate list: a diagnostic and its repeats. Its text can be
+/// selected and copied. In a row of the current result, a click on the message
+/// or the place moves the cursor to the place, unless the click ends a text
+/// selection; the Go button does the same from the keyboard. A click on the
+/// repeats only opens or closes them. A row of a result for older text names a
+/// place in that text, so it does not move the cursor.
 fn diagnostic_row(
-  d : Diagnostic,
+  group : DiagnosticGroup,
   current : Bool,
   emit : @rabbita.Emit[Msg],
 ) -> Html {
+  let d = group.first
   let severity = d.severity.to_lower()
   let shape = match d.shape {
     Some(id) => [@html.text(" · "), @html.span(class="pg-shape", id)]
     None => []
   }
-  let body = [
-    @html.span(class="pg-sev pg-sev-" + severity, d.severity),
-    @html.div(class="pg-diag-text", [
-      @html.div(class="pg-msg", d.message),
-      @html.div(
-        class="pg-loc",
-        [
-          @html.text(location(d) + " · "),
-          @html.span(class="pg-code", d.code),
-          ..shape,
-        ],
+  let count = if group.repeats.is_empty() {
+    []
+  } else {
+    [
+      @html.span(
+        class="pg-repeat",
+        title=plural(group.size(), "diagnostic", "diagnostics") +
+          " at this place",
+        "×\{group.size()}",
       ),
-    ]),
+    ]
+  }
+  let go = current && d.start_line > 0
+  let chosen = DiagnosticChosen(line=d.start_line, column=d.start_column)
+  let clicked = DiagnosticClicked(line=d.start_line, column=d.start_column)
+  let main = [
+    @html.div(class="pg-msg", message_html(d.message)),
+    @html.div(
+      class="pg-loc",
+      [
+        @html.text(location(d) + " · "),
+        @html.span(class="pg-code", d.code),
+        ..shape,
+      ],
+    ),
+  ]
+  let main = if go {
+    @html.div(
+      class="pg-diag-main",
+      title="Go to line \{d.start_line}",
+      on_click=emit(clicked),
+      main,
+    )
+  } else {
+    @html.div(class="pg-diag-main", main)
+  }
+  let body = [
+    @html.div(
+      class="pg-sevcol",
+      [@html.span(class="pg-sev pg-sev-" + severity, d.severity), ..count],
+    ),
+    @html.div(class="pg-diag-text", [main, ..repeats_html(group)]),
+    ..if go {
+      [
+        @html.button(
+          class="pg-go",
+          on_click=emit(chosen),
+          attrs=@html.Attrs::build().aria_label("Go to line \{d.start_line}"),
+          "Go",
+        ),
+      ]
+    } else {
+      []
+    },
   ]
   if !current {
     @html.div(class="pg-diag pg-diag-stale", body)
-  } else if d.start_line > 0 {
-    @html.button(
-      class="pg-diag",
-      title="Go to line \{d.start_line}",
-      on_click=emit(DiagnosticChosen(line=d.start_line, column=d.start_column)),
-      body,
-    )
+  } else if go {
+    @html.div(class="pg-diag pg-diag-go", body)
   } else {
     @html.div(class="pg-diag", body)
   }
+}
+
+///|
+/// The bar above the list: the count of diagnostics and of rows, and the
+/// "Group repeats" button.
+fn list_bar(
+  m : Model,
+  items : Array[Diagnostic],
+  groups : Array[DiagnosticGroup],
+  emit : @rabbita.Emit[Msg],
+) -> Html {
+  let count = plural(items.length(), "diagnostic", "diagnostics") +
+    (if groups.length() < items.length() {
+      " in " + plural(groups.length(), "row", "rows")
+    } else {
+      ""
+    })
+  @html.div(class="pg-listbar", [
+    @html.span(class="pg-hint", count),
+    @html.span(class="pg-spacer", ([] : Array[Html])),
+    @html.button(
+      id="pg-group",
+      class="pg-btn pg-toggle",
+      title="Show the diagnostics with the same code at the same place in one row",
+      on_click=emit(GroupToggled),
+      attrs=@html.Attrs::build().aria_pressed(
+        if m.grouped {
+          "true"
+        } else {
+          "false"
+        },
+      ),
+      "Group repeats",
+    ),
+  ])
 }
 
 ///|
@@ -315,30 +500,34 @@ fn validate_panel(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
       } else {
         []
       }
-      let listed = items[:if items.length() > MAX_LISTED {
+      let groups = group_diagnostics(items, m.grouped)
+      let listed = groups[:if groups.length() > MAX_LISTED {
           MAX_LISTED
         } else {
-          items.length()
+          groups.length()
         }]
       let current = m.is_current()
       let rows = listed
         .iter()
-        .map(d => diagnostic_row(d, current, emit))
+        .map(group => diagnostic_row(group, current, emit))
         .to_array()
-      let more = if items.length() > MAX_LISTED {
+      let unlisted = items.length() -
+        listed.iter().fold(init=0, (sum, group) => sum + group.size())
+      let more = if unlisted > 0 {
         [
           @html.p(
             class="pg-empty",
-            plural(
-              items.length() - MAX_LISTED,
-              "more diagnostic is",
-              "more diagnostics are",
-            ) +
+            plural(unlisted, "more diagnostic is", "more diagnostics are") +
             " not in the list. The editor marks all of them.",
           ),
         ]
       } else {
         []
+      }
+      let bar = if items.is_empty() {
+        []
+      } else {
+        [list_bar(m, items, groups, emit)]
       }
       let hint = if items.is_empty() {
         [
@@ -350,7 +539,7 @@ fn validate_panel(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
       } else {
         []
       }
-      [..head, ..rows, ..more, ..hint]
+      [..head, ..bar, ..rows, ..more, ..hint]
     }
   }
 }
@@ -451,6 +640,23 @@ pub fn cli_hint(
 }
 
 ///|
+/// The Run button of the Transform tab. The controls have one, and the tab row
+/// has another while the controls are folded, so each has its own `id`.
+fn run_button(m : Model, emit : @rabbita.Emit[Msg], id : String) -> Html {
+  @html.button(
+    id~,
+    class="pg-btn pg-btn-primary",
+    disabled=m.tx == TxRunning,
+    on_click=emit(RunClicked),
+    if m.tx == TxRunning {
+      "Running"
+    } else {
+      "Run"
+    },
+  )
+}
+
+///|
 fn transform_controls(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   let options = outputs.map(output => {
     @html.option(
@@ -488,17 +694,7 @@ fn transform_controls(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       options,
     ),
     @html.div(class="pg-selector-slot", selector),
-    @html.button(
-      id="pg-run",
-      class="pg-btn pg-btn-primary",
-      disabled=m.tx == TxRunning,
-      on_click=emit(RunClicked),
-      if m.tx == TxRunning {
-        "Running"
-      } else {
-        "Run"
-      },
-    ),
+    run_button(m, emit, "pg-run"),
     @html.span(class="pg-spacer", ([] : Array[Html])),
     @html.button(
       id="pg-copy",
@@ -528,7 +724,20 @@ fn transform_notice(m : Model) -> Array[Html] {
         ),
       ]
     TxRunning =>
-      [@html.p(class="pg-empty", "The playground runs the transform.")]
+      [
+        @html.p(class="pg-empty", [
+          spinner(),
+          @html.text("The playground runs the transform"),
+          @html.span(
+            class="pg-elapsed",
+            if m.waiting && m.inflight == Transforming {
+              elapsed_text(m.elapsed)
+            } else {
+              ""
+            },
+          ),
+        ]),
+      ]
     TxBlocked(reason~, by~) =>
       [
         @html.p(
@@ -680,21 +889,173 @@ fn panel(on : Bool, extra : String, children : Array[Html]) -> Html {
 }
 
 ///|
+/// The fold button of a tab with a code view, and the buttons that stay in
+/// the tab row while its controls are folded: Run, or Step and Run all.
+fn tab_actions(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
+  guard m.tab != ValidateTab else { return [] }
+  let folded = m.folded_on(m.tab)
+  let actions = if !folded {
+    []
+  } else if m.tab == TransformTab {
+    [run_button(m, emit, "pg-run-folded")]
+  } else {
+    step_buttons(m, emit, "-folded")
+  }
+  [
+    ..actions,
+    @html.button(
+      id="pg-fold",
+      class="pg-fold",
+      title=if folded {
+        "Show the controls of this tab"
+      } else {
+        "Fold the controls away, so the code views line up"
+      },
+      on_click=emit(FoldToggled(m.tab)),
+      attrs=@html.Attrs::build().aria_expanded(
+        if folded {
+          "false"
+        } else {
+          "true"
+        },
+      ),
+      if folded {
+        "▾ Controls"
+      } else {
+        "▴ Controls"
+      },
+    ),
+  ]
+}
+
+///|
+/// The summary of the shown tab, in the status bar under the results. It
+/// mirrors the status bar of the model editor.
+fn results_status_text(m : Model) -> String {
+  match m.tab {
+    ValidateTab =>
+      match m.check {
+        Checked(items~, ..) if m.is_current() =>
+          plural(items.length(), "diagnostic", "diagnostics")
+        Checked(..) => "Checking"
+        _ => "Not checked"
+      }
+    TransformTab =>
+      match m.tx {
+        TxDone(output~, files~, file~, warnings~, ..) => {
+          let name = match files.get(file) {
+            Some(name) => " · " + name
+            None => ""
+          }
+          let place = if files.length() > 1 {
+            " · file \{file + 1} of \{files.length()}"
+          } else {
+            ""
+          }
+          let warned = if warnings.is_empty() {
+            ""
+          } else {
+            " · " + plural(warnings.length(), "warning", "warnings")
+          }
+          output_label(output) + name + place + warned
+        }
+        TxRunning => "Running"
+        TxIdle => "No output yet"
+        _ => "No output"
+      }
+    TranscriptTab =>
+      match m.tr {
+        TrChecked(log) =>
+          plural(log.checked, "entry checked", "entries checked") +
+          " · " +
+          plural(log.findings.length(), "finding", "findings") +
+          (if log.done { "" } else { " so far" })
+        _ => "Not checked"
+      }
+  }
+}
+
+///|
+/// The warning of the status bar under the results when the shown result is
+/// for older input. The folded controls hide the notice that says so, and an
+/// old result must not pass for the result of the text in the editors.
+fn results_stale_text(m : Model) -> String? {
+  match m.tab {
+    ValidateTab => None
+    TransformTab =>
+      match m.tx {
+        TxDone(edits~, ..) if edits != m.edits =>
+          Some("older than the model: select Run")
+        _ => None
+      }
+    TranscriptTab =>
+      match m.tr {
+        TrChecked(log) if m.session is None && !log.done && !m.tr_running() =>
+          Some("stopped: select Step or Run all")
+        TrChecked(_) if !m.tr_current() && !m.tr_running() =>
+          Some("older than the editors: select Step or Run all")
+        _ => None
+      }
+  }
+}
+
+///|
 fn results_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   let count = if m.errors() > 0 {
     [@html.span(class="pg-count", m.errors().to_string())]
   } else {
     []
   }
+  // A folded tab hides its controls with CSS: the editors keep their elements.
+  // With no output, the Transform tab keeps its notices, so it is not empty.
+  let fold = fn(tab : @samples.Tab) {
+    if !m.folded_on(tab) {
+      ""
+    } else if tab == TransformTab &&
+      !(m.tx is TxDone(files~, ..) && !files.is_empty()) {
+      " pg-folded pg-folded-empty"
+    } else {
+      " pg-folded"
+    }
+  }
   @html.section(class="pg-pane pg-results", [
-    @html.div(class="pg-tabs", attrs=@html.Attrs::build().role("tablist"), [
-      tab_button(m, emit, ValidateTab, "Validate", count),
-      tab_button(m, emit, TransformTab, "Transform", []),
-      tab_button(m, emit, TranscriptTab, "Transcript", []),
-    ]),
+    @html.div(
+      class="pg-tabs",
+      [
+        @html.div(
+          class="pg-tablist",
+          attrs=@html.Attrs::build().role("tablist"),
+          [
+            tab_button(m, emit, ValidateTab, "Validate", count),
+            tab_button(m, emit, TransformTab, "Transform", []),
+            tab_button(m, emit, TranscriptTab, "Transcript", []),
+          ],
+        ),
+        @html.span(class="pg-spacer", ([] : Array[Html])),
+        ..tab_actions(m, emit),
+      ],
+    ),
     panel(m.tab == ValidateTab, "pg-validate", validate_panel(m, emit)),
-    panel(m.tab == TransformTab, "pg-transform", transform_panel(m, emit)),
-    panel(m.tab == TranscriptTab, "pg-trpanel", transcript_panel(m, emit)),
+    panel(
+      m.tab == TransformTab,
+      "pg-transform" + fold(TransformTab),
+      transform_panel(m, emit),
+    ),
+    panel(
+      m.tab == TranscriptTab,
+      "pg-trpanel" + fold(TranscriptTab),
+      transcript_panel(m, emit),
+    ),
+    @html.div(
+      class="pg-rstatus",
+      [
+        @html.span(class="pg-hint", results_status_text(m)),
+        ..match results_stale_text(m) {
+          Some(text) => [@html.span(class="pg-stale-tag", text)]
+          None => []
+        },
+      ],
+    ),
   ])
 }
 

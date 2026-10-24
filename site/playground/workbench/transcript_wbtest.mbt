@@ -191,6 +191,7 @@ test "transcript: Step starts the check, then checks one entry" {
   assert_eq(effects, [
     SendTranscriptStart(seq=2, settings=m.settings),
     Wait(ms=timeout_ms, then=TimedOut(seq=2)),
+    Wait(ms=TICK_MS, then=Ticked(seq=2)),
   ])
   assert_true(m.tr_running())
   let (m, effects) = update(
@@ -203,6 +204,7 @@ test "transcript: Step starts the check, then checks one entry" {
   assert_eq(effects, [
     SendTranscriptStep(seq=3, count=1),
     Wait(ms=timeout_ms, then=TimedOut(seq=3)),
+    Wait(ms=TICK_MS, then=Ticked(seq=3)),
   ])
   assert_eq(log_of(m).entries.length(), 2)
   let (m, effects) = update(m, Answered(seq=3, answer=progressed(checked=1)))
@@ -258,6 +260,7 @@ test "transcript: Run all checks in groups and appends the findings of each" {
     FollowTranscript(line=RUN_GROUP),
     SendTranscriptStep(seq=4, count=RUN_GROUP),
     Wait(ms=timeout_ms, then=TimedOut(seq=4)),
+    Wait(ms=TICK_MS, then=Ticked(seq=4)),
   ])
   let (m, _) = update(
     m,
@@ -307,6 +310,7 @@ test "queue: Step while a check runs waits, then the check of the newest text, t
   assert_eq(effects, [
     SendValidate(seq=2),
     Wait(ms=timeout_ms, then=TimedOut(seq=2)),
+    Wait(ms=TICK_MS, then=Ticked(seq=2)),
   ])
   assert_true(m.tr_running())
   let (m, effects) = update(
@@ -320,6 +324,7 @@ test "queue: Step while a check runs waits, then the check of the newest text, t
     Mark([]),
     SendTranscriptStart(seq=3, settings=m.settings),
     Wait(ms=timeout_ms, then=TimedOut(seq=3)),
+    Wait(ms=TICK_MS, then=Ticked(seq=3)),
   ])
   // A change while the start runs: its check goes before the step that the
   // start still needs.
@@ -331,6 +336,7 @@ test "queue: Step while a check runs waits, then the check of the newest text, t
   assert_eq(effects, [
     SendValidate(seq=4),
     Wait(ms=timeout_ms, then=TimedOut(seq=4)),
+    Wait(ms=TICK_MS, then=Ticked(seq=4)),
   ])
   let (_, effects) = update(
     m,
@@ -343,6 +349,7 @@ test "queue: Step while a check runs waits, then the check of the newest text, t
     Mark([]),
     SendTranscriptStep(seq=5, count=1),
     Wait(ms=timeout_ms, then=TimedOut(seq=5)),
+    Wait(ms=TICK_MS, then=Ticked(seq=5)),
   ])
 }
 
@@ -367,6 +374,7 @@ test "queue: a change during Run all is checked between two groups" {
     FollowTranscript(line=RUN_GROUP - 1),
     SendValidate(seq=4),
     Wait(ms=timeout_ms, then=TimedOut(seq=4)),
+    Wait(ms=TICK_MS, then=Ticked(seq=4)),
   ])
   // The run goes on after the check.
   let (_, effects) = update(
@@ -433,6 +441,7 @@ test "reset: Reset clears the list and ends the session of the Worker" {
   assert_eq(effects, [
     SendTranscriptReset(seq=4),
     Wait(ms=timeout_ms, then=TimedOut(seq=4)),
+    Wait(ms=TICK_MS, then=Ticked(seq=4)),
   ])
   let (m, effects) = update(m, Answered(seq=4, answer=progressed(checked=0)))
   assert_eq(effects, [])
@@ -455,6 +464,7 @@ test "reset: Reset during Run all drops the running answer and stops the run" {
   assert_eq(effects, [
     SendTranscriptReset(seq=3),
     Wait(ms=timeout_ms, then=TimedOut(seq=3)),
+    Wait(ms=TICK_MS, then=Ticked(seq=3)),
   ])
   assert_eq(m.tr, TrIdle)
   let (m, effects) = update(m, Answered(seq=3, answer=progressed(checked=0)))
@@ -785,6 +795,7 @@ test "queue: Step before the check of a new model waits for that check, then sta
   assert_eq(effects, [
     SendValidate(seq=2),
     Wait(ms=timeout_ms, then=TimedOut(seq=2)),
+    Wait(ms=TICK_MS, then=Ticked(seq=2)),
   ])
   let (m, effects) = update(
     m,
@@ -808,6 +819,7 @@ test "queue: Step before the check of a new model waits for that check, then sta
     Mark([]),
     SendTranscriptStart(seq=3, settings=fitted),
     Wait(ms=timeout_ms, then=TimedOut(seq=3)),
+    Wait(ms=TICK_MS, then=Ticked(seq=3)),
   ])
 }
 

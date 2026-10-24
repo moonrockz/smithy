@@ -22,7 +22,7 @@ for (const channel of ["next/", ""]) {
     await expect(page.locator(".pg-check")).toHaveText("● 1 error");
 
     // A click on the diagnostic moves the cursor to its place; the editor then shows the line.
-    await diagnostic.dispatchEvent("click");
+    await diagnostic.locator(".pg-diag-main").dispatchEvent("click");
     await expect(page.locator(".pg-cursor")).toHaveText("Ln 46, Col 31");
     await expect(page.locator("#pg-editor .cm-lintRange-error")).toHaveText("count: Intger");
     await expect(page.locator("#pg-editor .cm-lint-marker-error")).toHaveCount(1);

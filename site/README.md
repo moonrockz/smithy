@@ -114,6 +114,24 @@ the new page, so that no other page runs the playground script.
 | `playground/core` | the Smithy calls, with no browser (see below) |
 | `playground/editor` | JavaScript: CodeMirror 6, the Smithy stream language (the token kinds of `highlight`) and bracket folding |
 
+The Validate list shows at most 200 rows (`MAX_LISTED`). With "Group repeats" (`#pg-group`, on by default; the
+browser keeps the choice in `localStorage` under `smithy-playground-group-repeats`), the diagnostics with the same
+severity and code at the same place are one row, with their count and the other messages behind a disclosure
+(`group_diagnostics`). The text of a row can be selected and copied: a click on a row moves the cursor unless it
+ends a text selection, and its Go button does the same from the keyboard. The list shows the names between
+backticks and the absolute shape IDs of a message as code (`message_parts`).
+
+The Transform and Transcript tabs have a fold button (`#pg-fold`) at the end of the tab row. It folds their
+controls away, so that their code view starts on the same pixel row as the model editor: the model header and the
+tab row have one height (`--pg-head`). While a tab is folded, the tab row keeps Run (`#pg-run-folded`), or Step
+and Run all (`#pg-step-folded`, `#pg-runall-folded`). A notice that the reader must see (a refused, stopped or
+failed request, or a model that a transcript check cannot use) opens the controls when it appears; the reader
+can fold them again. The browser keeps the folds in `localStorage` under `smithy-playground-folded`. The results
+have a status bar (`.pg-rstatus`) that mirrors the one of the model editor, with a summary of the shown tab. When the
+shown output or transcript check is older than the editors, it says so (`.pg-stale-tag`), because folded controls
+hide the notice. In the Validate list, Go always moves the cursor; a click on the text does not when it ends a
+text selection.
+
 The Worker runs one request at a time (a Validate, a Transform or a transcript request). A change or a button
 while a request runs waits for it. When it ends, a Run of the Transform tab goes first, then a Step, Run all or
 Reset of the Transcript tab, then the newest text, then the next group of a Run all. So a long Run all does not
@@ -141,7 +159,10 @@ editor and then the MoonBit script) and `<out>/playground/worker.js`. The pre-re
 The page sends Validate 250 ms after the last change. Only one request runs at a time: a change while one runs
 waits, and the newest text goes when that request ends. Each request has a new `seq`. The page uses only the
 answer to its newest request, and only while the text is the text that it checked; until then the previous
-result stays, marked as checking, and its rows do not move the cursor. When the Worker gives no answer in 10
+result stays, marked as checking, and its rows do not move the cursor. While a request runs, the status bar shows
+a turning ring, what the Worker does and the seconds (`Ticked` each second), and from 5 seconds on the limit
+(`· 6 s of 10 s`); the Transform tab shows the same next to its notice. The ring is CSS only, has no text and fades
+instead of turning when the reader asks for reduced motion. When the Worker gives no answer in 10
 seconds, the page ends it, starts a new one and says so. When the Worker stops with an error, the page starts a
 new one at once and says that the check failed. The page loads `ui.js` and the Worker with the git ref of the build as the query
 (`?v=<ref>`, `SiteConfig::versioned`): Pages caches each file for 600 seconds, and a new page must not run an old
