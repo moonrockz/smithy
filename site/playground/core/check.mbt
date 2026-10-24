@@ -30,18 +30,37 @@ fn value_config(options : ValueOptions) -> @validation.Config {
 }
 
 ///|
+/// The severity of a finding as the CLI prints it.
+fn severity_text(severity : @validation.FindingSeverity) -> String {
+  match severity {
+    @validation.Error => "error"
+    @validation.Advisory => "advisory"
+  }
+}
+
+///|
 /// A finding of the validation library as a `Found`.
 fn found_of(finding : @validation.Finding) -> DataFinding {
   Found(
     code=finding.code.to_string(),
-    severity=match finding.severity {
-      @validation.Error => "error"
-      @validation.Advisory => "advisory"
-    },
+    severity=severity_text(finding.severity),
     path=finding.path.pointer(),
     shape=finding.shape.to_string(),
     message=finding.message,
     offset=None,
+  )
+}
+
+///|
+/// A finding of the JSON-RPC library as a `Found`, with its offset.
+fn rpc_found_of(finding : @rpc.Finding) -> DataFinding {
+  Found(
+    code=finding.code.to_string(),
+    severity=severity_text(finding.severity),
+    path=finding.path.pointer(),
+    shape=finding.shape.to_string(),
+    message=finding.message,
+    offset=finding.offset,
   )
 }
 
@@ -128,4 +147,117 @@ fn check_value(
     valid=result.is_valid(),
     findings=result.findings.map(found_of),
   )
+}
+
+///|
+/// The response context of the library for a context of the request, or the
+/// reason to block. The checks are the option checks of the CLI.
+fn rpc_context(
+  context : ResponseContext,
+) -> Result[@rpc.ResponseContext, String] {
+  match context {
+    EnvelopeOnly => Ok(@rpc.EnvelopeOnly)
+    Method(name) =>
+      match @rpc.MethodName::parse(name) {
+        Some(name) => Ok(@rpc.Method(name))
+        None =>
+          Err("I expected an application method name, but found '\{name}'.")
+      }
+    Operation(id) =>
+      match @smithy.ShapeId::parse(id) {
+        Some(parsed) if parsed.member_name() is None =>
+          Ok(@rpc.Operation(parsed))
+        _ => Err("I expected an absolute operation ID, but found '\{id}'.")
+      }
+    OriginalRequest(text) => Ok(@rpc.OriginalRequest(text))
+  }
+}
+
+///|
+/// Check one JSON-RPC message against a service, as `smithy validate rpc`
+/// does with `--message` or `--response` (`apps/smithy/cli.mbt` and
+/// `run_rpc_validation` in `apps/smithy/rpc_cli.mbt`), with the same library
+/// calls in the same order and the same codes and messages. The library reads
+/// the message as text, so an id keeps all of its digits.
+fn check_message(
+  seq : Int32,
+  files : Array[(String, String)],
+  service : String,
+  version : RpcVersion,
+  message : String,
+  kind : MessageKind,
+  options : ValueOptions,
+) -> Response {
+  let rpc_version = match version {
+    V1_0 => @rpc.V1_0
+    V2_0 => @rpc.V2_0
+  }
+  let response = match kind {
+    RequestMessage => None
+    ResponseMessage(context~, legacy_errors~) => {
+      let legacy_errors = match legacy_errors {
+        Opaque => @rpc.Opaque
+        CodeMessageData => {
+          if version != V1_0 {
+            return blocked(
+              seq~,
+              reason="The legacy error mapping code-message-data applies only to JSON-RPC 1.0.",
+            )
+          }
+          @rpc.CodeMessageData
+        }
+      }
+      let context = match context {
+        None => None
+        Some(context) =>
+          match rpc_context(context) {
+            Ok(context) => Some(context)
+            Err(reason) => return blocked(seq~, reason~)
+          }
+      }
+      Some((context, legacy_errors))
+    }
+  }
+  let model = match clean_model(load(files)) {
+    Ok(model) => model
+    Err((reason, kind)) => return Blocked(seq~, reason~, kind~)
+  }
+  guard @smithy.ShapeId::parse(service) is Some(id) else {
+    return blocked(
+      seq~,
+      reason="I expected an absolute shape ID for the service, but found '\{service}'.",
+    )
+  }
+  let prepared = @rpc.PreparedService::prepare(
+    model,
+    id,
+    rpc_version,
+    config=value_config(options),
+  ) catch {
+    @rpc.InvalidContract(id, message) =>
+      return stopped(
+        seq,
+        "InvalidContract",
+        id.to_string() + ": " + message,
+        source=Some("--service"),
+      )
+    @validation.UnsupportedConstraint(id, message) =>
+      return stopped(
+        seq,
+        "UnsupportedConstraint",
+        id.to_string() + ": " + message,
+      )
+    error => return stopped(seq, "InvalidConfiguration", error.to_string())
+  }
+  let (valid, findings) = match response {
+    None => {
+      let result = prepared.validate_request(message)
+      (result.is_valid(), result.findings)
+    }
+    Some((context, legacy_errors)) => {
+      let result = prepared.validate_response(message, context~, legacy_errors~)
+      (result.is_valid(), result.findings)
+    }
+  }
+  DataChecked(seq~, valid~, findings=findings.map(rpc_found_of))
 }

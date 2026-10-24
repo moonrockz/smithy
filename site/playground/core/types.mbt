@@ -11,6 +11,10 @@ pub using @samples {
   type UnknownMembers,
   type MemberNames,
   type ValueOptions,
+  type RpcVersion,
+  type ResponseContext,
+  type LegacyErrors,
+  type MessageKind,
 }
 
 ///|
@@ -70,6 +74,20 @@ pub(all) enum Request {
     files~ : Array[(String, String)],
     shape~ : String,
     value~ : String,
+    options~ : ValueOptions
+  )
+  /// Check one JSON-RPC message against a service of a model, as
+  /// `smithy validate rpc` does with `--message` or `--response`. `files` are
+  /// the model files, as (name, text). `service` is the absolute shape ID of
+  /// the service: the CLI option `--service`. `message` is the text of the
+  /// message; the check reads it as text, so an id keeps all of its digits.
+  CheckMessage(
+    seq~ : Int32,
+    files~ : Array[(String, String)],
+    service~ : String,
+    version~ : RpcVersion,
+    message~ : String,
+    kind~ : MessageKind,
     options~ : ValueOptions
   )
 } derive(Eq, Debug, ToJson, FromJson)
