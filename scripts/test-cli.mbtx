@@ -1365,6 +1365,223 @@ async fn exercise_bad_doc_comment(runner : Runner) -> Unit {
 }
 
 ///|
+/// The README files whose `console` and `LANG file=NAME` fences run. Keep it equal to
+/// `@source.cli_doc_files` in site/tour/source/include.mbt.
+let readme_files : Array[String] = ["apps/smithy/README.md"]
+
+///|
+priv struct DocCommand {
+  args : Array[String]
+  output : String
+} derive(Eq, Debug)
+
+///|
+priv enum DocStep {
+  Fixture(name~ : String, text~ : String)
+  Session(Array[DocCommand])
+} derive(Eq, Debug)
+
+///|
+/// Words of a command line; a single-quoted word keeps its spaces.
+fn shell_words(line : String) -> Result[Array[String], String] {
+  let words : Array[String] = []
+  let word = StringBuilder()
+  let mut started = false
+  let mut quoted = false
+  for c in line {
+    if quoted {
+      if c == '\'' {
+        quoted = false
+      } else {
+        word.write_char(c)
+      }
+      continue
+    }
+    match c {
+      '\'' => {
+        quoted = true
+        started = true
+      }
+      ' ' =>
+        if started {
+          words.push(word.to_string())
+          word.reset()
+          started = false
+        }
+      '|' | '>' | '<' | ';' | '&' | '"' | '`' | '$' | '\\' =>
+        return Err("I cannot run the shell character \{c} in `\{line}`.")
+      _ => {
+        word.write_char(c)
+        started = true
+      }
+    }
+  }
+  if quoted {
+    return Err("I found an unclosed quote in `\{line}`.")
+  }
+  if started {
+    words.push(word.to_string())
+  }
+  Ok(words)
+}
+
+///|
+fn doc_fixture_name(info : String) -> Result[String?, String] {
+  for word in info.split(" ") {
+    let word = word.to_owned()
+    if word.has_prefix("file=") {
+      let name = word[5:].to_owned()
+      let plain = !name.is_empty() &&
+        name != "." &&
+        name != ".." &&
+        name.iter().all(c => {
+          (c is ('a'..='z') || c is ('A'..='Z') || c is ('0'..='9')) || c == '.' || c == '_' || c == '-'
+        })
+      guard plain else {
+        return Err(
+          "I expected a plain file name after file= and found `\{name}`.",
+        )
+      }
+      return Ok(Some(name))
+    }
+  }
+  Ok(None)
+}
+
+///|
+fn doc_session(body : Array[String]) -> Result[DocStep, String] {
+  let commands : Array[DocCommand] = []
+  let mut args : Array[String]? = None
+  let mut output : Array[String] = []
+  fn finish(
+    commands : Array[DocCommand],
+    args : Array[String]?,
+    output : Array[String],
+  ) -> Unit {
+    if args is Some(args) {
+      let text = if output.is_empty() { "" } else { output.join("\n") + "\n" }
+      commands.push({ args, output: text })
+    }
+  }
+
+  for line in body {
+    if line.has_prefix("$ ") {
+      finish(commands, args, output)
+      let words = match shell_words(line[2:].to_owned()) {
+        Ok(words) => words
+        Err(msg) => return Err(msg)
+      }
+      guard words.length() > 0 && words[0] == "smithy" else {
+        return Err("I can run only a smithy command and found `\{line}`.")
+      }
+      args = Some(words[1:].to_owned())
+      output = []
+    } else {
+      guard args is Some(_) else {
+        return Err("I found output before the first command: `\{line}`.")
+      }
+      output.push(line)
+    }
+  }
+  finish(commands, args, output)
+  Ok(Session(commands))
+}
+
+///|
+/// The fixture and console fences of `markdown`, in order. Other fences are skipped.
+fn doc_steps(markdown : String) -> Result[Array[DocStep], String] {
+  let lines = markdown
+    .split("\n")
+    .map(l => l.trim_end(chars="\r").to_owned())
+    .collect()
+  let steps : Array[DocStep] = []
+  let mut i = 0
+  while i < lines.length() {
+    let line = lines[i]
+    i += 1
+    guard line.has_prefix("```") else { continue }
+    let mut ticks = 0
+    while ticks < line.length() && line[ticks] == '`' {
+      ticks += 1
+    }
+    let info = line[ticks:].trim().to_owned()
+    let body : Array[String] = []
+    let mut closed = false
+    while i < lines.length() {
+      let inner = lines[i]
+      i += 1
+      let inner_ticks = inner.iter().take_while(c => c == '`').count()
+      if inner_ticks >= ticks && inner_ticks == inner.length() {
+        closed = true
+        break
+      }
+      body.push(inner)
+    }
+    guard closed else {
+      return Err("I found a fence that never closes: `\{line}`.")
+    }
+    if info == "console" {
+      match doc_session(body) {
+        Ok(step) => steps.push(step)
+        Err(msg) => return Err(msg)
+      }
+    } else {
+      match doc_fixture_name(info) {
+        Ok(Some(name)) => {
+          let text = if body.is_empty() { "" } else { body.join("\n") + "\n" }
+          steps.push(Fixture(name~, text~))
+        }
+        Ok(None) => ()
+        Err(msg) => return Err(msg)
+      }
+    }
+  }
+  Ok(steps)
+}
+
+///|
+/// Writes each fixture into a fresh `<runner.dir>/readme` and runs each command there.
+async fn check_readme(runner : Runner, root : String) -> Unit {
+  let dir = "\{runner.dir}/readme"
+  let scratch = { ..runner, dir }
+  for file in readme_files {
+    let steps = match doc_steps(@fs.read_file("\{root}/\{file}").text()) {
+      Ok(steps) => steps
+      Err(msg) => fail("\{file}: \{msg}")
+    }
+    if @fs.exists(dir) {
+      @fs.rmdir(dir, recursive=true)
+    }
+    @fs.mkdir(dir, recursive=true, allow_exist=true)
+    let mut sessions = 0
+    for step in steps {
+      match step {
+        Fixture(name~, text~) => @fs.write_file("\{dir}/\{name}", text)
+        Session(commands) => {
+          sessions += 1
+          for command in commands {
+            let (out, err) = scratch.command(command.args, 0)
+            assert_eq(
+              err,
+              "",
+              msg="\{file}: smithy \{command.args.join(" ")} wrote to stderr",
+            )
+            assert_eq(
+              out,
+              command.output,
+              msg="\{file}: smithy \{command.args.join(" ")}\nthe README shows:\n\{command.output}\nthe command wrote:\n\{out}",
+            )
+          }
+        }
+      }
+    }
+    if sessions == 0 {
+      fail("I found no console block in \{file}")
+    }
+  }
+}
+
+///|
 async fn exercise(
   root : String,
   target : String,
@@ -1903,6 +2120,7 @@ async fn exercise(
   assert_true(@fs.exists("\{dir}/idl/other.smithy"))
   runner.command(["validate", "idl/example.smithy", "idl/other.smithy"], 0)
   |> ignore
+  check_readme(runner, root)
   println("CLI checks passed: \{target}")
 }
 
@@ -1934,4 +2152,78 @@ async test "native and moonx Wasm CLI behavior" {
 ///|
 async test "file checks run when stdin is skipped" {
   exercise(@fs.realpath(".."), "wasm", skip_stdin=true)
+}
+
+///|
+test "doc_steps reads fixtures and console sessions in order" {
+  let md = "# x\n\n```smithy file=greeting.smithy\n$version: \"2\"\n```\n\n```console\n$ smithy convert --to json greeting.smithy\n{\n}\n$ smithy version\n0.6.0\n```\n\n```shell\nsmithy anything\n```\n"
+  assert_eq(
+    doc_steps(md),
+    Ok([
+      Fixture(name="greeting.smithy", text="$version: \"2\"\n"),
+      Session([
+        {
+          args: ["convert", "--to", "json", "greeting.smithy"],
+          output: "{\n}\n",
+        },
+        { args: ["version"], output: "0.6.0\n" },
+      ]),
+    ]),
+  )
+}
+
+///|
+test "doc_steps reads CRLF text" {
+  let md = "# x\r\n\r\n```smithy file=greeting.smithy\r\n$version: \"2\"\r\n```\r\n\r\n```console\r\n$ smithy convert --to json greeting.smithy\r\n{\r\n}\r\n$ smithy version\r\n0.6.0\r\n```\r\n\r\n```shell\r\nsmithy anything\r\n```\r\n"
+  assert_eq(
+    doc_steps(md),
+    Ok([
+      Fixture(name="greeting.smithy", text="$version: \"2\"\n"),
+      Session([
+        {
+          args: ["convert", "--to", "json", "greeting.smithy"],
+          output: "{\n}\n",
+        },
+        { args: ["version"], output: "0.6.0\n" },
+      ]),
+    ]),
+  )
+}
+
+///|
+test "doc_steps errors" {
+  let cases = [
+    ("```console\n$ ls\n```", "I can run only a smithy command"),
+    (
+      "```console\n$ smithy select x | head\n```", "I cannot run the shell character |",
+    ),
+    ("```console\noutput\n```", "I found output before the first command"),
+    ("```smithy file=../x.smithy\n```", "I expected a plain file name"),
+    ("```smithy file=a/b.smithy\n```", "I expected a plain file name"),
+    ("```smithy file=..\n```", "I expected a plain file name"),
+    ("```console\n$ smithy x\n", "I found a fence that never closes"),
+  ]
+  for c in cases {
+    let (md, text) = c
+    match doc_steps(md) {
+      Err(msg) => assert_true(msg.contains(text), msg="\{msg} lacks \{text}")
+      Ok(_) => fail("expected an error for \{md}")
+    }
+  }
+}
+
+///|
+test "shell_words keeps a single-quoted word" {
+  assert_eq(
+    shell_words("smithy select --selector 'structure > member' m.smithy"),
+    Ok(["smithy", "select", "--selector", "structure > member", "m.smithy"]),
+  )
+}
+
+///|
+test "shell_words rejects shell characters and an unclosed quote" {
+  for bad in ["a | b", "a > b", "a < b", "a; b", "a & b", "a \"b\"", "a `b`", "a $b", "a \\b"] {
+    assert_true(shell_words(bad) is Err(_), msg=bad)
+  }
+  assert_true(shell_words("a 'b") is Err(_))
 }
