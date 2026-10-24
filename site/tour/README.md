@@ -159,6 +159,8 @@ Write `lesson.md` in ASD-STE100 Simplified Technical English:
 - Link to another lesson by the path of its `lesson.md`, for example `../04-shape-ids/lesson.md`. The site
   opens the page of that lesson, and the link also works on GitHub. A test of `site/tour/check`
   (`links_test.mbt`) fails on a link into `site/tour/lessons` that does not open a lesson page.
+- Link to the playground by the path of its README, `../../../playground/README.md`. The site opens the
+  playground page in the channel of the lesson, and the link also works on GitHub.
 - Every claim of the text is a case. When the text says that the Findings tab shows an error, add a case with
   that error in `events`. When the text says what the output contains, add a needle. A claim about the CLI or
   the API is an include block (see "CLI and API blocks"), which `mise run test:cli` or `moon test` runs.

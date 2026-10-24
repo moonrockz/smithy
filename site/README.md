@@ -258,3 +258,5 @@ A tour lesson never holds a CLI or API block that no test runs. It includes a ma
 and the lesson reader (`site/tour/source`) replaces the include block with a tab group. The format and the rules
 are in `site/tour/README.md`, section "CLI and API blocks". A bad include or a hand-written CLI or API block fails
 `mise run tour:check` (the CI job `tour`, on every pull request) and `mise run site:check`.
+
+A link to `site/playground/README.md` opens the playground.

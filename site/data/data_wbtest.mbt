@@ -207,3 +207,22 @@ test "channel names round-trip" {
   }
   assert_eq(Channel::parse("beta"), None)
 }
+
+///|
+test "a lesson link to the playground README opens the playground" {
+  let data = sample()
+  let ctx = link_context(
+    data.config,
+    data.manifest(),
+    data.examples,
+    "site/tour/lessons/33-where-next/lesson.md",
+  )
+  assert_eq(playground_source, "site/playground/README.md")
+  let target = @markdown.rewrite_link("../../../playground/README.md", ctx)
+  assert_eq(target, Internal(Playground, None))
+  assert_eq(
+    @route.href("/smithy/next/", Playground),
+    "/smithy/next/playground/",
+  )
+  assert_eq(@route.href("/smithy/", Playground), "/smithy/playground/")
+}
