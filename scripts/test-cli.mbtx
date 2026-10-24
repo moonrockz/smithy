@@ -1642,7 +1642,7 @@ async fn exercise_engine_cases(runner : Runner, root : String) -> Unit {
     fail("cli-cases.json must have a cases array")
   }
   // The ids that the file must hold: a case lost in a merge fails here.
-  let expected_ids = ["value-consumer-valid", "value-consumer-invalid", "value-unknown-reject", "value-unknown-ignore", "value-json-names", "value-member-target", "value-not-json", "value-duplicate-key", "value-missing-target", "value-invalid-model", "value-unsupported-pattern", "value-unsupported-timestamp", "value-json-limit", "rpc-call", "rpc-invalid", "rpc-reply", "rpc-error", "rpc-reply-no-context", "rpc-not-json", "rpc-missing-service", "rpc-legacy-call", "rpc-legacy-error", "rpc-legacy-opaque", "rpc-legacy-version-2", "rpc-envelope-only", "rpc-unknown-reject", "rpc-unknown-ignore"]
+  let expected_ids = ["value-consumer-valid", "value-consumer-invalid", "value-unknown-reject", "value-unknown-ignore", "value-json-names", "value-member-target", "value-not-json", "value-duplicate-key", "value-missing-target", "value-invalid-model", "value-unsupported-pattern", "value-unsupported-timestamp", "value-json-limit", "rpc-call", "rpc-invalid", "rpc-reply", "rpc-error", "rpc-reply-no-context", "rpc-not-json", "rpc-missing-service", "rpc-legacy-call", "rpc-legacy-error", "rpc-legacy-opaque", "rpc-legacy-version-2", "rpc-envelope-only", "rpc-unknown-reject", "rpc-unknown-ignore", "diff-constraints-added"]
   let seen : Array[String] = []
   for item in cases {
     guard item is { "id": String(id), .. } else {
@@ -1696,6 +1696,81 @@ async fn exercise_engine_cases(runner : Runner, root : String) -> Unit {
     let expected = Json::array(lines).stringify()
     let got = Json::array(printed).stringify()
     assert_eq(got, expected, msg="\{id}: the CLI printed \{got} but the case has \{expected}")
+  }
+}
+
+///|
+/// The pairs of `tests/tck/diff/events.json` that have files (the 21 mutation
+/// cases have none): the lines that `smithy diff` prints for each pair, sorted,
+/// are the corpus events without SUPPRESSED, and the status is 1 when the pair
+/// is breaking. With `all` false, only the first 5 pairs run.
+async fn exercise_diff_corpus(runner : Runner, root : String, all~ : Bool) -> Unit {
+  let corpus = "\{root}/tests/tck/diff"
+  guard @json.parse(@fs.read_file("\{corpus}/events.json").text())
+    is { "cases": Array(cases), .. } else {
+    fail("events.json must have a cases array")
+  }
+  let mut ran = 0
+  for item in cases {
+    if item is { "mutations": _, .. } {
+      continue
+    }
+    if !all && ran >= 5 {
+      break
+    }
+    guard item
+      is {
+        "old": String(old),
+        "new": String(new),
+        "breaking": breaking,
+        "events": Array(events),
+        ..
+      } else {
+      fail("a corpus case needs old, new, breaking and events")
+    }
+    let expected : Array[String] = []
+    for event in events {
+      guard event
+        is {
+          "id": String(id),
+          "shape": String(shape),
+          "severity": String(severity),
+          "message": String(message),
+          ..
+        } else {
+        fail("\{old}: an event needs id, shape, severity and message")
+      }
+      if severity != "SUPPRESSED" {
+        let escaped = message
+          .replace_all(old="\r\n", new="\n")
+          .replace_all(old="\n", new="\\n")
+        expected.push("[" + severity + "] " + shape + ": " + escaped + " | " + id)
+      }
+    }
+    let status : Int32 = if breaking is True { 1 } else { 0 }
+    let (out, _) = runner.command(
+      ["diff", "--old", "\{corpus}/\{old}", "--new", "\{corpus}/\{new}"],
+      status,
+    )
+    let printed : Array[String] = []
+    for line in out.split("\n") {
+      let line = line.to_owned()
+      if !line.is_empty() {
+        printed.push(line)
+      }
+    }
+    printed.sort_by((a, b) => a.lexical_compare(b))
+    expected.sort_by((a, b) => a.lexical_compare(b))
+    assert_eq(
+      Json::array(printed.map(Json::string)).stringify(),
+      Json::array(expected.map(Json::string)).stringify(),
+      msg="\{runner.target}: \{old}",
+    )
+    ran += 1
+  }
+  assert_true(ran >= 5, msg="the corpus ran \{ran} pairs")
+  if all {
+    assert_eq(ran, 67)
   }
 }
 
@@ -1774,6 +1849,7 @@ async fn exercise(
   let (json_diff, _) = runner.command(["diff", "--old", "old-ast.json", "--new", "input.smithy"], 0)
   assert_eq(json_diff, "")
   exercise_diff_jsonl(runner, root)
+  exercise_diff_corpus(runner, root, all=target == "native")
   let (version, _) = runner.command(["version"], 0)
   assert_true(version.has_prefix("smithy "))
   let (help, _) = runner.command(["--help"], 0)

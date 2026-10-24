@@ -32,6 +32,7 @@ let expected_ids : Array[String] = [
   "value-json-limit", "rpc-call", "rpc-invalid", "rpc-reply", "rpc-error", "rpc-reply-no-context",
   "rpc-not-json", "rpc-missing-service", "rpc-legacy-call", "rpc-legacy-error", "rpc-legacy-opaque",
   "rpc-legacy-version-2", "rpc-envelope-only", "rpc-unknown-reject", "rpc-unknown-ignore",
+  "diff-constraints-added",
 ]
 
 ///|
@@ -108,7 +109,8 @@ fn file_of(files : Map[String, String], name : String) -> String raise {
 
 ///|
 /// The core request for the arguments of a CLI run, and the input file name
-/// that `cli_line` prints. It knows `validate value` and `validate rpc`.
+/// that `cli_line` prints. It knows `validate value`, `validate rpc` and `diff --old A --new B`
+/// (one file each).
 fn request_of(
   args : Array[String],
   files : Map[String, String],
@@ -116,6 +118,13 @@ fn request_of(
   match args {
     ["validate", "value", .. rest] => value_request_of(rest, files)
     ["validate", "rpc", .. rest] => rpc_request_of(rest, files)
+    ["diff", "--old", old, "--new", new] =>
+      (
+        DiffModels(seq=1, old=[(old, file_of(files, old))], new=[
+          (new, file_of(files, new)),
+        ]),
+        "",
+      )
     _ =>
       fail("the differential test does not know the command \{args.join(" ")}")
   }
@@ -282,6 +291,58 @@ fn rpc_request_of(
 }
 
 ///|
+/// The lines of `smithy diff --old A --new B`: the events (stdout), then, on
+/// stderr, the ERROR, DANGER and WARNING findings of each model with its path.
+/// `ModelNotBuilt` is a finding for the page only; the CLI prints no line for it.
+fn diff_lines(
+  old_path : String,
+  new_path : String,
+  old : Array[@core.Diagnostic],
+  new : Array[@core.Diagnostic],
+  events : Array[@core.DiffEvent]?,
+) -> Array[String] {
+  let lines = match events {
+    Some(events) => events.map(@core.DiffEvent::cli_line)
+    None => []
+  }
+  for side in [(old_path, old), (new_path, new)] {
+    for d in side.1 {
+      if d.code != "ModelNotBuilt" &&
+        (
+          d.severity == "ERROR" ||
+          d.severity == "DANGER" ||
+          d.severity == "WARNING"
+        ) {
+        let event : @core.DiffEvent = {
+          id: d.code,
+          severity: d.severity,
+          shape: d.shape,
+          message: d.message,
+        }
+        lines.push("\{side.0}: \{event.cli_line()}")
+      }
+    }
+  }
+  lines
+}
+
+///|
+test "ModelNotBuilt never enters the CLI lines" {
+  let page_only : @core.Diagnostic = {
+    severity: "ERROR",
+    code: "ModelNotBuilt",
+    message: "I could not build a model from the text, and I have no error to show.",
+    file: "",
+    start_line: 0,
+    start_column: 0,
+    end_line: 0,
+    end_column: 0,
+    shape: None,
+  }
+  assert_eq(diff_lines("a", "b", [page_only], [page_only], None), [])
+}
+
+///|
 test "every CLI case gives the CLI lines and the CLI status in the core" {
   for c in load_cases() {
     let (request, file) = request_of(c.args, c.files)
@@ -303,6 +364,24 @@ test "every CLI case gives the CLI lines and the CLI status in the core" {
         if lines != c.lines || c.status != 2 {
           fail(
             "\{c.id}: the core blocked with \{Json(lines).stringify()} but the CLI printed \{Json(c.lines).stringify()} with status \{c.status}",
+          )
+        }
+      }
+      Diffed(old~, new~, events~, breaking~, ..) => {
+        let (old_path, new_path) = match c.args {
+          ["diff", "--old", old, "--new", new] => (old, new)
+          _ => fail("\{c.id}: I expected diff arguments")
+        }
+        let lines = diff_lines(old_path, new_path, old, new, events)
+        if lines != c.lines {
+          fail(
+            "\{c.id}: the core gave \{Json(lines).stringify()} but the CLI printed \{Json(c.lines).stringify()}",
+          )
+        }
+        let status = if events is Some(_) && !breaking { 0 } else { 1 }
+        if status != c.status {
+          fail(
+            "\{c.id}: the core means status \{status} but the CLI status is \{c.status}",
           )
         }
       }

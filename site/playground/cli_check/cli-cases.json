@@ -738,6 +738,33 @@
       ],
       "status": 0,
       "lines": []
+    },
+    {
+      "id": "diff-constraints-added",
+      "args": [
+        "diff",
+        "--old",
+        "old.smithy",
+        "--new",
+        "new.smithy"
+      ],
+      "files": [
+        {
+          "name": "old.smithy",
+          "from": "tests/tck/diff/local/constraints-added.a.smithy"
+        },
+        {
+          "name": "new.smithy",
+          "from": "tests/tck/diff/local/constraints-added.b.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": [
+        "[NOTE] example.constraints#LengthMax: Added trait `smithy.api#length` with value \\n```\\n{\\n    \"max\": 10\\n}\\n```\\n | ModifiedTrait.Add.smithy.api#length",
+        "[NOTE] example.constraints#LengthMin: Added trait `smithy.api#length` with value \\n```\\n{\\n    \"min\": 1\\n}\\n```\\n | ModifiedTrait.Add.smithy.api#length",
+        "[NOTE] example.constraints#RangeMax: Added trait `smithy.api#range` with value \\n```\\n{\\n    \"max\": 10\\n}\\n```\\n | ModifiedTrait.Add.smithy.api#range",
+        "[NOTE] example.constraints#RangeMin: Added trait `smithy.api#range` with value \\n```\\n{\\n    \"min\": -10\\n}\\n```\\n | ModifiedTrait.Add.smithy.api#range"
+      ]
     }
   ]
 }
