@@ -295,7 +295,7 @@ async function expectApiShown({ cli, api }) {
 }
 
 test("the include tabs switch without a reload", async ({ page }) => {
-  await page.goto(lessonUrl);
+  await openLesson(page);
   const tabs = includeTabs(page);
   await expectCliShown(tabs);
 
@@ -306,6 +306,28 @@ test("the include tabs switch without a reload", async ({ page }) => {
   await page.locator("#tabs-1-2").focus();
   await page.keyboard.press("ArrowLeft");
   await expectCliShown(tabs);
+  await expect(page.locator("#tabs-1-1")).toBeChecked();
+  expect(page.errors).toEqual([]);
+});
+
+test("the selected include tab stays after an edit and its answer", async ({ page }) => {
+  await openLesson(page);
+  const tabs = includeTabs(page);
+  await tabs.label("MoonBit").click();
+  await expectApiShown(tabs);
+
+  // Delete the namespace line: the editor, the findings and the output all re-render.
+  await page.locator("#tour-editor .cm-content").click();
+  await page.keyboard.press("ControlOrMeta+Home");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Shift+End");
+  await page.keyboard.press("Backspace");
+  await settled(page);
+  await page.getByRole("tab", { name: /Findings/ }).click();
+  await expect(page.locator(".tour-finding")).toHaveCount(1);
+  await expect(page.locator("#tabs-1-2")).toBeChecked();
+  await expectApiShown(tabs);
   expect(page.errors).toEqual([]);
 });
 
