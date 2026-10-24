@@ -185,8 +185,10 @@ test "documentation comments that Smithy reads or drops are not warnings" {
     guard r.ast is Some(f) && f.shapes()[0].shape is Aggregate(members~, ..) else {
       fail("no members")
     }
+    // Smithy documents `S$b` with `x` here (smithy-2qe.41.20). Change this
+    // expectation when the AST follows it.
     e.expect(members[1].docs.length()).to_equal(0)
-    // Before `:=`, and at the end of a file with no shape statement.
+    // Before `:=`.
     e
     .expect(
       dcodes(
@@ -200,16 +202,27 @@ test "documentation comments that Smithy reads or drops are not warnings" {
       ),
     )
     .to_equal([])
+  })
+}
+
+///|
+test "a documentation comment at the end of a file without a shape is its own warning" {
+  // Smithy drops it without an event, so it has a code of its own.
+  let r = dmodel(
+    (
+      #|/// x
+      #|/// y
+      #|
+    ),
+  )
+  @expect.expect(r.diagnostics.map(d => d.code)).to_equal(["SM-PARSE-016"])
+  @expect.expect_all(e => {
+    e.expect(r.has_errors()).to_be_false()
     e
-    .expect(
-      dcodes(
-        (
-          #|/// x
-          #|
-        ),
-      ),
+    .expect(r.diagnostics[0].message)
+    .to_equal(
+      "I ignored 2 documentation comments, from `/// x`, because no shape follows them",
     )
-    .to_equal([])
   })
 }
 

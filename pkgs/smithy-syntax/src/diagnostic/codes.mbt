@@ -24,6 +24,9 @@ let table : Array[(String, String)] = [
   ("SM-PARSE-013", "Duplicate control statement"),
   ("SM-PARSE-014", "Duplicate member name"),
   ("SM-PARSE-015", "Syntax that needs Smithy IDL version 1"),
+  (
+    "SM-PARSE-016", "Documentation comment at the end of a file without a shape (warning)",
+  ),
 ]
 
 ///|

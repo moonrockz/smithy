@@ -494,12 +494,12 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
       Idl(name~, text~) => {
         let parsed = @syntax.parse_idl(text, name~)
         for d in parsed.diagnostics {
-          guard syntax_event_id(d.code) is Some(event_id) else { continue }
+          let (event_id, report) = syntax_event(d.code)
           assembly.diagnostics.push({
             code: d.code,
             event_id,
             severity: d.severity,
-            report: Event,
+            report,
             message: d.message,
             source: assembly.location(name, span=d.span),
             shape: None,
@@ -582,13 +582,15 @@ pub fn Loader::assemble(self : Loader) -> LoadResult {
 }
 
 ///|
-/// The validation event ID of the IDL syntax diagnostic `code`, or `None` when
-/// Smithy reports nothing for it.
-fn syntax_event_id(code : String) -> String? {
+/// The validation event ID of the IDL syntax diagnostic `code`, and how the
+/// validation events report it.
+fn syntax_event(code : String) -> (String, DiagnosticReport) {
   match code {
     // Smithy builds this event and then drops it (IdlModelLoader.java:415).
-    "SM-PARSE-008" => None
-    "SM-PARSE-009" => Some("Model.BadDocumentationComment")
-    _ => Some("Model")
+    "SM-PARSE-008" => ("Model.BadDocumentationComment", HintOnly)
+    "SM-PARSE-009" => ("Model.BadDocumentationComment", Event)
+    // Smithy stops before it reads these comments (IdlModelLoader.java:452).
+    "SM-PARSE-016" => ("Model.BadDocumentationComment", HintOnly)
+    _ => ("Model", Event)
   }
 }

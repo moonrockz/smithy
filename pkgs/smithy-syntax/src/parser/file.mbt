@@ -407,12 +407,17 @@ pub fn parse_tokens(stream : @scanner.TokenStream) -> ParseResult {
     }
   }
   // Smithy warns about doc comments at the end of the file once it has
-  // read a shape statement, and drops them before that.
+  // read a shape statement. Before that it drops them without an event, so
+  // they have a code of their own.
+  p.stray_docs_before(p.text_end.next())
   if section is ShapeSection {
-    p.stray_docs_before(p.text_end.next())
     p.report_stray_docs()
   } else {
-    ignore(p.take_docs_before(p.text_end.next()))
+    p.report_stray_docs(
+      code="SM-PARSE-016",
+      why_one="because no shape follows it",
+      why_many="because no shape follows them",
+    )
   }
   // A tree when a statement was read, or when there was nothing to read:
   // an empty or comment-only file is a valid, empty `IdlFile` with an

@@ -1352,6 +1352,16 @@ async fn exercise_bad_doc_comment(runner : Runner) -> Unit {
     msg=info.stringify(),
   )
   runner.command(["clean", "--config", "docs-build.json"], 0) |> ignore
+  // Smithy reports no event for a doc comment before `apply`; the CLI still
+  // shows the hint where it prints diagnostics.
+  @fs.write_file(
+    dir + "/apply-docs.smithy",
+    "$version: \"2\"\nnamespace example\n\nstring Name\n\n/// Ignored.\napply Name @sensitive\n",
+  )
+  let (validate_out, validate_err) = runner.command(["validate", "apply-docs.smithy"], 0)
+  assert_eq((validate_out + validate_err).trim_end(), "")
+  let (ast_out, ast_err) = runner.command(["ast", "apply-docs.smithy"], 0)
+  assert_true((ast_out + ast_err).contains("warning[SM-PARSE-008]"), msg=ast_err)
 }
 
 ///|

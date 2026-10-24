@@ -495,14 +495,20 @@ fn Parser::end_line(self : Parser) -> Unit {
 
 ///|
 /// Report the stray doc comments as one warning, as Smithy reports its
-/// pending documentation lines when it clears them.
-fn Parser::report_stray_docs(self : Parser) -> Unit {
+/// pending documentation lines when it clears them. `why_one` and
+/// `why_many` end the message for one comment and for more.
+fn Parser::report_stray_docs(
+  self : Parser,
+  code~ : String = "SM-PARSE-009",
+  why_one~ : String = "because it is not right before a shape or member and its traits",
+  why_many~ : String = "because they are not right before a shape or member and its traits",
+) -> Unit {
   guard self.stray_docs.length() > 0 else { return }
   let first = self.stray_docs[0]
   let message = if self.stray_docs.length() == 1 {
-    "I ignored the documentation comment `///\{first.text}`, because it is not right before a shape or member and its traits"
+    "I ignored the documentation comment `///\{first.text}`, \{why_one}"
   } else {
-    "I ignored \{self.stray_docs.length()} documentation comments, from `///\{first.text}`, because they are not right before a shape or member and its traits"
+    "I ignored \{self.stray_docs.length()} documentation comments, from `///\{first.text}`, \{why_many}"
   }
   let labels = self.stray_docs[1:]
     .iter()
@@ -513,7 +519,7 @@ fn Parser::report_stray_docs(self : Parser) -> Unit {
     .collect()
   self.diagnostics.push(
     @diagnostic.Diagnostic::new(
-      code="SM-PARSE-009",
+      code~,
       severity=Warning,
       title="DETACHED DOC COMMENT",
       message~,

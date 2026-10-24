@@ -806,9 +806,7 @@ pub fn Model::validation_events(self : Model) -> Array[ValidationEvent] {
   let assembly = Assembly::new()
   assembly.validate(self, check_trait_definitions=false)
   self.collect_validation_events(
-    assembly.diagnostics
-    .filter(d => d.report != CoveredBySelector)
-    .map(diagnostic_event),
+    assembly.diagnostics.filter(d => d.report.has_event()).map(diagnostic_event),
   )
 }
 

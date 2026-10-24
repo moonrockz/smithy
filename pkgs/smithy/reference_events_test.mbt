@@ -397,3 +397,30 @@ test "an elided member that nothing defines is one Model error on the member, as
     ["Model|ERROR|example#GetOutput$population"],
   )
 }
+
+///|
+/// The IDL diagnostic codes and validation event IDs of the one-file model
+/// `text`.
+fn hints_and_events(text : String) -> (Array[String], Array[String]) {
+  let result = @smithy.Loader::new().add_idl("model.smithy", text).assemble()
+  (
+    result.diagnostics.map(d => d.code),
+    result.validation_events().map(e => e.id),
+  )
+}
+
+///|
+test "a documentation comment that Smithy drops silently stays a diagnostic for tools, with no event" {
+  // Before `apply`: Smithy builds the event and drops it (IdlModelLoader.java:415).
+  assert_eq(
+    hints_and_events(
+      "$version: \"2\"\nnamespace example\nstring Foo\n/// no\napply Foo @deprecated\n",
+    ),
+    (["SM-PARSE-008"], []),
+  )
+  // At the end of a file without a shape statement: Smithy never reads it.
+  assert_eq(
+    hints_and_events("$version: \"2\"\nnamespace example\n/// lonely\n"),
+    (["SM-PARSE-016"], []),
+  )
+}
