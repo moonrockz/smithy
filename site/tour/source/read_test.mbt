@@ -1,6 +1,6 @@
 ///|
 fn read(name : String) -> Result[@model.Tour, String] {
-  @source.read_tour("tour/source/testdata/\{name}")
+  @source.read_tour("tour/source/testdata/\{name}", repo="..")
 }
 
 ///|
@@ -179,4 +179,34 @@ test "a spec that is the path of a file that the site does not publish" {
     "unpublished-spec", "site/tour/lessons/01-hello-smithy/lesson.md",
   )
   expect_bad_spec("working-doc-spec", "docs/superpowers/plan.md")
+}
+
+///|
+test "an include of the CLI block becomes a tabs fence" {
+  let tour = match read("include-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let text = tour.lessons[0].text
+  assert_true(text.contains("```tabs"))
+  assert_false(text.contains("```include"))
+}
+
+///|
+test "an include of a missing file" {
+  expect_err("include-missing-file", [
+    "01-", "lesson.md", "I could not find the file apps/smithy/NOPE.md",
+  ])
+}
+
+///|
+test "an include of a missing marker" {
+  expect_err("include-missing-marker", [
+    "lesson.md", "<!-- tour:start no-such-block -->",
+  ])
+}
+
+///|
+test "a hand-written console block" {
+  expect_err("hand-written", ["lesson.md", "`console`"])
 }

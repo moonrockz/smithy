@@ -1,7 +1,8 @@
 ///|
 /// Read the lessons folder. The error names the folder and the problem.
-pub fn read_tour(root : String) -> Result[@model.Tour, String] {
-  Ok(read_root(root)) catch {
+/// `repo` is the repository root that include paths are relative to.
+pub fn read_tour(root : String, repo~ : String) -> Result[@model.Tour, String] {
+  Ok(read_root(root, repo)) catch {
     Failure(msg) => Err(msg)
     e => Err("\{root}: \{e}")
   }
@@ -34,14 +35,14 @@ fn is_dir(path : String) -> Bool raise {
 }
 
 ///|
-fn read_root(root : String) -> @model.Tour raise {
+fn read_root(root : String, repo : String) -> @model.Tour raise {
   let lessons : Array[@model.Lesson] = []
   for name in list_dir(root) {
     let path = "\{root}/\{name}"
     if !is_dir(path) {
       continue
     }
-    lessons.push(read_lesson(root, name))
+    lessons.push(read_lesson(root, name, repo))
   }
   if lessons.is_empty() {
     fail("\{root}: I found no lesson folder")
@@ -83,7 +84,11 @@ fn parse_number(dir : String) -> Int32 raise {
 }
 
 ///|
-fn read_lesson(root : String, dir : String) -> @model.Lesson raise {
+fn read_lesson(
+  root : String,
+  dir : String,
+  repo : String,
+) -> @model.Lesson raise {
   let base = "\{root}/\{dir}"
   let number = parse_number(dir)
   let meta = read_json("\{base}/lesson.json")
@@ -117,14 +122,18 @@ fn read_lesson(root : String, dir : String) -> @model.Lesson raise {
   if selector is Some(_) && !(output is Some(@samples.Output::Selector)) {
     fail("\{dir}: \"selector\" is for the output Selector only")
   }
-  let text = io("\{base}/lesson.md", () => {
+  let raw = io("\{base}/lesson.md", () => {
     @fs.read_file_to_string("\{base}/lesson.md")
   })
-  let first = text.split("\n").next().unwrap_or("")
+  let first = raw.split("\n").next().unwrap_or("")
   if first.trim_end(chars="\r").to_owned() != "# \{title}" {
     fail(
       "\{dir}/lesson.md: I expected the first line \"# \{title}\", but found \"\{first}\"",
     )
+  }
+  let text = match check_hand_written(raw) {
+    Ok(_) => text_of(dir, repo, raw)
+    Err(e) => fail("\{dir}/lesson.md: \{e}")
   }
   let files = read_files("\{base}/files", "\{dir}/files")
   if files.is_empty() {
@@ -143,6 +152,14 @@ fn read_lesson(root : String, dir : String) -> @model.Lesson raise {
     text,
     files,
     cases,
+  }
+}
+
+///|
+fn text_of(dir : String, repo : String, raw : String) -> String raise {
+  match @markdown.expand_includes(raw, inc => resolve_include(repo, inc)) {
+    Ok(text) => text
+    Err(e) => fail("\{dir}/lesson.md: \{e}")
   }
 }
 

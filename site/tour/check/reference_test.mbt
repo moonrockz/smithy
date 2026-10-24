@@ -471,7 +471,7 @@ fn document_pair(
 ///|
 /// The tour, the reference results and the allow list.
 fn inputs() -> (@model.Tour, Map[@model.CaseId, ReferenceCase], Array[Allowed]) raise {
-  let tour = match @source.read_tour(lessons_root) {
+  let tour = match @source.read_tour(lessons_root, repo="..") {
     Ok(tour) => tour
     Err(e) => fail("I cannot read the tour: " + e)
   }

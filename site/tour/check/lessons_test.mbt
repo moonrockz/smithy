@@ -126,7 +126,7 @@ test "output strings need an output that can run" {
 
 ///|
 test "the tour has lessons" {
-  match @source.read_tour(lessons_root) {
+  match @source.read_tour(lessons_root, repo="..") {
     Ok(tour) => assert_true(tour.lessons.length() > 0)
     Err(e) => fail("I cannot read the tour: " + e)
   }
@@ -134,7 +134,7 @@ test "the tour has lessons" {
 
 ///|
 test "every lesson case gives the findings and the output that its expect.json names" {
-  let tour = match @source.read_tour(lessons_root) {
+  let tour = match @source.read_tour(lessons_root, repo="..") {
     Ok(tour) => tour
     Err(e) => fail("I cannot read the tour: " + e)
   }

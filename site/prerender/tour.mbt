@@ -2,7 +2,7 @@
 /// The lessons of the checkout `content`. Every channel builds its own
 /// checkout, so a lessons folder that does not read is a broken build.
 fn load_tour(content : String) -> Result[@model.Tour, String] {
-  @source.read_tour(content + "/" + @model.lessons_root)
+  @source.read_tour(content + "/" + @model.lessons_root, repo=content)
 }
 
 ///|
