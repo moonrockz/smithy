@@ -4,9 +4,14 @@
 const MODEL_FILE : String = "model.smithy"
 
 ///|
-/// Load the model text with the `smithy.rpc` traits, as the CLI does.
-fn load(model : String) -> @smithy.LoadResult {
-  @rpc.loader().add_idl(MODEL_FILE, model).assemble()
+/// Load the model files, as (name, text), with the `smithy.rpc` traits, as the
+/// CLI does.
+fn load(files : Array[(String, String)]) -> @smithy.LoadResult {
+  let loader = @rpc.loader()
+  for file in files {
+    ignore(loader.add_idl(file.0, file.1))
+  }
+  loader.assemble()
 }
 
 ///|
@@ -25,7 +30,7 @@ let http_protocols : @lazy.Lazy[@smithy.Model?] = Lazy(() => {
 /// defaults, as `smithy build` does for the openapi plugin. The model needs
 /// them to name `aws.protocols#restJson1`.
 fn load_with_http_protocols(
-  model : String,
+  files : Array[(String, String)],
 ) -> Result[@smithy.LoadResult, String] {
   let failure = "Could not load bundled OpenAPI protocol definitions"
   guard http_protocols.force() is Some(protocols) else { return Err(failure) }
@@ -33,7 +38,10 @@ fn load_with_http_protocols(
   ignore(loader.add_defaults(protocols)) catch {
     _ => return Err(failure)
   }
-  Ok(loader.add_idl(MODEL_FILE, model).assemble())
+  for file in files {
+    ignore(loader.add_idl(file.0, file.1))
+  }
+  Ok(loader.assemble())
 }
 
 ///|
@@ -79,18 +87,22 @@ fn clean_model(
 ///|
 fn diagnostic_of(
   event : @smithy.ValidationEvent,
-  source : @syntax.SourceText,
+  sources : Map[String, @syntax.SourceText],
 ) -> Diagnostic {
   let (file, start, end) = match event.source {
     None => ("", (0, 0), (0, 0))
     Some(location) =>
       match location.span {
-        Some(span) if location.file == MODEL_FILE => {
-          let a = source.position(span.start)
-          let b = source.position(span.end())
-          (location.file, (a.line.0, a.column.0), (b.line.0, b.column.0))
-        }
-        _ => (location.file, (0, 0), (0, 0))
+        Some(span) =>
+          match sources.get(location.file) {
+            Some(source) => {
+              let a = source.position(span.start)
+              let b = source.position(span.end())
+              (location.file, (a.line.0, a.column.0), (b.line.0, b.column.0))
+            }
+            None => (location.file, (0, 0), (0, 0))
+          }
+        None => (location.file, (0, 0), (0, 0))
       }
   }
   {
@@ -195,12 +207,15 @@ fn protocols_of(model : @smithy.Model) -> Array[ProtocolView] {
 }
 
 ///|
-fn validate(seq : Int32, model : String) -> Response {
-  let loaded = load(model)
-  let source = @syntax.SourceText::new(model)
+fn validate(seq : Int32, files : Array[(String, String)]) -> Response {
+  let loaded = load(files)
+  let sources : Map[String, @syntax.SourceText] = Map([])
+  for file in files {
+    sources[file.0] = @syntax.SourceText::new(file.1)
+  }
   let items = loaded
     .validation_events()
-    .map(event => diagnostic_of(event, source))
+    .map(event => diagnostic_of(event, sources))
   let (shapes, protocols) = match loaded.model {
     Some(model) => (shape_count(model), protocols_of(model))
     None => (0, [])

@@ -208,17 +208,17 @@ fn run_output(
 ///|
 fn transform(
   seq : Int32,
-  model : String,
+  files : Array[(String, String)],
   output : Output,
   selector : String?,
 ) -> Response {
   let loaded = match output {
     OpenApi30 | OpenApi31 =>
-      match load_with_http_protocols(model) {
+      match load_with_http_protocols(files) {
         Ok(loaded) => loaded
         Err(reason) => return blocked(seq~, reason~)
       }
-    _ => load(model)
+    _ => load(files)
   }
   match clean_model(loaded) {
     Err((reason, kind)) => Blocked(seq~, reason~, kind~)

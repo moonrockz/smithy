@@ -3,9 +3,12 @@
 /// request starts, steps or resets the transcript that the session holds.
 pub fn handle(session : Session, request : Request) -> Response {
   match request {
-    Validate(seq~, model~) => validate(seq, model)
+    Validate(seq~, model~) => validate(seq, [(MODEL_FILE, model)])
     Transform(seq~, model~, output~, selector~) =>
-      transform(seq, model, output, selector)
+      transform(seq, [(MODEL_FILE, model)], output, selector)
+    ValidateFiles(seq~, files~) => validate(seq, files)
+    TransformFiles(seq~, files~, output~, selector~) =>
+      transform(seq, files, output, selector)
     TranscriptStart(
       seq~,
       model~,

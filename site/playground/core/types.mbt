@@ -21,6 +21,16 @@ pub(all) enum Request {
     output~ : Output,
     selector~ : String?
   )
+  /// Validate a model of several files, as (name, text). Each name is the
+  /// loader file name and the `file` of the findings in it.
+  ValidateFiles(seq~ : Int32, files~ : Array[(String, String)])
+  /// Convert a model of several files, as `Transform` does for one.
+  TransformFiles(
+    seq~ : Int32,
+    files~ : Array[(String, String)],
+    output~ : Output,
+    selector~ : String?
+  )
   /// Load a transcript and check its first entries. `log_preset` applies to
   /// the format Jsonl only, as the CLI option --log-preset; `None` is
   /// `DirMessage([])`. `version` is the CLI option --version: a log needs it,
