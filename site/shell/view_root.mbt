@@ -48,7 +48,15 @@ pub fn view(m : Model, emit : @rabbita.Emit[Msg], site_json : String) -> Html {
         name="description",
         content="Smithy for MoonBit: load, validate, build and diff Smithy models.",
       ),
-      link(rel="icon", href=base + "favicon.png"),
+      link(rel="icon", href=base + "favicon.ico", sizes="16x16 32x32 48x48"),
+      link(
+        rel="icon",
+        type_="image/png",
+        href=base + "favicon-32.png",
+        sizes="32x32",
+      ),
+      link(rel="apple-touch-icon", href=base + "apple-touch-icon.png"),
+      link(rel="manifest", href=base + "manifest.json"),
       link(rel="preconnect", href="https://fonts.googleapis.com"),
       link(
         rel="stylesheet",
