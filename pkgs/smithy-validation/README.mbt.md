@@ -86,7 +86,7 @@ See [RFC 3339 sections 4.3 and 5.7](https://www.rfc-editor.org/rfc/rfc3339).
 
 The portable pattern profile supports literals, classes/ranges, groups, alternation, repetitions,
 whole-input anchors and common digit/word/whitespace escapes. Dot excludes line terminators.
-A '-' at the start or end of a class, or after a range or a class escape, is a literal, as in ECMA-262. A '-' between a class escape and another item is a literal, and both items join the class.
+A '-' at the start or end of a class, or after a range, is a literal, as in ECMA-262. A '-' after a class escape is a literal, so `[\d-a]` matches a digit, '-' or 'a'. A '-' before a class escape, as in `[a-\d]`, fails preparation.
 A class range cannot end in `\d`, `\w` or `\s`. A `\u{...}` escape fails preparation; write `\uXXXX`.
 Lookaround, backreferences, flags, Unicode properties, complement escapes inside classes and
 unsupported core regex constructs fail preparation. Matching searches unless anchored. This is
