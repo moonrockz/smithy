@@ -24,6 +24,6 @@ Now suppress the warning. Put this line directly before the line `temperature: F
 @suppress(["DeprecatedShape"])
 ```
 
-The trait [`@suppress`](https://smithy.io/2.0/spec/model-validation.html#suppress-trait) suppresses the events with these IDs on its shape. The Findings tab still lists the event, marked `SUPPRESSED`. The specification defines four severities, and `SUPPRESSED` is not one of them. It tells you that a suppression matched the event. The model has no warning now.
+The trait [`@suppress`](https://smithy.io/2.0/spec/model-validation.html#suppress-trait) suppresses the events with these IDs on its shape. The Findings tab still lists the event, marked `SUPPRESSED`. The specification defines four severities, and `SUPPRESSED` is not one of them. The mark `SUPPRESSED` tells you that a suppression matched the event. The model has no warning now.
 
 To suppress events in a full namespace or in the full model, use the [metadata `suppressions`](https://smithy.io/2.0/spec/model-validation.html#suppression-metadata).
