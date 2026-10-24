@@ -140,5 +140,5 @@ fn tabs_view(id : String, tabs : Array[@markdown.Tab]) -> Html {
     }
     kids.push(@html.div(class="ms-tab-panel", panel))
   }
-  @html.div(class="ms-tabs", kids)
+  @html.div(class="ms-md-tabs", kids)
 }

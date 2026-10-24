@@ -49,3 +49,13 @@ test("a link to the playground loads its page and its script", async ({ page }) 
   await expect(page.locator("#pg-app")).toHaveCount(0);
   expect(page.errors).toEqual([]);
 });
+
+// The install tab bar of the landing page sits on its code box. The tab group
+// of a Markdown page has a class of its own, so its margin does not apply here.
+test("the landing page install tabs touch their code box", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(siteUrl(""));
+  const bar = await page.locator(".ms-start .ms-tabs").boundingBox();
+  const code = await page.locator(".ms-start .ms-code").boundingBox();
+  expect(Math.abs(code.y - (bar.y + bar.height))).toBeLessThanOrEqual(1);
+});

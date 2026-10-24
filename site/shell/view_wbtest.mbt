@@ -871,9 +871,36 @@ async test "a tab group renders radio tabs that work without JavaScript" {
     part in [
       "type=\"radio\"", "name=\"tabs-1\"", "id=\"tabs-1-1\"", "id=\"tabs-1-2\"",
       "for=\"tabs-1-2\"", "class=\"ms-tab-panel\"", "class=\"ms-codelabel\">greeting.smithy<",
+      // The landing page install bar owns the class `ms-tabs`.
+       "class=\"ms-md-tabs\"",
     ] {
     assert_true(html.contains(part))
   }
+  assert_false(html.contains("class=\"ms-tabs\""))
   let checked = html.split("checked").to_array().length() - 1
   assert_eq(checked, 1)
+}
+
+///|
+#cfg(not(target="js"))
+async test "two tab groups on a page do not share their radio names" {
+  let tabs : Array[@markdown.Tab] = [
+    { label: "A", snippets: [{ lang: "text", file: None, code: "a", }], },
+    { label: "B", snippets: [{ lang: "text", file: None, code: "b", }], },
+  ]
+  let fence = @markdown.tabs_fence(tabs)
+  let html = render_route(
+    Doc("smithy-syntax"),
+    Some("# T\n\n" + fence + "\n\nText.\n\n" + fence + "\n"),
+  )
+  for
+    part in [
+      "name=\"tabs-1\"", "id=\"tabs-1-1\"", "name=\"tabs-2\"", "id=\"tabs-2-1\"",
+      "for=\"tabs-2-2\"",
+    ] {
+    assert_true(html.contains(part))
+  }
+  // One checked tab in each group.
+  let checked = html.split("checked").to_array().length() - 1
+  assert_eq(checked, 2)
 }

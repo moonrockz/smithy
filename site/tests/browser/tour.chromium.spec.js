@@ -274,7 +274,7 @@ test("Undo after a file tab switch never moves the text of one file into another
 
 // The two tabs of the first include block of the lesson: the CLI and the MoonBit block.
 function includeTabs(page) {
-  const group = page.locator(".ms-tabs").first();
+  const group = page.locator(".ms-md-tabs").first();
   return {
     cli: group.locator(".ms-tab-panel").nth(0),
     api: group.locator(".ms-tab-panel").nth(1),
