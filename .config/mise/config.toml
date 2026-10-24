@@ -139,6 +139,10 @@ run = "moonx scripts/reference-openapi.mbtx"
 description = "Write the Java reference results (events, JSON Schema and OpenAPI, with the smithy.rpc traits for a case that uses them) of the tour lesson cases (requires a JDK; args: smithy checkout, --check)"
 run = "moonx scripts/reference-tour.mbtx"
 
+[tasks."tour:vendor:morphir"]
+description = "Vendor the pinned finos/morphir sources for the tour, hash-verified (args: checkout directory, default .dev/out/finos-morphir)"
+run = "moonx scripts/vendor-morphir.mbtx"
+
 [tasks."tour:check"]
 description = "Check the tour lessons against the playground core and the committed Java reference results (no bun, Java or browser)"
 run = "moon -C site test --target native -p moonrockz/smithy-site/tour/check"
