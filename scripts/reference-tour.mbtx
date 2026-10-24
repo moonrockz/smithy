@@ -1,0 +1,323 @@
+/// Write the Java reference results of the tour lesson cases to site/tour/reference-events.json.
+/// Requires a JDK with javac/java; generated code/classes stay under .dev/.
+/// Usage: moonx scripts/reference-tour.mbtx [CHECKOUT] [--check]
+/// CHECKOUT is a checkout of smithy-lang/smithy at the reference SHA (default .dev/out/reference-smithy).
+/// --check writes to a temporary file and fails when it differs from the committed file.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let reference_sha : String = "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
+
+///|
+let lessons_root : String = "site/tour/lessons"
+
+///|
+let results_path : String = "site/tour/reference-events.json"
+
+///|
+let scratch : String = ".dev/out/reference-tour"
+
+///|
+/// Reads the cases (`[{"id", "json_schema", "files": [{"name", "text"}]}]`) from args[0] and writes the results to
+/// args[1]. The digest is SHA-256 over the files sorted by name of name + NUL + text + NUL, in UTF-8.
+let harness : String =
+  #|import java.nio.charset.StandardCharsets;
+  #|import java.nio.file.*;
+  #|import java.security.MessageDigest;
+  #|import java.util.*;
+  #|import java.util.logging.*;
+  #|import software.amazon.smithy.jsonschema.*;
+  #|import software.amazon.smithy.model.*;
+  #|import software.amazon.smithy.model.loader.*;
+  #|import software.amazon.smithy.model.node.*;
+  #|import software.amazon.smithy.model.shapes.*;
+  #|import software.amazon.smithy.model.validation.*;
+  #|
+  #|public final class ReferenceTour {
+  #|  public static void main(String[] args) throws Exception {
+  #|    Logger.getLogger("").setLevel(Level.OFF);
+  #|    ArrayNode input = Node.parse(Files.readString(Path.of(args[0]))).expectArrayNode();
+  #|    ObjectNode.Builder cases = ObjectNode.builder();
+  #|    for (Node node : input) {
+  #|      ObjectNode test = node.expectObjectNode();
+  #|      String id = test.expectStringMember("id").getValue();
+  #|      List<ObjectNode> files = new ArrayList<>(test.expectArrayMember("files").getElementsAs(ObjectNode.class));
+  #|      files.sort(Comparator.comparing(file -> file.expectStringMember("name").getValue()));
+  #|      MessageDigest sha = MessageDigest.getInstance("SHA-256");
+  #|      ModelAssembler assembler = Model.assembler();
+  #|      for (ObjectNode file : files) {
+  #|        String name = file.expectStringMember("name").getValue();
+  #|        String text = file.expectStringMember("text").getValue();
+  #|        sha.update((name + '\0' + text + '\0').getBytes(StandardCharsets.UTF_8));
+  #|        assembler.addUnparsedModel(name, text);
+  #|      }
+  #|      ValidatedResult<Model> result = assembler.assemble();
+  #|      List<String> events = new ArrayList<>();
+  #|      boolean blocked = false;
+  #|      for (ValidationEvent event : result.getValidationEvents()) {
+  #|        Severity severity = event.getSeverity();
+  #|        if (severity != Severity.WARNING && severity != Severity.DANGER && severity != Severity.ERROR) continue;
+  #|        if (severity != Severity.WARNING) blocked = true;
+  #|        events.add(event.getId() + "|" + severity.name() + "|"
+  #|            + event.getShapeId().map(ShapeId::toString).orElse("-"));
+  #|      }
+  #|      Collections.sort(events);
+  #|      ObjectNode.Builder entry = ObjectNode.builder()
+  #|          .withMember("digest", HexFormat.of().formatHex(sha.digest()))
+  #|          .withMember("events", Node.fromStrings(events));
+  #|      if (test.expectBooleanMember("json_schema").getValue() && !blocked) {
+  #|        entry.withMember("json_schema",
+  #|            JsonSchemaConverter.builder().model(result.unwrap()).build().convert().toNode());
+  #|      }
+  #|      cases.withMember(id, entry.build());
+  #|      System.out.println("reference: " + id);
+  #|    }
+  #|    ObjectNode output = ObjectNode.builder()
+  #|        .withMember("reference_sha", "30bdab593f0c2cdf96036782cc3ce15c43a711ef")
+  #|        .withMember("cases", cases.build()).build();
+  #|    Files.writeString(Path.of(args[1]), Node.prettyPrintJson(output.withDeepSortedKeys()) + "\n");
+  #|  }
+  #|}
+
+///|
+struct Options {
+  checkout : String
+  check : Bool
+} derive(Eq, Debug)
+
+///|
+/// The options of `args`, without the script binary at index 0.
+fn parse_args(args : ArrayView[String]) -> Result[Options, String] {
+  let mut checkout : String? = None
+  let mut check = false
+  for arg in args {
+    if arg == "--check" {
+      check = true
+    } else if arg.has_prefix("-") {
+      return Err("unknown option " + arg)
+    } else if checkout is Some(_) {
+      return Err("more than one CHECKOUT: " + arg)
+    } else {
+      checkout = Some(arg)
+    }
+  }
+  Ok({ checkout: checkout.unwrap_or(".dev/out/reference-smithy"), check })
+}
+
+///|
+/// UTF-16 code unit order, as Java's `String.compareTo`. `String::compare` orders by length first.
+fn compare_code_units(a : String, b : String) -> Int {
+  let n = if a.length() < b.length() { a.length() } else { b.length() }
+  for i in 0..<n {
+    let x = a.code_unit_at(i).to_int()
+    let y = b.code_unit_at(i).to_int()
+    if x != y {
+      return if x < y { -1 } else { 1 }
+    }
+  }
+  a.length().compare(b.length())
+}
+
+///|
+/// The starting files, replaced or added by the case files by name, sorted by name. The same merge as
+/// `Lesson::case_files` in site/tour/model.
+fn merge_files(start : Array[(String, String)], case_files : Array[(String, String)]) -> Array[(String, String)] {
+  let merged = start.copy()
+  for file in case_files {
+    match merged.search_by(f => f.0 == file.0) {
+      Some(i) => merged[i] = file
+      None => merged.push(file)
+    }
+  }
+  merged.sort_by((a, b) => compare_code_units(a.0, b.0))
+  merged
+}
+
+///|
+fn git_blob_hash(text : String) -> String {
+  @crypto.bytes_to_hex_string(@crypto.sha1(@utf8.encode(
+    "blob " + @utf8.encode(text).length().to_string() + "\u{0000}" + text,
+  )))
+}
+
+///|
+fn java_quote(value : String) -> String {
+  "\"" + value.replace_all(old="\\", new="\\\\").replace_all(old="\"", new="\\\"") + "\""
+}
+
+///|
+async fn checked(command : String, args : Array[String]) -> String {
+  let (status, out, err) = @process.collect_output(command, args)
+  if status != 0 {
+    eprintln(command + " failed\n" + out.text() + err.text())
+    @sys.exit(1)
+  }
+  out.text()
+}
+
+///|
+async fn collect_files(root : String, relative : String) -> Array[String] {
+  let files : Array[String] = []
+  if !@fs.exists(root + "/" + relative) { return files }
+  for name in @fs.readdir(root + "/" + relative, sort=true) {
+    let path = relative + "/" + name
+    if @fs.kind(root + "/" + path) is Directory { files.append(collect_files(root, path)) }
+    else { files.push(path) }
+  }
+  files
+}
+
+///|
+/// The files directly in `path`, as (name, text).
+async fn read_files(path : String) -> Array[(String, String)] {
+  let files : Array[(String, String)] = []
+  if !@fs.exists(path) { return files }
+  for name in @fs.readdir(path, sort=true) {
+    if @fs.kind(path + "/" + name) is Directory { continue }
+    files.push((name, @fs.read_file(path + "/" + name).text()))
+  }
+  files
+}
+
+///|
+/// The cases of every lesson, in the input format of the harness.
+async fn lesson_cases() -> Array[Json] {
+  let cases : Array[Json] = []
+  for dir in @fs.readdir(lessons_root, sort=true) {
+    let base = lessons_root + "/" + dir
+    if !(@fs.kind(base) is Directory) { continue }
+    let json_schema = @json.parse(@fs.read_file(base + "/lesson.json").text()) is { "output": String("JsonSchema"), .. }
+    let start = read_files(base + "/files")
+    for name in @fs.readdir(base + "/cases", sort=true) {
+      if !(@fs.kind(base + "/cases/" + name) is Directory) { continue }
+      let files = merge_files(start, read_files(base + "/cases/" + name + "/files"))
+      cases.push(Json::object({
+        "id": Json::string(dir + "/" + name),
+        "json_schema": Json::boolean(json_schema),
+        "files": Json::array(files.map(f => Json::object({ "name": Json::string(f.0), "text": Json::string(f.1) }))),
+      }))
+    }
+  }
+  cases
+}
+
+///|
+/// Verify the pinned Java sources against the GitHub tree of the reference SHA and compile them with the harness.
+async fn compile_reference(source : String, classes : String) -> Unit {
+  let tree = @json.parse(checked("curl", ["-fsSL", "--retry", "2",
+    "https://api.github.com/repos/smithy-lang/smithy/git/trees/" + reference_sha + "?recursive=1",
+  ]))
+  guard tree is { "sha": String(sha), "tree": Array(entries), "truncated": False, .. } && sha == reference_sha else {
+    fail("Pinned Java source tree is missing, mismatched or truncated")
+  }
+  let blobs : Map[String, String] = Map([])
+  for entry in entries {
+    if entry is { "type": String("blob"), "path": String(path), "sha": String(blob), .. } { blobs[path] = blob }
+  }
+  if @fs.exists(classes) { @fs.rmdir(classes, recursive=true) }
+  @fs.mkdir(classes, recursive=true, allow_exist=true)
+  let harness_path = scratch + "/ReferenceTour.java"
+  @fs.write_file(harness_path, harness)
+  let sources = [harness_path]
+  let resources : Map[String, String] = Map([])
+  let verified : Array[Json] = []
+  for module_ in ["smithy-utils", "smithy-jmespath", "smithy-model", "smithy-jsonschema"] {
+    let java_prefix = module_ + "/src/main/java"
+    let resource_prefix = module_ + "/src/main/resources"
+    let paths = collect_files(source, java_prefix) + collect_files(source, resource_prefix)
+    if paths.is_empty() { fail("No Java sources for " + module_ + " in " + source) }
+    for path in paths {
+      let text = @fs.read_file(source + "/" + path).text()
+      guard blobs.get(path) is Some(blob) else { fail("Untracked reference source " + path) }
+      assert_eq(git_blob_hash(text), blob, msg="Java reference blob mismatch: " + path)
+      verified.push(Json::object({ "path": Json::string(path), "gitBlob": Json::string(blob) }))
+      if path.has_prefix(java_prefix + "/") {
+        if path.has_suffix(".java") && !path.has_suffix("/module-info.java") { sources.push(source + "/" + path) }
+      } else {
+        let relative = path[resource_prefix.length() + 1:].to_owned()
+        if (relative.has_prefix("META-INF/services/") || relative == "META-INF/smithy/manifest") && resources.get(relative) is Some(old) {
+          resources[relative] = old.trim_end().to_owned() + "\n" + text
+        } else { resources[relative] = text }
+      }
+    }
+  }
+  for relative, text in resources {
+    let target = classes + "/" + relative
+    let parts = target.split("/").map(p => p.to_owned()).to_array()
+    ignore(parts.pop())
+    @fs.mkdir(parts.join("/"), recursive=true, allow_exist=true)
+    @fs.write_file(target, text)
+  }
+  @fs.write_file(scratch + "/source-inventory.json", Json::object({
+    "referenceSha": Json::string(reference_sha), "files": Json::array(verified),
+  }).stringify(indent=2) + "\n")
+  let options = ["-proc:none", "-encoding", "UTF-8", "-d", classes, "-cp", classes] + sources
+  let argfile = scratch + "/javac.args"
+  @fs.write_file(argfile, options.map(java_quote).join("\n") + "\n")
+  println("Compiling hash-verified pinned Java sources")
+  ignore(checked("javac", ["@" + argfile]))
+}
+
+///|
+async fn main {
+  let options = match parse_args(@env.args()[1:]) {
+    Ok(options) => options
+    Err(message) => {
+      eprintln(message + "\nUsage: moonx scripts/reference-tour.mbtx [CHECKOUT] [--check]")
+      @sys.exit(2)
+      return
+    }
+  }
+  let classes = scratch + "/classes"
+  @fs.mkdir(scratch, recursive=true, allow_exist=true)
+  compile_reference(options.checkout, classes)
+  let input = scratch + "/cases.json"
+  @fs.write_file(input, Json::array(lesson_cases()).stringify(indent=2) + "\n")
+  let output = scratch + "/reference-events.json"
+  println(checked("java", ["-cp", classes, "ReferenceTour", input, output]).trim_end())
+  let actual = @fs.read_file(output).text()
+  if options.check {
+    let committed = if @fs.exists(results_path) { @fs.read_file(results_path).text() } else { "" }
+    if actual != committed {
+      eprintln(results_path + " differs from the Java reference; run `mise run reference:tour`")
+      @sys.exit(1)
+    }
+    println("Verified " + results_path)
+  } else {
+    @fs.write_file(results_path, actual)
+    println("Wrote " + results_path)
+  }
+}
+
+///|
+test "the arguments give the checkout and the check flag" {
+  assert_eq(parse_args([]), Ok({ checkout: ".dev/out/reference-smithy", check: false }))
+  assert_eq(parse_args(["../smithy", "--check"]), Ok({ checkout: "../smithy", check: true }))
+  assert_eq(parse_args(["--check", "../smithy"]), Ok({ checkout: "../smithy", check: true }))
+  assert_true(parse_args(["--force"]) is Err(_))
+  assert_true(parse_args(["a", "b"]) is Err(_))
+}
+
+///|
+test "a case replaces and adds files by name, sorted in code unit order" {
+  let start = [("model.smithy", "start"), ("b.smithy", "b")]
+  let case_files = [("model.smithy", "edited"), ("a-long-name.smithy", "new")]
+  assert_eq(merge_files(start, case_files), [
+    ("a-long-name.smithy", "new"), ("b.smithy", "b"), ("model.smithy", "edited"),
+  ])
+  assert_eq(merge_files(start, []), [("b.smithy", "b"), ("model.smithy", "start")])
+}
+
+///|
+test "javac argument files quote spaces and Windows path separators" {
+  assert_eq(java_quote("C:\\source files\\Test.java"), "\"C:\\\\source files\\\\Test.java\"")
+}

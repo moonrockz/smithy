@@ -135,6 +135,10 @@ run = "moonx scripts/reference-diff.mbtx"
 description = "Verify OpenAPI expectations against pinned Java sources (args: source directory, --check)"
 run = "moonx scripts/reference-openapi.mbtx"
 
+[tasks."reference:tour"]
+description = "Write the Java reference results of the tour lesson cases (requires a JDK; args: smithy checkout, --check)"
+run = "moonx scripts/reference-tour.mbtx"
+
 [tasks."test:native-zig"]
 description = "Run the native tests with zig as the C compiler (the host wrapper of zig-cross)"
 run = "moonx scripts/zig-cross.mbtx exec host -- moonx scripts/test.mbtx native"

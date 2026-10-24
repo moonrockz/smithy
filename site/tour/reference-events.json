@@ -1,0 +1,15 @@
+{
+    "cases": {
+        "01-hello-smithy/missing-namespace": {
+            "digest": "9a2246af9c3d57e04b6ac66775857b8e8b384a939f5c468661d3ad9d10d0b9d9",
+            "events": [
+                "Model|ERROR|-"
+            ]
+        },
+        "01-hello-smithy/start": {
+            "digest": "9e02d76db2e3c58b3b4d8e8308ea1589a2ba9adc03f3fe514a7f6e95cbe6a23c",
+            "events": []
+        }
+    },
+    "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
+}
