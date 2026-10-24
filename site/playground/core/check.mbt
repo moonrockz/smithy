@@ -177,8 +177,9 @@ fn rpc_context(
 /// Check one JSON-RPC message against a service, as `smithy validate rpc`
 /// does with `--message` or `--response` (`apps/smithy/cli.mbt` and
 /// `run_rpc_validation` in `apps/smithy/rpc_cli.mbt`), with the same library
-/// calls in the same order and the same codes and messages. The library reads
-/// the message as text, so an id keeps all of its digits.
+/// calls in the same order and the same codes and messages. As the CLI, it
+/// checks the options and the service ID before it loads the model. The
+/// library reads the message as text, so an id keeps all of its digits.
 fn check_message(
   seq : Int32,
   files : Array[(String, String)],
@@ -195,17 +196,12 @@ fn check_message(
   let response = match kind {
     RequestMessage => None
     ResponseMessage(context~, legacy_errors~) => {
+      if legacy_errors is Some(_) && version != V1_0 {
+        return blocked(seq~, reason="--legacy-errors requires version 1.0")
+      }
       let legacy_errors = match legacy_errors {
-        Opaque => @rpc.Opaque
-        CodeMessageData => {
-          if version != V1_0 {
-            return blocked(
-              seq~,
-              reason="The legacy error mapping code-message-data applies only to JSON-RPC 1.0.",
-            )
-          }
-          @rpc.CodeMessageData
-        }
+        None | Some(Opaque) => @rpc.Opaque
+        Some(CodeMessageData) => @rpc.CodeMessageData
       }
       let context = match context {
         None => None
@@ -218,15 +214,15 @@ fn check_message(
       Some((context, legacy_errors))
     }
   }
-  let model = match clean_model(load(files)) {
-    Ok(model) => model
-    Err((reason, kind)) => return Blocked(seq~, reason~, kind~)
-  }
   guard @smithy.ShapeId::parse(service) is Some(id) else {
     return blocked(
       seq~,
       reason="I expected an absolute shape ID for the service, but found '\{service}'.",
     )
+  }
+  let model = match clean_model(load(files)) {
+    Ok(model) => model
+    Err((reason, kind)) => return Blocked(seq~, reason~, kind~)
   }
   let prepared = @rpc.PreparedService::prepare(
     model,

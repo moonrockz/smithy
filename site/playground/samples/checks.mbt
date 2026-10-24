@@ -107,7 +107,7 @@ pub extend ResponseContext with FromJson::{from_json}
 
 ///|
 /// How a response check reads a JSON-RPC 1.0 error: the CLI option
-/// `--legacy-errors`. `CodeMessageData` applies only to JSON-RPC 1.0.
+/// `--legacy-errors`. The option applies only to JSON-RPC 1.0.
 pub(all) enum LegacyErrors {
   Opaque
   CodeMessageData
@@ -130,8 +130,10 @@ pub extend LegacyErrors with FromJson::{from_json}
 pub(all) enum MessageKind {
   /// --message: a request or a notification.
   RequestMessage
-  /// --response, with the context options of the CLI.
-  ResponseMessage(context~ : ResponseContext?, legacy_errors~ : LegacyErrors)
+  /// --response, with the context options of the CLI. `legacy_errors` is
+  /// `None` when the option is absent; the check then reads a 1.0 error as
+  /// `Opaque`. The CLI rejects the option, with any value, for JSON-RPC 2.0.
+  ResponseMessage(context~ : ResponseContext?, legacy_errors~ : LegacyErrors?)
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|

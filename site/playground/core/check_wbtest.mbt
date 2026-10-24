@@ -302,7 +302,7 @@ fn reply(message : String, context : ResponseContext?) -> CheckMessage {
     service: "example#Replies",
     version: V2_0,
     message,
-    kind: ResponseMessage(context~, legacy_errors=Opaque),
+    kind: ResponseMessage(context~, legacy_errors=None),
   }
 }
 
@@ -484,12 +484,30 @@ test "a response without context gives the findings of the library" {
 test "code-message-data with version 2.0 is blocked" {
   let response = {
     ..reply(call, None),
-    kind: ResponseMessage(context=None, legacy_errors=CodeMessageData),
+    kind: ResponseMessage(context=None, legacy_errors=Some(CodeMessageData)),
   }.run()
   assert_eq(blocked_kind(response), Other)
-  assert_eq(
-    blocked_reason(response),
-    "The legacy error mapping code-message-data applies only to JSON-RPC 1.0.",
+  assert_eq(blocked_reason(response), "--legacy-errors requires version 1.0")
+}
+
+///|
+test "an explicit opaque with version 2.0 is blocked" {
+  let response = {
+    ..reply(call, None),
+    kind: ResponseMessage(context=None, legacy_errors=Some(Opaque)),
+  }.run()
+  assert_eq(blocked_kind(response), Other)
+  assert_eq(blocked_reason(response), "--legacy-errors requires version 1.0")
+}
+
+///|
+test "no legacy error mapping with version 2.0 runs" {
+  assert_true(
+    reply(
+      "{\"jsonrpc\":\"2.0\",\"result\":19,\"id\":1}",
+      Some(Method("subtract")),
+    ).run()
+    is DataChecked(valid=true, findings=[], ..),
   )
 }
 
@@ -501,7 +519,7 @@ test "code-message-data with version 1.0 maps the error" {
     version: V1_0,
     kind: ResponseMessage(
       context=Some(Method("subtract")),
-      legacy_errors=CodeMessageData,
+      legacy_errors=Some(CodeMessageData),
     ),
   }
   guard only_finding(check.run())
@@ -513,7 +531,7 @@ test "code-message-data with version 1.0 maps the error" {
       ..check,
       kind: ResponseMessage(
         context=Some(Method("subtract")),
-        legacy_errors=Opaque,
+        legacy_errors=Some(Opaque),
       ),
     }.run()
     is DataChecked(valid=true, ..),
@@ -572,4 +590,32 @@ test "a message check survives the Worker JSON" {
   guard only_finding(response) is Found(code="IdMismatch", ..) else {
     fail("I expected IdMismatch")
   }
+}
+
+///|
+test "a bad service ID is blocked before the model loads" {
+  let model =
+    #|$version: "2"
+    #|namespace example
+    #|structure Input { x: Missing }
+  let response = { ..call_of(call), model, service: "Calculator", }.run()
+  assert_eq(blocked_kind(response), Other)
+  assert_eq(
+    blocked_reason(response),
+    "I expected an absolute shape ID for the service, but found 'Calculator'.",
+  )
+}
+
+///|
+test "a bad response option is blocked before the model loads" {
+  let model =
+    #|$version: "2"
+    #|namespace example
+    #|structure Input { x: Missing }
+  let response = { ..reply(call, Some(Method("rpc.x"))), model, }.run()
+  assert_eq(blocked_kind(response), Other)
+  assert_eq(
+    blocked_reason(response),
+    "I expected an application method name, but found 'rpc.x'.",
+  )
 }
