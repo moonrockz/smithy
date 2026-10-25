@@ -226,6 +226,12 @@ fn number_order(
   b : Double,
   b_repr : String?,
 ) -> Int32 {
+  // Without tokens, both sides are a 64-bit integer or a double, and the
+  // shortest decimal of a double orders as the double does, so the doubles
+  // decide. This keeps sort and max free of allocation.
+  if a_repr is None && b_repr is None {
+    return double_order(a, b)
+  }
   let a_class = number_class(a, a_repr)
   let b_class = number_class(b, b_repr)
   let big = a_class is (BigInteger | BigDecimal) ||

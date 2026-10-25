@@ -94,29 +94,20 @@ fn finite_number(value : Double, span : Span) -> Json raise JmespathError {
 
 ///|
 /// Compare numbers as the Smithy reference does (see `number_order`), and
-/// strings by Unicode code point rather than UTF-16 code unit.
+/// strings by UTF-16 code unit, as Java's `String.compareTo` does.
 fn compare_json(a : Json, b : Json) -> Int32 {
   match (a, b) {
     (Number(x, repr=x_repr), Number(y, repr=y_repr)) =>
       number_order(x, x_repr, y, y_repr)
     (String(a), String(b)) => {
-      let a = a.iter()
-      let b = b.iter()
-      while true {
-        match (a.next(), b.next()) {
-          (Some(a), Some(b)) => {
-            let order = a.compare(b)
-            if order != 0 {
-              return order
-            }
-          }
-          (None, None) => return 0
-          (None, _) => return -1
-          (_, None) => return 1
+      let n = a.length().min(b.length())
+      for i in 0..<n {
+        let order = a.code_unit_at(i).compare(b.code_unit_at(i))
+        if order != 0 {
+          return order
         }
-      } nobreak {
-        0
       }
+      a.length().compare(b.length())
     }
     _ => 0
   }

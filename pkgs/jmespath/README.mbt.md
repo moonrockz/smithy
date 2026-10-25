@@ -34,8 +34,11 @@ test {
 
 Neither parsing nor evaluation changes caller-owned JSON. Function arguments
 evaluate eagerly; logical `&&` and `||` short-circuit. Projections omit null
-results; `map` retains them. Strings use Unicode code points for length, reverse
-and ordering. Object iteration order is unspecified, as in JMESPath.
+results; `map` retains them. Strings use Unicode code points for length and
+reverse. `sort`, `max`, `min` and the `_by` functions order strings by UTF-16
+code unit, as Java's `String.compareTo` in the Smithy reference does, so
+U+10000 comes before U+FFFF. Object iteration order is unspecified, as in
+JMESPath.
 
 ## Numbers
 
@@ -68,6 +71,22 @@ test {
   )
 }
 ```
+
+### Behaviour changes
+
+This release changes these results to match the Smithy reference:
+
+- `to_number` of a string gives a double when the string has `.`, `e` or `E`,
+  and a 64-bit integer otherwise. A string that this rule does not parse, such
+  as `" 12 "` or `"9223372036854775808"`, gives null.
+- `` -0.0 == `0` `` is false, because the token `-0.0` is a double and Java's
+  `Double.compare` puts it before 0. The token `-0` is an integer and equals 0.
+- A number literal keeps its token, so `` `1e2` `` prints as `1e2`, not `100`.
+  The value does not change.
+- Strings order by UTF-16 code unit, not by code point.
+- `sum`, `avg`, `abs`, `ceil` and `floor` still compute with doubles. Their
+  results have no token, so they compare by the rule for a number without a
+  token.
 
 ## Inspect expressions and errors
 

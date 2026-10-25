@@ -124,15 +124,17 @@ test "compiled expressions are reusable and functions do not mutate input" {
 }
 
 ///|
-test "Unicode functions operate on code points including astral characters" {
+test "length and reverse use code points, and sort uses UTF-16 code units" {
   assert_eq(@jmespath.search("length('a𝄞b')", Json::null()), Json::number(3))
   assert_eq(
     @jmespath.search("reverse('a𝄞b')", Json::null()),
     Json::string("b𝄞a"),
   )
+  // Sorting orders by UTF-16 code unit, as Java does: U+1D11E (D834 DD1E)
+  // comes before U+E000.
   assert_eq(
     @jmespath.search("sort(@)", @json.parse("[\"𝄞\",\"\",\"a\"]")),
-    @json.parse("[\"a\",\"\",\"𝄞\"]"),
+    @json.parse("[\"a\",\"𝄞\",\"\"]"),
   )
 }
 
@@ -314,6 +316,54 @@ test "deep equality keeps its own stack" {
   )
   assert_eq(
     @jmespath.search("contains(@, `1`)", Json::array([a, Json::number(1)])),
+    Json::boolean(true),
+  )
+}
+
+///|
+test "strings order by UTF-16 code unit, as in the Smithy reference" {
+  // U+FFFF is one code unit; U+10000 is the surrogate pair D800 DC00, so it
+  // orders first. Results of Java Smithy's NodeJmespathRuntime at 30bdab59.
+  let bmp = "\u{FFFF}"
+  let astral = "\u{10000}"
+  let strings = Json::array([Json::string(bmp), Json::string(astral)])
+  assert_eq(
+    @jmespath.search("sort(@)", strings),
+    Json::array([Json::string(astral), Json::string(bmp)]),
+  )
+  assert_eq(@jmespath.search("max(@)", strings), Json::string(bmp))
+  assert_eq(@jmespath.search("min(@)", strings), Json::string(astral))
+  let objects = Json::array([
+    Json::object({ "k": Json::string(bmp) }),
+    Json::object({ "k": Json::string(astral) }),
+  ])
+  assert_eq(
+    @jmespath.search("sort_by(@, &k)[0].k", objects),
+    Json::string(astral),
+  )
+  assert_eq(@jmespath.search("max_by(@, &k).k", objects), Json::string(bmp))
+  assert_eq(@jmespath.search("min_by(@, &k).k", objects), Json::string(astral))
+  // Ordering comparisons are for numbers only.
+  assert_eq(@jmespath.search("@[0] < @[1]", strings), Json::null())
+}
+
+///|
+test "negative zero compares as in the Smithy reference" {
+  // Java: the token -0.0 is a double, and Double.compare puts it before 0;
+  // the token -0 is a 64-bit integer zero.
+  let negative_zero = Json::number(-0.0, repr="-0.0")
+  assert_eq(@jmespath.search("@ == `0`", negative_zero), Json::boolean(false))
+  assert_eq(@jmespath.search("@ == `0.0`", negative_zero), Json::boolean(false))
+  assert_eq(
+    @jmespath.search("@ == `0`", Json::number(-0.0, repr="-0")),
+    Json::boolean(true),
+  )
+  // Core JSON equality treats -0.0 as 0, so check the result with `==`.
+  assert_eq(
+    @jmespath.search(
+      "max(@) == `0`",
+      Json::array([negative_zero, Json::number(0, repr="0")]),
+    ),
     Json::boolean(true),
   )
 }
