@@ -430,3 +430,10 @@ test "a transcript finding key has the form code|severity|entry|sender" {
     "error or advisory", "a number or -",
   ])
 }
+
+///|
+test "valid in a transcript case must be true or false" {
+  expect_err("transcript-bad-valid", [
+    "01-weather/cases/start", "\"valid\" must be true or false",
+  ])
+}

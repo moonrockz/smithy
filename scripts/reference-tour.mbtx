@@ -538,8 +538,8 @@ test "a static lesson has no cases to read" {
 
 ///|
 async test "lesson_cases skips a static lesson that has no cases folder" {
-  let root = "static-lessons-scratch"
-  if @fs.exists(root) { @fs.rmdir(root, recursive=true) }
+  let root = @fs.tmpdir(prefix="static-lessons")
+  defer @fs.rmdir(root, recursive=true)
   @fs.mkdir(root + "/01-s/", recursive=true, allow_exist=true)
   @fs.write_file(root + "/01-s/lesson.json", "{\"slug\": \"s\", \"static\": true}")
   @fs.mkdir(root + "/02-m/files", recursive=true, allow_exist=true)
@@ -547,7 +547,6 @@ async test "lesson_cases skips a static lesson that has no cases folder" {
   @fs.write_file(root + "/02-m/lesson.json", "{\"slug\": \"m\"}")
   @fs.write_file(root + "/02-m/files/model.smithy", "namespace example\n")
   let cases = lesson_cases(root)
-  @fs.rmdir(root, recursive=true)
   let ids = cases.map(c => match c { { "id": String(id), .. } => id; _ => "" })
   assert_eq(ids, ["02-m/start"])
 }
@@ -567,8 +566,9 @@ test "the data files of a lesson are those of its engine" {
 
 ///|
 async test "lesson_cases leaves the data file of a transcript lesson out of the model files" {
-  let root = "transcript-lessons-scratch"
-  if @fs.exists(root) { @fs.rmdir(root, recursive=true) }
+  // A folder of its own, removed when the test ends, also after a failed assert.
+  let root = @fs.tmpdir(prefix="transcript-lessons")
+  defer @fs.rmdir(root, recursive=true)
   @fs.mkdir(root + "/01-t/files", recursive=true, allow_exist=true)
   @fs.mkdir(root + "/01-t/cases/start", recursive=true, allow_exist=true)
   @fs.write_file(
@@ -578,7 +578,6 @@ async test "lesson_cases leaves the data file of a transcript lesson out of the 
   @fs.write_file(root + "/01-t/files/model.smithy", "namespace example\n")
   @fs.write_file(root + "/01-t/files/exchange.json", "{}")
   let cases = lesson_cases(root)
-  @fs.rmdir(root, recursive=true)
   let names = match cases[0] {
     { "files": Array(files), .. } => files.map(f => match f { { "name": String(name), .. } => name; _ => "" })
     _ => []
