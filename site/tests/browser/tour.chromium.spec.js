@@ -272,6 +272,80 @@ test("Undo after a file tab switch never moves the text of one file into another
   expect(page.errors).toEqual([]);
 });
 
+test("a Selector lesson edits its query in the tab query.selector, and Undo stays inside that file", async ({
+  page,
+}) => {
+  await page.goto(siteUrl("tour/selectors/"));
+  await expect(page.locator("#tour-editor .cm-content")).toBeVisible();
+  await settled(page);
+  const editor = page.locator("#tour-editor .cm-content");
+  const output = page.locator("#tour-output .cm-content");
+  const modelTab = page.getByRole("tab", { name: "model.smithy" });
+  const queryTab = page.getByRole("tab", { name: "query.selector" });
+
+  await modelTab.click();
+  await expect(editor).toContainText("resource City");
+  const modelStart = await editorText(page);
+  await queryTab.click();
+  await expect(editor).toContainText("operation[trait|readonly]");
+  const queryStart = await editorText(page);
+  expect(queryStart).not.toContain("namespace example");
+
+  // The output tab lists the operations with @readonly.
+  await page.getByRole("tab", { name: /Selector/ }).click();
+  await expect(output).toContainText("example#GetCity");
+  expect(await outputText(page)).not.toContain("example#CreateCity");
+
+  // An edit of the query changes the output: without the attribute, every operation matches.
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+Home");
+  await page.keyboard.press("End");
+  for (const _ of "[trait|readonly]") await page.keyboard.press("Backspace");
+  await settled(page);
+  expect((await editorText(page)).trim()).toEqual("operation");
+  await expect(output).toContainText("example#CreateCity");
+
+  // A query that does not parse shows the reason, and the model has no findings.
+  await page.keyboard.type("[trait|readonly");
+  await settled(page);
+  await expect(page.locator(".tour-note.tour-err")).toContainText("I expected an attribute comparator");
+  await page.getByRole("tab", { name: /Findings/ }).click();
+  await expect(page.getByText("The model has no findings.")).toBeVisible();
+  await page.getByRole("tab", { name: /Selector/ }).click();
+
+  // The model file is unchanged.
+  await modelTab.click();
+  await expect(editor).toContainText("resource City");
+  expect(await editorText(page)).toEqual(modelStart);
+
+  // Undo until nothing changes: the query goes back to its own start text, never to the model text.
+  await queryTab.click();
+  await expect(editor).toContainText("operation[trait|readonly");
+  await editor.click();
+  let before = "";
+  for (let i = 0; i < 60; i++) {
+    const text = await editorText(page);
+    if (text === before) break;
+    before = text;
+    await page.keyboard.press("ControlOrMeta+z");
+    await settled(page);
+  }
+  const queryUndone = await editorText(page);
+  expect(queryUndone).toEqual(queryStart);
+  expect(queryUndone).not.toContain("namespace example");
+  await expect(output).toContainText("example#GetCity");
+  expect(await outputText(page)).not.toContain("example#CreateCity");
+
+  // Undo in model.smithy has nothing to undo. The editor shows only the lines in view, so the click is on
+  // the first line and the view stays at the top.
+  await modelTab.click();
+  await expect(editor).toContainText("resource City");
+  await editor.locator(".cm-line").first().click();
+  await page.keyboard.press("ControlOrMeta+z");
+  expect(await editorText(page)).toEqual(modelStart);
+  expect(page.errors).toEqual([]);
+});
+
 // The two tabs of the first include block of the lesson: the CLI and the MoonBit block.
 function includeTabs(page) {
   const group = page.locator(".ms-md-tabs").first();

@@ -1,0 +1,1 @@
+{"events": [], "output_contains": ["example#CreateCityInput$name\nexample#GetCityInput$cityId\nexample#GetForecastInput$cityId\n"]}

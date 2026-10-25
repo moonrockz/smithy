@@ -2186,6 +2186,87 @@
         "22-json-rpc/wrong-result-member": {
             "digest": "e0e957aae5000852cf774cf73d576db6d37aa240bf65f2d91f5faf51d62632de",
             "events": []
+        },
+        "23-selectors/all-operations": {
+            "digest": "3399ad57b04433d699f16f68e75df0076f5f0311bc3e9cf2d0ec1a5eb986b788",
+            "events": [],
+            "selector": [
+                "example#CreateCity",
+                "example#GetCity",
+                "example#GetForecast",
+                "example#ListCities"
+            ]
+        },
+        "23-selectors/input-members": {
+            "digest": "5149f8e9b0d59cecac59944b5acb23aadcbaddbd0002667e0370b75cd36f9922",
+            "events": [],
+            "selector": [
+                "example#CreateCityInput$name",
+                "example#GetCityInput$cityId",
+                "example#GetForecastInput$cityId"
+            ]
+        },
+        "23-selectors/invalid": {
+            "digest": "510f6f2401855da8d00b9d34551e3b1e370b195f6c0da2507d587edc0079c107",
+            "events": [],
+            "selector": null
+        },
+        "23-selectors/own-shapes": {
+            "digest": "6e82f07270fb54e37359a6e362c4196810a5fa86b7a7dcc0c0e111a9023f3bfc",
+            "events": [],
+            "selector": [
+                "example#CityId"
+            ]
+        },
+        "23-selectors/prelude": {
+            "digest": "df37a05b542ca44d506538d4c962cf9b3e083983598e3257b3081d65fe2f8a4f",
+            "events": [],
+            "selector": [
+                "example#CityId",
+                "smithy.api#AuthTraitReference",
+                "smithy.api#ClosureId",
+                "smithy.api#CommonMark",
+                "smithy.api#EnumConstantBodyName",
+                "smithy.api#HttpApiKeyLocations",
+                "smithy.api#Identifier",
+                "smithy.api#LocalMixinTrait",
+                "smithy.api#NonEmptyString",
+                "smithy.api#Severity",
+                "smithy.api#String",
+                "smithy.api#StructurallyExclusive",
+                "smithy.api#TraitChangeType",
+                "smithy.api#TraitShapeId",
+                "smithy.api#UnstableReason",
+                "smithy.api#documentation",
+                "smithy.api#error",
+                "smithy.api#httpHeader",
+                "smithy.api#httpPrefixHeaders",
+                "smithy.api#httpQuery",
+                "smithy.api#jsonName",
+                "smithy.api#mediaType",
+                "smithy.api#pattern",
+                "smithy.api#resourceIdentifier",
+                "smithy.api#since",
+                "smithy.api#timestampFormat",
+                "smithy.api#title",
+                "smithy.api#xmlName"
+            ]
+        },
+        "23-selectors/read-operation": {
+            "digest": "130d4d25b6f5fe1ed63e4679b64c41bafe2ca1846b3d9d847d9500d8040c0090",
+            "events": [],
+            "selector": [
+                "example#GetCity"
+            ]
+        },
+        "23-selectors/start": {
+            "digest": "87d9bec741b36daa61dd3183f516616c251241038cc97e170de5f79c2ff764e6",
+            "events": [],
+            "selector": [
+                "example#GetCity",
+                "example#GetForecast",
+                "example#ListCities"
+            ]
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
