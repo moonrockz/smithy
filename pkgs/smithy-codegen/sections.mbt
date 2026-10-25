@@ -104,8 +104,12 @@ pub fn CodeWriter::push_section(self : CodeWriter, section : Section) -> Unit {
 /// End the section and restore the state. The interceptors of the section
 /// change its text in the order that they were added. Then I write the text
 /// with the indentation of the enclosing writer. I write nothing when the
-/// text is empty. It raises `StateError` when no section is open, or when a
-/// `push_state` inside the section is still open.
+/// text is empty. A non-empty text ends the outer line, also when the section
+/// opened in the middle of a line. It raises `StateError` when no section is
+/// open, or when a `push_state` inside the section is still open. When an
+/// interceptor raises an error, the error passes through and the section is
+/// already ended: its text and its state are gone, and the writer does not
+/// write the section.
 pub fn CodeWriter::pop_section(self : CodeWriter) -> Unit raise CodegenError {
   guard self.open_sections.last() is Some(open) else {
     raise StateError("I found pop_section with no open section.")

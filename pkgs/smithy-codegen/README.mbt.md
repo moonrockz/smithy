@@ -49,7 +49,7 @@ renders a template and continues the line. `\r\n` in a template becomes `\n`.
 | `$L`, `$S`, `$T`, `$C` | The next argument, with a formatter. |
 | `$1L` | The argument at position 1 (positions start at 1). |
 | `$name:L`, `${name:L}` | The value `name` from the context of the writer. |
-| `${name:C\|}` | Align the later lines of the value with the column of the expression. |
+| `${name:C\|}` | Start each later line of the value with the leading white space of the current line of the output. It is not the column of the expression. |
 | `${?x}` ... `${/x}` | Render the block when `x` is true. |
 | `${^x}` ... `${/x}` | Render the block when `x` is false. |
 | `${#x}` ... `${/x}` | Render the block for each item of the list or record `x`. |
@@ -72,6 +72,10 @@ Add a formatter with `put_formatter`. Its character is an uppercase ASCII letter
 More rules:
 
 - A block tag alone on a line leaves no line in the output.
+- `write` adds a newline, unless the template ends with a block tag that is
+  alone on its line and has no newline after it. The text of the blocks then
+  already ends its line, so `write` adds no blank line.
+- A loop over a record uses the insertion order of the record.
 - `${#x}` over a missing name or over `Null` is an error.
 - A template that fails writes nothing and leaves the import tracker unchanged.
 - Two symbols with the same name from two namespaces in one file: the writer
@@ -90,7 +94,9 @@ empty. `push_section` and `pop_section` write a body between them. An
 - `Interceptor::new` replaces the body. It receives the previous text.
 
 Interceptors run in the order of their registration. A section that opens in the
-middle of a line continues that line.
+middle of a line continues that line. A section with non-empty text, after the
+interceptors, ends the outer line. An interceptor that raises an error ends the
+section too: the writer drops its text and does not write it.
 
 ## Example
 
