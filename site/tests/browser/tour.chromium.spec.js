@@ -463,37 +463,6 @@ test("a transcript lesson steps through the exchange", async ({ page }) => {
   expect(page.errors).toEqual([]);
 });
 
-// No lesson uses the diff engine yet, so this test gives the first lesson page the data of such a lesson. The
-// checker, the editors and the Worker are the real ones.
-async function openEngineLesson(page, engine, files) {
-  await page.route("**/tour/hello-smithy/", async (route) => {
-    const response = await route.fetch();
-    const html = await response.text();
-    const meta = html.match(/<meta name="smithy-data" content="([^"]*)"/);
-    const unescape = (text) =>
-      text.replaceAll("&quot;", '"').replaceAll("&#39;", "'").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");
-    const escape = (text) =>
-      text.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("'", "&#39;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-    const data = JSON.parse(unescape(meta[1]));
-    // Another request of the same URL can get the 404 page: it has no tour.
-    if (!data.tour) {
-      await route.fulfill({ response, body: html });
-      return;
-    }
-    const lesson = data.tour[1];
-    lesson.engine = engine;
-    delete lesson.output;
-    delete lesson.playground;
-    lesson.digest = "engine-lesson-fixture";
-    lesson.files = files;
-    await route.fulfill({ response, body: html.replace(meta[1], escape(JSON.stringify(data))) });
-  });
-  await page.goto(lessonUrl);
-  await expect(page.locator("#tour-editor .cm-content")).toBeVisible();
-  await expect(page.locator("#tour-output .cm-content")).toBeAttached();
-  await settled(page);
-}
-
 // The color of the editor for a property name (editor.js): only the JSON mode tags the keys of a JSON object
 // with it.
 const propertyNameColor = "rgb(126, 231, 135)";
@@ -623,40 +592,67 @@ test("a message lesson shows the message findings, marks the changed line and re
   expect(page.errors).toEqual([]);
 });
 
-test("a diff lesson groups the files under Old and New, shows the diff and marks a new event", async ({ page }) => {
-  const header = '$version: "2"\n\nnamespace example\n\n';
-  const old = header + "structure Greeting {\n    name: String\n}\n";
-  await openEngineLesson(page, "Diff", [
-    { name: "old/model.smithy", text: old },
-    { name: "new/model.smithy", text: old + "\nstructure Coupon {}\n" },
-  ]);
+test("a diff lesson groups the files under Old and New, shows the diff, marks a new event and keeps Undo in each side", async ({
+  page,
+}) => {
+  await page.goto(siteUrl("tour/comparing-models/"));
+  await expect(page.locator("#tour-editor .cm-content")).toBeVisible();
+  await expect(page.locator("#tour-output .cm-content")).toBeAttached();
+  await settled(page);
   const output = page.locator("#tour-output .cm-content");
+  const editor = page.locator("#tour-editor .cm-content");
   await expect(page.getByRole("tab", { name: "Diff" })).toHaveAttribute("aria-selected", "true");
-  await expect(output).toContainText("AddedShape");
+  await expect(output).toContainText("[NOTE] example.weather#GetForecastOutput$humidity");
+  await expect(output).toContainText("| AddedShape");
   await expect(page.getByRole("button", { name: "Open in playground" })).toHaveCount(0);
 
   // The tabs are under Old and New, without the folder in the name.
   const oldGroup = page.getByRole("tablist", { name: "Old model" });
   const newGroup = page.getByRole("tablist", { name: "New model" });
+  const oldTab = oldGroup.getByRole("tab", { name: "model.smithy" });
+  const newTab = newGroup.getByRole("tab", { name: "model.smithy" });
   await expect(page.locator(".tour-group-label", { hasText: "Old" })).toBeVisible();
   await expect(page.locator(".tour-group-label", { hasText: "New" })).toBeVisible();
-  await expect(newGroup.getByRole("tab", { name: "model.smithy" })).toBeVisible();
+  await expect(newTab).toBeVisible();
 
-  // Delete the member in the new model: an ERROR line comes and is marked as changed.
-  await newGroup.getByRole("tab", { name: "model.smithy" }).click();
-  const editor = page.locator("#tour-editor .cm-content");
-  await expect(editor).toContainText("structure Coupon");
-  await editor.locator(".cm-line", { hasText: "structure Greeting" }).click();
-  await page.keyboard.press("ControlOrMeta+Home");
-  await page.keyboard.press("ControlOrMeta+a");
-  await page.keyboard.type(header + "structure Greeting {}\n\nstructure Coupon {}\n");
+  await oldTab.click();
+  await expect(editor).not.toContainText("humidity");
+  const oldStart = await editorText(page);
+  await newTab.click();
+  await expect(editor).toContainText("humidity: Integer");
+  const newStart = await editorText(page);
+
+  // Delete the member days in the new model: an ERROR line comes and is marked as changed.
+  await editor.locator(".cm-line", { hasText: "days: Integer" }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+Home");
+  await page.keyboard.press("Backspace");
   await settled(page);
-  await expect(output).toContainText("[ERROR]");
+  await expect(output).toContainText("[ERROR] example.weather#GetForecastInput$days: Removed member");
   await expect(page.locator("#tour-output .cm-line.tour-changed")).toContainText("[ERROR]");
 
-  // The Old file keeps its own text.
-  await oldGroup.getByRole("tab", { name: "model.smithy" }).click();
-  await expect(editor).toContainText("name: String");
+  // The Old file keeps its own text. Add a comment there.
+  await oldTab.click();
+  await expect(editor).toContainText("days: Integer");
+  expect(await editorText(page)).toEqual(oldStart);
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.type("\n// An old comment.");
+  await settled(page);
+  await expect(editor).toContainText("// An old comment.");
+
+  // Undo in each side gives back the start text of that side, never the text of the other side.
+  await newTab.click();
+  await expect(editor).toContainText("humidity: Integer");
+  const newUndone = await undoAll(page);
+  expect(newUndone).toEqual(newStart);
+  expect(newUndone).not.toContain("// An old comment.");
+  await expect(output).not.toContainText("[ERROR]");
+  await oldTab.click();
+  await expect(editor).toContainText("// An old comment.");
+  const oldUndone = await undoAll(page);
+  expect(oldUndone).toEqual(oldStart);
+  expect(oldUndone).not.toContain("humidity");
 
   // The expand buttons keep working in a diff lesson.
   await page.getByRole("button", { name: "Expand the output" }).click();

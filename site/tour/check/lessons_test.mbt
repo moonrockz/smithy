@@ -900,6 +900,22 @@ test "lesson 29 shows the same model in both tabs" {
 }
 
 ///|
+test "lesson 30 includes its own old and new models" {
+  let lesson = lesson_in("30-comparing-models")
+  let old = case_file(lesson, "start", "old/model.smithy")
+  let removed = case_file(lesson, "removed-member", "new/model.smithy")
+  check_included_files(
+    lesson,
+    cli=[
+      ("old-weather.smithy", old),
+      ("new-weather.smithy", case_file(lesson, "start", "new/model.smithy")),
+      ("new-weather-removed.smithy", removed),
+    ],
+    api=[old, removed],
+  )
+}
+
+///|
 test "a static extension lesson says that the feature is our extension" {
   let ok = match
     @source.read_tour("tour/source/testdata/static-ok", repo="..") {

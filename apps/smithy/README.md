@@ -76,6 +76,108 @@ as `\n`. See the [model diff library](../../pkgs/smithy-diff/README.mbt.md) for 
 comparison API, suppressions and preview-feature behavior. This command compares
 explicit old/new snapshots; Git and project modes are not implemented.
 
+### Compare two models
+
+These commands compare an old weather model with two new models. The first new model adds an optional
+output member, a compatible change. The second new model also removes an input member, a breaking change, so
+the command exits 1.
+
+<!-- tour:start diff-cli -->
+```smithy file=old-weather.smithy
+$version: "2"
+
+namespace example.weather
+
+service Weather {
+    version: "2026-10-01"
+    operations: [GetForecast]
+}
+
+operation GetForecast {
+    input := {
+        @required
+        city: String
+
+        days: Integer
+    }
+
+    output := {
+        @required
+        summary: String
+
+        celsius: Integer
+    }
+}
+```
+
+```smithy file=new-weather.smithy
+$version: "2"
+
+namespace example.weather
+
+service Weather {
+    version: "2026-10-01"
+    operations: [GetForecast]
+}
+
+operation GetForecast {
+    input := {
+        @required
+        city: String
+
+        days: Integer
+    }
+
+    output := {
+        @required
+        summary: String
+
+        celsius: Integer
+
+        humidity: Integer
+    }
+}
+```
+
+```smithy file=new-weather-removed.smithy
+$version: "2"
+
+namespace example.weather
+
+service Weather {
+    version: "2026-10-01"
+    operations: [GetForecast]
+}
+
+operation GetForecast {
+    input := {
+        @required
+        city: String
+    }
+
+    output := {
+        @required
+        summary: String
+
+        celsius: Integer
+
+        humidity: Integer
+    }
+}
+```
+
+```console
+$ smithy diff --old old-weather.smithy --new new-weather.smithy
+[NOTE] example.weather#GetForecastOutput$humidity: Added member `example.weather#GetForecastOutput$humidity` | AddedShape
+```
+
+```console status=1
+$ smithy diff --old old-weather.smithy --new new-weather-removed.smithy
+[NOTE] example.weather#GetForecastOutput$humidity: Added member `example.weather#GetForecastOutput$humidity` | AddedShape
+[ERROR] example.weather#GetForecastInput$days: Removed member `example.weather#GetForecastInput$days` | RemovedShape
+```
+<!-- tour:end diff-cli -->
+
 ### Convert a model to the JSON AST
 
 This command writes the JSON AST of the model to standard output.

@@ -2467,6 +2467,41 @@
         "28-transcripts/wrong-sender": {
             "digest": "b2aecd767f4dc4df33bf5c2daa2ed1813072eb62f1260c0a676305682e131cff",
             "events": []
+        },
+        "30-comparing-models/broken-new": {
+            "digest": "19e75e192f0d98d428058e64bab3d310b860ec06221b1c138d74d9b14b400b51",
+            "events": [
+                "Target.UnresolvedShape|ERROR|example.weather#GetForecastOutput$celsius"
+            ]
+        },
+        "30-comparing-models/removed-member": {
+            "diff": [
+                "AddedShape|NOTE|example.weather#GetForecastOutput$humidity",
+                "RemovedShape|ERROR|example.weather#GetForecastInput$days"
+            ],
+            "digest": "bc3a8aff146a1f89f67d7a8614c1eaac0faba2ea2f2c1fe3ca6547836912163c",
+            "events": []
+        },
+        "30-comparing-models/required-added": {
+            "diff": [
+                "AddedRequiredMember|ERROR|example.weather#GetForecastInput$country",
+                "AddedShape|NOTE|example.weather#GetForecastInput$country",
+                "AddedShape|NOTE|example.weather#GetForecastOutput$humidity"
+            ],
+            "digest": "6df9557cbf6f771787995d90b83e6660da7e50cf0a961289e22ff7e6512b70e6",
+            "events": []
+        },
+        "30-comparing-models/same": {
+            "diff": [],
+            "digest": "727201e823caff2ef43e58845439ef83c3a4907eb2142b51992b133c9a6e7d34",
+            "events": []
+        },
+        "30-comparing-models/start": {
+            "diff": [
+                "AddedShape|NOTE|example.weather#GetForecastOutput$humidity"
+            ],
+            "digest": "2f18b366b7f2291bf48fcd2f5117a17a5e76798bbc4fdb3945c55c8ad82776d6",
+            "events": []
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
