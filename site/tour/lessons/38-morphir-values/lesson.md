@@ -4,7 +4,7 @@ This lesson checks the IR type in `type.json` against `morphir.ir.v4#Type`. The 
 
 > **Our extension:** Smithy defines no validation of JSON values. This check is part of moonrockz/smithy-validation. [Lesson 26](../26-validating-values/lesson.md) shows the same check from the CLI and from MoonBit.
 
-Every node of the value has the expanded spelling: a wrapper object with an object payload. The payload can start with `attributes`, and then has the members of the node ([decision 0005](https://github.com/finos/morphir/blob/ab8d5c9198c0f1ac8a3cabfd11b9ab59a468c409/kb/bundles/morphir/morphir-ir/decisions/0005-attributes-are-an-optional-first-member-of-every-node-payload.md?plain=1#L13-L16)). The value check reads this as a union of structures, so the value passes.
+Every node of the value has the expanded spelling: a wrapper object with an object payload. The payload can start with `attributes`, and then has the members of the node ([decision 0005](https://github.com/finos/morphir/blob/ab8d5c9198c0f1ac8a3cabfd11b9ab59a468c409/kb/bundles/morphir/morphir-ir/decisions/0005-attributes-are-an-optional-first-member-of-every-node-payload.md?plain=1#L13-L16)). The Morphir example writes the record in the compact spelling. This lesson expanded it by hand, by the rule of decision 0005. The value check reads this as a union of structures, so the value passes.
 
 Make these changes in `type.json` one at a time:
 

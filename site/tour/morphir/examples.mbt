@@ -47,6 +47,8 @@ pub fn rejected_code(diagnostic : String) -> String? {
     "invalid_name" => Some("Pattern")
     "unknown_node" | "unknown_member" => Some("UnknownMember")
     "invalid_type" => Some("TypeMismatch")
+    // The lesson model has no array form, so the check gives TypeMismatch.
+    "breaks_max_items" => Some("TypeMismatch")
     _ => None
   }
 }
@@ -74,7 +76,8 @@ fn kind_text(kind : Kind) -> String {
 
 ///|
 /// One line of the review snapshot: `<verdict> <form> <kind> <source> <at>`.
-/// The form is `expanded`, `compact(<pointer>,...)` or `unknown(<pointer>)`.
+/// The form is `expanded`, `unknown(<pointer>)`, or a `+` list of
+/// `<spelling>(<pointer>,...)` in the order compact, accepted, legacy.
 /// Each pointer is written as `#` and the JSON pointer, so the root is `#`.
 /// Only an accepted example is sorted; the form of another verdict is `-`.
 pub fn Example::line(self : Example) -> String {
@@ -82,8 +85,18 @@ pub fn Example::line(self : Example) -> String {
     Accepted =>
       match sort(self.kind, self.value) {
         Expanded => "expanded"
-        Compact(found) =>
-          "compact(\{found.map(fn(f) { "#" + f.pointer }).join(",")})"
+        Other(found) => {
+          let parts = []
+          for spelling in [Compact, Wrapper, Legacy] {
+            let pointers = found
+              .filter(fn(f) { f.spelling == spelling })
+              .map(fn(f) { "#" + f.pointer })
+            if !pointers.is_empty() {
+              parts.push("\{spelling.label()}(\{pointers.join(",")})")
+            }
+          }
+          parts.join("+")
+        }
         Unknown(pointer) => "unknown(#\{pointer})"
       }
     _ => "-"
@@ -104,6 +117,18 @@ fn items(json : Json?) -> Array[Json] {
   match json {
     Some(Array(items)) => items
     _ => []
+  }
+}
+
+///|
+/// The verdict of the schema on an example of one of its `oneOf` arms. An
+/// array with more items than the `maxItems` of its arm breaks the schema,
+/// although the schema gives it as an example.
+fn arm_verdict(arm : Json, value : Json) -> Verdict {
+  match (field(arm, "maxItems"), value) {
+    (Some(Number(max, ..)), Array(values)) if values.length().to_double() > max =>
+      Rejected("breaks_max_items")
+    _ => Accepted
   }
 }
 
@@ -152,7 +177,7 @@ pub fn schema_examples(schema : Json) -> Array[Example] {
           source,
           at: "\{base}/oneOf/\{j}/examples/\{i}",
           kind,
-          verdict: Accepted,
+          verdict: arm_verdict(arm, value),
           value,
         })
       }

@@ -31,19 +31,43 @@ pub(all) enum Verdict {
 } derive(Eq, Debug)
 
 ///|
-/// One finding that the value check must report for a compact example.
+/// A Morphir spelling that is not the expanded spelling. `Compact` is a bare
+/// string for a node. `Wrapper` is a node wrapper with a string or an array
+/// payload, which the schema lists as an accepted format. `Legacy` is an array
+/// for a name, a path, an FQName or a node.
+pub(all) enum Spelling {
+  Compact
+  Wrapper
+  Legacy
+} derive(Eq, Debug)
+
+///|
+/// The label of the spelling in the review snapshot.
+pub fn Spelling::label(self : Spelling) -> String {
+  match self {
+    Compact => "compact"
+    Wrapper => "accepted"
+    Legacy => "legacy"
+  }
+}
+
+///|
+/// One finding that the value check must report for an example in another
+/// spelling.
 pub(all) struct Expected {
   code : String
   pointer : String
   message : String
+  spelling : Spelling
 } derive(Eq, Debug)
 
 ///|
-/// How an example is spelled. `Unknown` holds the JSON pointer of a spelling
-/// that the sort does not know.
+/// How an example is spelled. `Other` holds the findings of the spellings that
+/// are not expanded. `Unknown` holds the JSON pointer of a spelling that the
+/// sort does not know.
 pub(all) enum Form {
   Expanded
-  Compact(Array[Expected])
+  Other(Array[Expected])
   Unknown(String)
 } derive(Eq, Debug)
 
@@ -100,8 +124,13 @@ priv struct Sorter {
 }
 
 ///|
-fn Sorter::compact(self : Sorter, pointer : String, message : String) -> Unit {
-  self.found.push({ code: "TypeMismatch", pointer, message, })
+fn Sorter::other(
+  self : Sorter,
+  pointer : String,
+  spelling : Spelling,
+  message : String,
+) -> Unit {
+  self.found.push({ code: "TypeMismatch", pointer, message, spelling, })
 }
 
 ///|
@@ -122,7 +151,7 @@ fn Sorter::node(
     Name | Path | FQName =>
       match value {
         String(_) => ()
-        Array(_) => self.compact(pointer, string_array)
+        Array(_) => self.other(pointer, Legacy, string_array)
         _ => self.unknown_at(pointer)
       }
     TypeAttributes | SourceLocation =>
@@ -137,8 +166,8 @@ fn Sorter::node(
 ///|
 fn Sorter::type_node(self : Sorter, value : Json, pointer : String) -> Unit {
   match value {
-    String(_) => self.compact(pointer, union_string)
-    Array(_) => self.compact(pointer, union_array)
+    String(_) => self.other(pointer, Compact, union_string)
+    Array(_) => self.other(pointer, Legacy, union_array)
     Object(wrapper) => {
       if wrapper.length() != 1 {
         self.unknown_at(pointer)
@@ -151,8 +180,8 @@ fn Sorter::type_node(self : Sorter, value : Json, pointer : String) -> Unit {
           continue
         }
         match payload {
-          String(_) => self.compact(at_tag, structure_string)
-          Array(_) => self.compact(at_tag, structure_array)
+          String(_) => self.other(at_tag, Wrapper, structure_string)
+          Array(_) => self.other(at_tag, Wrapper, structure_array)
           Object(payload) =>
             for name, child in payload {
               let at_child = "\{at_tag}/\{escape_token(name)}"
@@ -203,7 +232,7 @@ fn Sorter::member_node(
 
 ///|
 /// Sorts an example by its JSON spelling. Expanded: every node has the
-/// spelling of a Smithy value. Compact: another spelling that Morphir accepts,
+/// spelling of a Smithy value. Other: another spelling that Morphir accepts,
 /// with the findings that the value check must report. Unknown: a spelling
 /// that the sort does not know, so a person must look at it.
 pub fn sort(kind : Kind, value : Json) -> Form {
@@ -211,11 +240,6 @@ pub fn sort(kind : Kind, value : Json) -> Form {
   sorter.node(kind, value, "")
   match sorter.unknown {
     Some(pointer) => Unknown(pointer)
-    None =>
-      if sorter.found.is_empty() {
-        Expanded
-      } else {
-        Compact(sorter.found)
-      }
+    None => if sorter.found.is_empty() { Expanded } else { Other(sorter.found) }
   }
 }

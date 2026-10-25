@@ -3,18 +3,18 @@ Accepted expanded Name website/static/schemas/morphir-ir-v4.json /definitions/Na
 Accepted expanded Name website/static/schemas/morphir-ir-v4.json /definitions/NameString/examples/2
 Accepted expanded Name website/static/schemas/morphir-ir-v4.json /definitions/NameString/examples/3
 Accepted expanded Name website/static/schemas/morphir-ir-v4.json /definitions/NameString/examples/4
-Accepted compact(#) Name website/static/schemas/morphir-ir-v4.json /definitions/Name/oneOf/1/examples/0
-Accepted compact(#) Name website/static/schemas/morphir-ir-v4.json /definitions/Name/oneOf/1/examples/1
+Accepted legacy(#) Name website/static/schemas/morphir-ir-v4.json /definitions/Name/oneOf/1/examples/0
+Accepted legacy(#) Name website/static/schemas/morphir-ir-v4.json /definitions/Name/oneOf/1/examples/1
 Accepted expanded Path website/static/schemas/morphir-ir-v4.json /definitions/PathString/examples/0
 Accepted expanded Path website/static/schemas/morphir-ir-v4.json /definitions/PathString/examples/1
 Accepted expanded Path website/static/schemas/morphir-ir-v4.json /definitions/PathString/examples/2
-Accepted compact(#) Path website/static/schemas/morphir-ir-v4.json /definitions/Path/oneOf/1/examples/0
-Accepted compact(#) Path website/static/schemas/morphir-ir-v4.json /definitions/Path/oneOf/1/examples/1
+Accepted legacy(#) Path website/static/schemas/morphir-ir-v4.json /definitions/Path/oneOf/1/examples/0
+Accepted legacy(#) Path website/static/schemas/morphir-ir-v4.json /definitions/Path/oneOf/1/examples/1
 Accepted expanded FQName website/static/schemas/morphir-ir-v4.json /definitions/FQNameString/examples/0
 Accepted expanded FQName website/static/schemas/morphir-ir-v4.json /definitions/FQNameString/examples/1
 Accepted expanded FQName website/static/schemas/morphir-ir-v4.json /definitions/FQNameString/examples/2
-Accepted compact(#) FQName website/static/schemas/morphir-ir-v4.json /definitions/FQName/oneOf/1/examples/0
-Accepted compact(#) FQName website/static/schemas/morphir-ir-v4.json /definitions/FQName/oneOf/1/examples/1
+Accepted legacy(#) FQName website/static/schemas/morphir-ir-v4.json /definitions/FQName/oneOf/1/examples/0
+Rejected(breaks_max_items) - FQName website/static/schemas/morphir-ir-v4.json /definitions/FQName/oneOf/1/examples/1
 Accepted expanded TypeAttributes website/static/schemas/morphir-ir-v4.json /definitions/TypeAttributes/examples/0
 Accepted expanded TypeAttributes website/static/schemas/morphir-ir-v4.json /definitions/TypeAttributes/examples/1
 Accepted expanded TypeAttributes website/static/schemas/morphir-ir-v4.json /definitions/TypeAttributes/examples/2
@@ -25,14 +25,14 @@ Accepted compact(#) Type website/static/schemas/morphir-ir-v4.json /definitions/
 Accepted expanded Type website/static/schemas/morphir-ir-v4.json /definitions/VariableType/examples/2
 Accepted compact(#) Type website/static/schemas/morphir-ir-v4.json /definitions/ReferenceType/examples/0
 Accepted compact(#) Type website/static/schemas/morphir-ir-v4.json /definitions/ReferenceType/examples/1
-Accepted compact(#/Reference) Type website/static/schemas/morphir-ir-v4.json /definitions/ReferenceType/examples/2
-Accepted compact(#/Reference) Type website/static/schemas/morphir-ir-v4.json /definitions/ReferenceType/examples/3
-Accepted compact(#/Reference) Type website/static/schemas/morphir-ir-v4.json /definitions/ReferenceType/examples/4
+Accepted accepted(#/Reference) Type website/static/schemas/morphir-ir-v4.json /definitions/ReferenceType/examples/2
+Accepted accepted(#/Reference) Type website/static/schemas/morphir-ir-v4.json /definitions/ReferenceType/examples/3
+Accepted accepted(#/Reference) Type website/static/schemas/morphir-ir-v4.json /definitions/ReferenceType/examples/4
 Accepted compact(#/Reference/args/0) Type website/static/schemas/morphir-ir-v4.json /definitions/ReferenceType/examples/5
-Accepted compact(#) Type website/static/schemas/morphir-ir-v4.json /definitions/TupleType/examples/0
-Accepted compact(#/Tuple) Type website/static/schemas/morphir-ir-v4.json /definitions/TupleType/examples/1
+Accepted legacy(#) Type website/static/schemas/morphir-ir-v4.json /definitions/TupleType/examples/0
+Accepted accepted(#/Tuple) Type website/static/schemas/morphir-ir-v4.json /definitions/TupleType/examples/1
 Accepted compact(#/Tuple/elements/0,#/Tuple/elements/1) Type website/static/schemas/morphir-ir-v4.json /definitions/TupleType/examples/2
-Accepted compact(#) Type website/static/schemas/morphir-ir-v4.json /definitions/TupleType/examples/3
+Accepted legacy(#) Type website/static/schemas/morphir-ir-v4.json /definitions/TupleType/examples/3
 Accepted compact(#/Record/fields/name,#/Record/fields/age) Type website/static/schemas/morphir-ir-v4.json /definitions/RecordType/examples/0
 Accepted compact(#/Record/fields/inflows,#/Record/fields/outflows) Type website/static/schemas/morphir-ir-v4.json /definitions/RecordType/examples/1
 Accepted compact(#/ExtensibleRecord/fields/name) Type website/static/schemas/morphir-ir-v4.json /definitions/ExtensibleRecordType/examples/0
@@ -40,7 +40,7 @@ Accepted compact(#/ExtensibleRecord/fields/email) Type website/static/schemas/mo
 Accepted compact(#/Function/parameterType,#/Function/returnType) Type website/static/schemas/morphir-ir-v4.json /definitions/FunctionType/examples/0
 Accepted expanded Type website/static/schemas/morphir-ir-v4.json /definitions/UnitType/examples/0
 Accepted expanded Type website/static/schemas/morphir-ir-v4.json /definitions/UnitType/examples/1
-Accepted compact(#/Reference) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/dependencies/morphir~1SDK/modules/dict/types/dict/TypeAliasSpecification/typeExp
+Accepted accepted(#/Reference) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/dependencies/morphir~1SDK/modules/dict/types/dict/TypeAliasSpecification/typeExp
 Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/types/product-ID/Public/TypeAliasDefinition/typeExp
 Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/types/price/Public/TypeAliasDefinition/typeExp
 Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/types/quantity/Public/TypeAliasDefinition/typeExp
@@ -57,38 +57,38 @@ Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example
 Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/types/deal-event/Public/CustomTypeDefinition/constructors/duplicate-deal/0/1
 Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/types/deal-event/Public/CustomTypeDefinition/constructors/invalid-price/0/1
 Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/types/deal-event/Public/CustomTypeDefinition/constructors/invalid-quantity/0/1
-Accepted compact(#/Reference) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/types/book/Public/TypeAliasDefinition/typeExp
+Accepted accepted(#/Reference) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/types/book/Public/TypeAliasDefinition/typeExp
 Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/values/open-deal/Public/IncompleteBody/inputTypes/product
 Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/values/open-deal/Public/IncompleteBody/inputTypes/price
 Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/values/open-deal/Public/IncompleteBody/inputTypes/quantity
 Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/values/open-deal/Public/IncompleteBody/inputTypes/book
-Accepted compact(#/Tuple) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/values/open-deal/Public/IncompleteBody/outputType
+Accepted accepted(#/Tuple) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/values/open-deal/Public/IncompleteBody/outputType
 Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/values/close-deal/Public/IncompleteBody/inputTypes/product
 Accepted compact(#) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/values/close-deal/Public/IncompleteBody/inputTypes/book
-Accepted compact(#/Tuple) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/values/close-deal/Public/IncompleteBody/outputType
+Accepted accepted(#/Tuple) Type website/static/ir/examples/v4/books-and-records-example.json /distribution/Library/def/modules/books-and-records/Public/values/close-deal/Public/IncompleteBody/outputType
 Accepted compact(#) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/dependencies/morphir~1SDK/modules/basics/values/add/inputs/a
 Accepted compact(#) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/dependencies/morphir~1SDK/modules/basics/values/add/inputs/b
 Accepted compact(#) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/dependencies/morphir~1SDK/modules/basics/values/add/output
-Accepted compact(#/Reference) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/dependencies/morphir~1SDK/modules/list/types/list/TypeAliasSpecification/typeExp
+Accepted accepted(#/Reference) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/dependencies/morphir~1SDK/modules/list/types/list/TypeAliasSpecification/typeExp
 Accepted compact(#/Function/parameterType,#/Function/returnType) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/dependencies/morphir~1SDK/modules/list/values/map/inputs/f
-Accepted compact(#/Reference) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/dependencies/morphir~1SDK/modules/list/values/map/inputs/list
-Accepted compact(#/Reference) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/dependencies/morphir~1SDK/modules/list/values/map/output
+Accepted accepted(#/Reference) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/dependencies/morphir~1SDK/modules/list/values/map/inputs/list
+Accepted accepted(#/Reference) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/dependencies/morphir~1SDK/modules/list/values/map/output
 Accepted compact(#/Record/fields/inflows,#/Record/fields/outflows,#/Record/fields/supplemental) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/def/modules/u-s~1f-r-2052-a~1data-tables/value/types/data-tables/TypeAliasDefinition/typeExp
-Accepted compact(#/Record/fields/assets/Reference) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/def/modules/u-s~1f-r-2052-a~1data-tables/value/types/inflows/TypeAliasDefinition/typeExp
+Accepted accepted(#/Record/fields/assets/Reference) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/def/modules/u-s~1f-r-2052-a~1data-tables/value/types/inflows/TypeAliasDefinition/typeExp
 Accepted compact(#) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/def/modules/u-s~1f-r-2052-a~1data-tables/value/values/calculate-total/ExpressionBody/inputTypes/tables
 Accepted compact(#) Type website/static/ir/examples/v4/complete-example.json /distribution/Library/def/modules/u-s~1f-r-2052-a~1data-tables/value/values/calculate-total/ExpressionBody/outputType
 Accepted compact(#) Type spec/ir/mck/types.feature line 11
 Accepted expanded Type spec/ir/mck/types.feature line 14
 Accepted compact(#) Type spec/ir/mck/types.feature line 22
-Accepted compact(#/Reference) Type spec/ir/mck/types.feature line 29
+Accepted accepted(#/Reference) Type spec/ir/mck/types.feature line 29
 Accepted expanded Type spec/ir/mck/types.feature line 30
 Accepted expanded Type spec/ir/mck/types.feature line 31
 Accepted expanded Type spec/ir/mck/types.feature line 32
-Accepted compact(#/Reference) Type spec/ir/mck/types.feature line 42
+Accepted accepted(#/Reference) Type spec/ir/mck/types.feature line 42
 Accepted compact(#/Reference/args/0) Type spec/ir/mck/types.feature line 49
 Accepted compact(#/Reference/args/0) Type spec/ir/mck/types.feature line 50
-Accepted compact(#/Tuple) Type spec/ir/mck/types.feature line 61
-Accepted compact(#) Type spec/ir/mck/types.feature line 68
+Accepted accepted(#/Tuple) Type spec/ir/mck/types.feature line 61
+Accepted legacy(#) Type spec/ir/mck/types.feature line 68
 Accepted compact(#/Tuple/elements/0,#/Tuple/elements/1) Type spec/ir/mck/types.feature line 69
 Accepted compact(#/Tuple/elements/0,#/Tuple/elements/1) Type spec/ir/mck/types.feature line 70
 Accepted compact(#/Record/fields/name,#/Record/fields/age) Type spec/ir/mck/types.feature line 82
@@ -112,21 +112,21 @@ Rejected(unknown_node) - Type spec/ir/mck/types.feature line 174
 Rejected(invalid_type) - Type spec/ir/mck/types.feature line 183
 Rejected(unknown_member) - Type spec/ir/mck/types.feature line 184
 Accepted expanded Name spec/ir/mck/names.feature line 13
-Accepted compact(#) Name spec/ir/mck/names.feature line 17
+Accepted legacy(#) Name spec/ir/mck/names.feature line 17
 Accepted expanded Name spec/ir/mck/names.feature line 28
-Accepted compact(#) Name spec/ir/mck/names.feature line 32
+Accepted legacy(#) Name spec/ir/mck/names.feature line 32
 Rejected(invalid_name) - Name spec/ir/mck/names.feature line 42
 Rejected(invalid_name) - Name spec/ir/mck/names.feature line 43
 Accepted expanded Path spec/ir/mck/names.feature line 52
-Accepted compact(#) Path spec/ir/mck/names.feature line 56
+Accepted legacy(#) Path spec/ir/mck/names.feature line 56
 Accepted expanded FQName spec/ir/mck/names.feature line 65
-Accepted compact(#) FQName spec/ir/mck/names.feature line 69
+Accepted legacy(#) FQName spec/ir/mck/names.feature line 69
 Accepted expanded Path spec/ir/mck/names.feature line 80
-Accepted compact(#) Path spec/ir/mck/names.feature line 84
+Accepted legacy(#) Path spec/ir/mck/names.feature line 84
 Accepted expanded Name spec/ir/mck/names.feature line 95
-Accepted compact(#) Name spec/ir/mck/names.feature line 99
+Accepted legacy(#) Name spec/ir/mck/names.feature line 99
 Accepted expanded Name spec/ir/mck/names.feature line 108
-Accepted compact(#) Name spec/ir/mck/names.feature line 112
+Accepted legacy(#) Name spec/ir/mck/names.feature line 112
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /roundTripCases/0/canonical/uppercase
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /roundTripCases/1/canonical/uppercase
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /roundTripCases/2/canonical/uppercase
@@ -145,27 +145,27 @@ Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /roundTripC
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /roundTripCases/15/canonical/uppercase
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /roundTripCases/16/canonical/uppercase
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/0/canonical/uppercase
-Accepted compact(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/0/legacyArray
+Accepted legacy(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/0/legacyArray
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/1/canonical/uppercase
-Accepted compact(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/1/legacyArray
+Accepted legacy(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/1/legacyArray
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/2/canonical/uppercase
-Accepted compact(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/2/legacyArray
+Accepted legacy(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/2/legacyArray
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/3/canonical/uppercase
-Accepted compact(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/3/legacyArray
+Accepted legacy(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/3/legacyArray
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/4/canonical/uppercase
-Accepted compact(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/4/legacyArray
+Accepted legacy(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/4/legacyArray
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/5/canonical/uppercase
-Accepted compact(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/5/legacyArray
+Accepted legacy(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/5/legacyArray
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/6/canonical/uppercase
-Accepted compact(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/6/legacyArray
+Accepted legacy(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/6/legacyArray
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/7/canonical/uppercase
-Accepted compact(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/7/legacyArray
+Accepted legacy(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/7/legacyArray
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/8/canonical/uppercase
-Accepted compact(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/8/legacyArray
+Accepted legacy(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/8/legacyArray
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/9/canonical/uppercase
-Accepted compact(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/9/legacyArray
+Accepted legacy(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/9/legacyArray
 Accepted expanded Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/10/canonical/uppercase
-Accepted compact(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/10/legacyArray
+Accepted legacy(#) Name docs/spec/ir/fixtures/naming-conformance.json /legacyDecodeCases/10/legacyArray
 Rejected(invalid_name) - Name docs/spec/ir/fixtures/naming-conformance.json /rejectCases/0/input
 Rejected(invalid_name) - Name docs/spec/ir/fixtures/naming-conformance.json /rejectCases/1/input
 Rejected(invalid_name) - Name docs/spec/ir/fixtures/naming-conformance.json /rejectCases/2/input

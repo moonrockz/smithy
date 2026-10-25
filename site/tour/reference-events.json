@@ -3154,6 +3154,10 @@
             "digest": "b61a82c337795516a9df75c14cf68eaf5b1974978bffffc3b6e29a90cb43d408",
             "events": []
         },
+        "39-morphir-limits/reference-object": {
+            "digest": "160e7262fe46eb0f47070e8b763d0d972645079c89e5de9e062284e014368a92",
+            "events": []
+        },
         "39-morphir-limits/reference-string": {
             "digest": "53febe4527e1dc645274697ce39448d65aef97ef98a4255622317841683b9eb0",
             "events": []

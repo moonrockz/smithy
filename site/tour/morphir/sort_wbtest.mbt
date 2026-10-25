@@ -1,40 +1,52 @@
 ///|
-fn mismatch(pointer : String, message : String) -> Expected {
-  { code: "TypeMismatch", pointer, message, }
+fn mismatch(
+  pointer : String,
+  spelling : Spelling,
+  message : String,
+) -> Expected {
+  { code: "TypeMismatch", pointer, message, spelling, }
 }
 
 ///|
 test "a bare string is a compact type" {
   assert_eq(
     sort(Type, "a"),
-    Compact([mismatch("", "I expected a union value, but found string.")]),
+    Other([mismatch("", Compact, "I expected a union value, but found string.")]),
   )
 }
 
 ///|
-test "a bare array is a compact type" {
+test "a bare array is a legacy type" {
   assert_eq(
     sort(Type, ["a", "b"]),
-    Compact([mismatch("", "I expected a union value, but found array.")]),
+    Other([mismatch("", Legacy, "I expected a union value, but found array.")]),
   )
 }
 
 ///|
-test "a wrapper with a string payload is compact" {
+test "a wrapper with a string payload is an accepted wrapper" {
   assert_eq(
     sort(Type, { "Reference": "morphir/SDK:basics#int" }),
-    Compact([
-      mismatch("/Reference", "I expected a structure value, but found string."),
+    Other([
+      mismatch(
+        "/Reference",
+        Wrapper,
+        "I expected a structure value, but found string.",
+      ),
     ]),
   )
 }
 
 ///|
-test "a wrapper with an array payload is compact" {
+test "a wrapper with an array payload is an accepted wrapper" {
   assert_eq(
     sort(Type, { "Tuple": ["a"] }),
-    Compact([
-      mismatch("/Tuple", "I expected a structure value, but found array."),
+    Other([
+      mismatch(
+        "/Tuple",
+        Wrapper,
+        "I expected a structure value, but found array.",
+      ),
     ]),
   )
 }
@@ -49,47 +61,59 @@ test "a wrapper with an object payload is expanded" {
 }
 
 ///|
-test "a compact field is found with an escaped pointer" {
+test "a field in another spelling is found with an escaped pointer" {
   assert_eq(
     sort(Type, { "Record": { "fields": { "a/b": "x" } } }),
-    Compact([
+    Other([
       mismatch(
-        "/Record/fields/a~1b", "I expected a union value, but found string.",
+        "/Record/fields/a~1b",
+        Compact,
+        "I expected a union value, but found string.",
       ),
     ]),
   )
 }
 
 ///|
-test "a legacy array name is compact" {
+test "a legacy array name is legacy" {
   assert_eq(
     sort(Type, { "Variable": { "name": ["a"] } }),
-    Compact([
-      mismatch("/Variable/name", "I expected a string value, but found array."),
+    Other([
+      mismatch(
+        "/Variable/name",
+        Legacy,
+        "I expected a string value, but found array.",
+      ),
     ]),
   )
 }
 
 ///|
-test "each compact argument gives one finding" {
+test "each argument in another spelling gives one finding" {
   assert_eq(
     sort(Type, {
       "Reference": { "fqname": "a:b#c", "args": [{ "Unit": {} }, "x"] },
     }),
-    Compact([
+    Other([
       mismatch(
-        "/Reference/args/1", "I expected a union value, but found string.",
+        "/Reference/args/1",
+        Compact,
+        "I expected a union value, but found string.",
       ),
     ]),
   )
   assert_eq(
     sort(Type, { "Function": { "parameterType": "a", "returnType": ["b"] } }),
-    Compact([
+    Other([
       mismatch(
-        "/Function/parameterType", "I expected a union value, but found string.",
+        "/Function/parameterType",
+        Compact,
+        "I expected a union value, but found string.",
       ),
       mismatch(
-        "/Function/returnType", "I expected a union value, but found array.",
+        "/Function/returnType",
+        Legacy,
+        "I expected a union value, but found array.",
       ),
     ]),
   )
@@ -115,7 +139,7 @@ test "a spelling that the sort does not know is Unknown" {
 }
 
 ///|
-test "Unknown wins over a compact finding" {
+test "Unknown wins over a finding of another spelling" {
   assert_eq(
     sort(Type, { "Tuple": { "elements": ["a", { "Hole": {} }] } }),
     Unknown("/Tuple/elements/1"),
@@ -128,7 +152,7 @@ test "names, paths and attributes" {
   assert_eq(sort(Name, 5), Unknown(""))
   assert_eq(
     sort(Path, [["morphir"], ["s", "d", "k"]]),
-    Compact([mismatch("", "I expected a string value, but found array.")]),
+    Other([mismatch("", Legacy, "I expected a string value, but found array.")]),
   )
   assert_eq(sort(TypeAttributes, {}), Expanded)
   assert_eq(sort(SourceLocation, { "startLine": 1 }), Expanded)
@@ -172,7 +196,16 @@ test "snapshot lines for each verdict and form" {
   }
   assert_eq(
     compact.line(),
-    "Accepted compact(#/Function/parameterType,#/Function/returnType) Type k.feature line 6",
+    "Accepted compact(#/Function/parameterType)+legacy(#/Function/returnType) Type k.feature line 6",
+  )
+  let wrapper : Example = {
+    ..compact,
+    at: "line 9",
+    value: { "Tuple": { "elements": [["a"], { "Reference": "x:y#z" }, "b"] } },
+  }
+  assert_eq(
+    wrapper.line(),
+    "Accepted compact(#/Tuple/elements/2)+accepted(#/Tuple/elements/1/Reference)+legacy(#/Tuple/elements/0) Type k.feature line 9",
   )
   // A finding at the root of the value prints as `#`, not as nothing.
   let root : Example = { ..compact, at: "line 8", value: "a", }
@@ -187,6 +220,7 @@ test "rejected_code maps the Morphir diagnostics" {
   assert_eq(rejected_code("unknown_node"), Some("UnknownMember"))
   assert_eq(rejected_code("unknown_member"), Some("UnknownMember"))
   assert_eq(rejected_code("invalid_type"), Some("TypeMismatch"))
+  assert_eq(rejected_code("breaks_max_items"), Some("TypeMismatch"))
   assert_eq(rejected_code("other"), None)
 }
 

@@ -460,8 +460,15 @@ findings. The tests in `check/morphir_test.mbt` run each example through the val
 
 An example is expanded when each node in it has the spelling of a Smithy value. A type node is a wrapper object
 with one kind key, and its payload is an object with the members of that kind. Each name, path and FQName is a
-string. Every other accepted spelling is compact. For a compact example, the sort gives each finding that the value
-check must report: the code `TypeMismatch`, the JSON pointer and the message. A spelling that the sort does not know
+string. Every other accepted spelling has one of three labels, in the words of the Morphir sources:
+
+- `compact`: a bare string for a type node, such as `"a"` or `"morphir/SDK:basics#int"`.
+- `accepted`: a wrapper with a string or an array payload, such as `{"Reference": "..."}`. The schema lists these
+  as accepted formats.
+- `legacy`: an array for a name, a path, an FQName or a type node.
+
+For each of these, the sort gives each finding that the value check must report: the code `TypeMismatch`, the JSON
+pointer and the message. A spelling that the sort does not know
 is `unknown(<pointer>)`, and the check fails. A new spelling after a refresh then needs a person.
 
 ### What each example must give
@@ -471,15 +478,16 @@ The verdict comes from the Morphir source. The form comes from the sort.
 | Verdict and form | Source | The value check must give |
 |---|---|---|
 | Accepted, expanded | schema and file examples, kit "canonical" and "accepts" rows, corpus canonical strings and legacy arrays | no finding |
-| Accepted, compact | the same sources | exactly the predicted findings |
+| Accepted, compact, accepted or legacy | the same sources | exactly the predicted findings |
 | Legacy | kit rows "accepts ... with warning" | one or more findings, each `UnknownMember`, `RequiredMember` or `TypeMismatch` |
-| Rejected | kit rows "rejects", corpus inputs that are not valid | a finding with the code of the Morphir diagnostic (`rejected_code`) |
+| Rejected | kit rows "rejects", corpus inputs that are not valid, and schema `oneOf` examples with more items than the `maxItems` of their arm (`breaks_max_items`) | a finding with the code of the Morphir diagnostic (`rejected_code`) |
 
-A Morphir diagnostic that `rejected_code` does not know fails the check. Each message of a compact example must be
-in the `output_contains` of a lesson 39 case. `check/__snapshot__/morphir-examples.txt` lists each example with its
+A Morphir diagnostic that `rejected_code` does not know fails the check. Each predicted message of an example that is
+not expanded must be in the `output_contains` of a lesson 39 case. `check/__snapshot__/morphir-examples.txt` lists each example with its
 verdict and form, one line each: `<verdict> <form> <kind> <source> <at>`. The form is `expanded`,
-`compact(<pointer>,...)` with the pointer of each predicted finding, or `unknown(<pointer>)`. Each pointer is `#` and
-then the JSON pointer, so `compact(#)` is one finding at the root. A Legacy or Rejected example has the form `-`.
+`unknown(<pointer>)`, or a `+` list of `<label>(<pointer>,...)` in the order compact, accepted, legacy, with the
+pointer of each predicted finding. Each pointer is `#` and then the JSON pointer, so `compact(#)` is one finding at
+the root. A Legacy or Rejected example has the form `-`.
 
 ### The shared model files and the patterns
 

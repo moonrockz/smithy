@@ -20,6 +20,25 @@ test "schema examples come from a definition and from its oneOf arms" {
 }
 
 ///|
+test "an arm example with more items than maxItems is rejected" {
+  let schema : Json = {
+    "definitions": {
+      "FQName": {
+        "oneOf": [
+          { "examples": ["a:b#c"] },
+          { "maxItems": 3, "examples": [["a", "b", "c"], ["a", "b", "c", "d"]] },
+        ],
+      },
+    },
+  }
+  assert_eq(schema_examples(schema).map(fn(e) { e.verdict }), [
+    Accepted,
+    Accepted,
+    Rejected("breaks_max_items"),
+  ])
+}
+
+///|
 test "file examples are the top type nodes of a document" {
   let document : Json = {
     "a": {

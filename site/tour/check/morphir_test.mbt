@@ -325,7 +325,7 @@ test "every Morphir example gives the findings of its verdict and form" {
             } else {
               Some("expected no findings")
             }
-          Compact(expected) => {
+          Other(expected) => {
             let wanted = expected.map(e => (e.code, e.pointer, e.message))
             wanted.sort_by(compare)
             if found == wanted {
@@ -375,7 +375,7 @@ test "every Morphir example gives the findings of its verdict and form" {
 }
 
 ///|
-test "lesson 39 shows every compact message" {
+test "lesson 39 shows the message of every other spelling" {
   let shown : Array[String] = []
   for case in lesson_in("39-morphir-limits").cases {
     shown.append(case.expect.output_contains)
@@ -383,7 +383,7 @@ test "lesson 39 shows every compact message" {
   let missing : Array[String] = []
   for example in morphir_examples() {
     guard example.verdict is Accepted &&
-      @morphir.sort(example.kind, example.value) is Compact(expected) else {
+      @morphir.sort(example.kind, example.value) is Other(expected) else {
       continue
     }
     for e in expected {
