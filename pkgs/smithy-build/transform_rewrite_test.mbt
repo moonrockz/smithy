@@ -221,8 +221,12 @@ test "change types downgrades enum shapes to legacy string enum traits" {
   let source =
     #|$version: "2"
     #|namespace example
-    #|enum Choice { @documentation("docs") @internal @deprecated A = "alpha" }
-    #|intEnum Number { A = 1 }
+    #|enum Choice {
+    #|    @documentation("docs") @internal @deprecated A = "alpha"
+    #|}
+    #|intEnum Number {
+    #|    A = 1
+    #|}
   let model = rewrite_projection(
     rewrite_idl(source),
     "{\"name\":\"changeTypes\",\"args\":{\"shapeTypes\":{\"example#Choice\":\"string\",\"example#Number\":\"integer\"}}}",

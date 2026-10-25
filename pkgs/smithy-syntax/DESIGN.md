@@ -99,7 +99,9 @@ A `///` comment that documents nothing is a `SM-PARSE-009` warning, at the
 places where Smithy reports `Model.BadDocumentationComment`: after traits,
 inside a value or a shape body, before `{`, before `}`, before a control,
 `metadata`, `namespace` or `use` statement, on the line of a statement or a
-value assignment, and at the end of a file with a shape statement. The parser
+value assignment, and at the end of a file with a shape statement. Before
+an enum's closing `}`, documentation instead starts another enum member;
+the missing member name is a syntax error. The parser
 collects these stray comments and reports them as one warning where Smithy
 clears its pending documentation: at each statement or value `BR`, after the
 traits of a member, before `{` of shape members and before `}`. Smithy drops
@@ -107,8 +109,11 @@ without a warning the comments before `:=`, and so does the parser. Smithy
 also drops without a warning a comment before `apply` and those at the end of
 a file without a shape statement; the parser warns about them for editors with
 codes of their own, `SM-PARSE-008` and `SM-PARSE-016`, which the model loader
-does not report as validation events. A `///` comment on the line of a token stays an ordinary
-comment in the AST; it is a warning only where Smithy warns about it.
+does not report as validation events. A `///` comment after a member target,
+an enum member name without a value, `{`, or `:=` can document the next member
+or inline structure, including when the comment starts on the same line.
+A statement or value assignment's `BR` clears its trailing documentation
+with a warning instead.
 
 Partial ASTs preserve duplicate members after `SM-PARSE-014`. Member names
 are unique only when `ParseResult::has_errors()` is false. AST construct
@@ -132,7 +137,9 @@ Statements need a line break or comment before the next statement. Member
 and object-entry separators follow their own whitespace rules. Object and
 trait entries require whitespace between pairs, including a space, comma,
 comment or newline. Their separator diagnostics name the object or trait
-body and the offending token. Value assignments require a line break.
+body and the offending token. Comments and line breaks cannot separate a
+member name from its colon, or its colon from the target. Value assignments require
+a line break, including before the closing `}`.
 
 A missing namespace is reported once while later shapes can still parse.
 A late `use` is reported even when the namespace is missing. `$version`

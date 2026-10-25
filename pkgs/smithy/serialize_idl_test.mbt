@@ -14,11 +14,15 @@ test "IDL serialization preserves namespaces, traits, metadata and every shape k
     #|    RED = "red"
     #|    BLUE
     #|}
-    #|intEnum Code { OK = 200 }
+    #|intEnum Code {
+    #|    OK = 200
+    #|}
     #|union Choice { name: Name, code: Code }
     #|@mixin
     #|structure Base { @required id: String }
-    #|structure Input with [Base] { count: Integer = 3 }
+    #|structure Input with [Base] {
+    #|    count: Integer = 3
+    #|}
     #|@error("client")
     #|structure Problem { message: String }
     #|operation Get { input: Input, output: other#Output, errors: [Problem] }

@@ -286,3 +286,31 @@ Feature: Semantic model assembly
     When I assemble the semantic model
     Then the model has no errors
     And the validation events are "Model.BadDocumentationComment|WARNING|-"
+
+  Scenario: Trailing documentation comments document the next member or inline shape
+    Given the IDL model file "docs.smithy":
+      """smithy
+      $version: "2"
+      namespace example
+      structure S { /// first
+          a: String /// second
+          b: String
+      }
+      enum E {
+          A /// next
+          B
+      }
+      operation O {
+          input := /// inline
+          {}
+      }
+      """
+    When I assemble the semantic model
+    Then the model has no errors
+    And the validation events are ""
+    And the semantic shape "example#S$a" has documentation "first"
+    And the semantic shape "example#S$b" has documentation "second"
+    And the semantic shape "example#E$B" has documentation "next"
+    And the semantic shape "example#OInput" has documentation "inline"
+    And the assembled model exports and reloads unchanged
+    And converting the model to IDL and back preserves the JSON AST

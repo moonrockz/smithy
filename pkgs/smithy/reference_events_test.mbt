@@ -64,6 +64,69 @@ test "a mixin of another shape type stays a Model error, as in Smithy" {
 let bad_doc : String = "Model.BadDocumentationComment|WARNING|-"
 
 ///|
+/// Java 30bdab5 reports Model|ERROR|- for these parser boundary errors.
+/// The parser regression tests record the corresponding Java messages.
+test "member spacing enum documentation and value breaks give Java Model errors" {
+  for
+    body in [
+      "structure S { flag: Boolean = true }", "enum E { A = \"a\" }", "intEnum E { A = 1 }",
+      "structure S { a // comment\n : String\n}", "structure S { a /// comment\n : String\n}",
+      "structure S { a: // comment\n String\n}", "structure S { a: /// comment\n String\n}",
+      "enum E {\n A\n /// orphan\n}", "intEnum E {\n A = 1\n /// orphan\n}",
+    ] {
+    assert_eq(reference_keys(body), ["Model|ERROR|-"])
+  }
+}
+
+///|
+/// smithy-2qe.41.20. Java 30bdab5 emits no events for these cases.
+/// Its JSON AST has smithy.api#documentation = "x" on the named shape.
+test "trailing documentation matches the Java JSON AST at each member position" {
+  for
+    (body, id, member) in [
+      (
+        "structure S {\n    a: String /// x\n    b: String\n}",
+        "example#S",
+        Some("b"),
+      ),
+      ("enum E {\n    A /// x\n    B\n}", "example#E", Some("B")),
+      ("structure S { /// x\n    a: String\n}", "example#S", Some("a")),
+      ("operation O {\n    input := /// x\n    {}\n}", "example#OInput", None),
+    ] {
+    let result = @smithy.Loader::new()
+      .add_idl(
+        "model.smithy",
+        "$version: \"2\"\nnamespace example\n" + body + "\n",
+      )
+      .assemble()
+    assert_eq(reference_keys(body), [])
+    let model = result.model.unwrap()
+    let shape = model.to_json_ast().shapes.unwrap().get(id).unwrap()
+    let traits = match member {
+      Some(name) => {
+        guard shape.kind is (Structure(members) | Enum(members)) else {
+          fail("expected members")
+        }
+        members.unwrap().get(name).unwrap().traits
+      }
+      None => shape.traits
+    }
+    assert_eq(
+      traits.bind(t => t.get("smithy.api#documentation")),
+      Some(Json::string("x")),
+    )
+    let restored = @smithy.Loader::new()
+    for ns, text in model.to_idl() {
+      ignore(restored.add_idl(ns + ".smithy", text))
+    }
+    assert_eq(
+      @syntax.encode_json_ast(restored.assemble().model.unwrap().to_json_ast()),
+      @syntax.encode_json_ast(model.to_json_ast()),
+    )
+  }
+}
+
+///|
 test "a documentation comment after the traits of a shape is a BadDocumentationComment warning, as in Smithy" {
   assert_eq(reference_keys("@required\n/// The name.\nstring Name"), [
     "TraitTarget|ERROR|example#Name", bad_doc,
