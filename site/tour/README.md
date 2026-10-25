@@ -437,6 +437,65 @@ a `smithy` fence is rejected, because no `#` follows the name.
 The guard does not check other commands, such as `moon add moonrockz/smithy`. Do not put such a command in a
 lesson unless a test runs it.
 
+## The Morphir case study
+
+Lessons 34 to 39 model a part of the Morphir IR, version 4, in Smithy. Each Morphir claim of a lesson links to a
+line of a pinned Morphir commit. A test checks the lesson model against the examples of the Morphir sources.
+
+### The vendored sources
+
+`morphir/upstream/` holds the Morphir files at their paths in finos/morphir, byte for byte, at one pinned commit:
+the v4 JSON schema, the v4 and v3 IR examples, the kit files `types.feature` and `names.feature`, and the naming
+corpus. `morphir/inventory.json` holds the Git blob hash of each file. [morphir/README.md](morphir/README.md) gives
+the licence and the refresh steps. A refresh runs `mise run tour:vendor:morphir`, writes the snapshot again with
+`--update`, and needs a review of the snapshot diff and of the lesson texts.
+
+The package `morphir/` (`moonrockz/smithy-site/tour/morphir`) reads the examples, sorts each one and predicts its
+findings. The tests in `check/morphir_test.mbt` run each example through the value check of the playground core.
+`mise run tour:check` runs both packages.
+
+### The sort rule
+
+An example is expanded when each node in it has the spelling of a Smithy value. A type node is a wrapper object
+with one kind key, and its payload is an object with the members of that kind. Each name, path and FQName is a
+string. Every other accepted spelling is compact. For a compact example, the sort gives each finding that the value
+check must report: the code `TypeMismatch`, the JSON pointer and the message. A spelling that the sort does not know
+is `unknown(<pointer>)`, and the check fails. A new spelling after a refresh then needs a person.
+
+### What each example must give
+
+The verdict comes from the Morphir source. The form comes from the sort.
+
+| Verdict and form | Source | The value check must give |
+|---|---|---|
+| Accepted, expanded | schema and file examples, kit "canonical" and "accepts" rows, corpus canonical strings and legacy arrays | no finding |
+| Accepted, compact | the same sources | exactly the predicted findings |
+| Legacy | kit rows "accepts ... with warning" | one or more findings, each `UnknownMember`, `RequiredMember` or `TypeMismatch` |
+| Rejected | kit rows "rejects", corpus inputs that are not valid | a finding with the code of the Morphir diagnostic (`rejected_code`) |
+
+A Morphir diagnostic that `rejected_code` does not know fails the check. Each message of a compact example must be
+in the `output_contains` of a lesson 39 case. `check/__snapshot__/morphir-examples.txt` lists each example with its
+verdict and form, one line each: `<verdict> <form> <kind> <source> <at>`.
+
+### The shared model files and the patterns
+
+Lessons 34, 38 and 39 have the same `names.smithy` and `type.smithy`. Lessons 35, 36 and 37 have the same
+`names.smithy`, and lesson 37 has the `dsl.smithy` and `basics.smithy` of lesson 36. The example check uses the
+model files of lesson 38, the files that the reader sees. The `@pattern` of `Name`, `Path` and `FQName` must equal
+`NameString`, `PathString` and `FQNameString` of the vendored schema. The pattern of `@typeVariable` must equal the
+compact `VariableType` pattern.
+
+### The quotes
+
+`quotes` in `morphir/examples.mbt` names each lesson value that quotes a Morphir example. The value must equal the
+node at the JSON pointer of the upstream file. The start value of lesson 39 is the type `deal` of the
+books-and-records example. Its case `v3` is the type of `append` from the v3 greeting example.
+
+### Review
+
+The owner of the case study is a Morphir maintainer. After each change to a Morphir text or to the lesson model,
+ask the owner to review the lesson texts.
+
 ## How the site uses the tour
 
 The pre-render reads `site/tour/lessons` from the `--content` directory of the build and writes `/tour/` (the
