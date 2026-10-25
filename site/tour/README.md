@@ -86,12 +86,15 @@ commit that made them. For each case, the check:
 1. requires a fresh reference result. The digest in the file must match the case files. The result has a
    reference JSON Schema if and only if the lesson output is `JsonSchema` and the reference events have no
    `ERROR` and no `DANGER`. It has a reference OpenAPI entry if and only if the lesson output is `OpenApi30` or
-   `OpenApi31` and the reference events have no `ERROR` and no `DANGER`;
+   `OpenApi31` and the reference events have no `ERROR` and no `DANGER`. It has a reference selection if and only
+   if the lesson output is `Selector` and the reference events have no `ERROR` and no `DANGER`;
 2. requires the events of the playground core to be equal to the reference events (after the allow list);
 3. for a lesson with the output `JsonSchema`, requires the JSON Schema of the playground core to be equal to the
    reference JSON Schema (after the allow list);
 4. for a lesson with the output `OpenApi30` or `OpenApi31`, requires the OpenAPI document of the playground core
-   to be equal to the reference OpenAPI document (after the allow list).
+   to be equal to the reference OpenAPI document (after the allow list);
+5. for a lesson with the output `Selector`, requires the shape IDs of `selector.txt` to be equal to the shape IDs
+   that the Java `Selector` selects, both sorted by UTF-16 code unit (after the allow list).
 
 The check also fails for a reference result of a case that does not exist.
 
@@ -126,7 +129,7 @@ reference result stale. The digest of another case covers the case files only.
 It is a JSON array. Each entry has:
 
 - `case`: `<lesson folder>/<case>`
-- `kind`: `event`, `json_schema` or `openapi`
+- `kind`: `event`, `json_schema`, `openapi` or `selector`
 - `reason`: why the two differ
 - `issue`: a beads issue id, `smithy-` followed by lower-case letters, digits and dots (for example `smithy-2qe.4`)
 
@@ -141,6 +144,13 @@ an entry removes `/a/0`, the item that was at `/a/1` is at `/a/0`.
 
 A `kind` of `openapi` is the same for the OpenAPI documents: it has `pointer`, no `side`, and removes the value at
 the pointer from both documents.
+
+A `kind` of `selector` has `shape` (a shape ID) and `side` (`ours` or `reference`). The entry removes one copy of
+the shape ID from the selected shapes of the named side before the comparison. Use it for the smithy.rpc shapes
+that our core loads into every model and that Java does not have (issue `smithy-2qe.41.24`).
+
+The reference selection is `null` when the Java selector does not parse. Our output must then be blocked. A result
+on one side and a failure on the other side fails the check.
 
 The reference OpenAPI entry is `null` when the model has no service with a protocol trait or the Java
 conversion fails. Our output must then be blocked. A document

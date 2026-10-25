@@ -8,7 +8,8 @@ let reference_path : String = "tour/reference-events.json"
 /// and `side` (`ours` or `reference`), and removes one copy of the event from
 /// that side. Kind `json_schema` has `pointer` and no `side`, and removes the
 /// value at the pointer from both JSON Schema documents. Kind `openapi` is the
-/// same for the OpenAPI documents.
+/// same for the OpenAPI documents. Kind `selector` has `shape` and `side`, and
+/// removes one copy of the shape id from the selected shapes of that side.
 let allow_path : String = "tour/reference-allow.json"
 
 ///|
@@ -59,6 +60,8 @@ struct ReferenceCase {
   json_schema : Json?
   /// None: no entry. Some(null): the reference conversion failed.
   openapi : Json?
+  /// None: no entry. Some(null): the reference selector did not parse.
+  selector : Json?
 }
 
 ///|
@@ -76,6 +79,8 @@ enum Difference {
   JsonSchema(pointer~ : String)
   /// The value at the JSON pointer is removed from both OpenAPI documents.
   OpenApi(pointer~ : String)
+  /// The shape id is removed from the selected shapes of the named side only.
+  Selected(shape~ : String, side~ : Side)
 }
 
 ///|
@@ -172,9 +177,28 @@ fn parse_reference(text : String) -> Map[@model.CaseId, ReferenceCase] raise {
         { "openapi": document, .. } => Some(document)
         _ => None
       },
+      selector: match entry {
+        { "selector": selected, .. } => Some(selected)
+        _ => None
+      },
     }
   }
   result
+}
+
+///|
+fn side_member(entry : Json, where_ : String) -> Side raise {
+  match string_member(entry, "side", where_) {
+    "ours" => Ours
+    "reference" => Reference
+    other =>
+      fail(
+        where_ +
+        ": \"side\" must be \"ours\" or \"reference\", not \"" +
+        other +
+        "\"",
+      )
+  }
 }
 
 ///|
@@ -189,17 +213,12 @@ fn parse_allow(text : String) -> Array[Allowed] raise {
       "event" =>
         Event(
           event=event_member(entry, "event", where_),
-          side=match string_member(entry, "side", where_) {
-            "ours" => Ours
-            "reference" => Reference
-            other =>
-              fail(
-                where_ +
-                ": \"side\" must be \"ours\" or \"reference\", not \"" +
-                other +
-                "\"",
-              )
-          },
+          side=side_member(entry, where_),
+        )
+      "selector" =>
+        Selected(
+          shape=string_member(entry, "shape", where_),
+          side=side_member(entry, where_),
         )
       "json_schema" => {
         if entry is { "side": _, .. } {
@@ -222,7 +241,7 @@ fn parse_allow(text : String) -> Array[Allowed] raise {
       other =>
         fail(
           where_ +
-          ": \"kind\" must be \"event\", \"json_schema\" or \"openapi\", not \"" +
+          ": \"kind\" must be \"event\", \"json_schema\", \"openapi\" or \"selector\", not \"" +
           other +
           "\"",
         )
@@ -465,6 +484,82 @@ fn document_pair(
 }
 
 ///|
+/// The shape ids that our selector selects, one per line of `selector.txt`, or
+/// None when the transform is blocked (the selector does not parse).
+fn our_selection(
+  session : @core.Session,
+  where_ : String,
+  lesson : @model.Lesson,
+  files : Array[(String, String)],
+  selector : String?,
+) -> Array[String]? raise {
+  guard lesson.output is Some(output) else {
+    fail(
+      where_ + ": the reference has a selection, but the lesson has no output",
+    )
+  }
+  match
+    @core.handle(session, TransformFiles(seq=2, files~, output~, selector~)) {
+    Transformed(files=out, ..) =>
+      match out.search_by(f => f.0 == "selector.txt") {
+        Some(i) =>
+          Some(
+            out[i].1
+            .split("\n")
+            .filter(l => l != "")
+            .map(l => l.to_owned())
+            .collect(),
+          )
+        None => fail(where_ + ": the output has no selector.txt")
+      }
+    Blocked(kind=Other, ..) => None
+    Blocked(reason~, ..) => fail(where_ + ": the output was blocked: " + reason)
+    _ => fail(where_ + ": unexpected answer")
+  }
+}
+
+///|
+/// The two selections to compare. Both sides must agree on failure: a blocked
+/// output of ours goes with a reference selector that did not parse (null).
+fn selection_pair(
+  where_ : String,
+  ours : Array[String]?,
+  reference : Json,
+) -> (Array[String], Array[String])? raise {
+  match (ours, reference) {
+    (None, Null) => None
+    (Some(_), Null) =>
+      fail(where_ + ": the reference selector failed, but ours gave a result")
+    (None, _) =>
+      fail(where_ + ": our selector failed, but the reference gave a result")
+    (Some(a), Array(items)) =>
+      Some(
+        (
+          a,
+          items.map(item => {
+            guard item is String(id) else {
+              fail(
+                reference_path +
+                ": " +
+                where_ +
+                ": a selected shape must be a string",
+              )
+            }
+            id
+          }),
+        ),
+      )
+    (Some(_), _) =>
+      fail(
+        reference_path +
+        ": " +
+        where_ +
+        ": the selector must be an array or null",
+      )
+  }
+}
+
+///|
 /// The tour, the reference results and the allow list.
 fn inputs() -> (@model.Tour, Map[@model.CaseId, ReferenceCase], Array[Allowed]) raise {
   let tour = match @source.read_tour(lessons_root, repo="..") {
@@ -506,6 +601,16 @@ fn needs_openapi(
 }
 
 ///|
+/// Whether the reference must have a selector entry: the lesson output is
+/// Selector, and the reference events have no ERROR or DANGER.
+fn needs_selector(
+  output : @core.Output?,
+  events : Array[@model.EventKey],
+) -> Bool {
+  output is Some(Selector) && !events.any(e => e.severity.blocks_output())
+}
+
+///|
 /// Fail when the reference result is not the result of these case files and
 /// this lesson output.
 fn check_fresh(
@@ -516,7 +621,8 @@ fn check_fresh(
 ) -> Unit raise {
   if entry.digest != digest ||
     (entry.json_schema is Some(_)) != needs_json_schema(output, entry.events) ||
-    (entry.openapi is Some(_)) != needs_openapi(output, entry.events) {
+    (entry.openapi is Some(_)) != needs_openapi(output, entry.events) ||
+    (entry.selector is Some(_)) != needs_selector(output, entry.events) {
     fail(stale(where_))
   }
 }
@@ -567,6 +673,50 @@ fn compare_openapi(
 }
 
 ///|
+/// Compare our selected shapes with the reference ones for a case. An allow
+/// entry of the case with kind `selector` removes one copy of its shape from the
+/// side that it names, and is marked used when it removes one. Fail on a
+/// difference that remains when `selector` is true.
+fn compare_selector(
+  case_id : @model.CaseId,
+  ours : Array[String]?,
+  reference : Json,
+  allow : Array[Allowed],
+  used : Array[Bool],
+  selector~ : Bool,
+) -> Unit raise {
+  let where_ = case_id.to_string()
+  guard selection_pair(where_, ours, reference) is Some((mine, theirs)) else {
+    return
+  }
+  for i, entry in allow {
+    guard entry.case_id == case_id &&
+      entry.difference is Selected(shape~, side~) else {
+      continue
+    }
+    let selected = match side {
+      Ours => mine
+      Reference => theirs
+    }
+    if selected.search(shape) is Some(j) {
+      selected.remove(j) |> ignore
+      used[i] = true
+    }
+  }
+  mine.sort_by(@model.compare_code_units)
+  theirs.sort_by(@model.compare_code_units)
+  if selector && mine != theirs {
+    fail(
+      where_ +
+      ": our selected shapes differ from the reference.\n  ours:      " +
+      mine.join(" ") +
+      "\n  reference: " +
+      theirs.join(" "),
+    )
+  }
+}
+
+///|
 /// Compare our events and JSON Schema with the reference for every case, and
 /// mark the allow list entries that remove a difference.
 fn compare_all(
@@ -576,6 +726,7 @@ fn compare_all(
   events~ : Bool,
   json_schema~ : Bool,
   openapi~ : Bool,
+  selector~ : Bool,
 ) -> Array[Bool] raise {
   let used = allow.map(_ => false)
   let session = @core.Session::new()
@@ -586,7 +737,7 @@ fn compare_all(
       let files = files_of(
         @model.model_files(lesson.engine, lesson.case_files(case)),
       )
-      let selector = @model.query_of(
+      let query = @model.query_of(
         lesson.case_files(case),
         fixed=lesson.selector,
       )
@@ -606,7 +757,7 @@ fn compare_all(
         )
       }
       if expected.json_schema is Some(schema) {
-        let mine = our_json_schema(session, where_, lesson, files, selector)
+        let mine = our_json_schema(session, where_, lesson, files, query)
         let theirs = parse_json(reference_path, schema.stringify())
         for i, entry in allow {
           guard entry.case_id == case_id &&
@@ -627,8 +778,12 @@ fn compare_all(
       }
       if expected.openapi is Some(document) {
         let theirs = parse_json(reference_path, document.stringify())
-        let mine = our_openapi(session, where_, lesson, files, selector)
+        let mine = our_openapi(session, where_, lesson, files, query)
         compare_openapi(case_id, mine, theirs, allow, used, openapi~)
+      }
+      if expected.selector is Some(selected) {
+        let mine = our_selection(session, where_, lesson, files, query)
+        compare_selector(case_id, mine, selected, allow, used, selector~)
       }
     }
   }
@@ -674,6 +829,7 @@ test "our events agree with the reference events" {
       events=true,
       json_schema=false,
       openapi=false,
+      selector=false,
     ),
   )
 }
@@ -689,6 +845,7 @@ test "our JSON Schema agrees with the reference JSON Schema" {
       events=false,
       json_schema=true,
       openapi=false,
+      selector=false,
     ),
   )
 }
@@ -703,6 +860,7 @@ test "every allow list entry is used, has an issue, and its lesson says so" {
     events=false,
     json_schema=false,
     openapi=false,
+    selector=false,
   )
   for i, entry in allow {
     let where_ = allow_path +
@@ -873,6 +1031,7 @@ test "a JSON Schema lesson needs a reference schema unless the case has an error
       events: events.map(e => @model.EventKey::parse(e).unwrap()),
       json_schema,
       openapi: None,
+      selector: None,
     }
   }
   check_fresh("a", entry([], schema), "d", Some(JsonSchema))
@@ -932,6 +1091,7 @@ test "an OpenAPI lesson needs a reference document unless the case has an error"
       events: events.map(e => @model.EventKey::parse(e).unwrap()),
       json_schema: None,
       openapi,
+      selector: None,
     }
   }
   check_fresh("a", entry([], doc), "d", Some(OpenApi30))
@@ -1006,6 +1166,7 @@ test "our OpenAPI agrees with the reference OpenAPI" {
       events=false,
       json_schema=false,
       openapi=true,
+      selector=false,
     ),
   )
 }
@@ -1110,4 +1271,142 @@ test "our OpenAPI document is the .openapi.json file of the transform" {
     fail("the OpenAPI document is missing or has no version 3.0.2 and paths")
   }
   assert_true(paths.contains("/city"))
+}
+
+///|
+test "a Selector lesson needs a reference selection unless the case has an error" {
+  let list = Some(Json::array([Json::string("a#B")]))
+  let entry = fn(events : Array[String], selector : Json?) -> ReferenceCase {
+    {
+      digest: "d",
+      events: events.map(e => @model.EventKey::parse(e).unwrap()),
+      json_schema: None,
+      openapi: None,
+      selector,
+    }
+  }
+  check_fresh("a", entry([], list), "d", Some(Selector))
+  check_fresh("a", entry([], Some(Json::null())), "d", Some(Selector))
+  check_fresh("a", entry(["E|ERROR|-"], None), "d", Some(Selector))
+  let stale_message = "a: the reference result is missing or stale; run `mise run reference:tour`"
+  for
+    bad in [
+      (entry([], None), "d", Some(@core.Output::Selector)),
+      (entry([], list), "d", Some(@core.Output::JsonAst)),
+      (
+        entry(["E|DANGER|-"], Some(Json::array([]))),
+        "d",
+        Some(@core.Output::Selector),
+      ),
+    ] {
+    try check_fresh("a", bad.0, bad.1, bad.2) catch {
+      Failure(message) => assert_true(message.has_suffix(stale_message))
+      e => fail("unexpected error: " + e.to_string())
+    } noraise {
+      _ => fail("a stale result passed")
+    }
+  }
+}
+
+///|
+test "a failed reference selector agrees only with a blocked output" {
+  let list = Json::array([Json::string("a#B")])
+  assert_true(selection_pair("a", None, Json::null()) is None)
+  assert_eq(selection_pair("a", Some(["a#B"]), list), Some((["a#B"], ["a#B"])))
+  try selection_pair("a", Some([]), Json::null()) catch {
+    Failure(message) =>
+      assert_true(
+        message.has_suffix(
+          "a: the reference selector failed, but ours gave a result",
+        ),
+      )
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a result against a failed selector passed")
+  }
+  try selection_pair("a", None, list) catch {
+    Failure(message) =>
+      assert_true(
+        message.has_suffix(
+          "a: our selector failed, but the reference gave a result",
+        ),
+      )
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a blocked output against a result passed")
+  }
+}
+
+///|
+test "an allowed shape is removed once, from the side that the entry names" {
+  let start : @model.CaseId = { dir: "01-a", name: "start", }
+  let allowed = (side : Side) => {
+    case_id: start,
+    difference: Selected(shape="smithy.rpc#X", side~),
+    reason: "r",
+    issue: "smithy-1",
+  }
+  let reference = Json::array([Json::string("a#A")])
+  let used = [false]
+  compare_selector(
+    start,
+    Some(["a#A", "smithy.rpc#X"]),
+    reference,
+    [allowed(Ours)],
+    used,
+    selector=true,
+  )
+  assert_eq(used, [true])
+  // the same entry on the other side removes nothing: stale, and the difference fails
+  let used = [false]
+  try
+    compare_selector(
+      start,
+      Some(["a#A", "smithy.rpc#X"]),
+      reference,
+      [allowed(Reference)],
+      used,
+      selector=true,
+    )
+  catch {
+    Failure(message) =>
+      assert_true(message.contains("our selected shapes differ"))
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a difference passed with a wrong side")
+  }
+  assert_eq(used, [false])
+  // the order of the lines does not matter: both sides sort by code unit
+  compare_selector(
+    start,
+    Some(["a#B", "a#A"]),
+    Json::array([Json::string("a#A"), Json::string("a#B")]),
+    [],
+    [],
+    selector=true,
+  )
+}
+
+///|
+test "a selector allow entry names a shape and a side" {
+  let text = "[{\"case\": \"01-a/start\", \"kind\": \"selector\", \"shape\": \"smithy.rpc#X\", \"side\": \"ours\", \"reason\": \"r\", \"issue\": \"smithy-1\"}]"
+  let allow = parse_allow(text)
+  assert_eq(allow.length(), 1)
+  assert_true(allow[0].difference is Selected(shape="smithy.rpc#X", side=Ours))
+}
+
+///|
+test "our selector results agree with the reference" {
+  let (tour, reference, allow) = inputs()
+  ignore(
+    compare_all(
+      tour,
+      reference,
+      allow,
+      events=false,
+      json_schema=false,
+      openapi=false,
+      selector=true,
+    ),
+  )
 }

@@ -50,6 +50,7 @@ let harness : String =
   #|import software.amazon.smithy.model.*;
   #|import software.amazon.smithy.model.loader.*;
   #|import software.amazon.smithy.model.node.*;
+  #|import software.amazon.smithy.model.selector.*;
   #|import software.amazon.smithy.model.shapes.*;
   #|import software.amazon.smithy.model.traits.ProtocolDefinitionTrait;
   #|import software.amazon.smithy.model.validation.*;
@@ -124,6 +125,20 @@ let harness : String =
   #|          }
   #|        }
   #|        entry.withMember("openapi", openapi);
+  #|      }
+  #|      if (test.getMember("selector").isPresent() && !blocked) {
+  #|        Node selected;
+  #|        try {
+  #|          List<String> ids = new ArrayList<>();
+  #|          for (Shape shape : Selector.parse(test.expectStringMember("selector").getValue()).select(result.unwrap())) {
+  #|            ids.add(shape.getId().toString());
+  #|          }
+  #|          Collections.sort(ids);
+  #|          selected = Node.fromStrings(ids);
+  #|        } catch (SelectorSyntaxException e) {
+  #|          selected = Node.nullNode();
+  #|        }
+  #|        entry.withMember("selector", selected);
   #|      }
   #|      cases.withMember(id, entry.build());
   #|      System.out.println("reference: " + id);
@@ -251,15 +266,17 @@ struct Flags {
   json_schema : Bool
   openapi : String?
   http_protocols : Bool
+  selector : Bool
 } derive(Eq, Debug)
 
 ///|
 fn flags_of(output : String?) -> Flags {
   match output {
-    Some("JsonSchema") => { json_schema: true, openapi: None, http_protocols: false }
-    Some("OpenApi30") => { json_schema: false, openapi: Some("3.0.2"), http_protocols: true }
-    Some("OpenApi31") => { json_schema: false, openapi: Some("3.1.0"), http_protocols: true }
-    _ => { json_schema: false, openapi: None, http_protocols: false }
+    Some("JsonSchema") => { json_schema: true, openapi: None, http_protocols: false, selector: false }
+    Some("OpenApi30") => { json_schema: false, openapi: Some("3.0.2"), http_protocols: true, selector: false }
+    Some("OpenApi31") => { json_schema: false, openapi: Some("3.1.0"), http_protocols: true, selector: false }
+    Some("Selector") => { json_schema: false, openapi: None, http_protocols: false, selector: true }
+    _ => { json_schema: false, openapi: None, http_protocols: false, selector: false }
   }
 }
 
@@ -316,7 +333,7 @@ async fn lesson_cases(root : String) -> Array[Json] {
         "files": Json::array(files.map(f => Json::object({ "name": Json::string(f.0), "text": Json::string(f.1) }))),
       }
       if flags.openapi is Some(version) { entry["openapi"] = Json::string(version) }
-      if case_selector(files, fixed) is Some(selector) { entry["selector"] = Json::string(selector) }
+      if flags.selector && case_selector(files, fixed) is Some(selector) { entry["selector"] = Json::string(selector) }
       cases.push(Json::object(entry))
     }
   }
@@ -448,18 +465,19 @@ test "javac argument files quote spaces and Windows path separators" {
 
 ///|
 test "the lesson output gives the harness flags" {
-  let none = { json_schema: false, openapi: None, http_protocols: false }
+  let none = { json_schema: false, openapi: None, http_protocols: false, selector: false }
   assert_eq(flags_of(None), none)
   assert_eq(flags_of(Some("JsonAst")), none)
   assert_eq(flags_of(Some("JsonSchema")), { ..none, json_schema: true })
   assert_eq(
     flags_of(Some("OpenApi30")),
-    { json_schema: false, openapi: Some("3.0.2"), http_protocols: true },
+    { json_schema: false, openapi: Some("3.0.2"), http_protocols: true, selector: false },
   )
   assert_eq(
     flags_of(Some("OpenApi31")),
-    { json_schema: false, openapi: Some("3.1.0"), http_protocols: true },
+    { json_schema: false, openapi: Some("3.1.0"), http_protocols: true, selector: false },
   )
+  assert_eq(flags_of(Some("Selector")), { ..none, selector: true })
 }
 
 ///|
