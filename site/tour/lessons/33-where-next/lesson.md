@@ -1,6 +1,6 @@
 # Where next
 
-This is the last lesson of the tour. Each link below opens a page that goes further.
+This is the last lesson of the main tour. A case study follows it: [lesson 34](../34-morphir-ir-types/lesson.md) and the next five lessons model the Morphir IR in Smithy. Each link below opens a page that goes further.
 
 - [The Smithy specification](https://smithy.io/2.0/spec/index.html) defines the shapes, the traits and the rules of the language.
 - [The playground](../../../playground/README.md) runs Smithy in the browser on a model of your own.
