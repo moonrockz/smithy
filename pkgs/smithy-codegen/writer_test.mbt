@@ -47,7 +47,7 @@ test "built-in formatters format scalar values" {
   let ns = @codegen.Namespace::parse("example.orders", separator=".").unwrap()
   let sym = @codegen.Symbol::new(
     @codegen.SymbolName::parse("Order").unwrap(),
-    namespace=ns,
+    ns~,
   )
   w.write("$L|$L|$L|$L|$L", args=[
     @codegen.Int(7),
@@ -211,8 +211,8 @@ test "to_string trims trailing spaces and ends with one newline" {
 ///|
 test "the namespace of the writer" {
   let ns = @codegen.Namespace::parse("a.b", separator=".").unwrap()
-  assert_eq(@codegen.CodeWriter::new(namespace=ns).namespace(), ns)
-  assert_true(@codegen.CodeWriter::new().namespace().is_root())
+  assert_eq(@codegen.CodeWriter::new(ns~).ns(), ns)
+  assert_true(@codegen.CodeWriter::new().ns().is_root())
 }
 
 ///|

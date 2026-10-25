@@ -95,8 +95,8 @@ let items_idl : Array[String] = ["structure Item {\n    sku: String\n}"]
 let legacy_idl : Array[String] = ["structure Item {\n    code: String\n}"]
 
 ///|
-fn idl_file(namespace : String, blocks : Array[String]) -> String {
-  "$version: \"2\"\nnamespace \{namespace}\n\n" + blocks.join("\n\n") + "\n"
+fn idl_file(ns : String, blocks : Array[String]) -> String {
+  "$version: \"2\"\nnamespace \{ns}\n\n" + blocks.join("\n\n") + "\n"
 }
 
 ///|
@@ -109,10 +109,10 @@ fn load_fixture(reverse : Bool) -> @smithy.Model {
   let loader = @smithy.Loader::new()
   let ordered = if reverse { files.rev() } else { files }
   for file in ordered {
-    let (name, namespace, blocks) = file
+    let (name, ns, blocks) = file
     loader.add_idl(
       name,
-      idl_file(namespace, if reverse { blocks.rev() } else { blocks }),
+      idl_file(ns, if reverse { blocks.rev() } else { blocks }),
     )
     |> ignore
   }

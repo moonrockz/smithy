@@ -104,8 +104,10 @@ test "reserved words escape symbols and members separately" {
   )
   let error = provider.to_symbol(model.get("example#Error").unwrap())
   assert_eq(error.name.to_string(), "Error_")
-  let member = provider.to_member_name(model.get("example#Order$type").unwrap())
-  assert_eq(member, "type_")
+  let member_name_text = provider.to_member_name(
+    model.get("example#Order$type").unwrap(),
+  )
+  assert_eq(member_name_text, "type_")
   let kept = provider.to_symbol(model.get("example#type").unwrap())
   assert_eq(kept.name.to_string(), "type")
   let order_member = provider.to_member_name(

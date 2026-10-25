@@ -28,7 +28,7 @@ fn delegator_provider() -> @codegen.SymbolProvider {
     }
     @codegen.Symbol::new(
       @codegen.SymbolName::parse(name).unwrap(),
-      namespace=delegator_ns("example"),
+      ns=delegator_ns("example"),
       definition~,
     )
   })
@@ -72,7 +72,7 @@ test "shape writers use the symbol definition and namespace" {
   let order = model.get("example#Order").unwrap()
   let seen : Ref[String] = Ref("")
   delegator.use_shape_writer(order, w => {
-    seen.val = w.namespace().text
+    seen.val = w.ns().text
     w.write("order")
   })
   assert_eq(seen.val, "example")
@@ -134,7 +134,7 @@ test "flush renders sorted paths and clears the writers" {
   delegator.use_file_writer(delegator_path("b.txt"), ns, w => w.write("b"))
   delegator.use_file_writer(delegator_path("a.txt"), ns, w => w.write("a"))
   let dependency : @codegen.SymbolDependency = {
-    package: @codegen.PackageName::parse("pkg/a").unwrap(),
+    package_name: @codegen.PackageName::parse("pkg/a").unwrap(),
     version: "1.0.0",
     kind: Runtime,
   }

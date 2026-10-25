@@ -102,13 +102,13 @@ namespace. An interceptor adds a line to the section `header`.
 test {
   let item = @codegen.Symbol::new(
     @codegen.SymbolName::parse("Item").unwrap(),
-    namespace=@codegen.Namespace::parse("example.items", separator=".").unwrap(),
+    ns=@codegen.Namespace::parse("example.items", separator=".").unwrap(),
   )
   let order = @codegen.Symbol::new(
     @codegen.SymbolName::parse("Order").unwrap(),
-    namespace=@codegen.Namespace::parse("example.orders", separator=".").unwrap(),
+    ns=@codegen.Namespace::parse("example.orders", separator=".").unwrap(),
   )
-  let writer = @codegen.CodeWriter::new(namespace=order.namespace)
+  let writer = @codegen.CodeWriter::new(ns=order.ns)
   writer.on_section(
     @codegen.Interceptor::appender("header", (w, _) => w.write("// generated")),
   )

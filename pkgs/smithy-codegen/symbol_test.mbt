@@ -27,7 +27,7 @@ test "full names use the namespace separator" {
   let ns = @codegen.Namespace::parse("example.orders", separator=".").unwrap()
   let s = @codegen.Symbol::new(
     @codegen.SymbolName::parse("Order").unwrap(),
-    namespace=ns,
+    ns~,
   )
   assert_eq(s.full_name(), "example.orders.Order")
   assert_eq(
@@ -39,7 +39,7 @@ test "full names use the namespace separator" {
 ///|
 fn dependency(name : String) -> @codegen.SymbolDependency {
   {
-    package: @codegen.PackageName::parse(name).unwrap(),
+    package_name: @codegen.PackageName::parse(name).unwrap(),
     version: "1",
     kind: Runtime,
   }
@@ -60,7 +60,7 @@ test "all dependencies include references, sorted and deduplicated" {
   let s = named("Main")
     .with_dependency(dependency("b"))
     .with_reference(reference)
-  let names = s.all_dependencies().map(d => d.package.to_string())
+  let names = s.all_dependencies().map(d => d.package_name.to_string())
   assert_eq(names, ["a", "b"])
 }
 
@@ -113,11 +113,11 @@ test "with_name copies the symbol under a new name" {
   let ns = @codegen.Namespace::parse("a.b", separator=".").unwrap()
   let s = @codegen.Symbol::new(
     @codegen.SymbolName::parse("Order").unwrap(),
-    namespace=ns,
+    ns~,
   ).with_property("k", Json::number(1.0))
   let renamed = s.with_name(@codegen.SymbolName::parse("Order_").unwrap())
   assert_eq(renamed.name.to_string(), "Order_")
-  assert_eq(renamed.namespace, ns)
+  assert_eq(renamed.ns, ns)
   assert_eq(renamed.property("k"), Some(Json::number(1.0)))
   assert_eq(s.name.to_string(), "Order")
 }

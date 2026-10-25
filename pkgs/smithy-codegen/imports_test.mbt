@@ -9,27 +9,30 @@ fn imp_ns(text : String) -> @codegen.Namespace {
 }
 
 ///|
-fn imp_symbol(namespace : String, name : String) -> @codegen.Symbol {
-  @codegen.Symbol::new(imp_name(name), namespace=imp_ns(namespace))
+fn imp_symbol(ns : String, name : String) -> @codegen.Symbol {
+  @codegen.Symbol::new(imp_name(name), ns=imp_ns(ns))
 }
 
 ///|
 fn imp_entry(
-  namespace : String,
+  ns : String,
   name : String,
-  alias? : String,
+  local_name? : String,
 ) -> @codegen.ImportEntry {
   {
-    namespace: imp_ns(namespace),
+    ns: imp_ns(ns),
     name: imp_name(name),
-    alias: alias.map(imp_name),
+    local_name: local_name.map(imp_name),
   }
 }
 
 ///|
-fn imp_dep(package : String, version : String) -> @codegen.SymbolDependency {
+fn imp_dep(
+  package_name : String,
+  version : String,
+) -> @codegen.SymbolDependency {
   {
-    package: @codegen.PackageName::parse(package).unwrap(),
+    package_name: @codegen.PackageName::parse(package_name).unwrap(),
     version,
     kind: Runtime,
   }
@@ -37,7 +40,7 @@ fn imp_dep(package : String, version : String) -> @codegen.SymbolDependency {
 
 ///|
 test "symbols in other namespaces are imported" {
-  let w = @codegen.CodeWriter::new(namespace=imp_ns("a"))
+  let w = @codegen.CodeWriter::new(ns=imp_ns("a"))
   w.write("use $T", args=[@codegen.Sym(imp_symbol("b", "Item"))])
   assert_eq(w.to_string(), "use Item\n")
   assert_eq(w.imports(), [imp_entry("b", "Item")])
@@ -45,7 +48,7 @@ test "symbols in other namespaces are imported" {
 
 ///|
 test "same and root namespace symbols are not imported" {
-  let w = @codegen.CodeWriter::new(namespace=imp_ns("a"))
+  let w = @codegen.CodeWriter::new(ns=imp_ns("a"))
   let root = @codegen.Symbol::new(imp_name("String"))
   w.write("$T $T", args=[
     @codegen.Sym(imp_symbol("a", "Local")),
@@ -64,24 +67,24 @@ test "same and root namespace symbols are not imported" {
 
 ///|
 test "aliases are written and imported with the alias" {
-  let w = @codegen.CodeWriter::new(namespace=imp_ns("a"))
+  let w = @codegen.CodeWriter::new(ns=imp_ns("a"))
   let reference = @codegen.SymbolReference::new(
     imp_symbol("b", "Item"),
-    alias=Some(imp_name("BItem")),
+    local_name=Some(imp_name("BItem")),
   )
   w.write("$T $T", args=[@codegen.Ref(reference), @codegen.Ref(reference)])
   assert_eq(w.to_string(), "BItem BItem\n")
-  assert_eq(w.imports(), [imp_entry("b", "Item", alias="BItem")])
-  let v = @codegen.CodeWriter::new(namespace=imp_ns("a"))
-  v.add_import(imp_symbol("c", "Other"), alias=Some(imp_name("O")))
-  v.add_import(imp_symbol("c", "Other"), alias=Some(imp_name("O")))
+  assert_eq(w.imports(), [imp_entry("b", "Item", local_name="BItem")])
+  let v = @codegen.CodeWriter::new(ns=imp_ns("a"))
+  v.add_import(imp_symbol("c", "Other"), local_name=Some(imp_name("O")))
+  v.add_import(imp_symbol("c", "Other"), local_name=Some(imp_name("O")))
   assert_eq(v.to_string(), "")
-  assert_eq(v.imports(), [imp_entry("c", "Other", alias="O")])
+  assert_eq(v.imports(), [imp_entry("c", "Other", local_name="O")])
 }
 
 ///|
 test "a second symbol with a used name is written by full name" {
-  let w = @codegen.CodeWriter::new(namespace=imp_ns("a"))
+  let w = @codegen.CodeWriter::new(ns=imp_ns("a"))
   w.write("$T", args=[@codegen.Sym(imp_symbol("b", "Item"))])
   w.write("$T", args=[@codegen.Sym(imp_symbol("c", "Item"))])
   w.write("$T", args=[@codegen.Sym(imp_symbol("b", "Item"))])
@@ -100,7 +103,7 @@ test "dependencies of written symbols and their references are collected" {
     .with_dependency(d2)
     .with_reference(@codegen.SymbolReference::new(inner))
     .with_reference(@codegen.SymbolReference::new(inner))
-  let w = @codegen.CodeWriter::new(namespace=imp_ns("a"))
+  let w = @codegen.CodeWriter::new(ns=imp_ns("a"))
   w.add_dependency(d3)
   w.write("$T", args=[@codegen.Sym(outer)])
   assert_eq(w.to_string(), "Outer\n")
@@ -110,7 +113,7 @@ test "dependencies of written symbols and their references are collected" {
 
 ///|
 test "child writers share imports" {
-  let w = @codegen.CodeWriter::new(namespace=imp_ns("a"))
+  let w = @codegen.CodeWriter::new(ns=imp_ns("a"))
   w.write("$C", args=[
     @codegen.Call(child => {
       child.write("$T", args=[@codegen.Sym(imp_symbol("b", "Item"))])
@@ -126,7 +129,7 @@ test "a cycle of references does not loop" {
   let second = imp_symbol("c", "Second")
   first.references.push(@codegen.SymbolReference::new(second))
   second.references.push(@codegen.SymbolReference::new(first))
-  let w = @codegen.CodeWriter::new(namespace=imp_ns("a"))
+  let w = @codegen.CodeWriter::new(ns=imp_ns("a"))
   w.write("$T", args=[@codegen.Sym(first)])
   assert_eq(w.to_string(), "First\n")
   assert_eq(w.imports(), [imp_entry("b", "First"), imp_entry("c", "Second")])
@@ -136,7 +139,7 @@ test "a cycle of references does not loop" {
 test "a failed template leaves the imports and dependencies unchanged" {
   let dep = imp_dep("pkg-a", "1.0.0")
   let item = @codegen.Sym(imp_symbol("b", "Item").with_dependency(dep))
-  let w = @codegen.CodeWriter::new(namespace=imp_ns("a"))
+  let w = @codegen.CodeWriter::new(ns=imp_ns("a"))
   // The first template fails when I parse it. The second one fails while I
   // render it, after the `$T` recorded the import.
   for template in ["$T $", "$T $missing:L"] {
@@ -157,7 +160,7 @@ test "a failed template leaves the imports and dependencies unchanged" {
 ///|
 test "a failed nested body leaves the parent tracker unchanged" {
   let dep = imp_dep("pkg-a", "1.0.0")
-  let w = @codegen.CodeWriter::new(namespace=imp_ns("a"))
+  let w = @codegen.CodeWriter::new(ns=imp_ns("a"))
   w.write("$T", args=[@codegen.Sym(imp_symbol("d", "Kept"))])
   try
     w.write("$C", args=[

@@ -50,7 +50,7 @@ fn OutputBuffer::new() -> OutputBuffer {
 /// A writer of generated code. It keeps the output, the indentation, a stack of
 /// states (indentation, newline prefix, context and formatters) and the formatters.
 pub struct CodeWriter {
-  priv namespace : Namespace
+  priv ns : Namespace
   priv indent_text : String
   priv tracker : ImportTracker
   // The stack of output buffers. The last one takes the output. A section
@@ -81,7 +81,7 @@ fn format_literal(value : TemplateValue) -> Result[String, String] {
 
 ///|
 pub fn CodeWriter::new(
-  namespace~ : Namespace = Namespace::root(),
+  ns~ : Namespace = Namespace::root(),
   indent_text~ : String = "    ",
   string_literal~ : (String) -> String = json_string_literal,
 ) -> CodeWriter {
@@ -96,7 +96,7 @@ pub fn CodeWriter::new(
     }
   })
   {
-    namespace,
+    ns,
     indent_text,
     tracker: ImportTracker::new(),
     buffers: [OutputBuffer::new()],
@@ -114,8 +114,8 @@ fn CodeWriter::state(self : CodeWriter) -> WriterState {
 }
 
 ///|
-pub fn CodeWriter::namespace(self : CodeWriter) -> Namespace {
-  self.namespace
+pub fn CodeWriter::ns(self : CodeWriter) -> Namespace {
+  self.ns
 }
 
 ///|
@@ -308,7 +308,7 @@ fn normalize_output(text : String) -> String {
 pub fn CodeWriter::child(self : CodeWriter) -> CodeWriter {
   let state = self.state()
   {
-    namespace: self.namespace,
+    ns: self.ns,
     indent_text: self.indent_text,
     tracker: self.tracker,
     buffers: [OutputBuffer::new()],
@@ -556,7 +556,7 @@ fn CodeWriter::render_tokens(
               Ref(reference) =>
                 write_aligned(
                   out,
-                  self.symbol_text(reference.symbol, reference.alias),
+                  self.symbol_text(reference.symbol, reference.local_name),
                   align,
                 )
               _ =>

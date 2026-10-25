@@ -29,7 +29,7 @@ fn director_provider(
     let name = shape.id.name()
     @codegen.Symbol::new(
       @codegen.SymbolName::parse(name).unwrap(),
-      namespace=@codegen.Namespace::parse("example", separator=".").unwrap(),
+      ns=@codegen.Namespace::parse("example", separator=".").unwrap(),
       definition=@codegen.OutputPath::parse("gen/\{name}.txt"),
     )
   })
@@ -48,7 +48,7 @@ fn director_recorder(
         let path = ctx.info.provider.to_symbol(shape).definition.unwrap()
         ctx.delegator.use_file_writer(
           path,
-          ctx.info.provider.to_symbol(shape).namespace,
+          ctx.info.provider.to_symbol(shape).ns,
           w => w.write(entry),
         )
       }
@@ -213,15 +213,11 @@ test "interceptors from integrations reach the writers" {
     delegator=ctx => ctx.delegator,
     generate_service=(ctx, shape) => {
       let symbol = ctx.info.provider.to_symbol(shape)
-      ctx.delegator.use_file_writer(
-        symbol.definition.unwrap(),
-        symbol.namespace,
-        w => {
-          w.push_section(@codegen.Section::new("tail"))
-          w.write("body")
-          w.pop_section()
-        },
-      )
+      ctx.delegator.use_file_writer(symbol.definition.unwrap(), symbol.ns, w => {
+        w.push_section(@codegen.Section::new("tail"))
+        w.write("body")
+        w.pop_section()
+      })
     },
     generate_structure=(_, _) => (),
     generate_error=(_, _) => (),

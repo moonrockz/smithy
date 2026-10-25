@@ -2,7 +2,7 @@
 /// A writer with the namespace that the first use of its path asked for. The
 /// factory can return a writer with another namespace, so I keep this one.
 priv struct RequestedWriter {
-  namespace : Namespace
+  ns : Namespace
   writer : CodeWriter
 }
 
@@ -26,7 +26,7 @@ pub struct WriterDelegator {
 pub fn WriterDelegator::new(
   provider : SymbolProvider,
   factory~ : (OutputPath, Namespace) -> CodeWriter = (_, ns) => {
-    CodeWriter::new(namespace=ns)
+    CodeWriter::new(ns~)
   },
   render~ : (CodeWriter) -> String = w => w.to_string(),
 ) -> WriterDelegator {
@@ -61,27 +61,27 @@ pub fn WriterDelegator::add_interceptors(
 pub fn WriterDelegator::use_file_writer(
   self : WriterDelegator,
   path : OutputPath,
-  namespace : Namespace,
+  ns : Namespace,
   body : (CodeWriter) -> Unit raise CodegenError,
 ) -> Unit raise CodegenError {
   let key = path.to_string()
   let writer = match self.writers.get(key) {
     Some(entry) => {
-      let first = entry.namespace
-      if first != namespace {
+      let first = entry.ns
+      if first != ns {
         raise WriterConflict(
-          "I found two namespaces, `\{first.text}` and `\{namespace.text}`, for output file `\{key}`.",
+          "I found two namespaces, `\{first.text}` and `\{ns.text}`, for output file `\{key}`.",
         )
       }
       entry.writer.blank_line()
       entry.writer
     }
     None => {
-      let writer = (self.factory)(path, namespace)
+      let writer = (self.factory)(path, ns)
       for interceptor in self.interceptors {
         writer.on_section(interceptor)
       }
-      self.writers[key] = { namespace, writer, }
+      self.writers[key] = { ns, writer, }
       writer
     }
   }
@@ -101,7 +101,7 @@ pub fn WriterDelegator::use_shape_writer(
   guard symbol.definition is Some(path) else {
     raise MissingDefinition(shape.id)
   }
-  self.use_file_writer(path, symbol.namespace, body)
+  self.use_file_writer(path, symbol.ns, body)
 }
 
 ///|

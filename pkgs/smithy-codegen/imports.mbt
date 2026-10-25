@@ -1,15 +1,15 @@
 ///|
-/// An import that a generated file needs. The alias is the name that the
+/// An import that a generated file needs. The `local_name` is the name that the
 /// file uses for the symbol, when it is not the name of the symbol.
 pub(all) struct ImportEntry {
-  namespace : Namespace
+  ns : Namespace
   name : SymbolName
-  alias : SymbolName?
+  local_name : SymbolName?
 } derive(Eq, Compare, Hash, Debug)
 
 ///|
 /// The tracker of imports and dependencies. All writers of one file share it
-/// by reference. `imports` maps the name that the file uses (the alias, or the
+/// by reference. `imports` maps the name that the file uses (the local name, or the
 /// name of the symbol) to the first import of that name.
 priv struct ImportTracker {
   imports : Map[SymbolName, ImportEntry]
@@ -76,35 +76,31 @@ fn ImportTracker::add_dependency(
 /// write for the symbol.
 fn ImportTracker::use_one(
   self : ImportTracker,
-  namespace : Namespace,
+  ns : Namespace,
   symbol : Symbol,
-  alias : SymbolName?,
+  local_name : SymbolName?,
 ) -> String {
   for dependency in symbol.dependencies {
     self.add_dependency(dependency)
   }
-  if symbol.namespace.is_root() || symbol.namespace == namespace {
+  if symbol.ns.is_root() || symbol.ns == ns {
     return symbol.name.to_string()
   }
-  let key = match alias {
-    Some(alias) => alias
+  let key = match local_name {
+    Some(local_name) => local_name
     None => symbol.name
   }
   match self.imports.get(key) {
     Some(existing) =>
-      if existing.namespace == symbol.namespace &&
+      if existing.ns == symbol.ns &&
         existing.name == symbol.name &&
-        existing.alias == alias {
+        existing.local_name == local_name {
         key.to_string()
       } else {
         symbol.full_name()
       }
     None => {
-      self.imports[key] = {
-        namespace: symbol.namespace,
-        name: symbol.name,
-        alias,
-      }
+      self.imports[key] = { ns: symbol.ns, name: symbol.name, local_name, }
       self.import_log.push(key)
       key.to_string()
     }
@@ -114,28 +110,28 @@ fn ImportTracker::use_one(
 ///|
 /// Record the use of a symbol and of every symbol that it refers to, and give
 /// the text to write for the symbol. The walk keeps its own stack and a set of
-/// the symbols that it has seen (full name and alias), so a cycle or a diamond
+/// the symbols that it has seen (full name and local name), so a cycle or a diamond
 /// of references does not loop or repeat work.
 fn ImportTracker::use_symbol(
   self : ImportTracker,
-  namespace : Namespace,
+  ns : Namespace,
   symbol : Symbol,
-  alias : SymbolName?,
+  local_name : SymbolName?,
 ) -> String {
-  let text = self.use_one(namespace, symbol, alias)
+  let text = self.use_one(ns, symbol, local_name)
   let seen : Map[(String, SymbolName?), Unit] = Map([])
-  seen[(symbol.full_name(), alias)] = ()
+  seen[(symbol.full_name(), local_name)] = ()
   let stack : Array[SymbolReference] = []
   for index = symbol.references.length() - 1; index >= 0; index = index - 1 {
     stack.push(symbol.references[index])
   }
   while stack.pop() is Some(reference) {
-    let key = (reference.symbol.full_name(), reference.alias)
+    let key = (reference.symbol.full_name(), reference.local_name)
     if seen.contains(key) {
       continue
     }
     seen[key] = ()
-    let _ = self.use_one(namespace, reference.symbol, reference.alias)
+    let _ = self.use_one(ns, reference.symbol, reference.local_name)
     let references = reference.symbol.references
     for index = references.length() - 1; index >= 0; index = index - 1 {
       stack.push(references[index])
@@ -177,9 +173,9 @@ pub fn CodeWriter::add_dependency(
 pub fn CodeWriter::add_import(
   self : CodeWriter,
   symbol : Symbol,
-  alias~ : SymbolName? = None,
+  local_name~ : SymbolName? = None,
 ) -> Unit {
-  let _ = self.tracker.use_symbol(self.namespace, symbol, alias)
+  let _ = self.tracker.use_symbol(self.ns, symbol, local_name)
 }
 
 ///|
@@ -187,7 +183,7 @@ pub fn CodeWriter::add_import(
 fn CodeWriter::symbol_text(
   self : CodeWriter,
   symbol : Symbol,
-  alias : SymbolName?,
+  local_name : SymbolName?,
 ) -> String {
-  self.tracker.use_symbol(self.namespace, symbol, alias)
+  self.tracker.use_symbol(self.ns, symbol, local_name)
 }

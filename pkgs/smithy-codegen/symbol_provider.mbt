@@ -2,7 +2,7 @@
 /// The member name of a shape: the member part of its shape ID, else its name.
 fn default_member_name(shape : @smithy.Shape) -> String {
   match shape.id.member_name() {
-    Some(member) => member
+    Some(part) => part
     None => shape.id.name()
   }
 }

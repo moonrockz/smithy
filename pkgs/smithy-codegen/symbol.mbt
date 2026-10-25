@@ -132,7 +132,7 @@ pub(all) enum DependencyKind {
 
 ///|
 pub(all) struct SymbolDependency {
-  package : PackageName
+  package_name : PackageName
   version : String
   kind : DependencyKind
 } derive(Eq, Hash, Debug)
@@ -140,7 +140,7 @@ pub(all) struct SymbolDependency {
 ///|
 /// Order by package, then version in lexical order, then kind in declaration order.
 pub impl Compare for SymbolDependency with fn compare(self, other) {
-  match Compare::compare(self.package, other.package) {
+  match Compare::compare(self.package_name, other.package_name) {
     0 =>
       match lexical(self.version, other.version) {
         0 => Compare::compare(self.kind, other.kind)
@@ -154,7 +154,7 @@ pub impl Compare for SymbolDependency with fn compare(self, other) {
 /// A symbol: the target-language name of a shape, where it is defined and what it needs.
 pub struct Symbol {
   name : SymbolName
-  namespace : Namespace
+  ns : Namespace
   definition : OutputPath?
   references : Array[SymbolReference]
   dependencies : Array[SymbolDependency]
@@ -162,26 +162,19 @@ pub struct Symbol {
 } derive(Eq, Debug)
 
 ///|
-/// A reference from one symbol to another, with an optional alias.
+/// A reference from one symbol to another, with an optional local name.
 pub struct SymbolReference {
   symbol : Symbol
-  alias : SymbolName?
+  local_name : SymbolName?
 } derive(Eq, Debug)
 
 ///|
 pub fn Symbol::new(
   name : SymbolName,
-  namespace~ : Namespace = Namespace::root(),
+  ns~ : Namespace = Namespace::root(),
   definition~ : OutputPath? = None,
 ) -> Symbol {
-  {
-    name,
-    namespace,
-    definition,
-    references: [],
-    dependencies: [],
-    properties: {},
-  }
+  { name, ns, definition, references: [], dependencies: [], properties: {}, }
 }
 
 ///|
@@ -228,10 +221,10 @@ pub fn Symbol::property(self : Symbol, key : String) -> Json? {
 ///|
 /// The namespace, the separator and the name. Only the name when the namespace is root.
 pub fn Symbol::full_name(self : Symbol) -> String {
-  if self.namespace.is_root() {
+  if self.ns.is_root() {
     self.name.0
   } else {
-    "\{self.namespace.text}\{self.namespace.separator}\{self.name.0}"
+    "\{self.ns.text}\{self.ns.separator}\{self.name.0}"
   }
 }
 
@@ -261,7 +254,7 @@ pub fn Symbol::all_dependencies(self : Symbol) -> Array[SymbolDependency] {
 ///|
 pub fn SymbolReference::new(
   symbol : Symbol,
-  alias~ : SymbolName? = None,
+  local_name~ : SymbolName? = None,
 ) -> SymbolReference {
-  { symbol, alias, }
+  { symbol, local_name, }
 }

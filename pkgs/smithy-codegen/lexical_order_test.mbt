@@ -1,7 +1,7 @@
 ///|
-fn lex_dep(package : String) -> @codegen.SymbolDependency {
+fn lex_dep(package_name : String) -> @codegen.SymbolDependency {
   {
-    package: @codegen.PackageName::parse(package).unwrap(),
+    package_name: @codegen.PackageName::parse(package_name).unwrap(),
     version: "1",
     kind: Runtime,
   }
@@ -37,12 +37,12 @@ test "dependency kinds keep their declaration order" {
   assert_true(
     (
       {
-        package: @codegen.PackageName::parse("p").unwrap(),
+        package_name: @codegen.PackageName::parse("p").unwrap(),
         version: "1",
         kind: Runtime,
       } : @codegen.SymbolDependency) <
     {
-      package: @codegen.PackageName::parse("p").unwrap(),
+      package_name: @codegen.PackageName::parse("p").unwrap(),
       version: "1",
       kind: Test,
     },
@@ -50,12 +50,12 @@ test "dependency kinds keep their declaration order" {
   assert_true(
     (
       {
-        package: @codegen.PackageName::parse("p").unwrap(),
+        package_name: @codegen.PackageName::parse("p").unwrap(),
         version: "1",
         kind: Test,
       } : @codegen.SymbolDependency) <
     {
-      package: @codegen.PackageName::parse("p").unwrap(),
+      package_name: @codegen.PackageName::parse("p").unwrap(),
       version: "1",
       kind: Build,
     },
@@ -67,28 +67,28 @@ test "all dependencies are in lexical order" {
   let symbol = @codegen.Symbol::new(@codegen.SymbolName::parse("Main").unwrap())
     .with_dependency(lex_dep("bb"))
     .with_dependency(lex_dep("abc"))
-  assert_eq(symbol.all_dependencies().map(d => d.package.to_string()), [
+  assert_eq(symbol.all_dependencies().map(d => d.package_name.to_string()), [
     "abc", "bb",
   ])
 }
 
 ///|
 test "writer imports are in lexical order" {
-  let w = @codegen.CodeWriter::new(namespace=lex_ns("a"))
-  let make = (namespace : String, name : String) => {
+  let w = @codegen.CodeWriter::new(ns=lex_ns("a"))
+  let make = (ns : String, name : String) => {
     @codegen.Symbol::new(
       @codegen.SymbolName::parse(name).unwrap(),
-      namespace=lex_ns(namespace),
+      ns=lex_ns(ns),
     )
   }
   w.write("$T $T", args=[
     @codegen.Sym(make("zz", "Item")),
     @codegen.Sym(make("abc", "Other")),
   ])
-  assert_eq(w.imports().map(entry => entry.namespace.text), ["abc", "zz"])
+  assert_eq(w.imports().map(entry => entry.ns.text), ["abc", "zz"])
   w.add_dependency(lex_dep("bb"))
   w.add_dependency(lex_dep("abc"))
-  assert_eq(w.dependencies().map(d => d.package.to_string()), ["abc", "bb"])
+  assert_eq(w.dependencies().map(d => d.package_name.to_string()), ["abc", "bb"])
 }
 
 ///|
@@ -106,7 +106,7 @@ test "delegator flush and dependencies are in lexical order" {
   }
   delegator.add_dependency(lex_dep("bb"))
   delegator.add_dependency(lex_dep("abc"))
-  assert_eq(delegator.dependencies().map(d => d.package.to_string()), [
+  assert_eq(delegator.dependencies().map(d => d.package_name.to_string()), [
     "abc", "bb",
   ])
   assert_eq(delegator.flush().keys().collect(), ["aa.txt", "b.txt"])
@@ -180,7 +180,7 @@ test "dependency versions compare in lexical order" {
   let make = (version : String) => {
     (
       {
-        package: @codegen.PackageName::parse("p").unwrap(),
+        package_name: @codegen.PackageName::parse("p").unwrap(),
         version,
         kind: Runtime,
       } : @codegen.SymbolDependency)

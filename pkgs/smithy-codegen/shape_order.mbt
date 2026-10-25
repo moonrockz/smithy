@@ -163,11 +163,11 @@ fn components(deps : Array[Array[Int32]]) -> (Array[Int32], Array[Int32]) {
         if low[node] == index[node] {
           let id = sizes.length()
           let mut size = 0
-          while scc.pop() is Some(member) {
-            on_stack[member] = false
-            comp[member] = id
+          while scc.pop() is Some(member_node) {
+            on_stack[member_node] = false
+            comp[member_node] = id
             size += 1
-            if member == node {
+            if member_node == node {
               break
             }
           }

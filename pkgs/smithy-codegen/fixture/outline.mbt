@@ -18,7 +18,7 @@ fn[T] must(value : T?, what : String) -> T raise @codegen.CodegenError {
 ///|
 fn collections_dependency() -> @codegen.SymbolDependency raise @codegen.CodegenError {
   {
-    package: must(
+    package_name: must(
       @codegen.PackageName::parse("outline-collections"),
       "package name `outline-collections`",
     ),
@@ -38,18 +38,18 @@ fn outline_symbol(
     @codegen.SymbolName::parse(shape.id.name()),
     "a symbol name for shape `\{shape.id}`",
   )
-  let namespace = shape.id.namespace()
-  if namespace == "smithy.api" {
+  let ns = shape.id.namespace()
+  if ns == "smithy.api" {
     return @codegen.Symbol::new(name)
   }
-  let path = namespace.replace_all(old=".", new="/") +
+  let path = ns.replace_all(old=".", new="/") +
     "/" +
     shape.id.name() +
     ".outline"
   let symbol = @codegen.Symbol::new(
     name,
-    namespace=must(
-      @codegen.Namespace::parse(namespace, separator="."),
+    ns=must(
+      @codegen.Namespace::parse(ns, separator="."),
       "a namespace for shape `\{shape.id}`",
     ),
     definition=Some(
@@ -80,9 +80,10 @@ fn render_outline(writer : @codegen.CodeWriter) -> String {
   let out = StringBuilder()
   let imports = writer.imports()
   for entry in imports {
-    let full = @codegen.Symbol::new(entry.name, namespace=entry.namespace).full_name()
-    match entry.alias {
-      Some(alias) => out.write_string("use \{full} as \{alias.to_string()}\n")
+    let full = @codegen.Symbol::new(entry.name, ns=entry.ns).full_name()
+    match entry.local_name {
+      Some(local_name) =>
+        out.write_string("use \{full} as \{local_name.to_string()}\n")
       None => out.write_string("use \{full}\n")
     }
   }
@@ -113,8 +114,8 @@ fn member_target_symbol(
   ctx : OutlineCtx,
   id : @smithy.ShapeId,
 ) -> @codegen.TemplateValue raise @codegen.CodegenError {
-  guard ctx.info.model.shapes.get(id) is Some(member) &&
-    member.body is Member(target~) else {
+  guard ctx.info.model.shapes.get(id) is Some(member_shape) &&
+    member_shape.body is Member(target~) else {
     raise @codegen.StateError(
       "I could not find member shape `\{id}` in the model of the outline generator.",
     )
@@ -146,13 +147,13 @@ fn member_record(
 ) -> @codegen.TemplateValue raise @codegen.CodegenError {
   let fields : Map[String, @codegen.TemplateValue] = Map([])
   for id in members {
-    guard ctx.info.model.shapes.get(id) is Some(member) &&
-      member.body is Member(target~) else {
+    guard ctx.info.model.shapes.get(id) is Some(member_shape) &&
+      member_shape.body is Member(target~) else {
       raise @codegen.StateError(
         "I could not find member shape `\{id}` in the model of the outline generator.",
       )
     }
-    fields[ctx.info.provider.to_member_name(member)] = target_symbol(
+    fields[ctx.info.provider.to_member_name(member_shape)] = target_symbol(
       ctx, target,
     )
   }
@@ -191,12 +192,12 @@ fn generate_enum_like(
   }
   let names : Array[@codegen.TemplateValue] = []
   for id in ids {
-    guard ctx.info.model.shapes.get(id) is Some(member) else {
+    guard ctx.info.model.shapes.get(id) is Some(member_shape) else {
       raise @codegen.StateError(
         "I could not find member shape `\{id}` in the model of the outline generator.",
       )
     }
-    names.push(Text(ctx.info.provider.to_member_name(member)))
+    names.push(Text(ctx.info.provider.to_member_name(member_shape)))
   }
   let symbol = ctx.info.provider.to_symbol(shape)
   write_shape(ctx, shape, writer => {
@@ -212,9 +213,9 @@ fn generate_list(
   ctx : OutlineCtx,
   shape : @smithy.Shape,
 ) -> Unit raise @codegen.CodegenError {
-  guard shape.body is List(member) else { return }
+  guard shape.body is List(member_shape) else { return }
   let symbol = ctx.info.provider.to_symbol(shape)
-  let target = member_target_symbol(ctx, member)
+  let target = member_target_symbol(ctx, member_shape)
   write_shape(ctx, shape, writer => {
     writer.write("list $T of $T", args=[Sym(symbol), target])
   })
@@ -304,7 +305,7 @@ fn write_dependencies(ctx : OutlineCtx) -> Unit raise @codegen.CodegenError {
   ctx.delegator.use_file_writer(path, @codegen.Namespace::root(), writer => {
     for dependency in dependencies {
       writer.write("$L@$L ($L)", args=[
-        Text(dependency.package.to_string()),
+        Text(dependency.package_name.to_string()),
         Text(dependency.version),
         Text(kind_text(dependency.kind)),
       ])

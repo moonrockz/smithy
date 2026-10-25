@@ -12,7 +12,7 @@ keywords = [ "smithy", "codegen", "moonbit" ]
 
 readme = "README.mbt.md"
 
-warnings = "-implicit_impl_as_method-reserved_keyword"
+warnings = "-implicit_impl_as_method"
 
 import {
   "moonrockz/smithy@0.6.0",
