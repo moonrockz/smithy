@@ -1,0 +1,21 @@
+{
+  "version": "2.0",
+  "complete": true,
+  "expect": [
+    {"code":"RequestExpected","entry":3},
+    {"code":"UnknownCallReference","entry":5},
+    {"code":"NotificationExpected","entry":9}
+  ],
+  "entries": [
+    {"from":"pos","message":{"jsonrpc":"2.0","id":1,"method":"terminal.initialize","params":{"protocolVersion":"1","posName":"test checkout"}}},
+    {"from":"terminal","message":{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"1","terminalId":"test-terminal","capabilities":{"payment":true,"progress":true}}}},
+    {"from":"pos","message":{"jsonrpc":"2.0","method":"terminal.initialized"}},
+    {"from":"pos","message":{"jsonrpc":"2.0","method":"terminal.ping"}},
+    {"from":"pos","message":{"jsonrpc":"2.0","id":2,"method":"payment.start","params":{"paymentId":"test-timeout","amount":{"amount":1.00,"currency":"USD"},"entry":{"chip":{"maskedNumber":"**** 4242"}}}}},
+    {"from":"terminal","message":{"jsonrpc":"2.0","method":"payment.progress","params":{"requestId":"missing","phase":"authorizing"}}},
+    {"from":"terminal","message":{"jsonrpc":"2.0","id":2,"error":{"code":1004,"message":"I stopped payment.start because the time limit expired."}}},
+    {"from":"pos","message":{"jsonrpc":"2.0","id":3,"method":"terminal.shutdown"}},
+    {"from":"terminal","message":{"jsonrpc":"2.0","id":3,"result":null}},
+    {"from":"pos","message":{"jsonrpc":"2.0","id":4,"method":"terminal.exit"}}
+  ]
+}

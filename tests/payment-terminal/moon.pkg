@@ -1,0 +1,7 @@
+supported_targets = "js+native"
+
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-validation/rpc",
+  "moonbitlang/x/fs",
+} for "test"
