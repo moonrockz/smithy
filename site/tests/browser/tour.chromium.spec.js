@@ -342,6 +342,7 @@ test("a Selector lesson edits its query in the tab query.selector, and Undo stay
   await expect(editor).toContainText("resource City");
   await editor.locator(".cm-line").first().click();
   await page.keyboard.press("ControlOrMeta+z");
+  await settled(page);
   expect(await editorText(page)).toEqual(modelStart);
   expect(page.errors).toEqual([]);
 });

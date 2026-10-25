@@ -6,13 +6,13 @@ The tab `query.selector` holds the selector. Edit it, and the output tab shows t
 
 The selector `operation` matches each shape of [the type](https://smithy.io/2.0/spec/selectors.html#matching-shapes-by-type) `operation`. Write `operation`, and the output shows all four operations.
 
-`[trait|readonly]` is an [attribute selector](https://smithy.io/2.0/spec/selectors.html#attribute-selectors). It keeps the shapes that have the [trait](https://smithy.io/2.0/spec/selectors.html#trait-attribute) `@readonly`. Thus the start query gives three operations. `example#CreateCity` is not in the output, because it has no `@readonly`.
+`[trait|readonly]` is an [attribute selector](https://smithy.io/2.0/spec/selectors.html#attribute-selectors). It keeps the shapes that have the [trait](https://smithy.io/2.0/spec/selectors.html#trait-attribute) `@readonly`. The start query gives three operations. `example#CreateCity` is not in the output, because it has no `@readonly`.
 
-`-[read]->` is a [forward directed neighbor](https://smithy.io/2.0/spec/selectors.html#forward-directed-neighbors). It follows one named [relationship](https://smithy.io/2.0/spec/selectors.html#relationships) from a shape. The query `resource -[read]-> operation` gives `example#GetCity`. A [forward undirected neighbor](https://smithy.io/2.0/spec/selectors.html#forward-undirected-neighbor) `>` gives every shape that the current shape refers to. Thus `operation -[input]-> structure > member` gives the members of each input structure, such as `example#GetCityInput$cityId`.
+`-[read]->` is a [forward directed neighbor](https://smithy.io/2.0/spec/selectors.html#forward-directed-neighbors). The brackets name one or more [relationships](https://smithy.io/2.0/spec/selectors.html#relationships), and the selector follows only those from a shape. The query `resource -[read]-> operation` gives `example#GetCity`. A [forward undirected neighbor](https://smithy.io/2.0/spec/selectors.html#forward-undirected-neighbor) `>` gives every shape that the current shape refers to. The query `operation -[input]-> structure > member` gives the members of each input structure, such as `example#GetCityInput$cityId`.
 
 The model also holds the shapes of the [prelude](https://smithy.io/2.0/spec/model.html#prelude). The query `string` gives `example#CityId`, `smithy.api#String` and the other string shapes of the prelude.
 
-> **Reference difference:** This tool also loads the JSON-RPC trait shapes of the namespace `smithy.rpc` ([lesson 22](../22-json-rpc/lesson.md)) into every model. A selector can match them: `string` also gives `smithy.rpc#MethodName`. Standard Smithy does not have these shapes.
+> **Reference difference:** This tool also loads the shapes of the JSON-RPC trait definitions in the namespace `smithy.rpc` ([lesson 22](../22-json-rpc/lesson.md)) into every model. A selector can match them: `string` also gives `smithy.rpc#MethodName`. Standard Smithy does not have these shapes.
 
 The [`id` attribute](https://smithy.io/2.0/spec/selectors.html#id-attribute) keeps your own shapes. The query `string[id|namespace = example]` gives only `example#CityId`.
 
