@@ -378,3 +378,55 @@ test "a lesson has at most one query file" {
 test "a case cannot add a query file" {
   expect_err("query-case-adds", ["01-a/cases/more", "other.selector"])
 }
+
+///|
+test "a transcript lesson reads its setup and the fields of a case" {
+  let tour = match read("transcript-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(
+    lesson.engine,
+    Transcript({ file: "exchange.json", protocol: "example#WeatherProtocol", }),
+  )
+  assert_eq(lesson.files.map(f => f.name), ["exchange.json", "model.smithy"])
+  assert_eq(lesson.cases.map(c => c.name), [
+    "start", "no-reply", "not-json", "partial",
+  ])
+  let start = lesson.cases[0].expect
+  assert_eq(start.findings, [])
+  assert_eq(start.valid, Some(true))
+  assert_eq(start.steps, [{ count: 1, findings: [], }])
+  let no_reply = lesson.cases[1].expect
+  assert_eq(no_reply.findings, ["MissingResponse|error|0|client"])
+  assert_eq(no_reply.valid, Some(false))
+  assert_eq(no_reply.steps, [
+    { count: 1, findings: [], },
+    { count: 2, findings: ["MissingResponse|error|0|client"], },
+  ])
+  assert_eq(no_reply.output_contains, ["entry 0 client: error MissingResponse"])
+  assert_eq(lesson.cases[3].expect.valid, Some(true))
+}
+
+///|
+test "a transcript lesson needs a .json transcript" {
+  expect_err("transcript-jsonl", [
+    "01-weather", "a transcript lesson needs a .json transcript", "log.jsonl",
+  ])
+}
+
+///|
+test "steps are for a transcript lesson" {
+  expect_err("transcript-steps-in-value", [
+    "01-weather/cases/start", "\"steps\" is for a transcript lesson",
+  ])
+}
+
+///|
+test "a transcript finding key has the form code|severity|entry|sender" {
+  expect_err("transcript-bad-key", [
+    "01-weather/cases/start", "MissingResponse|error|zero|client", "code|severity|entry|sender",
+    "error or advisory", "a number or -",
+  ])
+}

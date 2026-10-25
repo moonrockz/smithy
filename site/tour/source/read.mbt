@@ -166,9 +166,7 @@ fn read_lesson(
   }
   for name in data {
     if !files.any(f => f.name == name) {
-      fail(
-        "\{dir}: the value file \"\{name}\" is not a starting file in files/",
-      )
+      fail("\{dir}: the data file \"\{name}\" is not a starting file in files/")
     }
   }
   let queries = files.filter(f => @model.is_query_file(f.name))
@@ -277,8 +275,15 @@ fn read_engine(
     return Static
   }
   let value = m.get("value")
-  if has_output && value is Some(_) {
-    fail("\{where_}: I expected at most one of output, value, message, diff")
+  let transcript = m.get("transcript")
+  let engines = [has_output, value is Some(_), transcript is Some(_)]
+  if engines.filter(b => b).length() > 1 {
+    fail(
+      "\{where_}: I expected at most one of output, value, transcript, message, diff",
+    )
+  }
+  if transcript is Some(setup) {
+    return read_transcript(setup, where_)
   }
   guard value is Some(setup) else { return Model }
   check_keys(setup, value_keys, "\{where_} \"value\"")
@@ -306,6 +311,26 @@ fn read_engine(
       )
   }
   Value({ file, shape, options: { unknown_members, member_names, }, })
+}
+
+///|
+/// The `transcript` setup of `lesson.json`. The starting file is a `.json`
+/// document: a Markdown transcript would need its own editor mode, and a JSONL
+/// log needs a version and a preset.
+fn read_transcript(setup : Json, where_ : String) -> @model.Engine raise {
+  let at = "\{where_} \"transcript\""
+  check_keys(setup, transcript_keys, at)
+  let file = string_field(setup, "file", at)
+  if !file.has_suffix(".json") {
+    fail(
+      "\{where_}: a transcript lesson needs a .json transcript, but the file is \"\{file}\"",
+    )
+  }
+  let protocol = string_field(setup, "protocol", at)
+  if protocol == "" {
+    fail("\{at}: \"protocol\" is empty")
+  }
+  Transcript({ file, protocol, })
 }
 
 ///|
@@ -403,17 +428,41 @@ fn read_case(
       if !(json is Object(m) && m.contains("findings")) {
         fail("\{where_}: a value lesson needs \"findings\" in expect.json")
       }
+    Transcript(_) =>
+      if !has_key(json, "findings") {
+        fail("\{where_}: a transcript lesson needs \"findings\" in expect.json")
+      }
     Static => fail("\{where_}: a static lesson has no cases")
     Model =>
       if !findings.is_empty() || has_key(json, "findings") {
         fail("\{where_}: \"findings\" is for a value or message lesson")
       }
   }
+  let is_transcript = engine is Transcript(_)
+  if !is_transcript && has_key(json, "valid") {
+    fail("\{where_}: \"valid\" is for a transcript lesson")
+  }
+  if !is_transcript && has_key(json, "steps") {
+    fail("\{where_}: \"steps\" is for a transcript lesson")
+  }
+  let valid = match json {
+    Object(m) =>
+      match m.get("valid") {
+        None => None
+        Some(True) => Some(true)
+        Some(False) => Some(false)
+        Some(_) => fail("\{where_}: \"valid\" must be true or false")
+      }
+    _ => None
+  }
+  let steps = read_steps(json, where_)
   if !diff.is_empty() || has_key(json, "diff") {
     fail("\{where_}: \"diff\" is for a diff lesson")
   }
   for key in findings {
-    if !@model.is_finding_key(key) {
+    if is_transcript {
+      check_transcript_key(key, where_)
+    } else if !@model.is_finding_key(key) {
       fail(
         "\{where_}: the finding \"\{key}\" must have the form code|error|pointer|shape or code|stopped|source",
       )
@@ -450,14 +499,15 @@ fn read_case(
   {
     name,
     files,
-    expect: { events, output_contains, blocked, findings, diff, },
+    expect: { events, output_contains, blocked, findings, diff, valid, steps, },
   }
 }
 
 ///|
 /// The keys of `lesson.json`.
 let lesson_keys : Array[String] = [
-  "slug", "title", "section", "spec", "output", "selector", "value", "static", "extension",
+  "slug", "title", "section", "spec", "output", "selector", "value", "transcript",
+  "static", "extension",
 ]
 
 ///|
@@ -467,10 +517,62 @@ let value_keys : Array[String] = [
 ]
 
 ///|
+/// The keys of `transcript` in `lesson.json`.
+let transcript_keys : Array[String] = ["file", "protocol"]
+
+///|
 /// The keys of `expect.json`.
 let expect_keys : Array[String] = [
-  "events", "output_contains", "blocked", "findings", "diff",
+  "events", "output_contains", "blocked", "findings", "diff", "valid", "steps",
 ]
+
+///|
+/// The keys of an item of `steps` in `expect.json`.
+let step_keys : Array[String] = ["count", "findings"]
+
+///|
+fn check_transcript_key(key : String, where_ : String) -> Unit raise {
+  if !@model.is_transcript_key(key) {
+    fail(
+      "\{where_}: the finding \"\{key}\" must have the form code|severity|entry|sender, with the severity error or advisory and the entry a number or -",
+    )
+  }
+}
+
+///|
+/// The `steps` of `expect.json`: items of `count` (a whole number from 1) and
+/// the transcript finding keys after that many steps.
+fn read_steps(
+  json : Json,
+  where_ : String,
+) -> Array[@model.StepExpectation] raise {
+  guard json is Object(m) && m.get("steps") is Some(steps) else { return [] }
+  guard steps is Array(items) else {
+    fail("\{where_}: \"steps\" must be an array")
+  }
+  items.map(item => {
+    check_keys(item, step_keys, "\{where_} \"steps\"")
+    let count = match item {
+      Object(o) =>
+        match o.get("count") {
+          Some(Number(n, ..)) if n >= 1.0 && n == n.to_int().to_double() =>
+            n.to_int()
+          _ =>
+            fail(
+              "\{where_}: every item of \"steps\" needs \"count\" as a whole number from 1",
+            )
+        }
+      _ => 0
+    }
+    let findings = string_array_field(item, "findings", "\{where_} \"steps\"")
+    for key in findings {
+      check_transcript_key(key, where_)
+    }
+    { count, findings, }
+  })
+}
+
+///|
 
 ///|
 /// Fail on a key that is not in `keys`. A misspelt key would otherwise drop

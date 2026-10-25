@@ -58,6 +58,8 @@ test "case_files replaces a starting file and adds a new one, sorted by name" {
       blocked: None,
       findings: [],
       diff: [],
+      valid: None,
+      steps: [],
     },
   }
   let names = lesson.case_files(c).map(f => f.name + "=" + f.text)
@@ -187,6 +189,8 @@ test "case_files sorts names of different length by code unit" {
       blocked: None,
       findings: [],
       diff: [],
+      valid: None,
+      steps: [],
     },
   }
   assert_eq(lesson.case_files(c).map(f => f.name), [
@@ -329,4 +333,46 @@ test "query_of prefers the query file" {
     Some("structure"),
   )
   assert_eq(query_of([{ name: "model.smithy", text: "", }], fixed=None), None)
+}
+
+///|
+test "transcript_key joins code, severity, entry and sender" {
+  assert_eq(
+    transcript_key("MissingResponse", "error", Some(0), Some("client")),
+    "MissingResponse|error|0|client",
+  )
+  assert_eq(
+    transcript_key("InvalidTranscript", "error", None, None),
+    "InvalidTranscript|error|-|-",
+  )
+}
+
+///|
+test "is_transcript_key accepts the form code|severity|entry|sender" {
+  assert_true(is_transcript_key("MissingResponse|error|0|client"))
+  assert_true(is_transcript_key("OutstandingCall|advisory|12|server"))
+  assert_true(is_transcript_key("InvalidTranscript|error|-|-"))
+  assert_true(!is_transcript_key("MissingResponse|error|zero|client"))
+  assert_true(!is_transcript_key("MissingResponse|warning|0|client"))
+  assert_true(!is_transcript_key("MissingResponse|error|0"))
+  assert_true(!is_transcript_key("|error|0|client"))
+  assert_true(!is_transcript_key("A|error|0|client|x"))
+  assert_true(!is_transcript_key("A|error|-1|client"))
+}
+
+///|
+test "a transcript lesson has its file as data file and needs a note" {
+  let engine : Engine = Transcript({
+    file: "exchange.json",
+    protocol: "example#P",
+  })
+  assert_eq(engine.data_files(), ["exchange.json"])
+  let files : Array[LessonFile] = [
+    { name: "model.smithy", text: "m", },
+    { name: "exchange.json", text: "{}", },
+  ]
+  assert_eq(model_files(engine, files).map(f => f.name), ["model.smithy"])
+  let lesson = { ..lesson_of(1, "T", [], []), engine, }
+  assert_true(lesson.needs_extension_note())
+  assert_true(!lesson.is_static())
 }

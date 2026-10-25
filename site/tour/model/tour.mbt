@@ -31,7 +31,27 @@ pub(all) struct Expectation {
   findings : Array[String]
   /// The diff event keys of a diff lesson. Empty for other lessons.
   diff : Array[String]
+  /// The verdict of the summary of a transcript lesson; `None` leaves it
+  /// unchecked. `None` for other lessons.
+  valid : Bool?
+  /// The findings of a transcript lesson after Step is clicked `count` times
+  /// from the start. Empty for other lessons.
+  steps : Array[StepExpectation]
 }
+
+///|
+/// The transcript finding keys (`transcript_key`) that a check shows after
+/// `count` entries from the start, in any order.
+pub(all) struct StepExpectation {
+  count : Int32
+  findings : Array[String]
+} derive(Eq, Debug)
+
+///|
+pub extend StepExpectation with Eq::{equal, not_equal}
+
+///|
+pub extend StepExpectation with @debug.Debug::{to_repr}
 
 ///|
 /// What a lesson runs on its files. A lesson has one engine.
@@ -40,6 +60,8 @@ pub(all) enum Engine {
   Model
   /// Check a JSON value against a shape of the model.
   Value(ValueSetup)
+  /// Step through a JSON-RPC transcript against a protocol of the model.
+  Transcript(TranscriptSetup)
   /// No editor, no files and no cases: the blocks of the text come from
   /// include blocks.
   Static
@@ -79,11 +101,32 @@ pub extend ValueSetup with ToJson::{to_json}
 pub extend ValueSetup with FromJson::{from_json}
 
 ///|
+/// The setup of a transcript lesson: the starting file with the transcript
+/// (a `.json` document) and the absolute ID of the protocol shape.
+pub(all) struct TranscriptSetup {
+  file : String
+  protocol : String
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend TranscriptSetup with Eq::{equal, not_equal}
+
+///|
+pub extend TranscriptSetup with @debug.Debug::{to_repr}
+
+///|
+pub extend TranscriptSetup with ToJson::{to_json}
+
+///|
+pub extend TranscriptSetup with FromJson::{from_json}
+
+///|
 /// The names of the files that hold data in place of a model.
 pub fn Engine::data_files(self : Engine) -> Array[String] {
   match self {
     Model => []
     Value(setup) => [setup.file]
+    Transcript(setup) => [setup.file]
     Static => []
   }
 }
@@ -155,6 +198,33 @@ pub fn is_finding_key(key : String) -> Bool {
 }
 
 ///|
+/// The key of a transcript finding: `code|severity|entry|sender`, with `-` for
+/// no entry or no sender.
+pub fn transcript_key(
+  code : String,
+  severity : String,
+  entry : Int32?,
+  sender : String?,
+) -> String {
+  "\{code}|\{severity}|\{entry.map(n => n.to_string()).unwrap_or("-")}|\{sender.unwrap_or("-")}"
+}
+
+///|
+/// Whether the text has the form of `transcript_key`: the severity is `error`
+/// or `advisory`, and the entry is a number or `-`.
+pub fn is_transcript_key(key : String) -> Bool {
+  guard key.split("|").map(p => p.to_owned()).to_array()
+    is [code, severity, entry, sender] &&
+    code != "" &&
+    sender != "" &&
+    (severity == "error" || severity == "advisory") else {
+    return false
+  }
+  entry == "-" ||
+  (entry != "" && entry.to_array().iter().all(c => c.is_ascii_digit()))
+}
+
+///|
 /// The note that a value or message lesson must have in its text: Smithy
 /// defines no such check.
 pub let extension_note : String = "> **Our extension:**"
@@ -164,7 +234,7 @@ pub let extension_note : String = "> **Our extension:**"
 pub fn Lesson::needs_extension_note(self : Lesson) -> Bool {
   match self.engine {
     Model => false
-    Value(_) => true
+    Value(_) | Transcript(_) => true
     Static => self.extension
   }
 }

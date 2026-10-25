@@ -259,18 +259,30 @@ async fn list_dir(path : String) -> Array[String] {
 }
 
 ///|
-/// The files directly in `path`, as (name, text). The loader in site/tour/source/read.mbt fails on a sub-folder and
-/// on a name that does not end in `.smithy` or `.selector`; this script fails on them too.
-async fn read_files(path : String) -> Array[(String, String)] {
+/// The files directly in `path`, as (name, text), without the data files `data` of the lesson engine. The loader in
+/// site/tour/source/read.mbt fails on a sub-folder and on a name that does not end in `.smithy` or `.selector`; this
+/// script fails on them too. Level 2 compares the events of the model files only.
+async fn read_files(path : String, data : Array[String]) -> Array[(String, String)] {
   let files : Array[(String, String)] = []
   if !@fs.exists(path) { return files }
   for name in list_dir(path) {
-    if @fs.kind(path + "/" + name) is Directory || !(name.has_suffix(".smithy") || name.has_suffix(".selector")) {
+    if @fs.kind(path + "/" + name) is Directory || !(name.has_suffix(".smithy") || name.has_suffix(".selector") || data.contains(name)) {
       fail(path + "/" + name + ": a lesson file must be a .smithy or .selector file directly in its files folder")
     }
+    if data.contains(name) { continue }
     files.push((name, @fs.read_file(path + "/" + name).text()))
   }
   files
+}
+
+///|
+/// The names of the data files of the lesson engine: the file of a `value` or a `transcript` setup. The same rule as
+/// `Engine::data_files` in site/tour/model.
+fn data_files(meta : Json) -> Array[String] {
+  match meta {
+    { "value": { "file": String(file), .. }, .. } | { "transcript": { "file": String(file), .. }, .. } => [file]
+    _ => []
+  }
 }
 
 ///|
@@ -339,14 +351,15 @@ async fn lesson_cases(root : String) -> Array[Json] {
       { "output": String(output), .. } => Some(output)
       _ => None
     })
-    let start = read_files(base + "/files")
+    let data = data_files(meta)
+    let start = read_files(base + "/files", data)
     let fixed = match meta {
       { "selector": String(selector), .. } => Some(selector)
       _ => None
     }
     for name in list_dir(base + "/cases") {
       if !(@fs.kind(base + "/cases/" + name) is Directory) { continue }
-      let files = merge_files(start, read_files(base + "/cases/" + name + "/files"))
+      let files = merge_files(start, read_files(base + "/cases/" + name + "/files", data))
       let entry : Map[String, Json] = {
         "id": Json::string(dir + "/" + name),
         "json_schema": Json::boolean(flags.json_schema),
@@ -537,4 +550,38 @@ async test "lesson_cases skips a static lesson that has no cases folder" {
   @fs.rmdir(root, recursive=true)
   let ids = cases.map(c => match c { { "id": String(id), .. } => id; _ => "" })
   assert_eq(ids, ["02-m/start"])
+}
+
+///|
+test "the data files of a lesson are those of its engine" {
+  assert_eq(data_files(@json.parse("{\"slug\": \"a\"}")), [])
+  assert_eq(
+    data_files(@json.parse("{\"slug\": \"a\", \"value\": {\"file\": \"order.json\", \"shape\": \"x#Y\"}}")),
+    ["order.json"],
+  )
+  assert_eq(
+    data_files(@json.parse("{\"slug\": \"a\", \"transcript\": {\"file\": \"exchange.json\", \"protocol\": \"x#P\"}}")),
+    ["exchange.json"],
+  )
+}
+
+///|
+async test "lesson_cases leaves the data file of a transcript lesson out of the model files" {
+  let root = "transcript-lessons-scratch"
+  if @fs.exists(root) { @fs.rmdir(root, recursive=true) }
+  @fs.mkdir(root + "/01-t/files", recursive=true, allow_exist=true)
+  @fs.mkdir(root + "/01-t/cases/start", recursive=true, allow_exist=true)
+  @fs.write_file(
+    root + "/01-t/lesson.json",
+    "{\"slug\": \"t\", \"transcript\": {\"file\": \"exchange.json\", \"protocol\": \"x#P\"}}",
+  )
+  @fs.write_file(root + "/01-t/files/model.smithy", "namespace example\n")
+  @fs.write_file(root + "/01-t/files/exchange.json", "{}")
+  let cases = lesson_cases(root)
+  @fs.rmdir(root, recursive=true)
+  let names = match cases[0] {
+    { "files": Array(files), .. } => files.map(f => match f { { "name": String(name), .. } => name; _ => "" })
+    _ => []
+  }
+  assert_eq(names, ["model.smithy"])
 }

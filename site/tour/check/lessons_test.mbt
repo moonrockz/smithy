@@ -198,7 +198,9 @@ fn check_case(
   }
   let runs = match
     output_plan(
-      lesson.output is Some(_) || lesson.engine is Value(_),
+      lesson.output is Some(_) ||
+      lesson.engine is Value(_) ||
+      lesson.engine is Transcript(_),
       expected,
       case.expect.output_contains,
       blocked=case.expect.blocked,
@@ -279,8 +281,138 @@ fn check_case(
         }
         _ => ()
       }
+    Transcript(setup) =>
+      if runs {
+        let text = match all_files.search_by(f => f.name == setup.file) {
+          Some(i) => all_files[i].text
+          None => fail(where_ + ": the case has no file " + setup.file)
+        }
+        check_transcript(where_, files, setup, text, case.expect)
+      }
     // A static lesson has no cases.
     Static => ()
+  }
+}
+
+///|
+/// The answer to a start or a step of a transcript: what is new, and the
+/// summary when the check has ended. A block fails the case with its reason.
+fn transcript_progress(
+  where_ : String,
+  response : @core.Response,
+) -> (Array[@core.FindingView], @core.SummaryView?, Bool) raise {
+  match response {
+    TranscriptProgress(findings~, summary~, done~, ..) =>
+      (findings, summary, done)
+    Blocked(reason~, ..) =>
+      fail(where_ + ": the transcript check was blocked: " + reason)
+    _ => fail(where_ + ": unexpected answer")
+  }
+}
+
+///|
+/// The keys of the transcript findings, sorted.
+fn transcript_keys(findings : Array[@core.FindingView]) -> Array[String] {
+  let keys = findings.map(f => {
+    @model.transcript_key(f.code, f.severity, f.entry, f.sender)
+  })
+  keys.sort_by(@model.compare_code_units)
+  keys
+}
+
+///|
+/// A fresh session that has loaded the transcript and checked `count` entries:
+/// the findings so far and the last summary.
+fn transcript_run(
+  where_ : String,
+  files : Array[(String, String)],
+  setup : @model.TranscriptSetup,
+  text : String,
+  count : Int32,
+) -> (Array[@core.FindingView], @core.SummaryView?) raise {
+  let session = @core.Session::new()
+  let (found, summary, done) = transcript_progress(
+    where_,
+    @core.handle(
+      session,
+      TranscriptStartFiles(
+        seq=1,
+        files~,
+        protocol=setup.protocol,
+        format=Json,
+        complete=false,
+        text~,
+      ),
+    ),
+  )
+  // A document that cannot be read ends at the start: it has nothing to step.
+  if done {
+    return (found, summary)
+  }
+  let (more, last, _) = transcript_progress(
+    where_,
+    @core.handle(session, TranscriptStep(seq=2, count~)),
+  )
+  (found + more, if last is Some(_) { last } else { summary })
+}
+
+///|
+/// Check a transcript case: the findings of a run to the end, the verdict of
+/// its summary, the findings after each step count, and the CLI lines.
+fn check_transcript(
+  where_ : String,
+  files : Array[(String, String)],
+  setup : @model.TranscriptSetup,
+  text : String,
+  expect : @model.Expectation,
+) -> Unit raise {
+  let (findings, summary) = transcript_run(where_, files, setup, text, 1000000)
+  let keys = transcript_keys(findings)
+  let wanted = expect.findings.copy()
+  wanted.sort_by(@model.compare_code_units)
+  if keys != wanted {
+    fail(
+      where_ +
+      ": findings differ.\n  expected: " +
+      show(wanted) +
+      "\n  actual:   " +
+      show(keys),
+    )
+  }
+  guard summary is Some(summary) else {
+    fail(where_ + ": the check gave no summary at the end")
+  }
+  if expect.valid is Some(valid) && valid != summary.valid {
+    fail(
+      where_ +
+      ": valid differs.\n  expected: \{valid}\n  actual:   \{summary.valid}",
+    )
+  }
+  for step in expect.steps {
+    let (so_far, _) = transcript_run(where_, files, setup, text, step.count)
+    let keys = transcript_keys(so_far)
+    let wanted = step.findings.copy()
+    wanted.sort_by(@model.compare_code_units)
+    if keys != wanted {
+      fail(
+        where_ +
+        ": the findings after \{step.count} step differ.\n  expected: " +
+        show(wanted) +
+        "\n  actual:   " +
+        show(keys),
+      )
+    }
+  }
+  let lines = findings.map(f => f.cli_line(file=setup.file))
+  let expect_lines = match summary.expectations {
+    Some(view) => view.cli_lines(file=setup.file)
+    None => []
+  }
+  let output = (lines + expect_lines).join("\n")
+  for needle in expect.output_contains {
+    if !output.contains(needle) {
+      fail(where_ + ": the output has no " + needle + "\n" + output)
+    }
   }
 }
 
@@ -507,4 +639,70 @@ test "a static extension lesson says that the feature is our extension" {
     Err(e) => fail("I cannot read the fixture: " + e)
   }
   assert_eq(lessons_without_note(bad), ["01-a"])
+}
+
+///|
+fn transcript_fixture() -> @model.Lesson raise {
+  match @source.read_tour("tour/source/testdata/transcript-ok", repo="..") {
+    Ok(tour) => tour.lessons[0]
+    Err(e) => fail("I cannot read the fixture: " + e)
+  }
+}
+
+///|
+test "a transcript lesson case gives the findings, the summary and the steps that its expect.json names" {
+  let lesson = transcript_fixture()
+  assert_true(lesson.engine is Transcript(_))
+  for case in lesson.cases {
+    check_case(@core.Session::new(), lesson, case)
+  }
+}
+
+///|
+test "a claim that a transcript check does not give is an error" {
+  let lesson = transcript_fixture()
+  let session = @core.Session::new()
+  let no_reply = lesson.cases[lesson.cases
+    .search_by(c => c.name == "no-reply")
+    .unwrap()]
+  let claim = fn(expect : @model.Expectation) -> @model.Case {
+    { ..no_reply, expect, }
+  }
+  let wrong_findings = claim({ ..no_reply.expect, findings: [], })
+  assert_true(
+    raises_with("findings differ", () => {
+      check_case(session, lesson, wrong_findings)
+    }),
+  )
+  let wrong_valid = claim({ ..no_reply.expect, valid: Some(true), })
+  assert_true(
+    raises_with("valid differs", () => check_case(session, lesson, wrong_valid)),
+  )
+  let wrong_steps = claim({
+    ..no_reply.expect,
+    steps: [{ count: 1, findings: ["MissingResponse|error|0|client"], }],
+  })
+  assert_true(
+    raises_with("after 1 step", () => check_case(session, lesson, wrong_steps)),
+  )
+  let wrong_text = claim({
+    ..no_reply.expect,
+    output_contains: ["no such text"],
+  })
+  assert_true(
+    raises_with("the output has no", () => {
+      check_case(session, lesson, wrong_text)
+    }),
+  )
+}
+
+///|
+test "a transcript lesson says that the check is our extension" {
+  let lesson = transcript_fixture()
+  assert_eq(lessons_without_note({ lessons: [lesson], }), [])
+  let stripped = {
+    ..lesson,
+    text: lesson.text.replace_all(old=@model.extension_note, new="> Note:"),
+  }
+  assert_eq(lessons_without_note({ lessons: [stripped], }), ["01-weather"])
 }

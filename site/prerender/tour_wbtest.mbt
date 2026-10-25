@@ -166,3 +166,17 @@ test "the query file of a Selector lesson does not count as a model file for the
   let page = lesson_page(fixture_config("next"), tour, lesson)
   assert_true(page.playground is Some(_))
 }
+
+///|
+test "a transcript lesson page has no playground link" {
+  let files : Array[@model.LessonFile] = [
+    { name: "exchange.json", text: "{}", },
+  ]
+  let lesson = {
+    ..fixture_lesson(4, "Weather", files),
+    engine: Transcript({ file: "exchange.json", protocol: "example#P", }),
+  }
+  let tour : @model.Tour = { lessons: [lesson], }
+  let page = lesson_page(fixture_config("next"), tour, lesson)
+  assert_eq(page.playground, None)
+}

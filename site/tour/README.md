@@ -215,7 +215,7 @@ then run `mise run tour:check`.
 
 A value lesson checks a JSON value against a shape of the lesson model, as
 `smithy validate value` does. `lesson.json` has `"value"` in place of `"output"`.
-A lesson has at most one of `output`, `value`, `message` and `diff`.
+A lesson has at most one of `output`, `value`, `transcript`, `message` and `diff`.
 
 ```json
 "value": {"file": "order.json", "shape": "example.orders#Order",
@@ -233,7 +233,7 @@ A lesson has at most one of `output`, `value`, `message` and `diff`.
 - Other keys are an error.
 
 File rules, for every lesson: each file in `files/` and in a case must end in
-`.smithy`, except the value file. A case cannot add another `.json` file.
+`.smithy`, except the data file of the engine (the value file or the transcript file). A case cannot add another `.json` file.
 
 `expect.json` of a value lesson needs `"findings"` (a lesson of another kind
 cannot have it). Each item is a key of what the reader sees, without the message:
@@ -253,6 +253,54 @@ The text of a value lesson must have a note that starts with
 `> **Our extension:**`. Smithy defines no value validation, and no Java
 reference exists for it. Level 1 checks the note. Level 2 compares only the
 model events.
+
+## Transcript lessons
+
+A transcript lesson steps through a JSON-RPC exchange against a protocol of the
+lesson model, as `smithy validate rpc transcript` does. `lesson.json` has
+`"transcript"` in place of `"output"`. A lesson has at most one of `output`,
+`value`, `transcript`, `message` and `diff`.
+
+```json
+"transcript": {"file": "exchange.json", "protocol": "example#WeatherProtocol"}
+```
+
+- `file` is a starting file in `files/`. It must end in `.json`: the editor
+  shows a JSON document. A Markdown transcript would need its own editor mode,
+  and a JSONL log needs a version and a preset, so the tour does not offer them.
+  A case can replace the file by name.
+- `protocol` is the absolute ID of the shape with the `jsonRpcProtocol` trait.
+- Other keys are an error. The file is a data file: it is not a model file.
+
+`expect.json` of a transcript lesson needs `"findings"`: the findings of a run
+to the end, as keys of the form `code|severity|entry|sender`. The severity is
+`error` or `advisory`. The entry is the entry number, or `-` for a finding with
+no entry. The sender is the peer name, or `-` for none. Examples:
+`MissingResponse|error|0|client` and `InvalidTranscript|error|-|-`. The check
+sorts the keys before it compares them. Two optional keys:
+
+- `"valid"` (`true` or `false`) is the verdict of the summary at the end.
+- `"steps"` is a list of `{"count": 1, "findings": []}`. Each item says which
+  findings a fresh check shows after Step is clicked `count` times from the
+  start. `count` is a whole number from 1. This is how a lesson claims that a
+  finding appears only when its entry is read.
+
+`valid` and `steps` in a lesson of another kind are an error.
+`output_contains` is checked against the lines that the CLI prints (the findings
+as `FindingView::cli_line`, then the expect lines), joined with a line break.
+A case whose model has an ERROR or a DANGER cannot name findings or output
+strings, because the check does not run.
+
+Level 1 runs each case on a fresh session: it starts the transcript with the
+model files and `format = Json`, steps to the end, and compares keys, `valid`,
+the steps and the output strings. A start that blocks fails the case with its
+reason. A transcript that is not valid JSON ends at the start with an
+`InvalidTranscript` finding.
+
+The text of a transcript lesson must have a note that starts with
+`> **Our extension:**`. Smithy defines no transcript check, and no Java
+reference exists for it. Level 1 checks the note. Level 2 compares only the
+model events of the model files.
 
 ## Static lessons
 
