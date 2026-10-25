@@ -93,6 +93,7 @@ pub(all) enum FindingCode {
   TypeMismatch
   RequiredMember
   UnknownMember
+  UnknownCriticalPath
   DuplicateMember
   InvalidNumber
   NumericBounds
@@ -114,6 +115,7 @@ pub fn FindingCode::to_string(self : FindingCode) -> String {
     TypeMismatch => "TypeMismatch"
     RequiredMember => "RequiredMember"
     UnknownMember => "UnknownMember"
+    UnknownCriticalPath => "UnknownCriticalPath"
     DuplicateMember => "DuplicateMember"
     InvalidNumber => "InvalidNumber"
     NumericBounds => "NumericBounds"

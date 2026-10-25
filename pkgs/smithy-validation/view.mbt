@@ -88,7 +88,7 @@ pub impl ValueView for Json with fn inspect(self) {
     Array(values) => Array(values)
     Object(fields) => {
       let names = fields.keys().to_array()
-      names.sort()
+      names.sort_by((a, b) => a.lexical_compare(b))
       Object(names.map(name => (name, fields.get(name).unwrap())))
     }
   }
@@ -104,7 +104,7 @@ pub impl ValueView for @smithy.NodeValue with fn inspect(self) {
     Array(values) => Array(values)
     Object(fields) => {
       let names = fields.keys().to_array()
-      names.sort()
+      names.sort_by((a, b) => a.lexical_compare(b))
       Object(names.map(name => (name, fields.get(name).unwrap())))
     }
   }

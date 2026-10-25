@@ -53,6 +53,8 @@ pub(all) enum TranscriptCode {
   CapabilityNotAdvertised
   /// A cancellation that names no active call (advisory).
   CancelInactiveCall
+  RefusalExpected
+  UnknownCallReference
 } derive(Eq, Debug)
 
 ///|
@@ -76,6 +78,8 @@ pub fn TranscriptCode::to_string(self : TranscriptCode) -> String {
     StateViolation => "StateViolation"
     CapabilityNotAdvertised => "CapabilityNotAdvertised"
     CancelInactiveCall => "CancelInactiveCall"
+    RefusalExpected => "RefusalExpected"
+    UnknownCallReference => "UnknownCallReference"
   }
 }
 

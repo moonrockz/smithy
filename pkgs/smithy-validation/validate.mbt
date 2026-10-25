@@ -12,6 +12,7 @@ priv struct Frame[V] {
   path : InstancePath
   depth : Int32
   nullable : Bool
+  critical : (@smithy.ShapeId, String)?
 }
 
 ///|
@@ -274,6 +275,7 @@ pub fn[V : ValueView] PreparedValidator::validate(
       path: base_path,
       depth: 0,
       nullable: false,
+      critical: None,
     },
   ]
   while stack.pop() is Some(frame) {
@@ -398,6 +400,16 @@ pub fn[V : ValueView] PreparedValidator::validate(
         )
       }
     }
+    if frame.critical is Some((enclosing, separator)) &&
+      node is String(text) &&
+      !self.critical_path_known(enclosing, text, separator, budget, frame.path) {
+      budget.emit(
+        UnknownCriticalPath,
+        frame.path,
+        frame.owner,
+        "I expected critical path \{text} to name declared structure members.",
+      )
+    }
     if !budget.complete {
       break
     }
@@ -418,6 +430,9 @@ pub fn[V : ValueView] PreparedValidator::validate(
           }
         })
         let nullable = shape.map(s => s.sparse).unwrap_or(false)
+        let critical = shape.bind(s => {
+          s.critical_separator.map(separator => (s.id.root(), separator))
+        })
         for i = values.length() - 1; i >= 0; i = i - 1 {
           stack.push({
             source: Original(values[i]),
@@ -426,6 +441,7 @@ pub fn[V : ValueView] PreparedValidator::validate(
             path: frame.path.child(Index(i)),
             depth: frame.depth + 1,
             nullable,
+            critical,
           })
         }
       }
@@ -537,6 +553,7 @@ pub fn[V : ValueView] PreparedValidator::validate(
             path,
             depth: frame.depth + 1,
             nullable: false,
+            critical: None,
           })
         }
         for i = located.length() - 1; i >= 0; i = i - 1 {
@@ -549,8 +566,7 @@ pub fn[V : ValueView] PreparedValidator::validate(
                 match shape.by_name.get(field.name) {
                   Some(member_) => expected = Some(member_.id)
                   None =>
-                    if self.config.unknown_members == Reject ||
-                      shape.body is Union(_) {
+                    if shape.unknown_members == Reject || shape.body is Union(_) {
                       budget.emit(
                         UnknownMember,
                         path,
@@ -569,6 +585,7 @@ pub fn[V : ValueView] PreparedValidator::validate(
                   path: frame.path.child(MapKey(field.name, occurrence)),
                   depth: frame.depth + 1,
                   nullable: false,
+                  critical: None,
                 })
               }
               _ => ()
@@ -581,6 +598,7 @@ pub fn[V : ValueView] PreparedValidator::validate(
             path,
             depth: frame.depth + 1,
             nullable,
+            critical: None,
           })
         }
       }

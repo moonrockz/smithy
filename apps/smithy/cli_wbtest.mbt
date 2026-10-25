@@ -997,3 +997,26 @@ test "a log matches --expect at the end and the status follows the match" {
   }
   assert_false(fields.contains("expectations"))
 }
+
+///|
+test "transcript accepts the unknown member policy" {
+  let opts = options([
+    "validate", "rpc", "transcript", "--protocol", "example#Link", "--unknown-members",
+    "ignore", "model.smithy", "log.json",
+  ])
+  assert_eq(
+    opts.value_validation.unwrap().config.unknown_members,
+    @validation.Ignore,
+  )
+  let status = try
+    options([
+      "validate", "rpc", "transcript", "--protocol", "example#Link", "--unknown-members",
+      "other", "model.smithy", "log.json",
+    ])
+  catch {
+    CliError(_, status) => status
+  } noraise {
+    _ => 0
+  }
+  assert_eq(status, 2)
+}

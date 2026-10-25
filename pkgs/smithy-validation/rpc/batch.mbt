@@ -576,7 +576,8 @@ pub fn PreparedService::validate_response_batch_json(
     }
   }
   for call in original_calls {
-    if !used.contains(call.index) {
+    if !used.contains(call.index) &&
+      !call.request.findings.iter().any(f => f.code == NotificationExpected) {
       report.emit(
         MissingResponse,
         root,

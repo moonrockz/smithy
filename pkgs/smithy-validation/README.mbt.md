@@ -121,7 +121,7 @@ continues to check model definitions. Stdin may appear once across model and val
 
 | Concern | Default and explicit choices |
 |---|---|
-| Unknown structure fields | Reject; `unknown_members=Ignore` or CLI `--unknown-members ignore` permits them. Unknown union alternatives always fail. |
+| Unknown structure fields | Reject by default. `@smithy.rpc#unknownMembers("ignore")` on a structure overrides the config or CLI policy. Unknown union alternatives always fail. |
 | Member names | Smithy names; `member_names=JsonName` or CLI `--member-names json` uses `jsonName`. Preparation rejects collisions. |
 | Null | Distinct from absence. Optional members may be absent but must match their target when present. Document and sparse list/map values permit null. |
 | Defaults/coercion | No mutation, default insertion or string-to-number coercion. Defaults do not excuse an absent required member. |
@@ -252,3 +252,25 @@ remain outside this library's dependency graph.
 Run `mise run test:validation-consumer` to audit resolved packaged dependencies and run an isolated
 example on all four targets. See [design](DESIGN.md) and the
 [shared RPC contract](JSON_RPC_DESIGN.md).
+
+## Model member policies
+
+The `smithy.rpc` trait bundle defines `@unknownMembers("reject" | "ignore")`
+for services and structures. A structure trait overrides the service policy.
+The service policy overrides `Config::new(unknown_members=...)` and the CLI flag.
+Value validation uses the structure policy and the config only. The RPC loader
+supplies the trait definitions. Other loaders can use `@rpc.trait_definitions()`
+as a built-in source. The value validator has no dependency on the RPC package.
+
+`@criticalPaths(separator: ".")` applies to a structure member with a list-of-string
+target. Each string must name a declared member path from that structure.
+The path uses the selected member name policy. A member can be absent in the
+value. Paths can pass through nested structures, including recursive structures.
+They cannot pass through lists, maps, unions, or scalar values. An unknown or empty
+path gives `UnknownCriticalPath` at the list element. Unknown fields that no
+critical path names follow the unknown member policy. The work limit also bounds
+critical path checks.
+
+`PreparedValidator::config()` returns the preparation config.
+`unknown_members(target)` returns the effective policy for a prepared target.
+`critical_paths(target)` returns the critical path separator for a prepared member.

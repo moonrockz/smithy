@@ -15,6 +15,8 @@ pub(all) struct MethodContract {
   operation : @smithy.ShapeId
   input : @smithy.ShapeId
   mode : ParameterMode
+  kind : MethodKind
+  refers_to_call : CallReferenceContract?
   positional : Array[@smithy.ShapeId]
   result : ResultSelection
   errors : Array[ErrorContract]
@@ -48,6 +50,12 @@ pub fn PreparedService::contracts(
       operation: method_.operation,
       input: method_.input,
       mode: method_.mode,
+      kind: method_.kind,
+      refers_to_call: method_.refers_to_call.map(rule => {
+        wire_name: rule.wire_name,
+        position: rule.position,
+        code: rule.code,
+      }),
       positional: method_.positional.copy(),
       result: method_.result,
       errors,

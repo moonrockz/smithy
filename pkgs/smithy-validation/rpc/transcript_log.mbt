@@ -44,13 +44,13 @@ pub(all) enum SenderSource {
 
 ///|
 /// A parsed JSON Pointer (RFC 6901).
-priv struct JsonPointer {
-  text : String
-  tokens : Array[String]
+pub struct JsonPointer {
+  priv text : String
+  priv tokens : Array[String]
 } derive(Eq, Debug)
 
 ///|
-fn JsonPointer::parse(
+pub fn JsonPointer::parse(
   text : String,
 ) -> JsonPointer raise @validation.ConfigurationError {
   let invalid = @validation.ConfigurationError(
@@ -78,6 +78,11 @@ fn JsonPointer::parse(
     })
     .collect()
   { text, tokens, }
+}
+
+///|
+pub fn JsonPointer::to_string(self : JsonPointer) -> String {
+  self.text
 }
 
 ///|

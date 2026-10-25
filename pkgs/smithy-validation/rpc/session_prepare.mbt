@@ -1,16 +1,21 @@
 ///|
 /// A session state named by `jsonRpcSession`. It follows the PeerName rule.
-priv struct StateName {
-  text : String
-} derive(Eq)
+pub struct StateName {
+  priv text : String
+} derive(Eq, Hash, Debug)
 
 ///|
-fn StateName::parse(text : String) -> StateName? {
+pub fn StateName::parse(text : String) -> StateName? {
   if is_protocol_name(text) {
     Some({ text, })
   } else {
     None
   }
+}
+
+///|
+pub fn StateName::to_string(self : StateName) -> String {
+  self.text
 }
 
 ///|
@@ -55,6 +60,8 @@ priv struct SessionRules {
   sources : Array[CapabilitySource]
   /// The rules of the methods each peer accepts, by receiving peer.
   methods : Map[PeerName, Map[MethodName, MethodRule]]
+  refusals : Map[StateName, ErrorCode]
+  capability_refusal : ErrorCode?
 }
 
 ///|
@@ -149,7 +156,76 @@ fn prepare_session(
     }
     methods[entry.name] = rules
   }
-  Some({ states, sources, methods, })
+  let refusals : Map[StateName, ErrorCode] = Map([])
+  let raw_refusals = match session.get("refusals") {
+    None => []
+    Some(Array(values)) => values
+    _ =>
+      raise InvalidContract(
+        protocol, "I expected jsonRpcSession refusals to be a list.",
+      )
+  }
+  for raw in raw_refusals {
+    let refusal = fields(Some(raw))
+    guard prepare_refusal_code(protocol, refusal.get("code"), "refusals")
+      is Some(code) else {
+      raise InvalidContract(
+        protocol, "I expected an integer jsonRpcSession refusal code.",
+      )
+    }
+    guard refusal.get("states") is Some(Array(values)) && !values.is_empty() else {
+      raise InvalidContract(
+        protocol, "I expected jsonRpcSession refusal states.",
+      )
+    }
+    for value in values {
+      guard value is String(name) &&
+        StateName::parse(name) is Some(state) &&
+        states.contains(state) else {
+        raise InvalidContract(
+          protocol, "I expected each jsonRpcSession refusal state to name a session state.",
+        )
+      }
+      if refusals.contains(state) {
+        raise InvalidContract(
+          protocol,
+          "I expected one jsonRpcSession refusal code for state \{name}.",
+        )
+      }
+      refusals[state] = code
+    }
+  }
+  let capability_refusal = prepare_refusal_code(
+    protocol,
+    session.get("capabilityRefusal"),
+    "capabilityRefusal",
+  )
+  Some({ states, sources, methods, refusals, capability_refusal, })
+}
+
+///|
+fn prepare_refusal_code(
+  id : @smithy.ShapeId,
+  value : @smithy.NodeValue?,
+  construct : String,
+) -> ErrorCode? raise PreparationError {
+  match value {
+    None => None
+    Some(Number(number)) =>
+      match ErrorCode::from_number(number) {
+        Some(code) => Some(code)
+        None =>
+          raise InvalidContract(
+            id,
+            "I expected an integer jsonRpcSession \{construct} code.",
+          )
+      }
+    _ =>
+      raise InvalidContract(
+        id,
+        "I expected an integer jsonRpcSession \{construct} code.",
+      )
+  }
 }
 
 ///|
@@ -238,6 +314,7 @@ fn prepare_cancel_rule(
   method_ : PreparedMethod,
   cancels : Map[String, @smithy.NodeValue],
   config : @validation.Config,
+  construct~ : String = "jsonRpcCancels",
 ) -> CancelRule raise PreparationError {
   let id = method_.operation
   let member_name = text(cancels.get("idMember")).unwrap_or("")
@@ -248,7 +325,7 @@ fn prepare_cancel_rule(
     model.shapes.get(member_id) is Some(member_) else {
     raise InvalidContract(
       id,
-      "I expected idMember to name an input member; I found \{member_name}.",
+      "I expected \{construct} idMember to name an input member; I found \{member_name}.",
     )
   }
   let wire_name = if config.member_names == @validation.JsonName {

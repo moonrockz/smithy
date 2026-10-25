@@ -21,7 +21,9 @@ fn next_rpc_code(code : FindingCode) -> FindingCode? {
     InvalidId => Some(DiscouragedId)
     DiscouragedId => Some(UnknownMethod)
     UnknownMethod => Some(InvalidParams)
-    InvalidParams => Some(UnsupportedMessage)
+    InvalidParams => Some(NotificationExpected)
+    NotificationExpected => Some(RequestExpected)
+    RequestExpected => Some(UnsupportedMessage)
     UnsupportedMessage => Some(MissingContext)
     MissingContext => Some(LimitedScope)
     LimitedScope => Some(InvalidContext)
@@ -57,7 +59,8 @@ fn next_value_code(code : @validation.FindingCode) -> @validation.FindingCode? {
     InvalidTimestamp => Some(UnsupportedValue)
     UnsupportedValue => Some(LimitExceeded)
     // An appended variant must be linked from this arm, and the snapshot test updated.
-    LimitExceeded => None
+    LimitExceeded => Some(UnknownCriticalPath)
+    UnknownCriticalPath => None
   }
 }
 
@@ -82,7 +85,9 @@ fn next_transcript_code(code : TranscriptCode) -> TranscriptCode? {
     StateViolation => Some(CapabilityNotAdvertised)
     CapabilityNotAdvertised => Some(CancelInactiveCall)
     // An appended variant must be linked from this arm, and the snapshot test updated.
-    CancelInactiveCall => None
+    CancelInactiveCall => Some(RefusalExpected)
+    RefusalExpected => Some(UnknownCallReference)
+    UnknownCallReference => None
     Message(_) => None
   }
 }

@@ -32,7 +32,20 @@ pub fn trait_definitions() -> String {
     #|  positional: MemberOrder
     #|  resultMember: String
     #|  nullResult: Boolean
+    #|  kind: MethodKind
     #|}
+    #|enum MethodKind {
+    #|  REQUEST = "request"
+    #|  NOTIFICATION = "notification"
+    #|  EITHER = "either"
+    #|}
+    #|@trait(selector: ":is(service, structure)")
+    #|enum unknownMembers {
+    #|  REJECT = "reject"
+    #|  IGNORE = "ignore"
+    #|}
+    #|@trait(selector: "structure > member")
+    #|structure criticalPaths { @required separator: String }
     #|@length(min: 1)
     #|string MethodName
     #|enum ParameterMode {
@@ -56,7 +69,11 @@ pub fn trait_definitions() -> String {
     #|structure jsonRpcSession {
     #|  @required states: StateNames
     #|  capabilities: CapabilitySources
+    #|  refusals: Refusals
+    #|  capabilityRefusal: Integer
     #|}
+    #|list Refusals { member: Refusal }
+    #|structure Refusal { @required states: StateNames, @required code: Integer }
     #|@length(min: 1)
     #|list StateNames { member: StateName }
     #|@pattern("^[A-Za-z][A-Za-z0-9_-]{0,63}$")
@@ -81,5 +98,7 @@ pub fn trait_definitions() -> String {
     #|  @required idMember: String
     #|  code: Integer
     #|}
+    #|@trait(selector: "operation")
+    #|structure jsonRpcRefersToCall { @required idMember: String }
   )
 }

@@ -40,6 +40,10 @@ fn transcript_command() -> @argparse.Command {
         about="JSON-RPC version: 1.0 or 2.0. Required when the transcript does not give it, and always for JSONL.",
       ),
       @argparse.OptionArg(
+        "unknown-members",
+        about="Unknown object member policy: reject or ignore; default reject. Service and structure traits override this policy.",
+      ),
+      @argparse.OptionArg(
         "input-format",
         about="Transcript format: json, markdown or jsonl; default from .json, .md, .jsonl or .ndjson, and jsonl for stdin.",
       ),

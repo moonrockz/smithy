@@ -302,7 +302,7 @@ test "only initialize describe ping and exit before initialization" {
     entry("host", call(3, "describe")),
     entry("host", call(4, "ping")),
     entry("host", call(5, "initialize", params="{\"host\": \"h\"}")),
-    // The rejected shutdown succeeds, but it moves the session nowhere.
+    // This invalid success reply causes no session transition.
     entry("extension", success(2, "null")),
     entry("extension", success(3, "\"compiler\"")),
     entry("extension", success(4, "null")),
@@ -314,8 +314,8 @@ test "only initialize describe ping and exit before initialization" {
     entry("host", call(9, "initialize", params="{\"host\": \"h\"}")),
   ])
   assert_eq(summary_of(found), [
-    "StateViolation@0[]", "StateViolation@1[]", "StateViolation@2[]", "StateViolation@10[9]",
-    "StateViolation@14[12]",
+    "StateViolation@0[]", "StateViolation@1[]", "StateViolation@2[]", "RefusalExpected@6[1]",
+    "StateViolation@10[9]", "StateViolation@14[12]",
   ])
   assert_eq(found[0].severity, @validation.Error)
   assert_eq(found[0].sender, Some(peer("host")))
@@ -324,11 +324,11 @@ test "only initialize describe ping and exit before initialization" {
     "I expected method compile only in state ready; entry 0 from host sent it in state starting.",
   )
   assert_eq(
-    found[3].message,
+    found[4].message,
     "I expected method compile only in state ready; entry 10 from host sent it in state initializing.",
   )
   assert_eq(
-    found[4].message,
+    found[5].message,
     "I expected method initialize only in state starting; entry 14 from host sent it in state ready.",
   )
   // Rejected calls are still correlated.
@@ -643,8 +643,8 @@ test "editor initialize first and shutdown then exit" {
   ]
   let (found, _) = run_all(ordered_editor(), transcript, Partial)
   assert_eq(summary_of(found), [
-    "StateViolation@0[]", "StateViolation@1[]", "ActiveIdReused@4[1]", "StateViolation@10[9]",
-    "StateViolation@12[11]",
+    "StateViolation@0[]", "StateViolation@1[]", "ActiveIdReused@4[1]", "RefusalExpected@5[1]",
+    "StateViolation@10[9]", "StateViolation@12[11]",
   ])
   assert_eq(found[1].sender, Some(peer("server")))
   // Editor has no session, so the same transcript has no order findings.

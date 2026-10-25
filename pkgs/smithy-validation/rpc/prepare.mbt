@@ -5,6 +5,8 @@ priv struct PreparedMethod {
   positional : Array[@smithy.ShapeId]
   validator : @validation.PreparedValidator
   mode : ParameterMode
+  kind : MethodKind
+  refers_to_call : CancelRule?
   order : Array[String]
   result : ResultSelection
   result_validator : @validation.PreparedValidator?
@@ -27,6 +29,7 @@ pub struct PreparedService {
   priv methods : Map[MethodName, PreparedMethod]
   priv document : @validation.PreparedValidator
   priv finding_limit : Int32
+  priv config : @validation.Config
 }
 
 ///|
@@ -64,6 +67,7 @@ pub fn PreparedService::prepare(
   guard model.shapes.get(service) is Some(root) && root.body is Service(..) else {
     raise InvalidContract(service, "I expected an existing service shape.")
   }
+  let config = service_config(root, config)
   let profile = fields(root.trait_value("smithy.rpc#jsonRpc"))
   guard profile.get("versions") is Some(Array(versions)) && !versions.is_empty() else {
     raise InvalidContract(
@@ -149,6 +153,15 @@ pub fn PreparedService::prepare(
           _ =>
             raise InvalidContract(
               id, "I expected named, positional or either parameter mode.",
+            )
+        }
+        let kind = match contract.get("kind") {
+          None | Some(String("either")) => RequestOrNotification
+          Some(String("request")) => RequestOnly
+          Some(String("notification")) => NotificationOnly
+          _ =>
+            raise InvalidContract(
+              id, "I expected method kind request, notification or either.",
             )
         }
         if declared.contains(V1_0) && mode == Named {
@@ -314,7 +327,7 @@ pub fn PreparedService::prepare(
             },
           })
         }
-        methods[name] = {
+        let prepared : PreparedMethod = {
           operation: id,
           input,
           positional,
@@ -324,11 +337,28 @@ pub fn PreparedService::prepare(
             config~,
           ),
           mode,
+          kind,
+          refers_to_call: None,
           order,
           result,
           result_validator,
           errors: prepared_errors,
         }
+        let refers_to_call = match
+          shape.trait_value("smithy.rpc#jsonRpcRefersToCall") {
+          None => None
+          Some(value) =>
+            Some(
+              prepare_cancel_rule(
+                model,
+                prepared,
+                fields(Some(value)),
+                config,
+                construct="jsonRpcRefersToCall",
+              ),
+            )
+        }
+        methods[name] = { ..prepared, refers_to_call, }
       }
       _ =>
         invalid(
@@ -341,6 +371,7 @@ pub fn PreparedService::prepare(
     version,
     methods,
     finding_limit: config.limits.findings,
+    config,
     document: @validation.PreparedValidator::prepare(
       model,
       @smithy.ShapeId::parse("smithy.api#Document").unwrap(),
