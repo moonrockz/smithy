@@ -1,0 +1,1 @@
+{"slug": "morphir-sdk", "title": "Describing Basics and String", "section": "Case study: a DSL for the Morphir IR", "output": "Selector", "selector": "service[trait|morphir.dsl#sdkModule] ~> operation", "spec": "https://smithy.io/2.0/spec/service-types.html#operation"}

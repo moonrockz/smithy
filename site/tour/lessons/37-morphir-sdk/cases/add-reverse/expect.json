@@ -1,0 +1,1 @@
+{"events": [], "output_contains": ["morphir.sdk.basics#Add\nmorphir.sdk.basics#And\nmorphir.sdk.basics#Negate\nmorphir.sdk.string#Append\nmorphir.sdk.string#IsEmpty\nmorphir.sdk.string#Length\nmorphir.sdk.string#Reverse\n"]}

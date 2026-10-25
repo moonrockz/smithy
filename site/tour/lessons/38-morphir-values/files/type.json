@@ -1,0 +1,9 @@
+{
+  "Record": {
+    "fields": {
+      "product": {"Reference": {"fqname": "morphir/reference/model:books-and-records#product-ID"}},
+      "price": {"Reference": {"fqname": "morphir/reference/model:books-and-records#price"}},
+      "quantity": {"Reference": {"fqname": "morphir/reference/model:books-and-records#quantity"}}
+    }
+  }
+}

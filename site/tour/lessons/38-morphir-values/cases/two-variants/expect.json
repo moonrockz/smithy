@@ -1,0 +1,1 @@
+{"events": [], "findings": ["UnionMember|error||morphir.ir.v4#Type"], "output_contains": ["I expected exactly one union member."]}

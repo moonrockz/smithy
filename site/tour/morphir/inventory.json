@@ -1,0 +1,46 @@
+{
+  "repository": "https://github.com/finos/morphir",
+  "commit": "ab8d5c9198c0f1ac8a3cabfd11b9ab59a468c409",
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "8dada3edaf50dbc082c9a125058f25def75e625a"
+    },
+    {
+      "path": "NOTICE",
+      "gitBlob": "ad14fb052bf0121ee088f7f0f12d178ba3249da1"
+    },
+    {
+      "path": "docs/spec/ir/fixtures/naming-conformance.json",
+      "gitBlob": "5ebb77fb90d5a46d36454056ca9259e8606df72b"
+    },
+    {
+      "path": "spec/ir/mck/names.feature",
+      "gitBlob": "c5d209dbb748bf96be065607a60117117e011131"
+    },
+    {
+      "path": "spec/ir/mck/types.feature",
+      "gitBlob": "58b0d68bfe343a1bdc74e6e460b0ff1120f79004"
+    },
+    {
+      "path": "website/static/ir/examples/v3/greeting-example.json",
+      "gitBlob": "3233304dcec5303efbc3d1168514e7dffe787723"
+    },
+    {
+      "path": "website/static/ir/examples/v4/books-and-records-example.json",
+      "gitBlob": "4549775bf28d38faad48153de6c3ca399c69b1e7"
+    },
+    {
+      "path": "website/static/ir/examples/v4/complete-example.json",
+      "gitBlob": "e5285a0c2369c0d51a6368274a3920e71f9797c9"
+    },
+    {
+      "path": "website/static/ir/examples/v4/index.json",
+      "gitBlob": "5d1a5e1c94c108ae4b2b900effe8e8ddeda39acb"
+    },
+    {
+      "path": "website/static/schemas/morphir-ir-v4.json",
+      "gitBlob": "c4cf98f59a2fd9ae121a451d8dc805301fcfea9d"
+    }
+  ]
+}

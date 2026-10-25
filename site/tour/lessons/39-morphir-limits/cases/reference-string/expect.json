@@ -1,0 +1,1 @@
+{"events": [], "findings": ["TypeMismatch|error|/Reference|morphir.ir.v4#Type$Reference"], "output_contains": ["I expected a structure value, but found string."]}

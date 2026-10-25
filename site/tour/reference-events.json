@@ -2502,6 +2502,673 @@
             ],
             "digest": "2f18b366b7f2291bf48fcd2f5117a17a5e76798bbc4fdb3945c55c8ad82776d6",
             "events": []
+        },
+        "34-morphir-ir-types/loop": {
+            "digest": "f959dba69bd492c6511b1e6f037966b5bb0639706885c93a0291253bdfa0bfc7",
+            "events": [
+                "ShapeRecursion|ERROR|morphir.ir.v4#Loop"
+            ]
+        },
+        "34-morphir-ir-types/loop-optional": {
+            "digest": "ffb1f8b13b9f1857c9424b86402b6ec70fb7f1974f1f501a6b4ab917a9c006b2",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "ExtensibleRecordType": {
+                        "properties": {
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            },
+                            "fields": {
+                                "$ref": "#/definitions/FieldMap"
+                            },
+                            "variable": {
+                                "description": "A name: segments joined by \"-\". A segment is all lowercase (a word) or\nall uppercase (an initialism). NameString in morphir-ir-v4.yaml.",
+                                "pattern": "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "fields",
+                            "variable"
+                        ],
+                        "type": "object"
+                    },
+                    "FieldMap": {
+                        "additionalProperties": {
+                            "$ref": "#/definitions/Type"
+                        },
+                        "description": "Field names to field types.",
+                        "propertyNames": {
+                            "description": "A name: segments joined by \"-\". A segment is all lowercase (a word) or\nall uppercase (an initialism). NameString in morphir-ir-v4.yaml.",
+                            "pattern": "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$",
+                            "type": "string"
+                        },
+                        "type": "object"
+                    },
+                    "FunctionType": {
+                        "properties": {
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            },
+                            "parameterType": {
+                                "$ref": "#/definitions/Type"
+                            },
+                            "returnType": {
+                                "$ref": "#/definitions/Type"
+                            }
+                        },
+                        "required": [
+                            "parameterType",
+                            "returnType"
+                        ],
+                        "type": "object"
+                    },
+                    "JsonObject": {
+                        "additionalProperties": {},
+                        "description": "Any JSON object. The schema gives these members only \"type: object\".",
+                        "propertyNames": {
+                            "type": "string"
+                        },
+                        "type": "object"
+                    },
+                    "Loop": {
+                        "properties": {
+                            "next": {
+                                "$ref": "#/definitions/Loop"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "RecordType": {
+                        "properties": {
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            },
+                            "fields": {
+                                "$ref": "#/definitions/FieldMap"
+                            }
+                        },
+                        "required": [
+                            "fields"
+                        ],
+                        "type": "object"
+                    },
+                    "ReferenceType": {
+                        "properties": {
+                            "args": {
+                                "items": {
+                                    "$ref": "#/definitions/Type"
+                                },
+                                "type": "array"
+                            },
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            },
+                            "fqname": {
+                                "description": "\"package:module#name\", such as \"morphir/SDK:basics#int\".\nFQNameString in morphir-ir-v4.yaml.",
+                                "pattern": "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*:([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*#([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "fqname"
+                        ],
+                        "type": "object"
+                    },
+                    "SourceLocation": {
+                        "properties": {
+                            "endColumn": {
+                                "type": "number"
+                            },
+                            "endLine": {
+                                "type": "number"
+                            },
+                            "startColumn": {
+                                "type": "number"
+                            },
+                            "startLine": {
+                                "type": "number"
+                            }
+                        },
+                        "required": [
+                            "endColumn",
+                            "endLine",
+                            "startColumn",
+                            "startLine"
+                        ],
+                        "type": "object"
+                    },
+                    "TupleType": {
+                        "properties": {
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            },
+                            "elements": {
+                                "items": {
+                                    "$ref": "#/definitions/Type"
+                                },
+                                "type": "array"
+                            }
+                        },
+                        "required": [
+                            "elements"
+                        ],
+                        "type": "object"
+                    },
+                    "Type": {
+                        "description": "A type expression. Each member is one variant of the tagged union.",
+                        "oneOf": [
+                            {
+                                "properties": {
+                                    "Variable": {
+                                        "$ref": "#/definitions/VariableType"
+                                    }
+                                },
+                                "required": [
+                                    "Variable"
+                                ],
+                                "title": "Variable",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "Reference": {
+                                        "$ref": "#/definitions/ReferenceType"
+                                    }
+                                },
+                                "required": [
+                                    "Reference"
+                                ],
+                                "title": "Reference",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "Tuple": {
+                                        "$ref": "#/definitions/TupleType"
+                                    }
+                                },
+                                "required": [
+                                    "Tuple"
+                                ],
+                                "title": "Tuple",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "Record": {
+                                        "$ref": "#/definitions/RecordType"
+                                    }
+                                },
+                                "required": [
+                                    "Record"
+                                ],
+                                "title": "Record",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "ExtensibleRecord": {
+                                        "$ref": "#/definitions/ExtensibleRecordType"
+                                    }
+                                },
+                                "required": [
+                                    "ExtensibleRecord"
+                                ],
+                                "title": "ExtensibleRecord",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "Function": {
+                                        "$ref": "#/definitions/FunctionType"
+                                    }
+                                },
+                                "required": [
+                                    "Function"
+                                ],
+                                "title": "Function",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "Unit": {
+                                        "$ref": "#/definitions/UnitType"
+                                    }
+                                },
+                                "required": [
+                                    "Unit"
+                                ],
+                                "title": "Unit",
+                                "type": "object"
+                            }
+                        ]
+                    },
+                    "TypeAttributes": {
+                        "properties": {
+                            "constraints": {
+                                "$ref": "#/definitions/JsonObject"
+                            },
+                            "extensions": {
+                                "$ref": "#/definitions/JsonObject"
+                            },
+                            "source": {
+                                "$ref": "#/definitions/SourceLocation"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "UnitType": {
+                        "properties": {
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "VariableType": {
+                        "properties": {
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            },
+                            "name": {
+                                "description": "A name: segments joined by \"-\". A segment is all lowercase (a word) or\nall uppercase (an initialism). NameString in morphir-ir-v4.yaml.",
+                                "pattern": "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name"
+                        ],
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "34-morphir-ir-types/start": {
+            "digest": "2a35ed333fa54cd1fb064cf7ca61efef9186458695b615aee4b8bc269c66f37f",
+            "events": [],
+            "json_schema": {
+                "definitions": {
+                    "ExtensibleRecordType": {
+                        "properties": {
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            },
+                            "fields": {
+                                "$ref": "#/definitions/FieldMap"
+                            },
+                            "variable": {
+                                "description": "A name: segments joined by \"-\". A segment is all lowercase (a word) or\nall uppercase (an initialism). NameString in morphir-ir-v4.yaml.",
+                                "pattern": "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "fields",
+                            "variable"
+                        ],
+                        "type": "object"
+                    },
+                    "FieldMap": {
+                        "additionalProperties": {
+                            "$ref": "#/definitions/Type"
+                        },
+                        "description": "Field names to field types.",
+                        "propertyNames": {
+                            "description": "A name: segments joined by \"-\". A segment is all lowercase (a word) or\nall uppercase (an initialism). NameString in morphir-ir-v4.yaml.",
+                            "pattern": "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$",
+                            "type": "string"
+                        },
+                        "type": "object"
+                    },
+                    "FunctionType": {
+                        "properties": {
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            },
+                            "parameterType": {
+                                "$ref": "#/definitions/Type"
+                            },
+                            "returnType": {
+                                "$ref": "#/definitions/Type"
+                            }
+                        },
+                        "required": [
+                            "parameterType",
+                            "returnType"
+                        ],
+                        "type": "object"
+                    },
+                    "JsonObject": {
+                        "additionalProperties": {},
+                        "description": "Any JSON object. The schema gives these members only \"type: object\".",
+                        "propertyNames": {
+                            "type": "string"
+                        },
+                        "type": "object"
+                    },
+                    "RecordType": {
+                        "properties": {
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            },
+                            "fields": {
+                                "$ref": "#/definitions/FieldMap"
+                            }
+                        },
+                        "required": [
+                            "fields"
+                        ],
+                        "type": "object"
+                    },
+                    "ReferenceType": {
+                        "properties": {
+                            "args": {
+                                "items": {
+                                    "$ref": "#/definitions/Type"
+                                },
+                                "type": "array"
+                            },
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            },
+                            "fqname": {
+                                "description": "\"package:module#name\", such as \"morphir/SDK:basics#int\".\nFQNameString in morphir-ir-v4.yaml.",
+                                "pattern": "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*:([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*#([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "fqname"
+                        ],
+                        "type": "object"
+                    },
+                    "SourceLocation": {
+                        "properties": {
+                            "endColumn": {
+                                "type": "number"
+                            },
+                            "endLine": {
+                                "type": "number"
+                            },
+                            "startColumn": {
+                                "type": "number"
+                            },
+                            "startLine": {
+                                "type": "number"
+                            }
+                        },
+                        "required": [
+                            "endColumn",
+                            "endLine",
+                            "startColumn",
+                            "startLine"
+                        ],
+                        "type": "object"
+                    },
+                    "TupleType": {
+                        "properties": {
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            },
+                            "elements": {
+                                "items": {
+                                    "$ref": "#/definitions/Type"
+                                },
+                                "type": "array"
+                            }
+                        },
+                        "required": [
+                            "elements"
+                        ],
+                        "type": "object"
+                    },
+                    "Type": {
+                        "description": "A type expression. Each member is one variant of the tagged union.",
+                        "oneOf": [
+                            {
+                                "properties": {
+                                    "Variable": {
+                                        "$ref": "#/definitions/VariableType"
+                                    }
+                                },
+                                "required": [
+                                    "Variable"
+                                ],
+                                "title": "Variable",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "Reference": {
+                                        "$ref": "#/definitions/ReferenceType"
+                                    }
+                                },
+                                "required": [
+                                    "Reference"
+                                ],
+                                "title": "Reference",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "Tuple": {
+                                        "$ref": "#/definitions/TupleType"
+                                    }
+                                },
+                                "required": [
+                                    "Tuple"
+                                ],
+                                "title": "Tuple",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "Record": {
+                                        "$ref": "#/definitions/RecordType"
+                                    }
+                                },
+                                "required": [
+                                    "Record"
+                                ],
+                                "title": "Record",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "ExtensibleRecord": {
+                                        "$ref": "#/definitions/ExtensibleRecordType"
+                                    }
+                                },
+                                "required": [
+                                    "ExtensibleRecord"
+                                ],
+                                "title": "ExtensibleRecord",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "Function": {
+                                        "$ref": "#/definitions/FunctionType"
+                                    }
+                                },
+                                "required": [
+                                    "Function"
+                                ],
+                                "title": "Function",
+                                "type": "object"
+                            },
+                            {
+                                "properties": {
+                                    "Unit": {
+                                        "$ref": "#/definitions/UnitType"
+                                    }
+                                },
+                                "required": [
+                                    "Unit"
+                                ],
+                                "title": "Unit",
+                                "type": "object"
+                            }
+                        ]
+                    },
+                    "TypeAttributes": {
+                        "properties": {
+                            "constraints": {
+                                "$ref": "#/definitions/JsonObject"
+                            },
+                            "extensions": {
+                                "$ref": "#/definitions/JsonObject"
+                            },
+                            "source": {
+                                "$ref": "#/definitions/SourceLocation"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "UnitType": {
+                        "properties": {
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "VariableType": {
+                        "properties": {
+                            "attributes": {
+                                "$ref": "#/definitions/TypeAttributes"
+                            },
+                            "name": {
+                                "description": "A name: segments joined by \"-\". A segment is all lowercase (a word) or\nall uppercase (an initialism). NameString in morphir-ir-v4.yaml.",
+                                "pattern": "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name"
+                        ],
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "35-morphir-names/legacy-array": {
+            "digest": "ef16bfbcf9f815c5b836d3849ace21ab1cb3e8fde50bbd64ff2fcfdd1dd3c932",
+            "events": []
+        },
+        "35-morphir-names/long": {
+            "digest": "6d161e7649e1d2d1b0ff38c1f68ed87a652df3837b4e7bda31c43772bf7230d8",
+            "events": []
+        },
+        "35-morphir-names/lowercase-sdk": {
+            "digest": "a595601eea68c20a35d803cbfc32f3513bd1ac67a81d7c4f7810017a558159d5",
+            "events": []
+        },
+        "35-morphir-names/mixed-case": {
+            "digest": "49c920b8e8cb5e08c145fa90c285b48742957578c46a439aa07df56b9a1b309e",
+            "events": []
+        },
+        "35-morphir-names/start": {
+            "digest": "47f7f82dd85348cd4baf45f3f763654403b58bd7218df3adcffa0b2b363d79dc",
+            "events": []
+        },
+        "36-morphir-vocabulary/start": {
+            "digest": "7d6282d2bf732b02afbfcc07acb6656e0997bc16c69d7d95d2639d555b268df6",
+            "events": []
+        },
+        "36-morphir-vocabulary/wrong-target": {
+            "digest": "0c1f61514b054177263dfd37224782444a5989402dfc449e5b61abce4811ad2d",
+            "events": [
+                "TraitTarget|ERROR|morphir.sdk.basics#Basics"
+            ]
+        },
+        "36-morphir-vocabulary/wrong-value": {
+            "digest": "44d1433538a9899f4213790063bf83199df47f2dcdb508736a976cce1532124a",
+            "events": [
+                "TraitValue|ERROR|morphir.sdk.basics#Add"
+            ]
+        },
+        "36-morphir-vocabulary/wrong-variable": {
+            "digest": "756c75fbc321f0ef6881a39d15b6c7326d171ec6c7ba896f0486e44a85bd1ddf",
+            "events": [
+                "TraitValue|ERROR|morphir.sdk.basics#AddInput$a"
+            ]
+        },
+        "37-morphir-sdk/add-reverse": {
+            "digest": "4458490c53bccecab75fdb284cf12c6941824504d0edc1818110cce180bd50fa",
+            "events": [],
+            "selector": [
+                "morphir.sdk.basics#Add",
+                "morphir.sdk.basics#And",
+                "morphir.sdk.basics#Negate",
+                "morphir.sdk.string#Append",
+                "morphir.sdk.string#IsEmpty",
+                "morphir.sdk.string#Length",
+                "morphir.sdk.string#Reverse"
+            ]
+        },
+        "37-morphir-sdk/start": {
+            "digest": "a08d4e974d95d40406fad3c32ca8e7c8c3ceeb1568c0b262e42ed6bd5a42e1df",
+            "events": [],
+            "selector": [
+                "morphir.sdk.basics#Add",
+                "morphir.sdk.basics#And",
+                "morphir.sdk.basics#Negate",
+                "morphir.sdk.string#Append",
+                "morphir.sdk.string#IsEmpty",
+                "morphir.sdk.string#Length"
+            ]
+        },
+        "38-morphir-values/constraints-number": {
+            "digest": "92f0e2dcc708a6ed69eb175fe1cb766ec45136e4f21ad8d6e6c3444dc13b765b",
+            "events": []
+        },
+        "38-morphir-values/curried-add": {
+            "digest": "d173227c3e223dd891a71ac34e107dc42d00271020ffa44ad71c36d7263f77e8",
+            "events": []
+        },
+        "38-morphir-values/field-name": {
+            "digest": "3e01379e7380c8ea4e54920279704822c6cf4b2da94342b97eacb6caa2e4b8ce",
+            "events": []
+        },
+        "38-morphir-values/legacy-attrs": {
+            "digest": "72d929aa64b00a515fb46eb517f4053f8b77a77a5855b067fe3febc25852832d",
+            "events": []
+        },
+        "38-morphir-values/start": {
+            "digest": "d12c002a285b4cd0517ae843f8c4495e19d66945effbb942e1ec135994a8dc8d",
+            "events": []
+        },
+        "38-morphir-values/two-variants": {
+            "digest": "c63a51ca20b6070ba46a6a6621d243e38bfa87e8ca48f2f5d4a8c9cf0909a88c",
+            "events": []
+        },
+        "39-morphir-limits/legacy-name": {
+            "digest": "0cc5920b0029a055e589f33caf91f9929cf4c8a64f47a4918d36f1f659553248",
+            "events": []
+        },
+        "39-morphir-limits/reference-args": {
+            "digest": "b61a82c337795516a9df75c14cf68eaf5b1974978bffffc3b6e29a90cb43d408",
+            "events": []
+        },
+        "39-morphir-limits/reference-object": {
+            "digest": "160e7262fe46eb0f47070e8b763d0d972645079c89e5de9e062284e014368a92",
+            "events": []
+        },
+        "39-morphir-limits/reference-string": {
+            "digest": "53febe4527e1dc645274697ce39448d65aef97ef98a4255622317841683b9eb0",
+            "events": []
+        },
+        "39-morphir-limits/start": {
+            "digest": "b504c34138804b626a3c57fe1f34112bec73e3ca7269ebcc22ed24935c323a12",
+            "events": []
+        },
+        "39-morphir-limits/v3": {
+            "digest": "52813d9d49ce7622ddf426dd338e829613ee17c0c0602b3f26ee80989202a408",
+            "events": []
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"

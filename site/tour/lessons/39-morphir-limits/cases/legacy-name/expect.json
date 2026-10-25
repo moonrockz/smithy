@@ -1,0 +1,1 @@
+{"events": [], "findings": ["TypeMismatch|error|/Variable/name|morphir.ir.v4#VariableType$name"], "output_contains": ["I expected a string value, but found array."]}
