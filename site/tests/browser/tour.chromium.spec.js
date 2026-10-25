@@ -654,3 +654,43 @@ test("a message lesson shows the message findings, marks the changed line and re
   await expect(page.getByRole("button", { name: "Expand the output" })).toHaveAttribute("aria-pressed", "true");
   expect(page.errors).toEqual([]);
 });
+
+test("a diff lesson groups the files under Old and New, shows the diff and marks a new event", async ({ page }) => {
+  const header = '$version: "2"\n\nnamespace example\n\n';
+  const old = header + "structure Greeting {\n    name: String\n}\n";
+  await openEngineLesson(page, "Diff", [
+    { name: "old/model.smithy", text: old },
+    { name: "new/model.smithy", text: old + "\nstructure Coupon {}\n" },
+  ]);
+  const output = page.locator("#tour-output .cm-content");
+  await expect(page.getByRole("tab", { name: "Diff" })).toHaveAttribute("aria-selected", "true");
+  await expect(output).toContainText("AddedShape");
+  await expect(page.getByRole("button", { name: "Open in playground" })).toHaveCount(0);
+
+  // The tabs are under Old and New, without the folder in the name.
+  const oldGroup = page.getByRole("group", { name: "Old model" });
+  const newGroup = page.getByRole("group", { name: "New model" });
+  await expect(oldGroup).toContainText("Old");
+  await expect(newGroup.getByRole("tab", { name: "model.smithy" })).toBeVisible();
+
+  // Delete the member in the new model: an ERROR line comes and is marked as changed.
+  await newGroup.getByRole("tab", { name: "model.smithy" }).click();
+  const editor = page.locator("#tour-editor .cm-content");
+  await expect(editor).toContainText("structure Coupon");
+  await editor.locator(".cm-line", { hasText: "structure Greeting" }).click();
+  await page.keyboard.press("ControlOrMeta+Home");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type(header + "structure Greeting {}\n\nstructure Coupon {}\n");
+  await settled(page);
+  await expect(output).toContainText("[ERROR]");
+  await expect(page.locator("#tour-output .cm-line.tour-changed")).toContainText("[ERROR]");
+
+  // The Old file keeps its own text.
+  await oldGroup.getByRole("tab", { name: "model.smithy" }).click();
+  await expect(editor).toContainText("name: String");
+
+  // The expand buttons keep working in a diff lesson.
+  await page.getByRole("button", { name: "Expand the output" }).click();
+  await expect(page.getByRole("button", { name: "Expand the output" })).toHaveAttribute("aria-pressed", "true");
+  expect(page.errors).toEqual([]);
+});

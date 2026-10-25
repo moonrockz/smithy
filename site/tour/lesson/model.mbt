@@ -106,6 +106,13 @@ pub(all) enum Answer {
   )
   /// The result of the value check.
   DataChecked(valid~ : Bool, findings~ : Array[@core.DataFinding])
+  /// The result of the diff: the findings of each model, and the events, or
+  /// `None` when a model has errors.
+  Diffed(
+    old~ : Array[@core.Diagnostic],
+    new~ : Array[@core.Diagnostic],
+    events~ : Array[@core.DiffEvent]?
+  )
 } derive(Eq, Debug)
 
 ///|
@@ -182,6 +189,13 @@ pub(all) enum Effect {
     kind~ : @samples.MessageKind,
     options~ : @samples.ValueOptions
   )
+  /// Send the model files of the old and of the new model to the Worker for a
+  /// diff.
+  SendDiff(
+    seq~ : Int32,
+    old~ : Array[(String, String)],
+    new~ : Array[(String, String)]
+  )
   /// Send `msg` after `ms` milliseconds.
   Wait(ms~ : Int32, msg~ : Msg)
   /// Put this text, of the selected file `file`, in the model editor, in
@@ -221,6 +235,7 @@ pub(all) enum Kind {
   Transcribing
   CheckingValue
   CheckingMessage
+  Diffing
 } derive(Eq, Debug)
 
 ///|
@@ -392,8 +407,8 @@ fn model_pairs(model : Model) -> Array[(String, String)] {
 
 ///|
 /// The tab of a lesson that comes after Findings: the name of its output, or
-/// "Value findings" for a value lesson and "Message findings" for a message
-/// lesson. `None` when the lesson has no such tab.
+/// "Value findings" for a value lesson, "Message findings" for a message
+/// lesson and "Diff" for a diff lesson. `None` when the lesson has no such tab.
 pub fn output_label(
   engine : @model.Engine,
   output : @samples.Output?,
@@ -402,7 +417,8 @@ pub fn output_label(
     Model => output.map(output_name)
     Value(_) => Some("Value findings")
     Message(_) => Some("Message findings")
-    Diff | Transcript(_) | Static => None
+    Diff => Some("Diff")
+    Transcript(_) | Static => None
   }
 }
 
@@ -438,6 +454,23 @@ pub fn data_text(
   } else {
     findings.map(f => f.cli_line(file~)).join("\n")
   }
+}
+
+///|
+/// The text of the Diff pane when the models do not differ.
+pub let no_difference_text : String = "No differences."
+
+///|
+/// The text of the Diff pane when a model has errors: the models were not
+/// compared. `old_failed` and `new_failed` tell which model has them.
+pub fn diff_not_run_text(old_failed : Bool, new_failed : Bool) -> String {
+  let which = match (old_failed, new_failed) {
+    (true, false) => " because the old model has errors"
+    (false, true) => " because the new model has errors"
+    (true, true) => " because the old model and the new model have errors"
+    (false, false) => ""
+  }
+  "The models were not compared,\{which}. See the Findings tab."
 }
 
 ///|

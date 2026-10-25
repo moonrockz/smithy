@@ -84,8 +84,8 @@ fn reply_msg(text : String, newest : Int32) -> @lesson.Msg {
       )
     DataChecked(seq~, valid~, findings~) =>
       Answered(seq~, answer=DataChecked(valid~, findings~))
-    // The page sends no diff request.
-    Diffed(..) => mismatch
+    Diffed(seq~, old~, new~, events~, ..) =>
+      Answered(seq~, answer=Diffed(old~, new~, events~))
   }
 }
 
@@ -180,6 +180,7 @@ fn request_of(
           ),
         ),
       )
+    SendDiff(seq~, old~, new~) => Some((seq, DiffModels(seq~, old~, new~)))
     SendTranscriptStart(seq~, files~, protocol~, text~) =>
       Some(
         (
@@ -207,6 +208,7 @@ fn Runtime::run(self : Runtime, effect : @lesson.Effect) -> Unit {
     | SendTransform(..)
     | SendCheckValue(..)
     | SendCheckMessage(..)
+    | SendDiff(..)
     | SendTranscriptStart(..)
     | SendTranscriptStep(..) =>
       match request_of(self.page, effect) {

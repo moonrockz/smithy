@@ -111,7 +111,8 @@ test "each output has a tab name" {
   assert_eq(output_label(Model, Some(Selector)), Some("Selector"))
   assert_eq(output_label(Model, Some(Idl)), Some("IDL (flattened)"))
   assert_eq(output_label(Model, None), None)
-  assert_eq(output_label(Diff, None), None)
+  assert_eq(output_label(Diff, None), Some("Diff"))
+  assert_eq(output_label(Static, None), None)
   let setup : @model.ValueSetup = {
     file: "order.json",
     shape: "example#Order",
@@ -221,6 +222,45 @@ async test "a message lesson has the tab Message findings and keeps the expand b
     button_tag(html, "Message findings").contains("aria-selected=\"true\""),
   )
   assert_false(html.contains("Value findings"))
+  assert_false(html.contains("Open in playground"))
+  assert_true(expand_tag(html, "Expand the output") != "")
+  assert_true(expand_tag(html, "Expand the editor") != "")
+}
+
+///|
+#cfg(not(target="js"))
+async test "the file tabs are grouped under Old and New, and each tab shows the name without its prefix" {
+  let (m, _) = Model::start(diff_page(), None)
+  let html = render(m)
+  assert_true(html.contains(">Old</span>"))
+  assert_true(html.contains(">New</span>"))
+  assert_eq(html.split("class=\"tour-group\"").count() - 1, 2)
+  assert_true(
+    html.find(">Old</span>").unwrap() < html.find(">New</span>").unwrap(),
+  )
+  assert_eq(html.split(">model.smithy</button>").count() - 1, 2)
+  assert_false(html.contains(">old/model.smithy"))
+  assert_false(html.contains(">new/model.smithy"))
+  // The first tab of the old group is selected; the new one is not.
+  let first = html.find(">model.smithy</button>").unwrap()
+  assert_true(html[:first].rev_find("aria-selected=\"true\"") is Some(_))
+  let (m, _) = update(m, SelectFile(1))
+  let html = render(m)
+  let second = html.rev_find(">model.smithy</button>").unwrap()
+  assert_true(html[:second].rev_find("aria-selected=\"true\"") is Some(_))
+  // A model lesson has no groups.
+  let (m, _) = Model::start(two_file_page(), None)
+  assert_false(render(m).contains("tour-group"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "a diff lesson has the tabs Findings and Diff and keeps the expand buttons" {
+  let (m, _) = Model::start(diff_page(), None)
+  let html = render(m)
+  assert_true(html.contains(">Findings"))
+  assert_true(html.contains(">Diff</button>"))
+  assert_true(button_tag(html, "Diff").contains("aria-selected=\"true\""))
   assert_false(html.contains("Open in playground"))
   assert_true(expand_tag(html, "Expand the output") != "")
   assert_true(expand_tag(html, "Expand the editor") != "")

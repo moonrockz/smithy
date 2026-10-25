@@ -1281,6 +1281,212 @@ test "the second timeout of a message check shows the timeout text" {
 }
 
 ///|
+let new_text : String = "$version: \"2\"\n\nnamespace example\n\nstructure Greeting {}\n\nstructure Coupon {}\n"
+
+///|
+/// A diff lesson: the old and the new model in their folders.
+fn diff_page() -> @model.LessonPage {
+  let files : Array[@model.LessonFile] = [
+    { name: "old/model.smithy", text: start_text, },
+    { name: "new/model.smithy", text: new_text, },
+  ]
+  {
+    ..page(),
+    engine: Diff,
+    output: None,
+    files,
+    digest: @model.digest(files),
+    playground: None,
+  }
+}
+
+///|
+fn added_coupon() -> @core.DiffEvent {
+  {
+    id: "AddedShape",
+    severity: "NOTE",
+    shape: Some("example#Coupon"),
+    message: "Added structure `example#Coupon`",
+  }
+}
+
+///|
+fn removed_greeting() -> @core.DiffEvent {
+  {
+    id: "RemovedShape",
+    severity: "ERROR",
+    shape: Some("example#Greeting"),
+    message: "Removed structure `example#Greeting`",
+  }
+}
+
+///|
+/// A diff lesson after its first answer: the models are clean.
+fn diff_shown() -> Model {
+  let (m, _) = Model::start(diff_page(), None)
+  update(
+    m,
+    Answered(
+      seq=1,
+      answer=Diffed(old=[], new=[], events=Some([added_coupon()])),
+    ),
+  ).0
+}
+
+///|
+test "a diff lesson sends one diff request and no validate" {
+  let (m, effects) = Model::start(diff_page(), None)
+  assert_eq(m.inflight, Diffing)
+  assert_eq(
+    effects[1],
+    SendDiff(seq=1, old=[("old/model.smithy", start_text)], new=[
+      ("new/model.smithy", new_text),
+    ]),
+  )
+  assert_false(effects.any(e => e is SendValidate(..)))
+  let (m, effects) = update(
+    m,
+    Answered(
+      seq=1,
+      answer=Diffed(old=[], new=[], events=Some([added_coupon()])),
+    ),
+  )
+  assert_false(effects.any(e => e is (SendValidate(..) | SendTransform(..))))
+  assert_false(m.waiting)
+  // An edit in the new model sends the diff again.
+  let (m, _) = update(m, SelectFile(1))
+  let (m, _) = update(m, Edited(start_text))
+  let (_, effects) = update(m, Debounced(1))
+  assert_true(
+    effects.contains(
+      SendDiff(seq=2, old=[("old/model.smithy", start_text)], new=[
+        ("new/model.smithy", start_text),
+      ]),
+    ),
+  )
+  assert_false(effects.any(e => e is SendValidate(..)))
+}
+
+///|
+test "the Findings tab of a diff lesson lists the findings of both models by file" {
+  let (m, _) = Model::start(diff_page(), None)
+  let old = [error_in("old/model.smithy", 3)]
+  let new = [error_in("new/model.smithy", 5)]
+  let (m, effects) = update(
+    m,
+    Answered(seq=1, answer=Diffed(old~, new~, events=None)),
+  )
+  assert_eq(m.findings, Found([..old, ..new]))
+  // The editor shows the old model first: its mark is the old finding.
+  assert_eq(effects[0], Mark(items=old))
+  let (_, effects) = update(m, SelectFile(1))
+  assert_eq(effects[1], Mark(items=new))
+  // The first model of the page has findings: the lesson opens on them.
+  assert_eq(m.pane, FindingsPane)
+}
+
+///|
+test "a diff answer shows the diff lines and highlights the changed lines" {
+  let m = diff_shown()
+  assert_eq(m.output, Shown(text=added_coupon().cli_line(), highlight=[]))
+  assert_eq(m.pane, OutputPane)
+  let (m, _) = update(m, SelectFile(1))
+  let (m, _) = update(m, Edited(start_text + "\n"))
+  let (m, _) = update(m, Debounced(1))
+  let (m, effects) = update(
+    m,
+    Answered(
+      seq=2,
+      answer=Diffed(
+        old=[],
+        new=[],
+        events=Some([added_coupon(), removed_greeting()]),
+      ),
+    ),
+  )
+  let text = added_coupon().cli_line() + "\n" + removed_greeting().cli_line()
+  assert_eq(effects, [Mark(items=[]), ShowOutput(text~, highlight=[2])])
+  assert_eq(m.output, Shown(text~, highlight=[2]))
+}
+
+///|
+test "a diff without events shows the text for no difference" {
+  let (m, _) = Model::start(diff_page(), None)
+  let (_, effects) = update(
+    m,
+    Answered(seq=1, answer=Diffed(old=[], new=[], events=Some([]))),
+  )
+  assert_true(
+    effects.contains(ShowOutput(text=no_difference_text, highlight=[])),
+  )
+  assert_eq(no_difference_text, "No differences.")
+}
+
+///|
+test "a diff with a model error shows diff_not_run_text and no highlight" {
+  let m = diff_shown()
+  let (m, _) = update(m, SelectFile(1))
+  let (m, _) = update(m, Edited("namespace\n"))
+  let (m, _) = update(m, Debounced(1))
+  let (m, effects) = update(
+    m,
+    Answered(
+      seq=2,
+      answer=Diffed(old=[], new=[error_in("new/model.smithy", 1)], events=None),
+    ),
+  )
+  let text = diff_not_run_text(false, true)
+  assert_eq(m.output, NotShown(text))
+  assert_true(effects.contains(ShowOutput(text~, highlight=[])))
+  assert_eq(
+    text, "The models were not compared, because the new model has errors. See the Findings tab.",
+  )
+  assert_eq(
+    diff_not_run_text(true, false),
+    "The models were not compared, because the old model has errors. See the Findings tab.",
+  )
+  assert_eq(
+    diff_not_run_text(true, true),
+    "The models were not compared, because the old model and the new model have errors. See the Findings tab.",
+  )
+}
+
+///|
+test "a diff timeout twice shows the timeout text" {
+  let (m, _) = Model::start(diff_page(), None)
+  let (m, _) = update(m, TimedOut(1))
+  assert_true(m.retried)
+  let (m, effects) = update(m, TimedOut(2))
+  assert_eq(m.output, NotShown(timeout_text))
+  assert_eq(m.findings, NotChecked(timeout_text))
+  assert_true(effects.contains(RestartWorker))
+}
+
+///|
+test "a diff lesson opens on the Diff tab and keeps the expand control" {
+  let (m, _) = Model::start(diff_page(), None)
+  assert_eq(m.pane, OutputPane)
+  let (m, effects) = update(m, ToggleExpand(OutputSide))
+  assert_eq(m.layout, OutputOnly)
+  assert_eq(effects, [Remeasure])
+}
+
+///|
+test "each file of a diff lesson has its own editor state" {
+  let (m, _) = Model::start(diff_page(), None)
+  let (_, effects) = update(m, SelectFile(1))
+  assert_eq(
+    effects[0],
+    LoadEditor(
+      text=new_text,
+      file="new/model.smithy",
+      fresh=false,
+      language="smithy",
+    ),
+  )
+}
+
+///|
 let exchange_text : String = "{\"entries\": [1, 2, 3]}\n"
 
 ///|

@@ -1,19 +1,24 @@
 ///|
+/// Send the first request of the files: the check of the model files, or, for
+/// a diff lesson, the diff of both models (its answer has their findings).
 fn Model::send_validate(self : Model) -> (Model, Array[Effect]) {
   let seq = self.seq + 1
+  let (inflight, request) = if self.page.engine is Diff {
+    let (old, new) = @model.sides(self.files)
+    (Diffing, SendDiff(seq~, old=pairs(old), new=pairs(new)))
+  } else {
+    (Validating, SendValidate(seq~, files=model_pairs(self)))
+  }
   (
     {
       ..self,
       seq,
       sent_edits: self.edits,
       waiting: true,
-      inflight: Validating,
+      inflight,
       pending: false,
     },
-    [
-      SendValidate(seq~, files=model_pairs(self)),
-      Wait(ms=TIMEOUT_MS, msg=TimedOut(seq)),
-    ],
+    [request, Wait(ms=TIMEOUT_MS, msg=TimedOut(seq))],
   )
 }
 
@@ -310,6 +315,53 @@ fn Model::checked(
 }
 
 ///|
+/// The answer of a diff: the findings of both models and the diff lines.
+fn Model::diffed(
+  self : Model,
+  old : Array[@core.Diagnostic],
+  new : Array[@core.Diagnostic],
+  events : Array[@core.DiffEvent]?,
+) -> (Model, Array[Effect]) {
+  let items = [..old, ..new]
+  // The tab opens on the diff, except when the first models of the page have
+  // findings that the lesson compares.
+  let pane = if self.findings == Unchecked &&
+    !self.chosen &&
+    items.any(d => @model.Severity::parse(d.severity) is Some(_)) {
+    FindingsPane
+  } else {
+    self.pane
+  }
+  let m = { ..self, findings: Found(items), pane, }
+  let marked = Mark(items=m.selected_findings())
+  match events {
+    None => {
+      let text = diff_not_run_text(old.any(is_error), new.any(is_error))
+      { ..m, output: NotShown(text), }.next([
+        marked,
+        ShowOutput(text~, highlight=[]),
+      ])
+    }
+    Some(events) => {
+      let text = if events.is_empty() {
+        no_difference_text
+      } else {
+        events.map(e => e.cli_line()).join("\n")
+      }
+      let before = match m.output {
+        Shown(text~, ..) => text
+        _ => ""
+      }
+      let highlight = changed_lines(before, text)
+      { ..m, output: Shown(text~, highlight~), }.next([
+        marked,
+        ShowOutput(text~, highlight~),
+      ])
+    }
+  }
+}
+
+///|
 /// The state of the transcript check arrived. A start gives every entry and
 /// replaces the rows; a step adds its findings. The check goes on to the
 /// position that the reader asked for.
@@ -418,6 +470,14 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         // No rows of an older text stay.
         (Transcribing, NotConverted(reason)) =>
           { ..m, transcript: None, not_run: Some(reason), }.next([])
+        (Diffing, Diffed(old~, new~, events~)) => m.diffed(old, new, events)
+        (Diffing, NotConverted(reason)) => {
+          // Both the findings and the diff come from this request.
+          let (m, shown) = { ..m, findings: NotChecked(reason), }.not_shown(
+            reason,
+          )
+          m.next([Mark(items=[]), ..shown])
+        }
         (CheckingValue, DataChecked(valid=_, findings~))
         | (CheckingMessage, DataChecked(valid=_, findings~)) => {
           let empty = if m.inflight == CheckingMessage {
@@ -460,6 +520,12 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
             let (m, shown) = m.not_shown(timeout_text)
             m.next([RestartWorker, ..shown])
           }
+          (Diffing, _) => {
+            let (m, shown) = { ..m, findings: NotChecked(timeout_text), }.not_shown(
+              timeout_text,
+            )
+            m.next([RestartWorker, Mark(items=[]), ..shown])
+          }
           (Validating, false) =>
             { ..m, findings: NotChecked(timeout_text), }.next([
               RestartWorker,
@@ -474,7 +540,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         }
       } else {
         let (sent, more) = match m.inflight {
-          Validating => m.send_validate()
+          Validating | Diffing => m.send_validate()
           Transforming => m.send_transform()
           // The new Worker holds no transcript: start it again. The answer
           // steps to the position of the reader.

@@ -73,13 +73,53 @@ fn head(
 }
 
 ///|
+/// The tab of the file with index `i`, labelled with `label`.
+fn file_tab(
+  m : Model,
+  emit : @rabbita.Emit[Msg],
+  i : Int32,
+  label : String,
+) -> Html {
+  tab(i == m.selected, emit(SelectFile(i)), [@html.text(label)])
+}
+
+///|
+/// The tabs of a diff lesson under the labels Old and New. A tab shows the
+/// name of its file without the folder.
+fn group_tabs(
+  m : Model,
+  emit : @rabbita.Emit[Msg],
+  title : String,
+  prefix : String,
+) -> Html {
+  let tabs : Array[Html] = []
+  for i, file in m.files {
+    if file.name.has_prefix(prefix) {
+      let label = file.name.strip_prefix(prefix).unwrap_or(file.name)
+      tabs.push(file_tab(m, emit, i, label.to_owned()))
+    }
+  }
+  @html.div(
+    class="tour-group",
+    attrs=@html.Attrs::build().role("group").aria_label(title + " model"),
+    [@html.span(class="tour-group-label", title), ..tabs],
+  )
+}
+
+///|
 fn file_tabs(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
+  let tabs = if m.page.engine is Diff {
+    [
+      group_tabs(m, emit, "Old", @model.old_prefix),
+      group_tabs(m, emit, "New", @model.new_prefix),
+    ]
+  } else {
+    m.files.mapi((i, file) => file_tab(m, emit, i, file.name))
+  }
   @html.div(
     class="tour-tabs",
     attrs=@html.Attrs::build().role("tablist").aria_label("Files"),
-    m.files.mapi((i, file) => {
-      tab(i == m.selected, emit(SelectFile(i)), [@html.text(file.name)])
-    }),
+    tabs,
   )
 }
 
