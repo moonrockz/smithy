@@ -244,3 +244,50 @@ test "mbt check fences render as mbt code" {
     CodeBlock("smithy", "string S"),
   ])
 }
+
+///|
+let sample_tabs : Array[Tab] = [
+  {
+    label: "CLI",
+    snippets: [
+      {
+        lang: "smithy",
+        file: Some("greeting.smithy"),
+        code: "$version: \"2\"\n```\nnamespace example",
+      },
+      { lang: "console", file: None, code: "$ smithy version", },
+    ],
+  },
+  {
+    label: "MoonBit",
+    snippets: [{ lang: "mbt", file: None, code: "///|\ntest {\n}", }],
+  },
+]
+
+///|
+test "a tabs fence becomes a tab group, numbered in document order" {
+  let src = "# T\n\n" +
+    tabs_fence(sample_tabs) +
+    "\n\n" +
+    tabs_fence(sample_tabs) +
+    "\n"
+  let doc = parse(src, plain_ctx("site/tour/lessons/01-x/lesson.md"))
+  assert_eq(doc.blocks[1:].to_owned(), [
+    Tabs("tabs-1", sample_tabs),
+    Tabs("tabs-2", sample_tabs),
+  ])
+}
+
+///|
+test "a tabs fence that is not a tab list stays a code block" {
+  let doc = parse("```tabs\nnot json\n```\n", plain_ctx("a.md"))
+  assert_eq(doc.blocks, [CodeBlock("tabs", "not json")])
+}
+
+///|
+test "block_text of a tab group has the labels and the code" {
+  let text = block_text(Tabs("tabs-1", sample_tabs))
+  assert_true(text.contains("CLI"))
+  assert_true(text.contains("$ smithy version"))
+  assert_true(text.contains("MoonBit"))
+}

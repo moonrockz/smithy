@@ -7,7 +7,8 @@ let reference_path : String = "tour/reference-events.json"
 /// (`<dir>/<case>`), `kind`, `reason` and `issue`. Kind `event` has `event`
 /// and `side` (`ours` or `reference`), and removes one copy of the event from
 /// that side. Kind `json_schema` has `pointer` and no `side`, and removes the
-/// value at the pointer from both JSON Schema documents.
+/// value at the pointer from both JSON Schema documents. Kind `openapi` is the
+/// same for the OpenAPI documents.
 let allow_path : String = "tour/reference-allow.json"
 
 ///|
@@ -20,6 +21,33 @@ let reference_sha : String = "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
 let prelude_sha_path : String = "../pkgs/smithy/PRELUDE_SHA"
 
 ///|
+/// The smithy.rpc trait definitions that `scripts/reference-tour.mbtx` adds to
+/// a Java case whose files name the namespace, as the playground core always
+/// loads them.
+let smithy_rpc_path : String = "tour/smithy-rpc-traits.smithy"
+
+///|
+/// The name of the smithy.rpc definitions in the digest of a case that uses
+/// them. A lesson file name ends in `.smithy`, so no case file has this name.
+let smithy_rpc_source : String = "<smithy-rpc-traits>"
+
+///|
+/// The digest of the reference result of a case: `@model.digest` of the case
+/// files and, when a file names `smithy.rpc#`, of the definitions as the file
+/// `smithy_rpc_source`. A change of the definitions then makes the result
+/// stale, as `scripts/reference-tour.mbtx` computes it.
+fn reference_digest(
+  files : Array[@model.LessonFile],
+  definitions : String,
+) -> String {
+  if files.any(f => f.text.contains("smithy.rpc#")) {
+    @model.digest(files + [{ name: smithy_rpc_source, text: definitions, }])
+  } else {
+    @model.digest(files)
+  }
+}
+
+///|
 /// The line that a lesson with a known difference must contain.
 let difference_note : String = "> **Reference difference:**"
 
@@ -29,6 +57,8 @@ struct ReferenceCase {
   digest : String
   events : Array[@model.EventKey]
   json_schema : Json?
+  /// None: no entry. Some(null): the reference conversion failed.
+  openapi : Json?
 }
 
 ///|
@@ -44,6 +74,8 @@ enum Difference {
   Event(event~ : @model.EventKey, side~ : Side)
   /// The value at the JSON pointer is removed from both JSON Schema documents.
   JsonSchema(pointer~ : String)
+  /// The value at the JSON pointer is removed from both OpenAPI documents.
+  OpenApi(pointer~ : String)
 }
 
 ///|
@@ -136,6 +168,10 @@ fn parse_reference(text : String) -> Map[@model.CaseId, ReferenceCase] raise {
         { "json_schema": schema, .. } => Some(schema)
         _ => None
       },
+      openapi: match entry {
+        { "openapi": document, .. } => Some(document)
+        _ => None
+      },
     }
   }
   result
@@ -174,10 +210,19 @@ fn parse_allow(text : String) -> Array[Allowed] raise {
         }
         JsonSchema(pointer=string_member(entry, "pointer", where_))
       }
+      "openapi" => {
+        if entry is { "side": _, .. } {
+          fail(
+            where_ +
+            ": \"side\" is for kind \"event\" only; an openapi entry removes the pointer from both sides",
+          )
+        }
+        OpenApi(pointer=string_member(entry, "pointer", where_))
+      }
       other =>
         fail(
           where_ +
-          ": \"kind\" must be \"event\" or \"json_schema\", not \"" +
+          ": \"kind\" must be \"event\", \"json_schema\" or \"openapi\", not \"" +
           other +
           "\"",
         )
@@ -332,8 +377,9 @@ fn our_events(
   session : @core.Session,
   where_ : String,
   files : Array[(String, String)],
+  output : @core.Output?,
 ) -> Array[@model.EventKey] raise {
-  match @core.handle(session, ValidateFiles(seq=1, files~)) {
+  match @core.handle(session, @core.lesson_validate(seq=1, files~, output~)) {
     Diagnostics(items~, ..) => compared(items)
     Blocked(reason~, ..) => fail(where_ + ": validation was blocked: " + reason)
     _ => fail(where_ + ": unexpected answer")
@@ -368,9 +414,64 @@ fn our_json_schema(
 }
 
 ///|
+/// Our OpenAPI document, or None when the transform is blocked (the model
+/// has no single service with a protocol trait, or the conversion fails).
+fn our_openapi(
+  session : @core.Session,
+  where_ : String,
+  lesson : @model.Lesson,
+  files : Array[(String, String)],
+) -> Json? raise {
+  guard lesson.output is Some(output) else {
+    fail(
+      where_ +
+      ": the reference has an OpenAPI document, but the lesson has no output",
+    )
+  }
+  match
+    @core.handle(
+      session,
+      TransformFiles(seq=2, files~, output~, selector=lesson.selector),
+    ) {
+    Transformed(files=out, ..) =>
+      match out.search_by(f => f.0.has_suffix(".openapi.json")) {
+        Some(i) => Some(parse_json(where_ + " OpenAPI", out[i].1))
+        None => fail(where_ + ": the output has no .openapi.json file")
+      }
+    Blocked(kind=Other, ..) => None
+    Blocked(reason~, ..) => fail(where_ + ": the output was blocked: " + reason)
+    _ => fail(where_ + ": unexpected answer")
+  }
+}
+
+///|
+/// The two documents to compare. Both sides must agree on failure: a blocked
+/// output of ours goes with a failed reference conversion (null).
+fn document_pair(
+  where_ : String,
+  ours : Json?,
+  reference : Json,
+) -> (Json, Json)? raise {
+  match (ours, reference) {
+    (None, Null) => None
+    (Some(_), Null) =>
+      fail(
+        where_ +
+        ": the reference OpenAPI conversion failed, but ours gave a document",
+      )
+    (None, _) =>
+      fail(
+        where_ +
+        ": our OpenAPI output was blocked, but the reference gave a document",
+      )
+    (Some(a), b) => Some((a, b))
+  }
+}
+
+///|
 /// The tour, the reference results and the allow list.
 fn inputs() -> (@model.Tour, Map[@model.CaseId, ReferenceCase], Array[Allowed]) raise {
-  let tour = match @source.read_tour(lessons_root) {
+  let tour = match @source.read_tour(lessons_root, repo="..") {
     Ok(tour) => tour
     Err(e) => fail("I cannot read the tour: " + e)
   }
@@ -398,6 +499,17 @@ fn needs_json_schema(
 }
 
 ///|
+/// Whether the reference must have an OpenAPI entry: the lesson output is
+/// OpenApi30 or OpenApi31, and the reference events have no ERROR or DANGER.
+fn needs_openapi(
+  output : @core.Output?,
+  events : Array[@model.EventKey],
+) -> Bool {
+  (output is Some(OpenApi30) || output is Some(OpenApi31)) &&
+  !events.any(e => e.severity.blocks_output())
+}
+
+///|
 /// Fail when the reference result is not the result of these case files and
 /// this lesson output.
 fn check_fresh(
@@ -407,7 +519,8 @@ fn check_fresh(
   output : @core.Output?,
 ) -> Unit raise {
   if entry.digest != digest ||
-    (entry.json_schema is Some(_)) != needs_json_schema(output, entry.events) {
+    (entry.json_schema is Some(_)) != needs_json_schema(output, entry.events) ||
+    (entry.openapi is Some(_)) != needs_openapi(output, entry.events) {
     fail(stale(where_))
   }
 }
@@ -424,6 +537,40 @@ fn reference_of(
 }
 
 ///|
+/// Compare our OpenAPI document with the reference one for a case. An allow
+/// entry of the case with kind `openapi` removes its pointer from both
+/// documents, and is marked used when that removes a difference. Fail on a
+/// difference that remains when `openapi` is true.
+fn compare_openapi(
+  case_id : @model.CaseId,
+  ours : Json?,
+  reference : Json,
+  allow : Array[Allowed],
+  used : Array[Bool],
+  openapi~ : Bool,
+) -> Unit raise {
+  let where_ = case_id.to_string()
+  guard document_pair(where_, ours, reference) is Some((mine, theirs)) else {
+    return
+  }
+  for i, entry in allow {
+    guard entry.case_id == case_id && entry.difference is OpenApi(pointer~) else {
+      continue
+    }
+    if removes_difference(mine, theirs, pointer) {
+      used[i] = true
+    }
+  }
+  if openapi && mine != theirs {
+    fail(
+      where_ +
+      ": our OpenAPI differs from the reference at " +
+      show(json_differences(mine, theirs, "")),
+    )
+  }
+}
+
+///|
 /// Compare our events and JSON Schema with the reference for every case, and
 /// mark the allow list entries that remove a difference.
 fn compare_all(
@@ -432,6 +579,7 @@ fn compare_all(
   allow : Array[Allowed],
   events~ : Bool,
   json_schema~ : Bool,
+  openapi~ : Bool,
 ) -> Array[Bool] raise {
   let used = allow.map(_ => false)
   let session = @core.Session::new()
@@ -441,7 +589,7 @@ fn compare_all(
       let where_ = case_id.to_string()
       let files = files_of(lesson.case_files(case))
       let expected = reference_of(reference, case_id)
-      let ours = our_events(session, where_, files)
+      let ours = our_events(session, where_, files, lesson.output)
       let theirs = expected.events.copy()
       remove_allowed_events(case_id, ours, theirs, allow, used)
       ours.sort_by(@model.compare_events)
@@ -455,24 +603,30 @@ fn compare_all(
           show_events(theirs),
         )
       }
-      guard expected.json_schema is Some(schema) else { continue }
-      let mine = our_json_schema(session, where_, lesson, files)
-      let theirs = parse_json(reference_path, schema.stringify())
-      for i, entry in allow {
-        guard entry.case_id == case_id &&
-          entry.difference is JsonSchema(pointer~) else {
-          continue
+      if expected.json_schema is Some(schema) {
+        let mine = our_json_schema(session, where_, lesson, files)
+        let theirs = parse_json(reference_path, schema.stringify())
+        for i, entry in allow {
+          guard entry.case_id == case_id &&
+            entry.difference is JsonSchema(pointer~) else {
+            continue
+          }
+          if removes_difference(mine, theirs, pointer) {
+            used[i] = true
+          }
         }
-        if removes_difference(mine, theirs, pointer) {
-          used[i] = true
+        if json_schema && mine != theirs {
+          fail(
+            where_ +
+            ": our JSON Schema differs from the reference at " +
+            show(json_differences(mine, theirs, "")),
+          )
         }
       }
-      if json_schema && mine != theirs {
-        fail(
-          where_ +
-          ": our JSON Schema differs from the reference at " +
-          show(json_differences(mine, theirs, "")),
-        )
+      if expected.openapi is Some(document) {
+        let theirs = parse_json(reference_path, document.stringify())
+        let mine = our_openapi(session, where_, lesson, files)
+        compare_openapi(case_id, mine, theirs, allow, used, openapi~)
       }
     }
   }
@@ -482,6 +636,7 @@ fn compare_all(
 ///|
 test "every lesson case has a fresh reference result" {
   let (tour, reference, _) = inputs()
+  let definitions = read_text(smithy_rpc_path)
   let known : Array[@model.CaseId] = []
   for lesson in tour.lessons {
     for case in lesson.cases {
@@ -491,7 +646,7 @@ test "every lesson case has a fresh reference result" {
       check_fresh(
         case_id.to_string(),
         entry,
-        @model.digest(lesson.case_files(case)),
+        reference_digest(lesson.case_files(case), definitions),
         lesson.output,
       )
     }
@@ -509,13 +664,31 @@ test "every lesson case has a fresh reference result" {
 ///|
 test "our events agree with the reference events" {
   let (tour, reference, allow) = inputs()
-  ignore(compare_all(tour, reference, allow, events=true, json_schema=false))
+  ignore(
+    compare_all(
+      tour,
+      reference,
+      allow,
+      events=true,
+      json_schema=false,
+      openapi=false,
+    ),
+  )
 }
 
 ///|
 test "our JSON Schema agrees with the reference JSON Schema" {
   let (tour, reference, allow) = inputs()
-  ignore(compare_all(tour, reference, allow, events=false, json_schema=true))
+  ignore(
+    compare_all(
+      tour,
+      reference,
+      allow,
+      events=false,
+      json_schema=true,
+      openapi=false,
+    ),
+  )
 }
 
 ///|
@@ -527,6 +700,7 @@ test "every allow list entry is used, has an issue, and its lesson says so" {
     allow,
     events=false,
     json_schema=false,
+    openapi=false,
   )
   for i, entry in allow {
     let where_ = allow_path +
@@ -569,6 +743,28 @@ test "every allow list entry is used, has an issue, and its lesson says so" {
 ///|
 test "the reference results use the commit of the vendored prelude" {
   assert_eq(read_text(prelude_sha_path).trim().to_owned(), reference_sha)
+}
+
+///|
+test "the reference loads the smithy.rpc definitions that the core loads" {
+  assert_eq(read_text(smithy_rpc_path), @rpc.trait_definitions())
+}
+
+///|
+test "the digest of a smithy.rpc case changes when the definitions change" {
+  let rpc : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: "use smithy.rpc#jsonRpc", },
+  ]
+  let plain : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: "namespace example", },
+  ]
+  assert_true(reference_digest(rpc, "a") != reference_digest(rpc, "b"))
+  assert_eq(
+    reference_digest(rpc, "a"),
+    @model.digest(rpc + [{ name: smithy_rpc_source, text: "a", }]),
+  )
+  assert_eq(reference_digest(plain, "a"), @model.digest(plain))
+  assert_eq(reference_digest(plain, "b"), @model.digest(plain))
 }
 
 ///|
@@ -674,6 +870,7 @@ test "a JSON Schema lesson needs a reference schema unless the case has an error
       digest: "d",
       events: events.map(e => @model.EventKey::parse(e).unwrap()),
       json_schema,
+      openapi: None,
     }
   }
   check_fresh("a", entry([], schema), "d", Some(JsonSchema))
@@ -722,4 +919,187 @@ test "a json_schema allow entry must not name a side" {
   } noraise {
     _ => fail("a json_schema entry with a side was accepted")
   }
+}
+
+///|
+test "an OpenAPI lesson needs a reference document unless the case has an error" {
+  let doc = Some(Json::object({}))
+  let entry = fn(events : Array[String], openapi : Json?) -> ReferenceCase {
+    {
+      digest: "d",
+      events: events.map(e => @model.EventKey::parse(e).unwrap()),
+      json_schema: None,
+      openapi,
+    }
+  }
+  check_fresh("a", entry([], doc), "d", Some(OpenApi30))
+  check_fresh("a", entry([], Some(Json::null())), "d", Some(OpenApi31))
+  check_fresh("a", entry(["E|ERROR|-"], None), "d", Some(OpenApi30))
+  let stale_message = "a: the reference result is missing or stale; run `mise run reference:tour`"
+  for
+    bad in [
+      (entry([], None), "d", Some(@core.Output::OpenApi30)),
+      (entry([], doc), "d", Some(@core.Output::JsonAst)),
+      (entry(["E|DANGER|-"], doc), "d", Some(@core.Output::OpenApi31)),
+    ] {
+    try check_fresh("a", bad.0, bad.1, bad.2) catch {
+      Failure(message) => assert_true(message.has_suffix(stale_message))
+      e => fail("unexpected error: " + e.to_string())
+    } noraise {
+      _ => fail("a stale result passed")
+    }
+  }
+}
+
+///|
+test "a failed reference conversion agrees only with a blocked output" {
+  let x = Json::object({ "x": Json::number(1.0) })
+  let y = Json::object({ "y": Json::number(2.0) })
+  assert_true(document_pair("a", None, Json::null()) is None)
+  assert_eq(document_pair("a", Some(x), y), Some((x, y)))
+  try document_pair("a", Some(x), Json::null()) catch {
+    Failure(message) =>
+      assert_true(
+        message.has_suffix(
+          "a: the reference OpenAPI conversion failed, but ours gave a document",
+        ),
+      )
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a document against a failed conversion passed")
+  }
+  try document_pair("a", None, y) catch {
+    Failure(message) =>
+      assert_true(
+        message.has_suffix(
+          "a: our OpenAPI output was blocked, but the reference gave a document",
+        ),
+      )
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a blocked output against a document passed")
+  }
+}
+
+///|
+test "an openapi allow entry must not name a side" {
+  let text = "[{\"case\": \"01-a/start\", \"kind\": \"openapi\", \"pointer\": \"/a\", \"side\": \"ours\", \"reason\": \"r\", \"issue\": \"smithy-1\"}]"
+  try parse_allow(text) catch {
+    Failure(message) =>
+      assert_true(message.contains("\"side\" is for kind \"event\" only"))
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("an openapi entry with a side was accepted")
+  }
+}
+
+///|
+test "our OpenAPI agrees with the reference OpenAPI" {
+  let (tour, reference, allow) = inputs()
+  ignore(
+    compare_all(
+      tour,
+      reference,
+      allow,
+      events=false,
+      json_schema=false,
+      openapi=true,
+    ),
+  )
+}
+
+///|
+test "the OpenAPI comparison fails on a difference and honors the allow list" {
+  let json = (text : String) => parse_json("test", text)
+  let ours = json("{\"a\": 1, \"b\": 2}")
+  let theirs = json("{\"a\": 1, \"b\": 3}")
+  let start : @model.CaseId = { dir: "01-a", name: "start", }
+  let other : @model.CaseId = { dir: "01-a", name: "other", }
+  let allowed = (case_id : @model.CaseId, pointer : String) => {
+    case_id,
+    difference: OpenApi(pointer~),
+    reason: "r",
+    issue: "smithy-1",
+  }
+  // equal documents pass
+  compare_openapi(
+    start,
+    Some(json("{\"a\": 1}")),
+    json("{\"a\": 1}"),
+    [],
+    [],
+    openapi=true,
+  )
+  // different documents fail with the pointer
+  try compare_openapi(start, Some(ours), theirs, [], [], openapi=true) catch {
+    Failure(message) =>
+      assert_true(
+        message.contains(
+          "01-a/start: our OpenAPI differs from the reference at [/b",
+        ),
+      )
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a different document passed")
+  }
+  // a matching entry is used and the check passes
+  let allow = [allowed(start, "/b")]
+  let used = [false]
+  compare_openapi(
+    start,
+    Some(json("{\"a\": 1, \"b\": 2}")),
+    json("{\"a\": 1, \"b\": 3}"),
+    allow,
+    used,
+    openapi=true,
+  )
+  assert_eq(used, [true])
+  // a wrong case or pointer stays unused and the difference fails
+  for wrong in [allowed(other, "/b"), allowed(start, "/c")] {
+    let used = [false]
+    try
+      compare_openapi(
+        start,
+        Some(json("{\"a\": 1, \"b\": 2}")),
+        json("{\"a\": 1, \"b\": 3}"),
+        [wrong],
+        used,
+        openapi=true,
+      )
+    catch {
+      Failure(message) => assert_true(message.contains("our OpenAPI differs"))
+      e => fail("unexpected error: " + e.to_string())
+    } noraise {
+      _ => fail("a difference passed with a wrong allow entry")
+    }
+    assert_eq(used, [false])
+  }
+  // a blocked output and a failed conversion agree
+  compare_openapi(start, None, Json::null(), [], [], openapi=true)
+}
+
+///|
+test "our OpenAPI document is the .openapi.json file of the transform" {
+  let model = "$version: \"2\"\nnamespace example.web\nuse aws.protocols#restJson1\n@restJson1\nservice Weather { version: \"1\", operations: [GetCity] }\n@readonly\n@http(method: \"GET\", uri: \"/city\")\noperation GetCity { output: CityOutput }\nstructure CityOutput { name: String }\n"
+  let lesson : @model.Lesson = {
+    dir: "99-x",
+    number: 99,
+    slug: "x",
+    title: "x",
+    section: "x",
+    output: Some(OpenApi30),
+    selector: None,
+    spec: "",
+    text: "",
+    files: [],
+    cases: [],
+  }
+  let document = our_openapi(@core.Session::new(), "a", lesson, [
+    ("model.smithy", model),
+  ])
+  guard document
+    is Some({ "openapi": String("3.0.2"), "paths": Object(paths), .. }) else {
+    fail("the OpenAPI document is missing or has no version 3.0.2 and paths")
+  }
+  assert_true(paths.contains("/city"))
 }

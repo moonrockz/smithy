@@ -76,6 +76,39 @@ as `\n`. See the [model diff library](../../pkgs/smithy-diff/README.mbt.md) for 
 comparison API, suppressions and preview-feature behavior. This command compares
 explicit old/new snapshots; Git and project modes are not implemented.
 
+### Convert a model to the JSON AST
+
+This command writes the JSON AST of the model to standard output.
+
+<!-- tour:start convert-json-cli -->
+```smithy file=greeting.smithy
+$version: "2"
+
+namespace example
+
+structure Greeting {
+    message: String
+}
+```
+
+```console
+$ smithy convert --to json greeting.smithy
+{
+    "smithy": "2.0",
+    "shapes": {
+        "example#Greeting": {
+            "type": "structure",
+            "members": {
+                "message": {
+                    "target": "smithy.api#String"
+                }
+            }
+        }
+    }
+}
+```
+<!-- tour:end convert-json-cli -->
+
 ### JSONL diff output
 
 Use `--format jsonl` for automation. `--format=jsonl` also works. Text remains

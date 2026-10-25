@@ -1,7 +1,8 @@
 ///|
 /// Read the lessons folder. The error names the folder and the problem.
-pub fn read_tour(root : String) -> Result[@model.Tour, String] {
-  Ok(read_root(root)) catch {
+/// `repo` is the repository root that include paths are relative to.
+pub fn read_tour(root : String, repo~ : String) -> Result[@model.Tour, String] {
+  Ok(read_root(root, repo)) catch {
     Failure(msg) => Err(msg)
     e => Err("\{root}: \{e}")
   }
@@ -34,14 +35,14 @@ fn is_dir(path : String) -> Bool raise {
 }
 
 ///|
-fn read_root(root : String) -> @model.Tour raise {
+fn read_root(root : String, repo : String) -> @model.Tour raise {
   let lessons : Array[@model.Lesson] = []
   for name in list_dir(root) {
     let path = "\{root}/\{name}"
     if !is_dir(path) {
       continue
     }
-    lessons.push(read_lesson(root, name))
+    lessons.push(read_lesson(root, name, repo))
   }
   if lessons.is_empty() {
     fail("\{root}: I found no lesson folder")
@@ -83,7 +84,11 @@ fn parse_number(dir : String) -> Int32 raise {
 }
 
 ///|
-fn read_lesson(root : String, dir : String) -> @model.Lesson raise {
+fn read_lesson(
+  root : String,
+  dir : String,
+  repo : String,
+) -> @model.Lesson raise {
   let base = "\{root}/\{dir}"
   let number = parse_number(dir)
   let meta = read_json("\{base}/lesson.json")
@@ -98,6 +103,12 @@ fn read_lesson(root : String, dir : String) -> @model.Lesson raise {
   let title = string_field(meta, "title", dir)
   let section = string_field(meta, "section", dir)
   let spec = string_field(meta, "spec", dir)
+  if !spec.has_prefix(@model.spec_url_prefix) &&
+    @content.doc_route(spec) is None {
+    fail(
+      "\{dir}: \"spec\" must be a smithy.io URL or the repository path of a docs page, not \"\{spec}\"",
+    )
+  }
   let output = match optional_string_field(meta, "output", dir) {
     None => None
     Some(name) =>
@@ -111,20 +122,24 @@ fn read_lesson(root : String, dir : String) -> @model.Lesson raise {
   if selector is Some(_) && !(output is Some(@samples.Output::Selector)) {
     fail("\{dir}: \"selector\" is for the output Selector only")
   }
-  let text = io("\{base}/lesson.md", () => {
+  let raw = io("\{base}/lesson.md", () => {
     @fs.read_file_to_string("\{base}/lesson.md")
   })
-  let first = text.split("\n").next().unwrap_or("")
+  let first = raw.split("\n").next().unwrap_or("")
   if first.trim_end(chars="\r").to_owned() != "# \{title}" {
     fail(
       "\{dir}/lesson.md: I expected the first line \"# \{title}\", but found \"\{first}\"",
     )
   }
+  let text = match check_hand_written(raw) {
+    Ok(_) => text_of(dir, repo, raw)
+    Err(e) => fail("\{dir}/lesson.md: \{e}")
+  }
   let files = read_files("\{base}/files", "\{dir}/files")
   if files.is_empty() {
     fail("\{dir}: I found no starting file in files/")
   }
-  let cases = read_cases(dir, "\{base}/cases")
+  let cases = read_cases(dir, "\{base}/cases", output is Some(_))
   {
     dir,
     number,
@@ -138,6 +153,19 @@ fn read_lesson(root : String, dir : String) -> @model.Lesson raise {
     files,
     cases,
   }
+}
+
+///|
+fn text_of(dir : String, repo : String, raw : String) -> String raise {
+  let text = match
+    @markdown.expand_includes(raw, inc => resolve_include(repo, inc)) {
+    Ok(text) => text
+    Err(e) => fail("\{dir}/lesson.md: \{e}")
+  }
+  if check_expanded(text) is Err(e) {
+    fail("\{dir}/lesson.md: \{e}")
+  }
+  text
 }
 
 ///|
@@ -167,20 +195,29 @@ fn read_files(path : String, where_ : String) -> Array[@model.LessonFile] raise 
 }
 
 ///|
-fn read_cases(dir : String, path : String) -> Array[@model.Case] raise {
+fn read_cases(
+  dir : String,
+  path : String,
+  has_output : Bool,
+) -> Array[@model.Case] raise {
   if !@fs.path_exists("\{path}/start") {
     fail("\{dir}: I found no cases/start folder")
   }
   let names = list_dir(path).filter(n => n != "start" && is_dir("\{path}/\{n}"))
-  let cases = [read_case(dir, path, "start")]
+  let cases = [read_case(dir, path, "start", has_output)]
   for name in names {
-    cases.push(read_case(dir, path, name))
+    cases.push(read_case(dir, path, name, has_output))
   }
   cases
 }
 
 ///|
-fn read_case(dir : String, path : String, name : String) -> @model.Case raise {
+fn read_case(
+  dir : String,
+  path : String,
+  name : String,
+  has_output : Bool,
+) -> @model.Case raise {
   let base = "\{path}/\{name}"
   let expect_path = "\{base}/expect.json"
   if !@fs.path_exists(expect_path) {
@@ -207,10 +244,27 @@ fn read_case(dir : String, path : String, name : String) -> @model.Case raise {
       "\{dir}/cases/\{name}: a string of \"output_contains\" is empty, and an empty string matches every output",
     )
   }
+  let where_ = "\{dir}/cases/\{name}"
+  let blocked = optional_string_field(json, "blocked", where_)
+  if blocked is Some(_) {
+    if !output_contains.is_empty() {
+      fail(
+        "\{where_}: \"blocked\" and \"output_contains\" cannot be together, because a blocked output has no text",
+      )
+    }
+    if !has_output {
+      fail("\{where_}: \"blocked\" needs a lesson output")
+    }
+    if events.any(e => e.severity.blocks_output()) {
+      fail(
+        "\{where_}: \"blocked\" cannot have an ERROR or DANGER event, because the block reason would be the model errors",
+      )
+    }
+  }
   {
     name,
-    files: read_files("\{base}/files", "\{dir}/cases/\{name}/files"),
-    expect: { events, output_contains, },
+    files: read_files("\{base}/files", "\{where_}/files"),
+    expect: { events, output_contains, blocked, },
   }
 }
 
@@ -222,7 +276,7 @@ let lesson_keys : Array[String] = [
 
 ///|
 /// The keys of `expect.json`.
-let expect_keys : Array[String] = ["events", "output_contains"]
+let expect_keys : Array[String] = ["events", "output_contains", "blocked"]
 
 ///|
 /// Fail on a key that is not in `keys`. A misspelt key would otherwise drop

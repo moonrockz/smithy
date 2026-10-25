@@ -110,3 +110,17 @@ test "samples: a document of the picker has no version or preset, and a log has 
     }
   }
 }
+
+///|
+test "samples: ValidateFilesFor a non-OpenAPI output gives the answer of ValidateFiles" {
+  let session = @core.Session::new()
+  for source in @samples.manifest {
+    let files = [("model.smithy", repository_file(source.path))]
+    for output in [@core.Output::JsonAst, Idl, Selector, JsonSchema, OpenRpc] {
+      assert_eq(
+        @core.handle(session, ValidateFilesFor(seq=1, files~, output~)),
+        @core.handle(session, ValidateFiles(seq=1, files~)),
+      )
+    }
+  }
+}

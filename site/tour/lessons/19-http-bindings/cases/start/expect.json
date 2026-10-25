@@ -1,0 +1,1 @@
+{"events": [], "output_contains": ["\"/cities/{cityId}/forecast\"", "\"in\": \"path\"", "\"name\": \"days\"", "\"in\": \"query\"", "\"name\": \"Accept-Language\"", "\"in\": \"header\"", "\"Cache-Control\"", "\"application/octet-stream\""]}

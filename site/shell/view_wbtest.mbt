@@ -730,6 +730,8 @@ async test "a lesson page has the top bar, the text, the spec link and the empty
   assert_true(
     html.contains("href=\"https://smithy.io/2.0/spec/simple-types.html\""),
   )
+  assert_true(html.contains("Read this subject in the Smithy specification"))
+  assert_true(!html.contains("Read the documentation of this feature"))
   for id in ["tour-app", "tour-editor", "tour-output"] {
     assert_true(html.contains("id=\"\{id}\""))
   }
@@ -820,4 +822,85 @@ async test "the docs sidebar links to the tour" {
       "href=\"/smithy/tour/\" target=\"_self\" class=\"ms-side-link\">Tour</a>",
     ),
   )
+}
+
+///|
+#cfg(not(target="js"))
+async test "a lesson page with a docs link names it the documentation" {
+  let page = { ..simple_shapes_page(), spec: "/smithy/docs/smithy-openrpc/", }
+  let html = render_tour(
+    Lesson("simple-shapes"),
+    Page(page),
+    Some("# Simple shapes\n\nText.\n"),
+  )
+  assert_true(html.contains("href=\"/smithy/docs/smithy-openrpc/\""))
+  assert_true(html.contains("Read the documentation of this feature"))
+  assert_true(!html.contains("Read this subject in the Smithy specification"))
+  // The top bar has its own external icon, so count the icons: the spec
+  // link adds one on a smithy.io page and none on a docs page.
+  let spec_html = render_tour(
+    Lesson("simple-shapes"),
+    Page(simple_shapes_page()),
+    Some("# Simple shapes\n\nText.\n"),
+  )
+  let icons = html.split("ms-ext").count()
+  assert_eq(spec_html.split("ms-ext").count(), icons + 1)
+}
+
+///|
+#cfg(not(target="js"))
+async test "a tab group renders radio tabs that work without JavaScript" {
+  let tabs : Array[@markdown.Tab] = [
+    {
+      label: "CLI",
+      snippets: [
+        { lang: "smithy", file: Some("greeting.smithy"), code: "namespace a", },
+        { lang: "console", file: None, code: "$ smithy version", },
+      ],
+    },
+    {
+      label: "MoonBit",
+      snippets: [{ lang: "mbt", file: None, code: "test {}", }],
+    },
+  ]
+  let html = render_route(
+    Doc("smithy-syntax"),
+    Some("# T\n\n" + @markdown.tabs_fence(tabs) + "\n"),
+  )
+  for
+    part in [
+      "type=\"radio\"", "name=\"tabs-1\"", "id=\"tabs-1-1\"", "id=\"tabs-1-2\"",
+      "for=\"tabs-1-2\"", "class=\"ms-tab-panel\"", "class=\"ms-codelabel\">greeting.smithy<",
+      // The landing page install bar owns the class `ms-tabs`.
+       "class=\"ms-md-tabs\"",
+    ] {
+    assert_true(html.contains(part))
+  }
+  assert_false(html.contains("class=\"ms-tabs\""))
+  let checked = html.split("checked").to_array().length() - 1
+  assert_eq(checked, 1)
+}
+
+///|
+#cfg(not(target="js"))
+async test "two tab groups on a page do not share their radio names" {
+  let tabs : Array[@markdown.Tab] = [
+    { label: "A", snippets: [{ lang: "text", file: None, code: "a", }], },
+    { label: "B", snippets: [{ lang: "text", file: None, code: "b", }], },
+  ]
+  let fence = @markdown.tabs_fence(tabs)
+  let html = render_route(
+    Doc("smithy-syntax"),
+    Some("# T\n\n" + fence + "\n\nText.\n\n" + fence + "\n"),
+  )
+  for
+    part in [
+      "name=\"tabs-1\"", "id=\"tabs-1-1\"", "name=\"tabs-2\"", "id=\"tabs-2-1\"",
+      "for=\"tabs-2-2\"",
+    ] {
+    assert_true(html.contains(part))
+  }
+  // One checked tab in each group.
+  let checked = html.split("checked").to_array().length() - 1
+  assert_eq(checked, 2)
 }

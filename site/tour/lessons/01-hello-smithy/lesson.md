@@ -13,3 +13,12 @@ A shape is one named item of the model. This model has one shape: the structure 
 The full name of a shape is its namespace, a `#` character, and its name. The full name of this shape is `example#Greeting`. Look at the JSON AST output. It uses this name as a key.
 
 Now break the model. Delete the line `namespace example`. A namespace must come before the first shape. The Findings tab now shows one error. The error says that the parser found `structure` but no `namespace` statement before it. Put the line back, and the error goes away.
+
+## On your computer
+
+The `smithy` CLI and the MoonBit library also convert this model to the JSON AST. Select a tab to see each one. The tests of this repository run both blocks.
+
+```include
+CLI: apps/smithy/README.md#convert-json-cli
+MoonBit: pkgs/smithy/README.mbt.md#convert-json-api
+```

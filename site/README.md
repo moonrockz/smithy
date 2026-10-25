@@ -251,3 +251,10 @@ results. CI runs it as the job `tour`.
 `scripts/site-pages.mbtx` on main builds the release channel by running the tag's own `scripts/site-build.mbtx`
 in a worktree of that tag. A new main therefore calls an old `site-build`. Keep the arguments of `site-build`
 backward-compatible: add optional flags, and never rename or remove one.
+
+## Include blocks in tour lessons
+
+A tour lesson never holds a CLI or API block that no test runs. It includes a marked region of a tested source,
+and the lesson reader (`site/tour/source`) replaces the include block with a tab group. The format and the rules
+are in `site/tour/README.md`, section "CLI and API blocks". A bad include or a hand-written CLI or API block fails
+`mise run tour:check` (the CI job `tour`, on every pull request) and `mise run site:check`.

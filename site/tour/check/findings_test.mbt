@@ -4,7 +4,7 @@ fn case_diagnostics(
   dir : String,
   name : String,
 ) -> Array[@core.Diagnostic] raise {
-  let tour = match @source.read_tour(lessons_root) {
+  let tour = match @source.read_tour(lessons_root, repo="..") {
     Ok(tour) => tour
     Err(e) => fail("I cannot read the tour: " + e)
   }

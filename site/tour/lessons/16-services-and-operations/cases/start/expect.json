@@ -1,0 +1,1 @@
+{"events": [], "output_contains": ["\"openapi\": \"3.0.2\"", "\"/service/Weather/operation/GetForecast\"", "\"post\": {", "\"GetForecastRequestContent\"", "\"GetForecastResponseContent\"", "\"description\": \"Gives the forecast for one city.\""]}

@@ -82,6 +82,7 @@ fn md_block(base : String, b : @markdown.Block) -> Html {
     }
     Paragraph(xs) => @html.p(md_inlines(base, xs))
     CodeBlock(lang, code) => code_view(lang, code)
+    Tabs(id, tabs) => tabs_view(id, tabs)
     Quote(bs) => @html.blockquote(bs.map(x => md_block(base, x)))
     BulletList(items) =>
       @html.ul(items.map(item => @html.li(item.map(x => md_block(base, x)))))
@@ -106,4 +107,38 @@ fn md_block(base : String, b : @markdown.Block) -> Html {
 ///|
 pub fn md_view(base : String, blocks : Array[@markdown.Block]) -> Html {
   @html.div(class="ms-md", blocks.map(b => md_block(base, b)))
+}
+
+///|
+/// A tab group: radio inputs, labels and panels that CSS switches without JavaScript.
+fn tabs_view(id : String, tabs : Array[@markdown.Tab]) -> Html {
+  let kids : Array[Html] = []
+  for i, tab in tabs {
+    let tab_id = "\{id}-\{i + 1}"
+    kids.push(
+      @html.input(
+        input_type=Radio,
+        class="ms-tab-input",
+        name=id,
+        id=tab_id,
+        checked=i == 0,
+      ),
+    )
+    kids.push(
+      @html.label(
+        class="ms-tab-label",
+        attrs=@html.Attrs::build().for_(tab_id),
+        tab.label,
+      ),
+    )
+    let panel : Array[Html] = []
+    for snippet in tab.snippets {
+      if snippet.file is Some(file) {
+        panel.push(@html.span(class="ms-codelabel", file))
+      }
+      panel.push(code_view(snippet.lang, snippet.code))
+    }
+    kids.push(@html.div(class="ms-tab-panel", panel))
+  }
+  @html.div(class="ms-md-tabs", kids)
 }

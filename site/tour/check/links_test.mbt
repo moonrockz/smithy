@@ -36,7 +36,8 @@ fn links_of(blocks : Array[@markdown.Block]) -> Array[@markdown.Target] {
         head.each(inlines)
         rows.each(row => row.each(inlines))
       }
-      CodeBlock(_, _) | Rule => ()
+      // A tab holds a label and code snippets: plain text with no link.
+      CodeBlock(_, _) | Rule | Tabs(_, _) => ()
     }
   }
   result
@@ -47,7 +48,7 @@ fn links_of(blocks : Array[@markdown.Block]) -> Array[@markdown.Target] {
 /// link that the site sends to GitHub is a folder or a file that the site
 /// does not publish, and a relative link to a lesson folder breaks on GitHub.
 test "every link of a lesson into the lessons folder opens a lesson page" {
-  let tour = match @source.read_tour(lessons_root) {
+  let tour = match @source.read_tour(lessons_root, repo="..") {
     Ok(tour) => tour
     Err(e) => fail("I cannot read the tour: " + e)
   }

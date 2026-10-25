@@ -8,6 +8,13 @@ pub using @samples {
   type Output,
   type Tab,
   type ShareState,
+  type UnknownMembers,
+  type MemberNames,
+  type ValueOptions,
+  type RpcVersion,
+  type ResponseContext,
+  type LegacyErrors,
+  type MessageKind,
 }
 
 ///|
@@ -24,6 +31,13 @@ pub(all) enum Request {
   /// Validate a model of several files, as (name, text). Each name is the
   /// loader file name and the `file` of the findings in it.
   ValidateFiles(seq~ : Int32, files~ : Array[(String, String)])
+  /// Validate the files with the model that `TransformFiles` loads for `output`:
+  /// with the bundled OpenAPI protocol definitions for OpenApi30 and OpenApi31.
+  ValidateFilesFor(
+    seq~ : Int32,
+    files~ : Array[(String, String)],
+    output~ : Output
+  )
   /// Convert a model of several files, as `Transform` does for one.
   TransformFiles(
     seq~ : Int32,
@@ -51,7 +65,60 @@ pub(all) enum Request {
   /// Check the next `count` entries: 1 for Step, a large number for Run all.
   TranscriptStep(seq~ : Int32, count~ : Int32)
   TranscriptReset(seq~ : Int32)
+  /// Check a JSON value against a data shape of a model, as
+  /// `smithy validate value` does. `files` are the model files, as (name,
+  /// text). `shape` is the absolute shape ID of the target: the CLI option
+  /// `--shape`. `value` is the text of the value.
+  CheckValue(
+    seq~ : Int32,
+    files~ : Array[(String, String)],
+    shape~ : String,
+    value~ : String,
+    options~ : ValueOptions
+  )
+  /// Check one JSON-RPC message against a service of a model, as
+  /// `smithy validate rpc` does with `--message` or `--response`. `files` are
+  /// the model files, as (name, text). `service` is the absolute shape ID of
+  /// the service: the CLI option `--service`. `message` is the text of the
+  /// message; the check reads it as text, so an id keeps all of its digits.
+  CheckMessage(
+    seq~ : Int32,
+    files~ : Array[(String, String)],
+    service~ : String,
+    version~ : RpcVersion,
+    message~ : String,
+    kind~ : MessageKind,
+    options~ : ValueOptions
+  )
+  /// Compare two models, as `smithy diff --old --new` does. `old` and `new`
+  /// are the model files of each side, as (name, text).
+  DiffModels(
+    seq~ : Int32,
+    old~ : Array[(String, String)],
+    new~ : Array[(String, String)]
+  )
 } derive(Eq, Debug, ToJson, FromJson)
+
+///|
+/// An event of a model diff, as the library writes it. `shape` is the shape ID
+/// or `None`, as the CLI prints `-`.
+pub(all) struct DiffEvent {
+  id : String
+  severity : String
+  shape : String?
+  message : String
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+/// The line that `smithy diff` prints for the event: line breaks of the
+/// message are written as `\n`.
+pub fn DiffEvent::cli_line(self : DiffEvent) -> String {
+  let shape = self.shape.unwrap_or("-")
+  let message = self.message
+    .replace_all(old="\r\n", new="\n")
+    .replace_all(old="\n", new="\\n")
+  "[\{self.severity}] \{shape}: \{message} | \{self.id}"
+}
 
 ///|
 /// A finding of the model, as the library writes it. `severity` and `code` are
@@ -151,6 +218,31 @@ pub(all) struct ProtocolView {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+/// A line of a value or message check, with the fields that the CLI prints.
+pub(all) enum DataFinding {
+  /// A finding in the checked text. `path` is a JSON pointer; "" is the root.
+  /// `offset` is the place in the text when the check gives one (a JSON-RPC
+  /// message that does not parse).
+  Found(
+    code~ : String,
+    severity~ : String,
+    path~ : String,
+    shape~ : String,
+    message~ : String,
+    offset~ : Int32?
+  )
+  /// A problem that stopped the check before it checked the value. `source` is
+  /// what the CLI names in place of the input file: "--shape", "--service" or
+  /// a model file; `None` is the input.
+  Stopped(
+    code~ : String,
+    message~ : String,
+    source~ : String?,
+    offset~ : Int32?
+  )
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
 pub(all) enum Response {
   /// The diagnostics of the model, and its JSON-RPC protocols, by shape ID.
   /// A model that does not assemble lists no protocol.
@@ -185,5 +277,20 @@ pub(all) enum Response {
     checked~ : Int32,
     done~ : Bool,
     summary~ : SummaryView?
+  )
+  /// The result of a value or message check. `valid` is the result of the
+  /// CLI: false when a finding is an error or a problem stopped the check.
+  DataChecked(seq~ : Int32, valid~ : Bool, findings~ : Array[DataFinding])
+  /// The findings of each model, by file. `events` is `None` when a model has
+  /// an ERROR or DANGER event or does not assemble: the CLI then does not
+  /// compare and exits 1: do not read `breaking` then (it is false), the reason is
+  /// in `old` and `new`. SUPPRESSED events are left out. With events, `breaking`
+  /// is the result of the CLI.
+  Diffed(
+    seq~ : Int32,
+    old~ : Array[Diagnostic],
+    new~ : Array[Diagnostic],
+    events~ : Array[DiffEvent]?,
+    breaking~ : Bool
   )
 } derive(Eq, Debug, ToJson, FromJson)

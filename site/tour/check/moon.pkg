@@ -1,9 +1,10 @@
 import {
   "moonrockz/smithy-site/tour/model",
   "moonrockz/smithy-site/tour/source",
+  "moonrockz/smithy-site/markdown",
   "moonrockz/smithy-site/playground/core",
   "moonrockz/smithy-site/data",
-  "moonrockz/smithy-site/markdown",
+  "moonrockz/smithy-validation/rpc",
   "moonbitlang/x/fs",
   "moonbitlang/core/json",
 } for "test"

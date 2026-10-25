@@ -23,6 +23,9 @@ pub extend LessonFile with FromJson::{from_json}
 pub(all) struct Expectation {
   events : Array[EventKey]
   output_contains : Array[String]
+  /// A text that the reason of a blocked output must contain. The output must
+  /// be blocked for a reason other than model errors (`BlockKind::Other`).
+  blocked : String?
 }
 
 ///|
@@ -277,19 +280,10 @@ pub fn Lesson::case_id(self : Lesson, case : Case) -> CaseId {
 }
 
 ///|
-/// Order by UTF-16 code unit, then by length. `String::compare` orders by
-/// length first, so the digest and the file order cannot use it.
-pub fn compare_code_units(a : String, b : String) -> Int32 {
-  let n = if a.length() < b.length() { a.length() } else { b.length() }
-  for i in 0..<n {
-    let x = a.code_unit_at(i).to_int()
-    let y = b.code_unit_at(i).to_int()
-    if x != y {
-      return if x < y { -1 } else { 1 }
-    }
-  }
-  a.length().compare(b.length())
-}
+/// Order by UTF-16 code unit, then by length (`@samples.compare_code_units`).
+/// `String::compare` orders by length first, so the digest and the file order
+/// cannot use it.
+pub using @samples {compare_code_units}
 
 ///|
 /// The folder of a lesson: its number in two digits, `-`, and its slug.
@@ -297,6 +291,10 @@ pub fn lesson_dir(number : Int32, slug : String) -> String {
   let digits = if number < 10 { "0\{number}" } else { "\{number}" }
   "\{digits}-\{slug}"
 }
+
+///|
+/// A `spec` that starts with this is a link to the Smithy specification.
+pub let spec_url_prefix : String = "https://smithy.io/"
 
 ///|
 /// The repository path of the lessons folder.

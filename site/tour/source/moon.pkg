@@ -1,6 +1,8 @@
 import {
   "moonrockz/smithy-site/tour/model",
   "moonrockz/smithy-site/playground/samples",
+  "moonrockz/smithy-site/content",
+  "moonrockz/smithy-site/markdown",
   "moonbitlang/x/fs",
   "moonbitlang/core/json",
 }

@@ -1,6 +1,6 @@
 ///|
 fn read(name : String) -> Result[@model.Tour, String] {
-  @source.read_tour("tour/source/testdata/\{name}")
+  @source.read_tour("tour/source/testdata/\{name}", repo="..")
 }
 
 ///|
@@ -119,4 +119,101 @@ test "a sub-folder of the files of a case" {
 ///|
 test "a lesson file whose name does not end in .smithy" {
   expect_err("not-smithy", ["01-a/files/model.json", ".smithy"])
+}
+
+///|
+test "a case that expects a blocked output" {
+  let tour = match read("blocked") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let cases = tour.lessons[0].cases
+  assert_eq(cases.map(c => c.name), ["start", "b"])
+  assert_eq(cases[0].expect.blocked, None)
+  assert_eq(cases[1].expect.blocked, Some("x"))
+}
+
+///|
+test "blocked together with output_contains" {
+  expect_err("blocked-and-contains", [
+    "01-a/cases/b", "blocked", "output_contains",
+  ])
+}
+
+///|
+test "blocked in a lesson without an output" {
+  expect_err("blocked-no-output", ["01-a/cases/b", "needs a lesson output"])
+}
+
+///|
+test "blocked with an ERROR event" {
+  expect_err("blocked-with-error", ["01-a/cases/b", "blocked", "ERROR"])
+}
+
+///|
+test "a spec that is neither a smithy.io URL nor a docs page" {
+  expect_err("bad-spec", [
+    "01-a: \"spec\" must be a smithy.io URL or the repository path of a docs page, not \"https://example.com/x\"",
+  ])
+}
+
+///|
+test "a spec that is the repository path of a docs page" {
+  match read("docs-spec") {
+    Ok(tour) =>
+      assert_eq(tour.lessons[0].spec, "pkgs/smithy-openrpc/README.mbt.md")
+    Err(msg) => fail(msg)
+  }
+}
+
+///|
+fn expect_bad_spec(name : String, spec : String) -> Unit raise {
+  expect_err(name, [
+    "01-a: \"spec\" must be a smithy.io URL or the repository path of a docs page, not \"\{spec}\"",
+  ])
+}
+
+///|
+test "a spec that is the path of a file that the site does not publish" {
+  expect_bad_spec(
+    "unpublished-spec", "site/tour/lessons/01-hello-smithy/lesson.md",
+  )
+  expect_bad_spec("working-doc-spec", "docs/superpowers/plan.md")
+}
+
+///|
+test "an include of the CLI block becomes a tabs fence" {
+  let tour = match read("include-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let text = tour.lessons[0].text
+  assert_true(text.contains("```tabs"))
+  assert_false(text.contains("```include"))
+}
+
+///|
+test "an include of a missing file" {
+  expect_err("include-missing-file", [
+    "01-", "lesson.md", "I could not find the file apps/smithy/NOPE.md",
+  ])
+}
+
+///|
+test "an include of a missing marker" {
+  expect_err("include-missing-marker", [
+    "lesson.md", "<!-- tour:start no-such-block -->",
+  ])
+}
+
+///|
+test "a hand-written console block" {
+  expect_err("hand-written", ["lesson.md", "`console`"])
+}
+
+///|
+test "an include block that the reader cannot expand" {
+  expect_err("include-unexpanded", [
+    "01-hello/lesson.md", "I found an include block that I cannot expand",
+  ])
 }

@@ -3,6 +3,7 @@ import {
   "moonrockz/smithy-syntax" @syntax,
   "moonrockz/smithy-validation" @validation,
   "moonrockz/smithy-validation/rpc",
+  "moonrockz/smithy-diff" @diff,
   "moonrockz/smithy-site/playground/samples",
   "moonrockz/smithy-jsonschema" @jsonschema,
   "moonrockz/smithy-openapi" @openapi,

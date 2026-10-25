@@ -1,0 +1,794 @@
+{
+  "cases": [
+    {
+      "id": "value-consumer-valid",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":2}"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "value-consumer-invalid",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":0}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "value.json/count: error[Range] example#Input$count: I expected the number to satisfy the modeled range."
+      ]
+    },
+    {
+      "id": "value-unknown-reject",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":2,\"extra\":1}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "value.json/extra: error[UnknownMember] example#Input: I expected a declared member, but found an unknown member."
+      ]
+    },
+    {
+      "id": "value-unknown-ignore",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "--unknown-members",
+        "ignore",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":2,\"extra\":1}"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "value-json-names",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "--member-names",
+        "json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required @jsonName(\"n\") count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"n\":2}"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "value-member-target",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input$count",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "0"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "value.json: error[Range] example#Input$count: I expected the number to satisfy the modeled range."
+      ]
+    },
+    {
+      "id": "value-not-json",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":1"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "value.json: error[InvalidJson]: I expected one well-formed JSON value: Unexpected end of file"
+      ]
+    },
+    {
+      "id": "value-duplicate-key",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":1,\"count\":2}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "value.json: error[DuplicateJsonKey]: I expected unique JSON object member names, but found a duplicate."
+      ]
+    },
+    {
+      "id": "value-missing-target",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Missing",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":2}"
+        }
+      ],
+      "status": 2,
+      "lines": [
+        "--shape: error[InvalidTarget]: example#Missing: I expected an existing data shape or data member as the validation target."
+      ]
+    },
+    {
+      "id": "value-invalid-model",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(foo: 1)\ninteger Count\nstructure Input { count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"count\":2}"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "example.smithy: error[InvalidModel]: example#Input$count: I found an unknown constraint bound."
+      ]
+    },
+    {
+      "id": "value-unsupported-pattern",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@pattern(\"^\\\\u{41}$\")\nstring Name\nstructure Input { name: Name }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"name\":\"A\"}"
+        }
+      ],
+      "status": 2,
+      "lines": [
+        "example.smithy: error[UnsupportedConstraint]: example#Input$name: I could not read '\\u{' in the pattern. I accept only \\uXXXX with four hex digits."
+      ]
+    },
+    {
+      "id": "value-unsupported-timestamp",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\nstructure Input { @timestampFormat(\"http-date\") when: Timestamp }"
+        },
+        {
+          "name": "value.json",
+          "text": "{\"when\":\"x\"}"
+        }
+      ],
+      "status": 2,
+      "lines": [
+        "example.smithy: error[UnsupportedConstraint]: example#Input$when: I cannot validate this timestamp format in the JSON value profile."
+      ]
+    },
+    {
+      "id": "value-json-limit",
+      "args": [
+        "validate",
+        "value",
+        "--shape",
+        "example#Input",
+        "--value",
+        "value.json",
+        "example.smithy"
+      ],
+      "files": [
+        {
+          "name": "example.smithy",
+          "text": "$version: \"2\"\nnamespace example\n@range(min: 1, max: 100)\ninteger Count\nstructure Input { @required count: Count }"
+        },
+        {
+          "name": "value.json",
+          "text": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "value.json: error[JsonInputLimit]: I expected JSON nesting depth no greater than 128."
+      ]
+    },
+    {
+      "id": "rpc-call",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Calculator",
+        "--message",
+        "call.json",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "call.json",
+          "from": "examples/json-rpc/call.json"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "rpc-invalid",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Calculator",
+        "--message",
+        "invalid.json",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "invalid.json",
+          "from": "examples/json-rpc/invalid.json"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "invalid.json/params/1: error[TypeMismatch] example#SubtractInput$subtrahend: I expected a integer value, but found string."
+      ]
+    },
+    {
+      "id": "rpc-reply",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Replies",
+        "--response",
+        "reply.json",
+        "--method",
+        "subtract",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "reply.json",
+          "from": "examples/json-rpc/reply.json"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "rpc-error",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Replies",
+        "--response",
+        "error.json",
+        "--request",
+        "call.json",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "error.json",
+          "from": "examples/json-rpc/error.json"
+        },
+        {
+          "name": "call.json",
+          "from": "examples/json-rpc/call.json"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "rpc-reply-no-context",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Replies",
+        "--response",
+        "reply.json",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "reply.json",
+          "from": "examples/json-rpc/reply.json"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "reply.json: error[MissingContext] example#Replies: I expected explicit method, operation, original-request or envelope-only context."
+      ]
+    },
+    {
+      "id": "rpc-not-json",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Calculator",
+        "--message",
+        "bad.json",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "bad.json",
+          "text": "{1"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "bad.json:1: error[InvalidJson] example#Calculator: I expected one well-formed JSON value: Invalid character '1' at line 1, column 1"
+      ]
+    },
+    {
+      "id": "rpc-missing-service",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Nope",
+        "--message",
+        "call.json",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "call.json",
+          "from": "examples/json-rpc/call.json"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 2,
+      "lines": [
+        "--service: error[InvalidContract]: example#Nope: I expected an existing service shape."
+      ]
+    },
+    {
+      "id": "rpc-legacy-call",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "1.0",
+        "--service",
+        "example#Calculator",
+        "--message",
+        "legacy.json",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "legacy.json",
+          "text": "{\"method\":\"subtract\",\"params\":[42,23],\"id\":1}"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "rpc-legacy-error",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "1.0",
+        "--service",
+        "example#Replies",
+        "--response",
+        "legacy-error.json",
+        "--method",
+        "subtract",
+        "--legacy-errors",
+        "code-message-data",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "legacy-error.json",
+          "text": "{\"result\":null,\"error\":{\"code\":1001,\"message\":\"failure\",\"data\":1},\"id\":1}"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "legacy-error.json/error/data: error[TypeMismatch] example#Problem$detail: I expected a string value, but found number."
+      ]
+    },
+    {
+      "id": "rpc-legacy-opaque",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "1.0",
+        "--service",
+        "example#Replies",
+        "--response",
+        "legacy-error.json",
+        "--method",
+        "subtract",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "legacy-error.json",
+          "text": "{\"result\":null,\"error\":{\"code\":1001,\"message\":\"failure\",\"data\":1},\"id\":1}"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": [
+        "legacy-error.json/error: advisory[LimitedScope] example#Subtract: I checked an opaque legacy error; no code/message/data application mapping was selected."
+      ]
+    },
+    {
+      "id": "rpc-legacy-version-2",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--legacy-errors",
+        "opaque",
+        "--service",
+        "example#Replies",
+        "--response",
+        "reply.json",
+        "--method",
+        "subtract",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "reply.json",
+          "from": "examples/json-rpc/reply.json"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 2,
+      "lines": [
+        "smithy: --legacy-errors requires version 1.0"
+      ]
+    },
+    {
+      "id": "rpc-envelope-only",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Replies",
+        "--response",
+        "reply.json",
+        "--envelope-only",
+        "responses.smithy"
+      ],
+      "files": [
+        {
+          "name": "reply.json",
+          "from": "examples/json-rpc/reply.json"
+        },
+        {
+          "name": "responses.smithy",
+          "from": "examples/json-rpc/responses.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": [
+        "reply.json: advisory[LimitedScope] example#Replies: I checked only the response envelope; payload contracts and request ID correlation were not checked."
+      ]
+    },
+    {
+      "id": "rpc-unknown-reject",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Calculator",
+        "--message",
+        "extra.json",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "extra.json",
+          "text": "{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":{\"minuend\":42,\"subtrahend\":23,\"extra\":1},\"id\":1}"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "extra.json/params/extra: error[UnknownMember] example#SubtractInput: I expected a declared member, but found an unknown member."
+      ]
+    },
+    {
+      "id": "rpc-unknown-ignore",
+      "args": [
+        "validate",
+        "rpc",
+        "--version",
+        "2.0",
+        "--service",
+        "example#Calculator",
+        "--message",
+        "extra.json",
+        "--unknown-members",
+        "ignore",
+        "calculator.smithy"
+      ],
+      "files": [
+        {
+          "name": "extra.json",
+          "text": "{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":{\"minuend\":42,\"subtrahend\":23,\"extra\":1},\"id\":1}"
+        },
+        {
+          "name": "calculator.smithy",
+          "from": "examples/json-rpc/calculator.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": []
+    },
+    {
+      "id": "diff-constraints-added",
+      "args": [
+        "diff",
+        "--old",
+        "old.smithy",
+        "--new",
+        "new.smithy"
+      ],
+      "files": [
+        {
+          "name": "old.smithy",
+          "from": "tests/tck/diff/local/constraints-added.a.smithy"
+        },
+        {
+          "name": "new.smithy",
+          "from": "tests/tck/diff/local/constraints-added.b.smithy"
+        }
+      ],
+      "status": 0,
+      "lines": [
+        "[NOTE] example.constraints#LengthMax: Added trait `smithy.api#length` with value \\n```\\n{\\n    \"max\": 10\\n}\\n```\\n | ModifiedTrait.Add.smithy.api#length",
+        "[NOTE] example.constraints#LengthMin: Added trait `smithy.api#length` with value \\n```\\n{\\n    \"min\": 1\\n}\\n```\\n | ModifiedTrait.Add.smithy.api#length",
+        "[NOTE] example.constraints#RangeMax: Added trait `smithy.api#range` with value \\n```\\n{\\n    \"max\": 10\\n}\\n```\\n | ModifiedTrait.Add.smithy.api#range",
+        "[NOTE] example.constraints#RangeMin: Added trait `smithy.api#range` with value \\n```\\n{\\n    \"min\": -10\\n}\\n```\\n | ModifiedTrait.Add.smithy.api#range"
+      ]
+    },
+    {
+      "id": "diff-removed-shape",
+      "args": [
+        "diff",
+        "--old",
+        "old.smithy",
+        "--new",
+        "new.smithy"
+      ],
+      "files": [
+        {
+          "name": "old.smithy",
+          "text": "$version: \"2\"\nnamespace example\nstructure A { x: String }\nstructure B { y: String }"
+        },
+        {
+          "name": "new.smithy",
+          "text": "$version: \"2\"\nnamespace example\nstructure A { x: String }"
+        }
+      ],
+      "status": 1,
+      "lines": [
+        "[ERROR] example#B: Removed structure `example#B` | RemovedShape"
+      ]
+    }
+  ]
+}

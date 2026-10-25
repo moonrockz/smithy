@@ -226,6 +226,9 @@ fn Runtime::reply_msg(self : Runtime, text : String) -> @workbench.Msg {
           summary=summary.map(summary_of),
         ),
       )
+    // The playground never asks for a value or message check (no new tab, spec §2).
+    DataChecked(..) => Mismatched
+    Diffed(..) => Mismatched
   }
 }
 

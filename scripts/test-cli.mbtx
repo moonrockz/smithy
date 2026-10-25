@@ -1365,6 +1365,416 @@ async fn exercise_bad_doc_comment(runner : Runner) -> Unit {
 }
 
 ///|
+/// The README files whose `console` and `LANG file=NAME` fences run. Keep it equal to
+/// `@source.cli_doc_files` in site/tour/source/include.mbt.
+let readme_files : Array[String] = ["apps/smithy/README.md"]
+
+///|
+priv struct DocCommand {
+  args : Array[String]
+  output : String
+} derive(Eq, Debug)
+
+///|
+priv enum DocStep {
+  Fixture(name~ : String, text~ : String)
+  Session(Array[DocCommand])
+} derive(Eq, Debug)
+
+///|
+/// Words of a command line; a single-quoted word keeps its spaces.
+fn shell_words(line : String) -> Result[Array[String], String] {
+  let words : Array[String] = []
+  let word = StringBuilder()
+  let mut started = false
+  let mut quoted = false
+  for c in line {
+    if quoted {
+      if c == '\'' {
+        quoted = false
+      } else {
+        word.write_char(c)
+      }
+      continue
+    }
+    match c {
+      '\'' => {
+        quoted = true
+        started = true
+      }
+      ' ' =>
+        if started {
+          words.push(word.to_string())
+          word.reset()
+          started = false
+        }
+      '|' | '>' | '<' | ';' | '&' | '"' | '`' | '$' | '\\' =>
+        return Err("I cannot run the shell character \{c} in `\{line}`.")
+      _ => {
+        word.write_char(c)
+        started = true
+      }
+    }
+  }
+  if quoted {
+    return Err("I found an unclosed quote in `\{line}`.")
+  }
+  if started {
+    words.push(word.to_string())
+  }
+  Ok(words)
+}
+
+///|
+fn doc_fixture_name(info : String) -> Result[String?, String] {
+  for word in info.split(" ") {
+    let word = word.to_owned()
+    if word.has_prefix("file=") {
+      let name = word[5:].to_owned()
+      let plain = !name.is_empty() &&
+        name != "." &&
+        name != ".." &&
+        name.iter().all(c => {
+          (c is ('a'..='z') || c is ('A'..='Z') || c is ('0'..='9')) || c == '.' || c == '_' || c == '-'
+        })
+      guard plain else {
+        return Err(
+          "I expected a plain file name after file= and found `\{name}`.",
+        )
+      }
+      return Ok(Some(name))
+    }
+  }
+  Ok(None)
+}
+
+///|
+/// True when an argument names an absolute path, or has a `..` segment, so it could leave the scratch folder.
+fn doc_path_leaves(word : String) -> Bool {
+  let drive = word.length() >= 2 && word[1] == ':'
+  word.has_prefix("/") ||
+  word.has_prefix("\\") ||
+  drive ||
+  word.split("/").any(part => part.split("\\").any(seg => seg == ".."))
+}
+
+///|
+fn doc_session(body : Array[String]) -> Result[DocStep, String] {
+  let commands : Array[DocCommand] = []
+  let mut args : Array[String]? = None
+  let mut output : Array[String] = []
+  fn finish(
+    commands : Array[DocCommand],
+    args : Array[String]?,
+    output : Array[String],
+  ) -> Unit {
+    if args is Some(args) {
+      let text = if output.is_empty() { "" } else { output.join("\n") + "\n" }
+      commands.push({ args, output: text })
+    }
+  }
+
+  for line in body {
+    if line.has_prefix("$ ") {
+      finish(commands, args, output)
+      let words = match shell_words(line[2:].to_owned()) {
+        Ok(words) => words
+        Err(msg) => return Err(msg)
+      }
+      guard words.length() > 0 && words[0] == "smithy" else {
+        return Err("I can run only a smithy command and found `\{line}`.")
+      }
+      for word in words[1:] {
+        if doc_path_leaves(word) {
+          return Err(
+            "I cannot run an argument that is an absolute path or has a .. segment: `\{word}` in `\{line}`.",
+          )
+        }
+      }
+      args = Some(words[1:].to_owned())
+      output = []
+    } else {
+      guard args is Some(_) else {
+        return Err("I found output before the first command: `\{line}`.")
+      }
+      output.push(line)
+    }
+  }
+  finish(commands, args, output)
+  if commands.is_empty() {
+    return Err("I found a console block with no command.")
+  }
+  Ok(Session(commands))
+}
+
+///|
+/// The fixture and console fences of `markdown`, in order. Other fences are skipped.
+///
+/// THE RULE (`@source` in site/tour/source/include.mbt must use the same one):
+/// - A fence starts at the start of a line with three or more backticks. The info string is the rest of
+///   the line. A fence closes at the first line of at least as many backticks, after up to 3 spaces (as in
+///   CommonMark) and with only spaces or tabs after.
+/// - A console fence is a fence whose first info word is `console`, whatever words follow. Every
+///   command of it runs, and a console fence with no command is an error.
+/// - A fixture fence is a fence with an info word `file=NAME`. Its text is written to NAME.
+/// - A fence that starts with spaces or tabs, or with `~~~`, and that would be a console or fixture fence,
+///   is an error: I cannot tell whether a test runs it. I never skip it in silence.
+/// - Every other fence is skipped.
+fn doc_steps(markdown : String) -> Result[Array[DocStep], String] {
+  let lines = markdown
+    .split("\n")
+    .map(l => l.trim_end(chars="\r").to_owned())
+    .collect()
+  let steps : Array[DocStep] = []
+  let mut i = 0
+  while i < lines.length() {
+    let line = lines[i]
+    i += 1
+    let first = line.trim_start().to_owned()
+    let info_first = fn(text : String) -> String {
+      let rest = text.trim_start(chars="`~").trim().to_owned()
+      match rest.split(" ").next() {
+        Some(word) => word.to_owned()
+        None => ""
+      }
+    }
+    if !line.has_prefix("```") {
+      if (first.has_prefix("```") || first.has_prefix("~~~")) &&
+        (info_first(first) == "console" || first.contains(" file=")) {
+        return Err(
+          "I found a console or file= fence that does not start at the start of a line: `\{line}`. I cannot tell whether a test runs it.",
+        )
+      }
+      continue
+    }
+    let mut ticks = 0
+    while ticks < line.length() && line[ticks] == '`' {
+      ticks += 1
+    }
+    let info = line[ticks:].trim().to_owned()
+    let body : Array[String] = []
+    let mut closed = false
+    while i < lines.length() {
+      let inner = lines[i]
+      i += 1
+      let indent = inner.iter().take(4).take_while(c => c == ' ').count()
+      let inner_ticks = inner[indent:].iter().take_while(c => c == '`').count()
+      let tail = inner[indent + inner_ticks:].trim(chars=" \t")
+      if indent <= 3 && inner_ticks >= ticks && tail.is_empty() {
+        closed = true
+        break
+      }
+      body.push(inner)
+    }
+    guard closed else {
+      return Err("I found a fence that never closes: `\{line}`.")
+    }
+    if info_first(info) == "console" {
+      match doc_session(body) {
+        Ok(step) => steps.push(step)
+        Err(msg) => return Err(msg)
+      }
+    } else {
+      match doc_fixture_name(info) {
+        Ok(Some(name)) => {
+          let text = if body.is_empty() { "" } else { body.join("\n") + "\n" }
+          steps.push(Fixture(name~, text~))
+        }
+        Ok(None) => ()
+        Err(msg) => return Err(msg)
+      }
+    }
+  }
+  Ok(steps)
+}
+
+///|
+/// Writes each fixture into a fresh `<runner.dir>/readme` and runs each command there.
+async fn check_readme(runner : Runner, root : String) -> Unit {
+  let dir = "\{runner.dir}/readme"
+  let scratch = { ..runner, dir }
+  for file in readme_files {
+    let steps = match doc_steps(@fs.read_file("\{root}/\{file}").text()) {
+      Ok(steps) => steps
+      Err(msg) => fail("\{file}: \{msg}")
+    }
+    if @fs.exists(dir) {
+      @fs.rmdir(dir, recursive=true)
+    }
+    @fs.mkdir(dir, recursive=true, allow_exist=true)
+    let mut ran = 0
+    for step in steps {
+      match step {
+        Fixture(name~, text~) => @fs.write_file("\{dir}/\{name}", text)
+        Session(commands) => {
+          for command in commands {
+            ran += 1
+            let (out, err) = scratch.command(command.args, 0)
+            assert_eq(
+              err,
+              "",
+              msg="\{file}: smithy \{command.args.join(" ")} wrote to stderr",
+            )
+            assert_eq(
+              out,
+              command.output,
+              msg="\{file}: smithy \{command.args.join(" ")}\nthe README shows:\n\{command.output}\nthe command wrote:\n\{out}",
+            )
+          }
+        }
+      }
+    }
+    if ran == 0 {
+      fail("I found no console block in \{file}")
+    }
+  }
+}
+
+///|
+/// The cases of `site/playground/cli_check/cli-cases.json`: each runs in its own
+/// directory, and the lines it prints (stdout, then stderr) are the lines that
+/// the playground core must give for the same input.
+async fn exercise_engine_cases(runner : Runner, root : String) -> Unit {
+  let cases = @json.parse(
+    @fs.read_file("\{root}/site/playground/cli_check/cli-cases.json").text(),
+  )
+  guard cases is { "cases": Array(cases), .. } else {
+    fail("cli-cases.json must have a cases array")
+  }
+  // The ids that the file must hold: a case lost in a merge fails here.
+  let expected_ids = ["value-consumer-valid", "value-consumer-invalid", "value-unknown-reject", "value-unknown-ignore", "value-json-names", "value-member-target", "value-not-json", "value-duplicate-key", "value-missing-target", "value-invalid-model", "value-unsupported-pattern", "value-unsupported-timestamp", "value-json-limit", "rpc-call", "rpc-invalid", "rpc-reply", "rpc-error", "rpc-reply-no-context", "rpc-not-json", "rpc-missing-service", "rpc-legacy-call", "rpc-legacy-error", "rpc-legacy-opaque", "rpc-legacy-version-2", "rpc-envelope-only", "rpc-unknown-reject", "rpc-unknown-ignore", "diff-constraints-added", "diff-removed-shape"]
+  let seen : Array[String] = []
+  for item in cases {
+    guard item is { "id": String(id), .. } else {
+      fail("a case needs an id: \{item.stringify()}")
+    }
+    assert_false(seen.contains(id), msg="duplicate case id \{id}")
+    seen.push(id)
+  }
+  assert_true(!cases.is_empty(), msg="cli-cases.json has no case")
+  assert_eq(seen, expected_ids)
+  for item in cases {
+    guard item
+      is {
+        "id": String(id),
+        "args": Array(args),
+        "files": Array(files),
+        "status": Number(status, ..),
+        "lines": Array(lines),
+        ..
+      } else {
+      fail("a case needs id, args, files, status and lines: \{item.stringify()}")
+    }
+    let dir = "\{runner.dir}/engine/\{id}"
+    @fs.mkdir(dir, recursive=true, allow_exist=true)
+    for file in files {
+      guard file is { "name": String(name), .. } else {
+        fail("\{id}: a file needs a name")
+      }
+      let text = match file {
+        { "text": _, "from": _, .. } =>
+          fail("\{id}: file \{name} needs exactly one of text and from")
+        { "text": String(text), .. } => text
+        { "from": String(from), .. } =>
+          @fs.read_file("\{root}/\{from}").text()
+        _ => fail("\{id}: file \{name} needs exactly one of text and from")
+      }
+      @fs.write_file("\{dir}/\{name}", text)
+    }
+    let args = args.map(arg => {
+      guard arg is String(arg) else { fail("\{id}: an argument must be a string") }
+      arg
+    })
+    let (out, err) = { ..runner, dir, }.command(args, status.to_int())
+    let printed : Array[Json] = []
+    for line in (out + err).replace_all(old="\r\n", new="\n").split("\n") {
+      let line = line.to_owned()
+      if !line.is_empty() {
+        printed.push(Json::string(line))
+      }
+    }
+    let expected = Json::array(lines).stringify()
+    let got = Json::array(printed).stringify()
+    assert_eq(got, expected, msg="\{id}: the CLI printed \{got} but the case has \{expected}")
+  }
+}
+
+///|
+/// The pairs of `tests/tck/diff/events.json` that have files (the 21 mutation
+/// cases have none): the lines that `smithy diff` prints for each pair, sorted,
+/// are the corpus events without SUPPRESSED, and the status is 1 when the pair
+/// is breaking. With `all` false, only the first 5 pairs run.
+async fn exercise_diff_corpus(runner : Runner, root : String, all~ : Bool) -> Unit {
+  let corpus = "\{root}/tests/tck/diff"
+  guard @json.parse(@fs.read_file("\{corpus}/events.json").text())
+    is { "cases": Array(cases), .. } else {
+    fail("events.json must have a cases array")
+  }
+  let mut ran = 0
+  for item in cases {
+    if item is { "mutations": _, .. } {
+      continue
+    }
+    if !all && ran >= 5 {
+      break
+    }
+    guard item
+      is {
+        "old": String(old),
+        "new": String(new),
+        "breaking": breaking,
+        "events": Array(events),
+        ..
+      } else {
+      fail("a corpus case needs old, new, breaking and events")
+    }
+    let expected : Array[String] = []
+    for event in events {
+      guard event
+        is {
+          "id": String(id),
+          "shape": String(shape),
+          "severity": String(severity),
+          "message": String(message),
+          ..
+        } else {
+        fail("\{old}: an event needs id, shape, severity and message")
+      }
+      if severity != "SUPPRESSED" {
+        let escaped = message
+          .replace_all(old="\r\n", new="\n")
+          .replace_all(old="\n", new="\\n")
+        expected.push("[" + severity + "] " + shape + ": " + escaped + " | " + id)
+      }
+    }
+    let status : Int32 = if breaking is True { 1 } else { 0 }
+    let (out, _) = runner.command(
+      ["diff", "--old", "\{corpus}/\{old}", "--new", "\{corpus}/\{new}"],
+      status,
+    )
+    let printed : Array[String] = []
+    for line in out.split("\n") {
+      let line = line.to_owned()
+      if !line.is_empty() {
+        printed.push(line)
+      }
+    }
+    printed.sort_by((a, b) => a.lexical_compare(b))
+    expected.sort_by((a, b) => a.lexical_compare(b))
+    assert_eq(
+      Json::array(printed.map(Json::string)).stringify(),
+      Json::array(expected.map(Json::string)).stringify(),
+      msg="\{runner.target}: \{old}",
+    )
+    ran += 1
+  }
+  assert_true(ran >= 5, msg="the corpus ran \{ran} pairs")
+  if all {
+    assert_eq(ran, 67)
+  }
+}
+
+///|
 async fn exercise(
   root : String,
   target : String,
@@ -1403,6 +1813,7 @@ async fn exercise(
   exercise_landing_sample(runner, root)
   exercise_rpc(runner, root, skip_stdin)
   exercise_rpc_traits(runner, root)
+  exercise_engine_cases(runner, root)
   exercise_rpc_responses(runner, root, skip_stdin)
   exercise_rpc_batches(runner, root, skip_stdin)
   exercise_rpc_transcripts(runner, root, skip_stdin)
@@ -1438,6 +1849,7 @@ async fn exercise(
   let (json_diff, _) = runner.command(["diff", "--old", "old-ast.json", "--new", "input.smithy"], 0)
   assert_eq(json_diff, "")
   exercise_diff_jsonl(runner, root)
+  exercise_diff_corpus(runner, root, all=target == "native")
   let (version, _) = runner.command(["version"], 0)
   assert_true(version.has_prefix("smithy "))
   let (help, _) = runner.command(["--help"], 0)
@@ -1903,6 +2315,7 @@ async fn exercise(
   assert_true(@fs.exists("\{dir}/idl/other.smithy"))
   runner.command(["validate", "idl/example.smithy", "idl/other.smithy"], 0)
   |> ignore
+  check_readme(runner, root)
   println("CLI checks passed: \{target}")
 }
 
@@ -1934,4 +2347,142 @@ async test "native and moonx Wasm CLI behavior" {
 ///|
 async test "file checks run when stdin is skipped" {
   exercise(@fs.realpath(".."), "wasm", skip_stdin=true)
+}
+
+///|
+test "doc_steps reads fixtures and console sessions in order" {
+  let md = "# x\n\n```smithy file=greeting.smithy\n$version: \"2\"\n```\n\n```console\n$ smithy convert --to json greeting.smithy\n{\n}\n$ smithy version\n0.6.0\n```\n\n```shell\nsmithy anything\n```\n"
+  assert_eq(
+    doc_steps(md),
+    Ok([
+      Fixture(name="greeting.smithy", text="$version: \"2\"\n"),
+      Session([
+        {
+          args: ["convert", "--to", "json", "greeting.smithy"],
+          output: "{\n}\n",
+        },
+        { args: ["version"], output: "0.6.0\n" },
+      ]),
+    ]),
+  )
+}
+
+///|
+test "doc_steps reads CRLF text" {
+  let md = "# x\r\n\r\n```smithy file=greeting.smithy\r\n$version: \"2\"\r\n```\r\n\r\n```console\r\n$ smithy convert --to json greeting.smithy\r\n{\r\n}\r\n$ smithy version\r\n0.6.0\r\n```\r\n\r\n```shell\r\nsmithy anything\r\n```\r\n"
+  assert_eq(
+    doc_steps(md),
+    Ok([
+      Fixture(name="greeting.smithy", text="$version: \"2\"\n"),
+      Session([
+        {
+          args: ["convert", "--to", "json", "greeting.smithy"],
+          output: "{\n}\n",
+        },
+        { args: ["version"], output: "0.6.0\n" },
+      ]),
+    ]),
+  )
+}
+
+///|
+test "doc_steps errors" {
+  let cases = [
+    ("```console\n$ ls\n```", "I can run only a smithy command"),
+    (
+      "```console\n$ smithy select x | head\n```", "I cannot run the shell character |",
+    ),
+    ("```console\noutput\n```", "I found output before the first command"),
+    ("```smithy file=../x.smithy\n```", "I expected a plain file name"),
+    ("```smithy file=a/b.smithy\n```", "I expected a plain file name"),
+    ("```smithy file=..\n```", "I expected a plain file name"),
+    ("```console\n$ smithy x\n", "I found a fence that never closes"),
+  ]
+  for c in cases {
+    let (md, text) = c
+    match doc_steps(md) {
+      Err(msg) => assert_true(msg.contains(text), msg="\{msg} lacks \{text}")
+      Ok(_) => fail("expected an error for \{md}")
+    }
+  }
+}
+
+///|
+test "shell_words keeps a single-quoted word" {
+  assert_eq(
+    shell_words("smithy select --selector 'structure > member' m.smithy"),
+    Ok(["smithy", "select", "--selector", "structure > member", "m.smithy"]),
+  )
+}
+
+///|
+test "shell_words rejects shell characters and an unclosed quote" {
+  for bad in ["a | b", "a > b", "a < b", "a; b", "a & b", "a \"b\"", "a `b`", "a $b", "a \\b"] {
+    assert_true(shell_words(bad) is Err(_), msg=bad)
+  }
+  assert_true(shell_words("a 'b") is Err(_))
+}
+
+///|
+test "doc_steps does not skip console and fixture fences in silence" {
+  let cases = [
+    ("```console title=x\n$ smithy version\n0.6.0\n```", None),
+    ("  ```console\n  $ smithy version\n  ```", Some("does not start at the start of a line")),
+    ("  ```smithy file=a.smithy\n  ```", Some("does not start at the start of a line")),
+    ("```console\n```", Some("a console block with no command")),
+    ("```console\n$ smithy version\n0.6.0\n```  \n", None),
+    ("```console\n$ smithy cat /etc/passwd\n```", Some("absolute path")),
+    ("```console\n$ smithy cat ../x\n```", Some("absolute path")),
+    ("```console\n$ smithy cat 'a\\..\\x'\n```", Some("absolute path")),
+    ("```console\n$ smithy cat C:x\n```", Some("absolute path")),
+    ("```console\n$ smithy cat a/b.smithy ..x\n```", None),
+    ("~~~console\n$ smithy version\n~~~", Some("does not start at the start of a line")),
+  ]
+  for c in cases {
+    let (md, want) = c
+    match (doc_steps(md), want) {
+      (Ok(steps), None) => assert_true(!steps.is_empty(), msg=md)
+      (Err(msg), Some(text)) =>
+        assert_true(msg.contains(text), msg="\{msg} lacks \{text}")
+      _ => fail("unexpected result for \{md}")
+    }
+  }
+  // A closing fence with trailing spaces closes, so the next fence is read.
+  assert_eq(
+    doc_steps(
+      "```console\n$ smithy version\n0.6.0\n```  \n\n```smithy file=a.smithy\nx\n```\n",
+    ).map(steps => steps.length()),
+    Ok(2),
+  )
+  // As in CommonMark, a closing fence can have up to 3 spaces of indent. The fence
+  // ends there, so the output of the command is only `0.6.0`.
+  for indent in [" ", "  ", "   "] {
+    assert_eq(
+      doc_steps(
+        "```console\n$ smithy version\n0.6.0\n\{indent}```\n\n```smithy file=a.smithy\nx\n```\n",
+      ),
+      Ok([
+        Session([{ args: ["version"], output: "0.6.0\n" }]),
+        Fixture(name="a.smithy", text="x\n"),
+      ]),
+      msg="indent \{indent.length()}",
+    )
+  }
+  // A closing fence with 4 spaces of indent is code of the fence.
+  assert_true(
+    doc_steps("```console\n$ smithy version\n    ```\n```\n")
+    is Ok([Session([{ output: "    ```\n", .. }])]),
+  )
+}
+
+///|
+/// A fence inside a longer fence is code: the runner skips it, as `@markdown.region`
+/// (site/markdown/include.mbt) does not see a region there.
+test "doc_steps skips a console fence inside a longer fence" {
+  assert_eq(
+    doc_steps(
+      "````markdown\n<!-- tour:start x -->\n```console\n$ smithy version\n```\n<!-- tour:end x -->\n````\n",
+    ),
+    Ok([]),
+  )
 }

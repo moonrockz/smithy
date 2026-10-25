@@ -1,0 +1,7 @@
+import {
+  "moonrockz/smithy-site/playground/core",
+  "moonbitlang/x/fs",
+  "moonbitlang/core/json",
+} for "test"
+
+supported_targets = "native"

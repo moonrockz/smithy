@@ -109,6 +109,7 @@ test "each output has a tab name" {
   assert_eq(output_label(JsonAst), "JSON AST")
   assert_eq(output_label(JsonSchema), "JSON Schema")
   assert_eq(output_label(Selector), "Selector")
+  assert_eq(output_label(Idl), "IDL (flattened)")
 }
 
 ///|

@@ -100,6 +100,12 @@ Every lesson claim is a checked case. A difference from the Java reference is on
 and is told in the lesson. Run `mise run tour:check` after a change to a lesson or to the playground core. The
 format and the rules are in `site/tour/README.md`.
 
+A lesson never holds a hand-copied CLI or API block. It includes a marked region (`<!-- tour:start NAME -->` ...
+`<!-- tour:end NAME -->`) of a tested source: an `mbt check` block of a `.mbt.md` file, or a `console` or
+`LANG file=NAME` fence of `apps/smithy/README.md`. `mise run test:cli` runs each `console` fence and writes each
+`file=` fixture of that README. Do not remove a tour marker that a lesson uses: `mise run tour:check` and
+`mise run site:check` then fail.
+
 ## Release process
 
 Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every release in `CHANGELOG.md`.

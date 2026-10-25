@@ -109,3 +109,24 @@ test "the search entry of the contents names every lesson" {
   assert_true(entry.text.contains("Lesson 1"))
   assert_true(entry.text.contains("Lesson 3"))
 }
+
+///|
+test "a lesson spec that is a docs path links to the docs page" {
+  let tour = fixture_tour()
+  let config = fixture_config("next")
+  let lesson = { ..tour.lessons[0], spec: "pkgs/smithy-openrpc/README.mbt.md", }
+  let page = lesson_page(config, tour, lesson)
+  assert_eq(page.spec, @route.href(config.base, Doc("smithy-openrpc")))
+  let web = lesson_page(config, tour, tour.lessons[1])
+  assert_eq(web.spec, "https://smithy.io/2.0/spec/idl.html")
+}
+
+///|
+test "a lesson with an OpenAPI output has no playground link" {
+  let tour = fixture_tour()
+  for output in [@samples.Output::OpenApi30, @samples.Output::OpenApi31] {
+    let lesson = { ..tour.lessons[0], output: Some(output), }
+    let page = lesson_page(fixture_config("next"), tour, lesson)
+    assert_eq(page.playground, None)
+  }
+}

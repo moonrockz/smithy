@@ -50,7 +50,7 @@ test "case_files replaces a starting file and adds a new one, sorted by name" {
       { name: "model.smithy", text: "new", },
       { name: "a.smithy", text: "a", },
     ],
-    expect: { events: [], output_contains: [], },
+    expect: { events: [], output_contains: [], blocked: None, },
   }
   let names = lesson.case_files(c).map(f => f.name + "=" + f.text)
   assert_eq(names, ["a.smithy=a", "b.smithy=b", "model.smithy=new"])
@@ -173,7 +173,7 @@ test "case_files sorts names of different length by code unit" {
   let c : Case = {
     name: "c",
     files: [],
-    expect: { events: [], output_contains: [], },
+    expect: { events: [], output_contains: [], blocked: None, },
   }
   assert_eq(lesson.case_files(c).map(f => f.name), [
     "a-long-name.smithy", "zz.smithy",

@@ -207,15 +207,25 @@ fn protocols_of(model : @smithy.Model) -> Array[ProtocolView] {
 }
 
 ///|
-fn validate(seq : Int32, files : Array[(String, String)]) -> Response {
-  let loaded = load(files)
+/// The findings of a load, with their places in the model files.
+fn diagnostics_of(
+  loaded : @smithy.LoadResult,
+  files : Array[(String, String)],
+) -> Array[Diagnostic] {
   let sources : Map[String, @syntax.SourceText] = Map([])
   for file in files {
     sources[file.0] = @syntax.SourceText::new(file.1)
   }
-  let items = loaded
-    .validation_events()
-    .map(event => diagnostic_of(event, sources))
+  loaded.validation_events().map(event => diagnostic_of(event, sources))
+}
+
+///|
+fn validate(
+  seq : Int32,
+  files : Array[(String, String)],
+  loaded : @smithy.LoadResult,
+) -> Response {
+  let items = diagnostics_of(loaded, files)
   let (shapes, protocols) = match loaded.model {
     Some(model) => (shape_count(model), protocols_of(model))
     None => (0, [])

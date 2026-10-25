@@ -5,7 +5,7 @@ fn blocked(seq~ : Int32, reason~ : String) -> Response {
 }
 
 ///|
-/// The user services of the model, by shape ID.
+/// The user services of the model, in the code unit order of their shape IDs.
 fn user_services(model : @smithy.Model) -> Array[@smithy.Shape] {
   let services = []
   for _, shape in model.shapes {
@@ -13,7 +13,9 @@ fn user_services(model : @smithy.Model) -> Array[@smithy.Shape] {
       services.push(shape)
     }
   }
-  services.sort_by_key(shape => shape.id.to_string())
+  services.sort_by((a, b) => {
+    @samples.compare_code_units(a.id.to_string(), b.id.to_string())
+  })
   services
 }
 
@@ -44,9 +46,9 @@ fn has_protocol_trait(model : @smithy.Model, shape : @smithy.Shape) -> Bool {
 }
 
 ///|
-/// The first service by shape ID that the output can use. OpenRPC needs a
-/// `jsonRpc` trait for version 2.0, as the CLI does. OpenAPI needs a protocol
-/// trait.
+/// The first service in the order of shape IDs that the output can use.
+/// OpenRPC needs a `jsonRpc` trait for version 2.0, as the CLI does. OpenAPI
+/// needs a protocol trait.
 fn pick_service(
   model : @smithy.Model,
   output : Output,
@@ -206,19 +208,28 @@ fn run_output(
 }
 
 ///|
+/// The load of the files for `output`, as `TransformFiles` does it: the OpenAPI
+/// outputs load with the bundled protocol definitions, the others without.
+fn load_for(
+  files : Array[(String, String)],
+  output : Output,
+) -> Result[@smithy.LoadResult, String] {
+  match output {
+    OpenApi30 | OpenApi31 => load_with_http_protocols(files)
+    _ => Ok(load(files))
+  }
+}
+
+///|
 fn transform(
   seq : Int32,
   files : Array[(String, String)],
   output : Output,
   selector : String?,
 ) -> Response {
-  let loaded = match output {
-    OpenApi30 | OpenApi31 =>
-      match load_with_http_protocols(files) {
-        Ok(loaded) => loaded
-        Err(reason) => return blocked(seq~, reason~)
-      }
-    _ => load(files)
+  let loaded = match load_for(files, output) {
+    Ok(loaded) => loaded
+    Err(reason) => return blocked(seq~, reason~)
   }
   match clean_model(loaded) {
     Err((reason, kind)) => Blocked(seq~, reason~, kind~)

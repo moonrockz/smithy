@@ -2,7 +2,7 @@
 /// The lessons of the checkout `content`. Every channel builds its own
 /// checkout, so a lessons folder that does not read is a broken build.
 fn load_tour(content : String) -> Result[@model.Tour, String] {
-  @source.read_tour(content + "/" + @model.lessons_root)
+  @source.read_tour(content + "/" + @model.lessons_root, repo=content)
 }
 
 ///|
@@ -14,6 +14,16 @@ fn link_of(lesson : @model.Lesson) -> @model.LessonLink {
 /// The contents of the tour: the sections in order, each with its lessons.
 fn tour_contents(tour : @model.Tour) -> @model.TourContents {
   { sections: tour.sections().map(s => (s.0, s.1.map(link_of))), }
+}
+
+///|
+/// The href of the `spec` of a lesson: a smithy.io URL as it is, or the docs
+/// page of a repository path.
+fn spec_href(config : @data.SiteConfig, spec : String) -> String {
+  match @content.doc_route(spec) {
+    Some(route) => @route.href(config.base, route)
+    None => spec
+  }
 }
 
 ///|
@@ -32,15 +42,17 @@ fn lesson_page(
     total: tour.lessons.length(),
     output: lesson.output,
     selector: lesson.selector,
-    spec: lesson.spec,
+    spec: spec_href(config, lesson.spec),
     files: lesson.files,
     digest: @model.digest(lesson.files),
     previous: previous.map(link_of),
     next: next.map(link_of),
     worker: worker_url(config),
     storage_key: "smithy-tour:" + config.channel.name() + ":" + lesson.slug,
-    // The playground holds one model.
-    playground: if lesson.files.length() == 1 {
+    // The playground holds one model. It validates without the protocol
+    // definitions, so it marks an OpenAPI model with an error (smithy-2qe.41.22).
+    playground: if lesson.files.length() == 1 &&
+      !(lesson.output is Some(OpenApi30 | OpenApi31)) {
       Some(@route.href(config.base, Playground))
     } else {
       None
