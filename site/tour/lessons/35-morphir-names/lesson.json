@@ -1,0 +1,1 @@
+{"slug": "morphir-names", "title": "Names as constrained strings", "section": "Case study: a DSL for the Morphir IR", "spec": "https://smithy.io/2.0/spec/constraint-traits.html#pattern-trait", "value": {"file": "fqname.json", "shape": "morphir.ir.v4#FQName"}}

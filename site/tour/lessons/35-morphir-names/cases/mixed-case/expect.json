@@ -1,0 +1,1 @@
+{"events": [], "findings": ["Pattern|error||morphir.ir.v4#FQName"], "output_contains": ["I expected the string to match the modeled pattern."]}

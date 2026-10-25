@@ -3054,6 +3054,26 @@
                     }
                 }
             }
+        },
+        "35-morphir-names/legacy-array": {
+            "digest": "ef16bfbcf9f815c5b836d3849ace21ab1cb3e8fde50bbd64ff2fcfdd1dd3c932",
+            "events": []
+        },
+        "35-morphir-names/long": {
+            "digest": "6d161e7649e1d2d1b0ff38c1f68ed87a652df3837b4e7bda31c43772bf7230d8",
+            "events": []
+        },
+        "35-morphir-names/lowercase-sdk": {
+            "digest": "a595601eea68c20a35d803cbfc32f3513bd1ac67a81d7c4f7810017a558159d5",
+            "events": []
+        },
+        "35-morphir-names/mixed-case": {
+            "digest": "49c920b8e8cb5e08c145fa90c285b48742957578c46a439aa07df56b9a1b309e",
+            "events": []
+        },
+        "35-morphir-names/start": {
+            "digest": "47f7f82dd85348cd4baf45f3f763654403b58bd7218df3adcffa0b2b363d79dc",
+            "events": []
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
