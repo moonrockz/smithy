@@ -2423,6 +2423,30 @@
         "26-validating-values/unknown-member": {
             "digest": "4cd59a4c9fe7121b3ef4e6c9fafdf2462c27c6d1e02f1c8198c2c409609ada9d",
             "events": []
+        },
+        "27-validating-messages/extra-param": {
+            "digest": "6e30190c6fcd9ce7cca6bfe5f461b5fa2279c5ebe1bca0d3d271df0db7e3fdbd",
+            "events": []
+        },
+        "27-validating-messages/named": {
+            "digest": "671fc0642435a356d669a22f441de6440ab71cb704d6cb0b5f97913ba2a5cd72",
+            "events": []
+        },
+        "27-validating-messages/notification": {
+            "digest": "be2a10aff4a56ecc3c593f585c6866bdb5808be59c0d2df11641db6c77d32e2d",
+            "events": []
+        },
+        "27-validating-messages/start": {
+            "digest": "cca841c8ab545ce595b608edbacfd64c886600527837f794aa98ef383c4f3989",
+            "events": []
+        },
+        "27-validating-messages/unknown-method": {
+            "digest": "6dbf25c4dde4aa277ba93d57f2f6707ef731b0d097901465cec58e3040b556bc",
+            "events": []
+        },
+        "27-validating-messages/wrong-type": {
+            "digest": "4216787f98e3dbae7db52ba8bebf1e9062d7bd8d627059857b8f1cc565a7ba29",
+            "events": []
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"

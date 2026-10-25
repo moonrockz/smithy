@@ -39,6 +39,80 @@ rejects duplicate decoded keys and preserves exact numbers. `validate_json` acce
 JSON; it cannot recover precision lost by an earlier parser. IDs distinguish absent from
 present values and retain legacy structured IDs as exact `NodeValue` data.
 
+This test checks two calls of `subtract`. The first call is valid, and the second call has a string as its
+second argument.
+
+<!-- tour:start message-api -->
+```mbt check
+///|
+test "validate a subtract call" {
+  let model = @rpc.loader()
+  .add_idl(
+    "calculator.smithy",
+    (
+      #|$version: "2"
+      #|namespace example
+      #|
+      #|use smithy.rpc#jsonRpc
+      #|use smithy.rpc#method
+      #|
+      #|@jsonRpc(versions: ["1.0", "2.0"])
+      #|service Calculator {
+      #|    version: "1"
+      #|    operations: [Subtract, Ping]
+      #|}
+      #|
+      #|@method(name: "subtract", params: "either",
+      #|    positional: ["minuend", "subtrahend"], resultMember: "value")
+      #|operation Subtract { input: SubtractInput, output: SubtractOutput }
+      #|
+      #|structure SubtractInput {
+      #|    @required
+      #|    minuend: Integer
+      #|    @required
+      #|    subtrahend: Integer
+      #|}
+      #|
+      #|structure SubtractOutput { value: Integer }
+      #|
+      #|@method(name: "ping", params: "either", positional: [], nullResult: true)
+      #|operation Ping {}
+    ),
+  )
+  .assemble().model.unwrap()
+  let service = @rpc.PreparedService::prepare(
+    model,
+    @smithy.ShapeId::parse("example#Calculator").unwrap(),
+    @rpc.V2_0,
+  )
+  let call =
+    #|{
+    #|    "jsonrpc": "2.0",
+    #|    "method": "subtract",
+    #|    "params": [42, 23],
+    #|    "id": 1
+    #|}
+  assert_true(service.validate_request(call).is_valid())
+  let string_argument =
+    #|{
+    #|    "jsonrpc": "2.0",
+    #|    "method": "subtract",
+    #|    "params": [42, "23"],
+    #|    "id": 1
+    #|}
+  let result = service.validate_request(string_argument)
+  assert_false(result.is_valid())
+  assert_eq(result.findings.length(), 1)
+  assert_eq(result.findings[0].code.to_string(), "TypeMismatch")
+  assert_eq(result.findings[0].path.pointer(), "/params/1")
+  assert_eq(
+    result.findings[0].shape.to_string(),
+    "example#SubtractInput$subtrahend",
+  )
+}
+```
+<!-- tour:end message-api -->
+
 The `jsonRpc` service trait declares supported versions. Every operation reachable through
 the service or its resources needs a `method` trait with a nonempty unique wire name and
 `params` mode `named`, `positional` or `either`. Positional-capable methods must declare a

@@ -842,6 +842,22 @@ test "lesson 26 includes its own starting files" {
 }
 
 ///|
+test "lesson 27 includes its own starting files" {
+  let lesson = lesson_in("27-validating-messages")
+  let model = case_file(lesson, "start", "model.smithy")
+  let call = case_file(lesson, "start", "call.json")
+  check_included_files(
+    lesson,
+    cli=[
+      ("calculator.smithy", model),
+      ("subtract.json", call),
+      ("subtract-string.json", case_file(lesson, "wrong-type", "call.json")),
+    ],
+    api=[model, call],
+  )
+}
+
+///|
 test "a static extension lesson says that the feature is our extension" {
   let ok = match
     @source.read_tour("tour/source/testdata/static-ok", repo="..") {

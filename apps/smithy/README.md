@@ -665,6 +665,68 @@ and parse offsets. Explicit JSON-RPC 2.0 batches use `--batch`; exchanges betwee
 See the [RPC library and runnable calculator examples](../../pkgs/smithy-validation/rpc/README.mbt.md)
 for trait definitions, version rules, parameter mapping, stdin and dependency isolation.
 
+These commands check two calls of `subtract`. The first call is valid, and the second call has a string as its
+second argument.
+
+<!-- tour:start message-cli -->
+```smithy file=calculator.smithy
+$version: "2"
+namespace example
+
+use smithy.rpc#jsonRpc
+use smithy.rpc#method
+
+@jsonRpc(versions: ["1.0", "2.0"])
+service Calculator {
+    version: "1"
+    operations: [Subtract, Ping]
+}
+
+@method(name: "subtract", params: "either",
+    positional: ["minuend", "subtrahend"], resultMember: "value")
+operation Subtract { input: SubtractInput, output: SubtractOutput }
+
+structure SubtractInput {
+    @required
+    minuend: Integer
+    @required
+    subtrahend: Integer
+}
+
+structure SubtractOutput { value: Integer }
+
+@method(name: "ping", params: "either", positional: [], nullResult: true)
+operation Ping {}
+```
+
+```json file=subtract.json
+{
+    "jsonrpc": "2.0",
+    "method": "subtract",
+    "params": [42, 23],
+    "id": 1
+}
+```
+
+```json file=subtract-string.json
+{
+    "jsonrpc": "2.0",
+    "method": "subtract",
+    "params": [42, "23"],
+    "id": 1
+}
+```
+
+```console
+$ smithy validate rpc --version 2.0 --service example#Calculator --message subtract.json calculator.smithy
+```
+
+```console status=1
+$ smithy validate rpc --version 2.0 --service example#Calculator --message subtract-string.json calculator.smithy
+subtract-string.json/params/1: error[TypeMismatch] example#SubtractInput$subtrahend: I expected a integer value, but found string.
+```
+<!-- tour:end message-cli -->
+
 Response mode uses `--response` in place of `--message`. Supply exactly one context option:
 `--method` for a wire method, `--operation` for a Smithy operation ID, `--request` for the original
 request file, or explicit `--envelope-only`. Missing context fails. Only original-request context

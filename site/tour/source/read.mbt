@@ -886,9 +886,14 @@ fn optional_keys_field(
 }
 
 ///|
+/// The kind of a lesson in an error message.
 fn engine_name(engine : @model.Engine) -> String {
   match engine {
+    Model => "model"
+    Value(_) => "value"
     Message(_) => "message"
-    _ => "value"
+    Diff => "diff"
+    Transcript(_) => "transcript"
+    Static => "static"
   }
 }

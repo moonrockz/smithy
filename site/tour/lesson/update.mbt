@@ -214,6 +214,25 @@ fn Model::send_check(self : Model) -> (Model, Array[Effect]) {
 }
 
 ///|
+/// Show the lines of a value or message check, with the lines that changed
+/// since the output on the page. `empty` is the text when there is no finding.
+fn Model::data_checked(
+  self : Model,
+  findings : Array[@core.DataFinding],
+  empty~ : String,
+) -> (Model, Array[Effect]) {
+  let text = data_text(findings, self.data_file(), empty~)
+  let before = match self.output {
+    Shown(text~, ..) => text
+    _ => ""
+  }
+  let highlight = changed_lines(before, text)
+  { ..self, output: Shown(text~, highlight~), }.next([
+    ShowOutput(text~, highlight~),
+  ])
+}
+
+///|
 /// The name of the output tab.
 fn output_name(output : @samples.Output) -> String {
   match output {
@@ -484,23 +503,10 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
           )
           m.next([Mark(items=[]), ..shown])
         }
-        (CheckingValue, DataChecked(valid=_, findings~))
-        | (CheckingMessage, DataChecked(valid=_, findings~)) => {
-          let empty = if m.inflight == CheckingMessage {
-            message_valid_text
-          } else {
-            valid_text
-          }
-          let text = data_text(findings, m.data_file(), empty~)
-          let before = match m.output {
-            Shown(text~, ..) => text
-            _ => ""
-          }
-          let highlight = changed_lines(before, text)
-          { ..m, output: Shown(text~, highlight~), }.next([
-            ShowOutput(text~, highlight~),
-          ])
-        }
+        (CheckingValue, DataChecked(valid=_, findings~)) =>
+          m.data_checked(findings, empty=valid_text)
+        (CheckingMessage, DataChecked(valid=_, findings~)) =>
+          m.data_checked(findings, empty=message_valid_text)
         // An answer of the other kind cannot come; the request ends.
         _ => m.next([])
       }
