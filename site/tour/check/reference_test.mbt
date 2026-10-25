@@ -1963,3 +1963,24 @@ test "our diff events agree with the reference diff events" {
     ),
   )
 }
+
+///|
+test "our_events of a value lesson validates only the model files" {
+  let tour = match
+    @source.read_tour("tour/source/testdata/value-level1", repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the fixture: " + e)
+  }
+  let lesson = tour.lessons[0]
+  let all = lesson.case_files(lesson.cases[0])
+  let model = @model.model_files(lesson.engine, all)
+  assert_true(all.length() > model.length())
+  assert_true(model.all(f => f.name.has_suffix(".smithy")))
+  let events = our_events(
+    @core.Session::new(),
+    "value",
+    files_of(model),
+    lesson.output,
+  )
+  assert_eq(events, [])
+}

@@ -168,6 +168,48 @@ test "the query file of a Selector lesson does not count as a model file for the
 }
 
 ///|
+test "a value lesson page has its engine and no playground link, also with one model file" {
+  let setup : @model.ValueSetup = {
+    file: "order.json",
+    shape: "example#Order",
+    options: @samples.ValueOptions::default(),
+  }
+  let files : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: "namespace a\n", },
+    { name: "order.json", text: "{}\n", },
+  ]
+  let lesson = {
+    ..fixture_lesson(5, "Values", files),
+    engine: Value(setup),
+    output: None,
+  }
+  let tour : @model.Tour = { lessons: [lesson], }
+  let page = lesson_page(fixture_config("next"), tour, lesson)
+  assert_eq(page.engine, Value(setup))
+  assert_eq(page.playground, None)
+}
+
+///|
+test "a value lesson page with one file has no playground link" {
+  let setup : @model.ValueSetup = {
+    file: "model.smithy",
+    shape: "example#Order",
+    options: @samples.ValueOptions::default(),
+  }
+  let files : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: "namespace a\n", },
+  ]
+  let lesson = {
+    ..fixture_lesson(5, "Values", files),
+    engine: Value(setup),
+    output: None,
+  }
+  let tour : @model.Tour = { lessons: [lesson], }
+  let page = lesson_page(fixture_config("next"), tour, lesson)
+  assert_eq(page.playground, None)
+}
+
+///|
 test "a transcript lesson page has no playground link" {
   let files : Array[@model.LessonFile] = [
     { name: "exchange.json", text: "{}", },

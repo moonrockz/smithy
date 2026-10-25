@@ -35,14 +35,15 @@ let smithy_rpc_path : String = "site/tour/smithy-rpc-traits.smithy"
 
 ///|
 /// Reads the cases (`[{"id", "json_schema", "json_ast", "http_protocols", "smithy_rpc", "smithy_contracts", "diff",
-/// "files": [{"name", "text"}], "openapi"?, "selector"?}]`) from args[0] and writes the results to args[1], with args[2] as the reference SHA. A case with `smithy_rpc` also
+/// "load": [names], "files": [{"name", "text"}], "openapi"?, "selector"?}]`) from args[0] and writes the results to args[1], with args[2] as the reference SHA. A case with `smithy_rpc` also
 /// loads the smithy.rpc trait definitions from args[3]. The digest is SHA-256 over the files sorted by name of
 /// name + NUL + text + NUL, in UTF-8: the case files and, for a `smithy_rpc` case, the definitions as the file
 /// `<smithy-rpc-traits>` (`reference_digest` in site/tour/check/reference_test.mbt), so that a change of the
 /// definitions makes the result stale. A `diff` case has the files `old/<name>` and `new/<name>`: each side is
 /// assembled alone (with the smithy.rpc and contract definitions when the case uses them), `events` are the events of
 /// both sides, and, when neither side has an ERROR or a DANGER, `diff` holds the sorted keys `id|SEVERITY|shape` of
-/// the events of `ModelDiff` without SUPPRESSED (`-` for no shape).
+/// the events of `ModelDiff` without SUPPRESSED (`-` for no shape). The digest covers all files; only the files named
+/// in `load` go to the assembler, so a data file of a value or a transcript lesson is hashed and not loaded.
 let harness : String =
   #|import java.io.InputStream;
   #|import java.nio.charset.StandardCharsets;
@@ -67,6 +68,8 @@ let harness : String =
   #|  /// is not a model file. The smithy.rpc definitions and the contract traits load into every side that uses them.
   #|  private static ValidatedResult<Model> assemble(List<ObjectNode> files, String prefix, ObjectNode test)
   #|      throws Exception {
+  #|    List<String> load = test.expectArrayMember("load").getElementsAs(StringNode.class).stream()
+  #|        .map(StringNode::getValue).collect(java.util.stream.Collectors.toList());
   #|    ModelAssembler assembler = test.expectBooleanMember("http_protocols").getValue()
   #|        ? Model.assembler().discoverModels(ReferenceTour.class.getClassLoader())
   #|        : Model.assembler();
@@ -76,6 +79,8 @@ let harness : String =
   #|      boolean definitions = name.equals("<smithy-rpc-traits>");
   #|      if (!definitions && !name.startsWith(prefix)) continue;
   #|      if (name.endsWith(".selector")) continue;
+  #|      // A data file of a value lesson is not in `load`: it is in the digest but not in the model.
+  #|      if (!definitions && !load.contains(name)) continue;
   #|      // A lesson file name ends in .smithy; the definitions load as IDL under such a name.
   #|      assembler.addUnparsedModel(definitions ? "smithy-rpc-traits.smithy" : name, text);
   #|    }
@@ -295,30 +300,20 @@ async fn list_dir(path : String) -> Array[String] {
 }
 
 ///|
-/// The files directly in `path`, as (name, text), without the data files `data` of the lesson engine. The loader in
-/// site/tour/source/read.mbt fails on a sub-folder and on a name that does not end in `.smithy` or `.selector`; this
-/// script fails on them too. Level 2 compares the events of the model files only.
-async fn read_files(path : String, data : Array[String]) -> Array[(String, String)] {
+/// The files directly in `path`, as (name, text). The loader in site/tour/source/read.mbt fails on a sub-folder and
+/// on a name that does not end in `.smithy` or `.selector` and is not a data file of the lesson; this script fails on
+/// them too.
+async fn read_files(path : String, data~ : Array[String] = []) -> Array[(String, String)] {
   let files : Array[(String, String)] = []
   if !@fs.exists(path) { return files }
   for name in list_dir(path) {
-    if @fs.kind(path + "/" + name) is Directory || !(name.has_suffix(".smithy") || name.has_suffix(".selector") || data.contains(name)) {
+    if @fs.kind(path + "/" + name) is Directory ||
+      !(name.has_suffix(".smithy") || name.has_suffix(".selector") || data.contains(name)) {
       fail(path + "/" + name + ": a lesson file must be a .smithy or .selector file directly in its files folder")
     }
-    if data.contains(name) { continue }
     files.push((name, @fs.read_file(path + "/" + name).text()))
   }
   files
-}
-
-///|
-/// The names of the data files of the lesson engine: the file of a `value` or a `transcript` setup. The same rule as
-/// `Engine::data_files` in site/tour/model.
-fn data_files(meta : Json) -> Array[String] {
-  match meta {
-    { "value": { "file": String(file), .. }, .. } | { "transcript": { "file": String(file), .. }, .. } => [file]
-    _ => []
-  }
 }
 
 ///|
@@ -331,7 +326,7 @@ async fn read_sides(path : String) -> Array[(String, String)] {
     if !(side == "old" || side == "new") || !(@fs.kind(path + "/" + side) is Directory) {
       fail(path + "/" + side + ": a diff lesson keeps its files in the folders old/ and new/")
     }
-    for file in read_files(path + "/" + side, []) {
+    for file in read_files(path + "/" + side) {
       files.push((side + "/" + file.0, file.1))
     }
   }
@@ -391,6 +386,16 @@ fn case_selector(files : Array[(String, String)], fixed : String?) -> String? {
 }
 
 ///|
+/// The names of the files of a lesson that hold data in place of a model: the file of a `value` or a `transcript`
+/// setup. The same rule as `Engine::data_files` in site/tour/model.
+fn data_files(lesson : Json) -> Array[String] {
+  match lesson {
+    { "value": { "file": String(file), .. }, .. } | { "transcript": { "file": String(file), .. }, .. } => [file]
+    _ => []
+  }
+}
+
+///|
 /// The cases of every lesson, in the input format of the harness.
 async fn lesson_cases(root : String) -> Array[Json] {
   let cases : Array[Json] = []
@@ -404,18 +409,20 @@ async fn lesson_cases(root : String) -> Array[Json] {
       { "output": String(output), .. } => Some(output)
       _ => None
     })
-    let data = data_files(meta)
     // A diff lesson keeps the files of the old and the new model in files/old and files/new.
     let diff = meta is { "diff": True, .. }
-    let start = if diff { read_sides(base + "/files") } else { read_files(base + "/files", data) }
+    let data = data_files(meta)
+    let read = async fn(path : String) {
+      if diff { read_sides(path) } else { read_files(path, data~) }
+    }
+    let start = read(base + "/files")
     let fixed = match meta {
       { "selector": String(selector), .. } => Some(selector)
       _ => None
     }
     for name in list_dir(base + "/cases") {
       if !(@fs.kind(base + "/cases/" + name) is Directory) { continue }
-      let case_files = base + "/cases/" + name + "/files"
-      let files = merge_files(start, if diff { read_sides(case_files) } else { read_files(case_files, data) })
+      let files = merge_files(start, read(base + "/cases/" + name + "/files"))
       let entry : Map[String, Json] = {
         "id": Json::string(dir + "/" + name),
         "json_schema": Json::boolean(flags.json_schema),
@@ -424,6 +431,7 @@ async fn lesson_cases(root : String) -> Array[Json] {
         "smithy_rpc": Json::boolean(uses_smithy_rpc(files)),
         "smithy_contracts": Json::boolean(uses_smithy_contracts(files)),
         "diff": Json::boolean(diff),
+        "load": Json::array(files.filter(f => !data.contains(f.0)).map(f => Json::string(f.0))),
         "files": Json::array(files.map(f => Json::object({ "name": Json::string(f.0), "text": Json::string(f.1) }))),
       }
       if flags.openapi is Some(version) { entry["openapi"] = Json::string(version) }
@@ -622,7 +630,7 @@ test "the data files of a lesson are those of its engine" {
 }
 
 ///|
-async test "lesson_cases leaves the data file of a transcript lesson out of the model files" {
+async test "lesson_cases loads only the model files of a transcript lesson, and keeps all files for the digest" {
   // A folder of its own, removed when the test ends, also after a failed assert.
   let root = @fs.tmpdir(prefix="transcript-lessons")
   defer @fs.rmdir(root, recursive=true)
@@ -635,11 +643,19 @@ async test "lesson_cases leaves the data file of a transcript lesson out of the 
   @fs.write_file(root + "/01-t/files/model.smithy", "namespace example\n")
   @fs.write_file(root + "/01-t/files/exchange.json", "{}")
   let cases = lesson_cases(root)
-  let names = match cases[0] {
-    { "files": Array(files), .. } => files.map(f => match f { { "name": String(name), .. } => name; _ => "" })
-    _ => []
+  let names = fn(key : String) {
+    match cases[0] {
+      { "files": Array(files), "load": Array(load), .. } =>
+        if key == "load" {
+          load.map(l => match l { String(name) => name; _ => "" })
+        } else {
+          files.map(f => match f { { "name": String(name), .. } => name; _ => "" })
+        }
+      _ => []
+    }
   }
-  assert_eq(names, ["model.smithy"])
+  assert_eq(names("load"), ["model.smithy"])
+  assert_eq(names("files"), ["exchange.json", "model.smithy"])
 }
 
 ///|
@@ -692,4 +708,35 @@ async test "lesson_cases marks a model lesson as no diff case" {
   let cases = lesson_cases(root)
   @fs.rmdir(root, recursive=true)
   assert_true(cases[0] is { "diff": False, .. })
+}
+
+///|
+test "data_files of a value lesson names the value file" {
+  let meta = @json.parse("{\"slug\": \"v\", \"value\": {\"file\": \"order.json\", \"shape\": \"a#B\"}}")
+  assert_eq(data_files(meta), ["order.json"])
+}
+
+///|
+test "data_files of a model lesson is empty" {
+  assert_eq(data_files(@json.parse("{\"slug\": \"m\"}")), [])
+}
+
+///|
+async test "lesson_cases loads only the model files of a value lesson, and keeps all files for the digest" {
+  let root = "value-lessons-scratch"
+  if @fs.exists(root) { @fs.rmdir(root, recursive=true) }
+  @fs.mkdir(root + "/01-v/files", recursive=true, allow_exist=true)
+  @fs.mkdir(root + "/01-v/cases/start", recursive=true, allow_exist=true)
+  @fs.write_file(root + "/01-v/lesson.json", "{\"slug\": \"v\", \"value\": {\"file\": \"order.json\", \"shape\": \"a#B\"}}")
+  @fs.write_file(root + "/01-v/files/model.smithy", "namespace a\n")
+  @fs.write_file(root + "/01-v/files/order.json", "{}\n")
+  let cases = lesson_cases(root)
+  @fs.rmdir(root, recursive=true)
+  match cases[0] {
+    { "load": Array(load), "files": Array(files), .. } => {
+      assert_eq(load.map(l => match l { String(s) => s; _ => "?" }), ["model.smithy"])
+      assert_eq(files.length(), 2)
+    }
+    _ => fail("the case has no load list")
+  }
 }
