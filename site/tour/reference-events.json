@@ -3074,6 +3074,28 @@
         "35-morphir-names/start": {
             "digest": "47f7f82dd85348cd4baf45f3f763654403b58bd7218df3adcffa0b2b363d79dc",
             "events": []
+        },
+        "36-morphir-vocabulary/start": {
+            "digest": "7d6282d2bf732b02afbfcc07acb6656e0997bc16c69d7d95d2639d555b268df6",
+            "events": []
+        },
+        "36-morphir-vocabulary/wrong-target": {
+            "digest": "0c1f61514b054177263dfd37224782444a5989402dfc449e5b61abce4811ad2d",
+            "events": [
+                "TraitTarget|ERROR|morphir.sdk.basics#Basics"
+            ]
+        },
+        "36-morphir-vocabulary/wrong-value": {
+            "digest": "44d1433538a9899f4213790063bf83199df47f2dcdb508736a976cce1532124a",
+            "events": [
+                "TraitValue|ERROR|morphir.sdk.basics#Add"
+            ]
+        },
+        "36-morphir-vocabulary/wrong-variable": {
+            "digest": "756c75fbc321f0ef6881a39d15b6c7326d171ec6c7ba896f0486e44a85bd1ddf",
+            "events": [
+                "TraitValue|ERROR|morphir.sdk.basics#AddInput$a"
+            ]
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
