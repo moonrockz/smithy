@@ -89,7 +89,8 @@ commit that made them. For each case, the check:
    `OpenApi31` and the reference events have no `ERROR` and no `DANGER`. It has a reference selection if and only
    if the lesson output is `Selector` and the reference events have no `ERROR` and no `DANGER`. It has a
    reference JSON AST if and only if the lesson output is `JsonAst` and the reference events have no `ERROR` and
-   no `DANGER`;
+   no `DANGER`. It has reference diff events if and only if the lesson is a diff lesson and the reference events
+   (of both models together) have no `ERROR` and no `DANGER`;
 2. requires the events of the playground core to be equal to the reference events (after the allow list);
 3. for a lesson with the output `JsonSchema`, requires the JSON Schema of the playground core to be equal to the
    reference JSON Schema (after the allow list);
@@ -99,7 +100,11 @@ commit that made them. For each case, the check:
    that the Java `Selector` selects, both sorted by UTF-16 code unit (after the allow list);
 6. for a lesson with the output `JsonAst`, requires the JSON AST of the playground core (`model.json`) to be equal
    to the Java `ModelSerializer` output, without the shapes of the namespaces `smithy.rpc` and
-   `smithy.contracts` (after the allow list).
+   `smithy.contracts` (after the allow list);
+7. for a diff lesson, requires the diff events of the playground core (`id|SEVERITY|shape`, sorted by UTF-16 code
+   unit) to be equal to the events of the Java `ModelDiff` without `SUPPRESSED` (after the allow list). Both
+   sides must agree on whether a diff ran. The model events of item 2 are those of the old and the new model
+   together.
 
 The check also fails for a reference result of a case that does not exist.
 
@@ -134,13 +139,17 @@ It then loads `META-INF/smithy/contracts.smithy` from the compiled module. The d
 definitions: they come from the pinned checkout, and `reference_sha` already pins it. A case with the flag is
 checked at level 2 like any other case.
 
+The harness reads a diff lesson from `files/old/` and `files/new/` (and the same folders of a case). It
+assembles each side alone, with the name prefix `old/` or `new/` of the case files. It compares the two models
+with `ModelDiff` only when neither has an `ERROR` or a `DANGER`.
+
 ## The allow list
 
 `site/tour/reference-allow.json` lists the known differences between the playground core and the Java reference.
 It is a JSON array. Each entry has:
 
 - `case`: `<lesson folder>/<case>`
-- `kind`: `event`, `json_schema`, `openapi`, `json_ast` or `selector`
+- `kind`: `event`, `json_schema`, `openapi`, `json_ast`, `selector` or `diff_event`
 - `reason`: why the two differ
 - `issue`: a beads issue id, `smithy-` followed by lower-case letters, digits and dots (for example `smithy-2qe.4`)
 
@@ -162,6 +171,9 @@ at the pointer from both documents.
 A `kind` of `selector` has `shape` (a shape ID) and `side` (`ours` or `reference`). The entry removes one copy of
 the shape ID from the selected shapes of the named side before the comparison. Use it for the smithy.rpc shapes
 that our core loads into every model and that Java does not have (issue `smithy-2qe.41.24`).
+
+A `kind` of `diff_event` has `event` (`id|SEVERITY|shape`, with `-` for no shape) and `side` (`ours` or
+`reference`). The entry removes one copy of the diff event from the named side before the comparison.
 
 The reference selection is `null` when the Java selector does not parse. Our output must then be blocked. A result
 on one side and a failure on the other side fails the check.
