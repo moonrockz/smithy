@@ -33,16 +33,33 @@ fn WriterState::copy(self : WriterState) -> WriterState {
 }
 
 ///|
+/// One output buffer, and whether its next write starts a line. Each buffer
+/// keeps its own line state, so a capture does not change the line state of
+/// the buffer under it.
+priv struct OutputBuffer {
+  out : StringBuilder
+  mut at_line_start : Bool
+}
+
+///|
+fn OutputBuffer::new() -> OutputBuffer {
+  { out: StringBuilder(), at_line_start: true, }
+}
+
+///|
 /// A writer of generated code. It keeps the output, the indentation, a stack of
 /// states (indentation, newline prefix, context and formatters) and the formatters.
 pub struct CodeWriter {
   priv namespace : Namespace
   priv indent_text : String
   priv tracker : ImportTracker
-  // The stack of output buffers. The last one takes the output. A capture of
-  // text can push a buffer and pop it later.
-  priv buffers : Array[StringBuilder]
-  priv mut at_line_start : Bool
+  // The stack of output buffers. The last one takes the output. A section
+  // pushes a buffer to capture text and pops it later.
+  priv buffers : Array[OutputBuffer]
+  // The interceptors of sections. This writer and its children share the array.
+  priv interceptors : Array[Interceptor]
+  // The sections that are open, the innermost last.
+  priv open_sections : Array[OpenSection]
   // The stack of states. The last one is the current state.
   priv states : Array[WriterState]
 }
@@ -82,8 +99,9 @@ pub fn CodeWriter::new(
     namespace,
     indent_text,
     tracker: ImportTracker::new(),
-    buffers: [StringBuilder()],
-    at_line_start: true,
+    buffers: [OutputBuffer::new()],
+    interceptors: [],
+    open_sections: [],
     states: [
       { indent_level: 0, newline_prefix: "", context: Map([]), formatters, },
     ],
@@ -104,29 +122,30 @@ pub fn CodeWriter::namespace(self : CodeWriter) -> Namespace {
 /// Write the text. Each line gets the newline prefix and the indentation, but
 /// an empty line gets nothing. `end_line` ends the last line.
 fn CodeWriter::emit(self : CodeWriter, text : String, end_line : Bool) -> Unit {
-  let out = self.buffers[self.buffers.length() - 1]
+  let buffer = self.buffers[self.buffers.length() - 1]
+  let out = buffer.out
   let state = self.state()
   let lines = text.split("\n").map(line => line.to_owned()).collect()
   for index, line in lines {
     if index > 0 {
       out.write_char('\n')
-      self.at_line_start = true
+      buffer.at_line_start = true
     }
     if line.is_empty() {
       continue
     }
-    if self.at_line_start {
+    if buffer.at_line_start {
       out.write_string(state.newline_prefix)
       for _ in 0..<state.indent_level {
         out.write_string(self.indent_text)
       }
-      self.at_line_start = false
+      buffer.at_line_start = false
     }
     out.write_string(line)
   }
   if end_line {
     out.write_char('\n')
-    self.at_line_start = true
+    buffer.at_line_start = true
   }
 }
 
@@ -247,6 +266,12 @@ pub fn CodeWriter::pop_state(self : CodeWriter) -> Unit raise CodegenError {
       "I could not pop the state of the writer: I did not push one.",
     )
   }
+  if self.open_sections.last() is Some(open) &&
+    open.depth == self.states.length() {
+    raise StateError(
+      "I could not pop the state of the writer: it belongs to section `\{open.section.name}`, and `pop_section` ends it.",
+    )
+  }
   let _ = self.states.pop()
 }
 
@@ -254,8 +279,15 @@ pub fn CodeWriter::pop_state(self : CodeWriter) -> Unit raise CodegenError {
 /// The text that I wrote. I trim the trailing whitespace of each line and end
 /// with exactly one newline. I give the empty string when nothing is there.
 pub fn CodeWriter::to_string(self : CodeWriter) -> String {
+  normalize_output(self.buffers[0].out.to_string())
+}
+
+///|
+/// Trim the trailing whitespace of each line and end with exactly one newline.
+/// Text without content gives the empty string.
+fn normalize_output(text : String) -> String {
   let lines : Array[String] = []
-  for line in self.buffers[0].to_string().split("\n") {
+  for line in text.split("\n") {
     lines.push(line.trim_end(chars=" \t").to_owned())
   }
   while lines.last() is Some("") {
@@ -277,8 +309,9 @@ pub fn CodeWriter::child(self : CodeWriter) -> CodeWriter {
     namespace: self.namespace,
     indent_text: self.indent_text,
     tracker: self.tracker,
-    buffers: [StringBuilder()],
-    at_line_start: true,
+    buffers: [OutputBuffer::new()],
+    interceptors: self.interceptors,
+    open_sections: [],
     states: [
       {
         indent_level: 0,
