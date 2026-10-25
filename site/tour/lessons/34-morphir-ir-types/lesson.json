@@ -1,0 +1,1 @@
+{"slug": "morphir-ir-types", "title": "The IR as recursive tagged unions", "section": "Case study: a DSL for the Morphir IR", "output": "JsonSchema", "spec": "https://smithy.io/2.0/spec/aggregate-types.html#recursive-shape-definitions"}

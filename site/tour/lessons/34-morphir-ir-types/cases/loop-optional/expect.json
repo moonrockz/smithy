@@ -1,0 +1,1 @@
+{"events": [], "output_contains": ["\"Loop\": {\n            \"type\": \"object\",\n            \"properties\": {\n                \"next\": {\n                    \"$ref\": \"#/definitions/Loop\"\n                }\n            }\n        }"]}
