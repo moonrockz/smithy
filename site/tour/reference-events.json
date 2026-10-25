@@ -3096,6 +3096,31 @@
             "events": [
                 "TraitValue|ERROR|morphir.sdk.basics#AddInput$a"
             ]
+        },
+        "37-morphir-sdk/add-reverse": {
+            "digest": "4458490c53bccecab75fdb284cf12c6941824504d0edc1818110cce180bd50fa",
+            "events": [],
+            "selector": [
+                "morphir.sdk.basics#Add",
+                "morphir.sdk.basics#And",
+                "morphir.sdk.basics#Negate",
+                "morphir.sdk.string#Append",
+                "morphir.sdk.string#IsEmpty",
+                "morphir.sdk.string#Length",
+                "morphir.sdk.string#Reverse"
+            ]
+        },
+        "37-morphir-sdk/start": {
+            "digest": "a08d4e974d95d40406fad3c32ca8e7c8c3ceeb1568c0b262e42ed6bd5a42e1df",
+            "events": [],
+            "selector": [
+                "morphir.sdk.basics#Add",
+                "morphir.sdk.basics#And",
+                "morphir.sdk.basics#Negate",
+                "morphir.sdk.string#Append",
+                "morphir.sdk.string#IsEmpty",
+                "morphir.sdk.string#Length"
+            ]
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
