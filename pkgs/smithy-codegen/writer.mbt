@@ -8,6 +8,8 @@ priv enum Formatter {
   Builtin((TemplateValue) -> Result[String, String])
   /// `C`: run a `Call` value on a child writer and give its text.
   Nested
+  /// `T`: write a symbol, and record its imports and dependencies.
+  Symbolic
   Custom((CodeWriter, TemplateValue) -> String raise CodegenError)
 }
 
@@ -33,11 +35,10 @@ fn WriterState::copy(self : WriterState) -> WriterState {
 ///|
 /// A writer of generated code. It keeps the output, the indentation, a stack of
 /// states (indentation, newline prefix, context and formatters) and the formatters.
-#warnings("-unused_field")
 pub struct CodeWriter {
   priv namespace : Namespace
   priv indent_text : String
-  priv imports : ImportTracker
+  priv tracker : ImportTracker
   // The stack of output buffers. The last one takes the output. A capture of
   // text can push a buffer and pop it later.
   priv buffers : Array[StringBuilder]
@@ -70,6 +71,7 @@ pub fn CodeWriter::new(
   let formatters : Map[Char, Formatter] = Map([])
   formatters['L'] = Builtin(format_literal)
   formatters['C'] = Nested
+  formatters['T'] = Symbolic
   formatters['S'] = Builtin(value => {
     match value {
       Text(text) => Ok(string_literal(text))
@@ -79,7 +81,7 @@ pub fn CodeWriter::new(
   {
     namespace,
     indent_text,
-    imports: ImportTracker::new(),
+    tracker: ImportTracker::new(),
     buffers: [StringBuilder()],
     at_line_start: true,
     states: [
@@ -274,7 +276,7 @@ pub fn CodeWriter::child(self : CodeWriter) -> CodeWriter {
   {
     namespace: self.namespace,
     indent_text: self.indent_text,
-    imports: self.imports,
+    tracker: self.tracker,
     buffers: [StringBuilder()],
     at_line_start: true,
     states: [
@@ -495,6 +497,22 @@ fn CodeWriter::render(
               _ =>
                 raise template_error(
                   "a value that `C` cannot format: only a function", offset, template,
+                )
+            }
+          Some(Symbolic) =>
+            match value {
+              Sym(symbol) =>
+                write_aligned(out, self.symbol_text(symbol, None), align)
+              Ref(reference) =>
+                write_aligned(
+                  out,
+                  self.symbol_text(reference.symbol, reference.alias),
+                  align,
+                )
+              _ =>
+                raise template_error(
+                  "a value that `T` cannot format: only a symbol or a reference",
+                  offset, template,
                 )
             }
           Some(Custom(format)) => write_aligned(out, format(self, value), align)
