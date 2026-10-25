@@ -278,6 +278,81 @@ See the [provider contracts](../artifact-resources/README.mbt.md#public-npm-pack
 [Maven example](../../examples/maven-repository/README.md). All remote inputs share
 `cacheDirectory`, `offline` and the CLI cache flags.
 
+This test reads one npm, one Maven and one GitHub input. Parsing performs no I/O,
+so it needs no network. Each input knows its kind and its location. A version
+range fails:
+
+<!-- tour:start remote-inputs-api -->
+```mbt check
+///|
+test "read npm, Maven and GitHub inputs" {
+  let config = @build.BuildConfig::parse(
+    (
+      #|{
+      #|  "version": "1.0",
+      #|  "sources": [
+      #|    {
+      #|      "npm": { "package": "@example/weather-models", "version": "1.2.3" },
+      #|      "root": "package/models",
+      #|      "globs": ["**/*.smithy"]
+      #|    },
+      #|    {
+      #|      "maven": {
+      #|        "group": "software.amazon.smithy",
+      #|        "artifact": "smithy-aws-traits",
+      #|        "version": "1.72.0"
+      #|      }
+      #|    },
+      #|    {
+      #|      "github": {
+      #|        "repository": "example/weather-models",
+      #|        "tag": "v1.2.3",
+      #|        "asset": "models.tar.gz"
+      #|      },
+      #|      "format": "tgz",
+      #|      "root": "package/models",
+      #|      "globs": ["**/*.smithy"]
+      #|    }
+      #|  ]
+      #|}
+    ),
+  )
+  let kinds = config.sources.map(input => {
+    match input {
+      Npm(_) => "npm"
+      Maven(_) => "maven"
+      GitHub(_) => "github"
+      _ => "other"
+    }
+  })
+  assert_eq(kinds, ["npm", "maven", "github"])
+  let locations = config.sources.map(input => input.location().to_string())
+  assert_eq(locations[0], "https://registry.npmjs.org")
+  assert_eq(locations[1], "https://repo.maven.apache.org/maven2")
+  assert_eq(locations[2], "example/weather-models")
+  let range =
+    #|{
+    #|  "version": "1.0",
+    #|  "sources": [
+    #|    {
+    #|      "npm": { "package": "@example/weather-models", "version": "^1.2.0" },
+    #|      "root": "package/models",
+    #|      "globs": ["**/*.smithy"]
+    #|    }
+    #|  ]
+    #|}
+  try @build.BuildConfig::parse(range) catch {
+    @build.InvalidBuildConfig(message) => {
+      let expected = "npm requires a public registry base, package name and exact semantic version"
+      assert_eq(message, expected)
+    }
+  } noraise {
+    _ => fail("I expected the version range to fail")
+  }
+}
+```
+<!-- tour:end remote-inputs-api -->
+
 ## Credential bindings
 
 Root-level `credentials` is an array of `CredentialBinding` values. Each binding

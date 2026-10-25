@@ -1260,6 +1260,45 @@ hosts use curl. Wasm and Wasm GC retain portable archive/provider behavior with 
 custom library transport/cache store. Normal tests use controlled HTTP fixtures,
 not live registry availability.
 
+### Exact versions of remote inputs
+
+An npm input needs an exact version. A range such as `^1.2.0` fails when the CLI reads
+the configuration, before it acquires anything. The second configuration has a range, so
+the build exits 1 without network access.
+
+<!-- tour:start remote-inputs-cli -->
+```json file=weather-build.json
+{
+  "version": "1.0",
+  "sources": [
+    {
+      "npm": { "package": "@example/weather-models", "version": "1.2.3" },
+      "root": "package/models",
+      "globs": ["**/*.smithy"]
+    }
+  ]
+}
+```
+
+```json file=weather-build-range.json
+{
+  "version": "1.0",
+  "sources": [
+    {
+      "npm": { "package": "@example/weather-models", "version": "^1.2.0" },
+      "root": "package/models",
+      "globs": ["**/*.smithy"]
+    }
+  ]
+}
+```
+
+```console status=1
+$ smithy build --config weather-build-range.json
+smithy: npm requires a public registry base, package name and exact semantic version
+```
+<!-- tour:end remote-inputs-cli -->
+
 ## Repository credentials
 
 Declare exact origin bindings at the root of `smithy-build.json`. Bindings contain

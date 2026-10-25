@@ -939,6 +939,29 @@ test "lesson 31 shows the protocol-tests example" {
 }
 
 ///|
+test "lesson 32 shows the same npm input in both tabs" {
+  let lesson = lesson_in("32-loading-models")
+  let (cli, lines) = include_tabs(lesson)
+  let snippet = name => {
+    match cli.search_by(s => s.file == Some(name)) {
+      Some(i) => cli[i].code
+      None => fail("lesson 32: the CLI tab has no file " + name)
+    }
+  }
+  let range = snippet("weather-build-range.json")
+  check_api_has(lesson, lines, range)
+  // The exact configuration differs from the range only in the version.
+  let exact = snippet("weather-build.json")
+  let range_version = "\"version\": \"^1.2.0\""
+  assert_eq(range.split(range_version).count(), 2)
+  assert_eq(
+    exact,
+    range.replace(old=range_version, new="\"version\": \"1.2.3\""),
+  )
+  check_api_has(lesson, lines, exact.split("\n").drop(3).take(5).join("\n"))
+}
+
+///|
 test "a static extension lesson says that the feature is our extension" {
   let ok = match
     @source.read_tour("tour/source/testdata/static-ok", repo="..") {
