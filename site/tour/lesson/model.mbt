@@ -381,7 +381,8 @@ fn model_pairs(model : Model) -> Array[(String, String)] {
 
 ///|
 /// The tab of a lesson that comes after Findings: the name of its output, or
-/// "Value findings" for a value lesson. `None` when the lesson has no such tab.
+/// "Value findings" for a value lesson and "Message findings" for a message
+/// lesson. `None` when the lesson has no such tab.
 pub fn output_label(
   engine : @model.Engine,
   output : @samples.Output?,
@@ -389,6 +390,7 @@ pub fn output_label(
   match engine {
     Model => output.map(output_name)
     Value(_) => Some("Value findings")
+    Message(_) => Some("Message findings")
     Diff | Transcript(_) | Static => None
   }
 }

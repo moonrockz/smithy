@@ -1,0 +1,1 @@
+{"slug": "a", "title": "A", "section": "Data", "spec": "https://smithy.io/2.0/", "message": {"file": "reply.json", "service": "example#Calculator", "version": "1.0", "kind": "response", "context": {"request": "call.json"}, "legacy_errors": "code-message-data", "unknown_members": "ignore"}}

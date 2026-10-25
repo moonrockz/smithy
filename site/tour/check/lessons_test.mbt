@@ -242,6 +242,36 @@ fn check_diff_case(
 }
 
 ///|
+/// Compare the findings of a value or message check with the keys and the
+/// output strings of the case. `file` is the name that the CLI prints for the
+/// input.
+fn check_findings(
+  where_ : String,
+  case : @model.Case,
+  findings : Array[@core.DataFinding],
+  file : String,
+) -> Unit raise {
+  let keys = data_keys(findings)
+  let wanted = case.expect.findings.copy()
+  wanted.sort_by(@model.compare_code_units)
+  if keys != wanted {
+    fail(
+      where_ +
+      ": findings differ.\n  expected: " +
+      show(wanted) +
+      "\n  actual:   " +
+      show(keys),
+    )
+  }
+  let text = findings.map(f => f.cli_line(file~)).join("\n")
+  for needle in case.expect.output_contains {
+    if !text.contains(needle) {
+      fail(where_ + ": the output has no " + needle + "\n" + text)
+    }
+  }
+}
+
+///|
 /// Check one case of a lesson: its events, its findings and its output text.
 fn check_case(
   session : @core.Session,
@@ -270,8 +300,7 @@ fn check_case(
   let runs = match
     output_plan(
       lesson.output is Some(_) ||
-      lesson.engine is Value(_) ||
-      lesson.engine is Transcript(_),
+      lesson.engine is (Value(_) | Message(_) | Transcript(_)),
       expected,
       case.expect.output_contains,
       blocked=case.expect.blocked,
@@ -312,24 +341,33 @@ fn check_case(
             fail(where_ + ": the value check was blocked: " + reason)
           _ => fail(where_ + ": unexpected answer")
         }
-        let keys = data_keys(findings)
-        let wanted = case.expect.findings.copy()
-        wanted.sort_by(@model.compare_code_units)
-        if keys != wanted {
-          fail(
-            where_ +
-            ": findings differ.\n  expected: " +
-            show(wanted) +
-            "\n  actual:   " +
-            show(keys),
-          )
+        check_findings(where_, case, findings, setup.file)
+      }
+    Message(setup) =>
+      if runs {
+        let message = match all_files.search_by(f => f.name == setup.file) {
+          Some(i) => all_files[i].text
+          None => fail(where_ + ": the case has no file " + setup.file)
         }
-        let text = findings.map(f => f.cli_line(file=setup.file)).join("\n")
-        for needle in case.expect.output_contains {
-          if !text.contains(needle) {
-            fail(where_ + ": the output has no " + needle + "\n" + text)
-          }
+        let findings = match
+          @core.handle(
+            session,
+            CheckMessage(
+              seq=2,
+              files~,
+              service=setup.service,
+              version=setup.version,
+              message~,
+              kind=setup.message_kind(all_files),
+              options=setup.options,
+            ),
+          ) {
+          DataChecked(findings~, ..) => findings
+          Blocked(reason~, ..) =>
+            fail(where_ + ": the message check was blocked: " + reason)
+          _ => fail(where_ + ": unexpected answer")
         }
+        check_findings(where_, case, findings, setup.file)
       }
     Model =>
       match lesson.output {
@@ -785,6 +823,105 @@ test "a diff case with a model error claims no diff events and the model events 
   }
   assert_true(
     raises_with("events differ", () => check_case(session, lesson, no_events)),
+  )
+}
+
+///|
+fn message_fixture() -> @model.Tour raise {
+  match @source.read_tour("tour/source/testdata/message-level1", repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the fixture: " + e)
+  }
+}
+
+///|
+test "a message lesson case gives the findings that its expect.json names" {
+  let tour = message_fixture()
+  assert_eq(tour.lessons.map(l => l.dir), ["01-call", "02-reply"])
+  let session = @core.Session::new()
+  for lesson in tour.lessons {
+    assert_true(lesson.engine is Message(_))
+    assert_eq(lesson.text.contains(@model.extension_note), true)
+    for case in lesson.cases {
+      check_case(session, lesson, case)
+    }
+  }
+  // A claim that the check does not give is an error.
+  let lesson = tour.lessons[0]
+  let start = lesson.cases[0]
+  let wrong : @model.Case = {
+    ..start,
+    expect: {
+      ..start.expect,
+      findings: ["TypeMismatch|error|/params/1|example#SubtractInput"],
+    },
+  }
+  assert_true(
+    raises_with("findings differ", () => check_case(session, lesson, wrong)),
+  )
+  let wrong_text : @model.Case = {
+    ..start,
+    expect: { ..start.expect, output_contains: ["no such text"], },
+  }
+  assert_true(
+    raises_with("the output has no", () => {
+      check_case(session, lesson, wrong_text)
+    }),
+  )
+}
+
+///|
+test "a message case with an ERROR or a DANGER cannot claim findings" {
+  let lesson = message_fixture().lessons[0]
+  let i = lesson.cases.search_by(c => c.name == "model-error")
+  guard i is Some(i) else { fail("the fixture has no model-error case") }
+  let case = lesson.cases[i]
+  assert_true(case.expect.events.any(e => e.severity.blocks_output()))
+  check_case(@core.Session::new(), lesson, case)
+  let claims : @model.Case = {
+    ..case,
+    expect: { ..case.expect, findings: ["Range|error|/id|example#Order"], },
+  }
+  assert_true(
+    raises_with("output_contains cannot run", () => {
+      check_case(@core.Session::new(), lesson, claims)
+    }),
+  )
+}
+
+///|
+test "a message lesson that loses its note is found" {
+  let tour = message_fixture()
+  assert_eq(lessons_without_note(tour), [])
+  let stripped : @model.Tour = {
+    lessons: tour.lessons.map(l => {
+      ..l,
+      text: l.text.replace_all(old=@model.extension_note, new="> Note:"),
+    }),
+  }
+  assert_eq(lessons_without_note(stripped), ["01-call", "02-reply"])
+}
+
+///|
+test "a response case sends the text of the request file" {
+  let lesson = message_fixture().lessons[1]
+  let session = @core.Session::new()
+  let by_name = (name : String) => {
+    let i = lesson.cases.search_by(c => c.name == name)
+    guard i is Some(i) else { fail("the fixture has no case " + name) }
+    lesson.cases[i]
+  }
+  // The edited request has id 7 and the edited reply answers it.
+  check_case(session, lesson, by_name("edited-request"))
+  // The same reply, without the edit of the request, does not answer id 7.
+  let reply_only : @model.Case = {
+    ..by_name("edited-request"),
+    files: [
+      by_name("edited-request").files.filter(f => f.name == "reply.json")[0],
+    ],
+  }
+  assert_true(
+    raises_with("findings differ", () => check_case(session, lesson, reply_only)),
   )
 }
 

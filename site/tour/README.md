@@ -18,7 +18,7 @@ site/tour/lessons/NN-<slug>/
 
 - Lesson numbers start at 01 and have no gap. The folder name is `NN-<slug>`, and `<slug>` is the `slug` of
   `lesson.json`. Two lessons cannot have the same number or the same slug.
-- `lesson.json` has the keys `slug`, `title`, `section`, `spec`, and optionally `output` and `selector` (and `value`, `diff`, `static` and `extension`, see below).
+- `lesson.json` has the keys `slug`, `title`, `section`, `spec`, and optionally `output` and `selector` (and `value`, `transcript`, `message`, `diff`, `static` and `extension`, see below).
   Another key is an error. `section` groups consecutive lessons on the contents page. `spec` is the link to what
   the lesson teaches: a URL that starts with `https://smithy.io/`, or the repository path of a docs page, such as
   `pkgs/smithy-openrpc/README.mbt.md`. The reader rejects any other value. A docs path links to the page on the
@@ -245,7 +245,7 @@ A lesson has at most one of `output`, `value`, `transcript`, `message` and `diff
 - Other keys are an error.
 
 File rules, for every lesson: each file in `files/` and in a case must end in
-`.smithy`, except the data file of the engine (the value file or the transcript file). A case cannot add another `.json` file.
+`.smithy`, except the data file of the engine (the value file, the transcript file, or the message file and the request file of a message lesson). A case cannot add another `.json` file.
 
 `expect.json` of a value lesson needs `"findings"` (a lesson of another kind
 cannot have it). Each item is a key of what the reader sees, without the message:
@@ -313,6 +313,40 @@ The text of a transcript lesson must have a note that starts with
 `> **Our extension:**`. Smithy defines no transcript check, and no Java
 reference exists for it. Level 1 checks the note. Level 2 compares only the
 model events of the model files.
+
+## Message lessons
+
+A message lesson checks one JSON-RPC message against a service of the lesson
+model, as `smithy validate rpc --message` or `--response` does. `lesson.json`
+has `"message"` in place of `"output"`, and the lesson has the file rules,
+the `findings` of `expect.json` and the extension note of a value lesson.
+
+```json
+"message": {"file": "reply.json", "service": "example#Calculator", "version": "1.0",
+            "kind": "response", "context": {"request": "call.json"},
+            "legacy_errors": "code-message-data",
+            "unknown_members": "reject", "member_names": "smithy"}
+```
+
+- `file` is a starting file in `files/` that ends in `.json`. It holds the
+  message. `service` is the absolute ID of the service (`--service`).
+- `version` is `"1.0"` or `"2.0"`. `kind` is `"request"` or `"response"`.
+- `context` is for a response only. It is `"envelope-only"`, or an object with
+  exactly one of `method` (the name of the method), `operation` (the absolute
+  ID of the operation) and `request`. `request` names a starting `.json` file
+  other than the message file. The check gets the text of that file as the
+  original request, so a case that edits the file changes the check. A JSON-RPC
+  id keeps all of its digits, because the check reads the text.
+- `legacy_errors` is for a response only: `"opaque"` (the default) or
+  `"code-message-data"`. The second value needs `"version": "1.0"`.
+- `unknown_members` and `member_names` are optional, as for a value lesson.
+- Other keys are an error.
+
+Every file ends in `.smithy`, except the message file and the request file.
+A finding key has the form of a value finding. The shape of a finding is the
+shape that the CLI prints: a member, an operation or the service. A message
+that is not JSON gives `InvalidJson|error||<service>`. Level 1 and level 2 are as
+for a value lesson: only the model events are compared with the Java reference.
 
 ## Diff lessons
 

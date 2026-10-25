@@ -294,6 +294,95 @@ test "model_files leaves out the data files of the engine" {
 }
 
 ///|
+test "a message lesson has its message and its request file as data files" {
+  let options = @samples.ValueOptions::default()
+  let request : MessageSetup = {
+    file: "call.json",
+    service: "a#S",
+    version: V2_0,
+    role: Request,
+    options,
+  }
+  let response : MessageSetup = {
+    ..request,
+    file: "reply.json",
+    role: Response(context=Some(RequestFile("call.json")), legacy_errors=Opaque),
+  }
+  assert_eq(Message(request).data_files(), ["call.json"])
+  assert_eq(Message(response).data_files(), ["reply.json", "call.json"])
+  let named : MessageSetup = {
+    ..response,
+    role: Response(context=Some(Method("m")), legacy_errors=Opaque),
+  }
+  assert_eq(Message(named).data_files(), ["reply.json"])
+  let files : Array[LessonFile] = [
+    { name: "model.smithy", text: "m", },
+    { name: "reply.json", text: "{}", },
+    { name: "call.json", text: "{\"id\":1}", },
+  ]
+  assert_eq(model_files(Message(response), files).map(f => f.name), [
+    "model.smithy",
+  ])
+  let lesson = { ..lesson_of(1, "M", [], []), engine: Message(response), }
+  assert_true(lesson.needs_extension_note())
+}
+
+///|
+test "a message engine survives the page data" {
+  let engine : Engine = Message({
+    file: "reply.json",
+    service: "a#S",
+    version: V1_0,
+    role: Response(
+      context=Some(RequestFile("call.json")),
+      legacy_errors=CodeMessageData,
+    ),
+    options: @samples.ValueOptions::default(),
+  })
+  let back : Engine = @json.from_json(engine.to_json())
+  assert_eq(back, engine)
+}
+
+///|
+test "the message kind of a setup carries the text of the request file" {
+  let options = @samples.ValueOptions::default()
+  let files : Array[LessonFile] = [{ name: "call.json", text: "{\"id\":1}", }]
+  let request : MessageSetup = {
+    file: "call.json",
+    service: "a#S",
+    version: V2_0,
+    role: Request,
+    options,
+  }
+  assert_eq(request.message_kind(files), RequestMessage)
+  let response : MessageSetup = {
+    ..request,
+    file: "reply.json",
+    role: Response(context=Some(RequestFile("call.json")), legacy_errors=Opaque),
+  }
+  // JSON-RPC 2.0 has no legacy errors: the option is absent.
+  assert_eq(
+    response.message_kind(files),
+    ResponseMessage(
+      context=Some(OriginalRequest("{\"id\":1}")),
+      legacy_errors=None,
+    ),
+  )
+  let legacy : MessageSetup = {
+    ..response,
+    version: V1_0,
+    role: Response(context=Some(EnvelopeOnly), legacy_errors=CodeMessageData),
+  }
+  assert_eq(
+    legacy.message_kind(files),
+    ResponseMessage(
+      context=Some(@samples.ResponseContext::EnvelopeOnly),
+      legacy_errors=Some(CodeMessageData),
+    ),
+  )
+}
+
+///|
 test "a static lesson has no data files and needs a note only when it is an extension" {
   assert_eq(Static.data_files(), [])
   let base = lesson_of(1, "S", [], [])

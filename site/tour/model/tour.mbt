@@ -60,6 +60,8 @@ pub(all) enum Engine {
   Model
   /// Check a JSON value against a shape of the model.
   Value(ValueSetup)
+  /// Check a JSON-RPC message against a service of the model.
+  Message(MessageSetup)
   /// Compare the models in `old/` and `new/`, as `smithy diff` does.
   Diff
   /// Step through a JSON-RPC transcript against a protocol of the model.
@@ -103,6 +105,110 @@ pub extend ValueSetup with ToJson::{to_json}
 pub extend ValueSetup with FromJson::{from_json}
 
 ///|
+/// The setup of a message lesson: the starting file with the message, the
+/// absolute ID of the service, the JSON-RPC version, what the message is and
+/// the options of `smithy validate rpc`.
+pub(all) struct MessageSetup {
+  file : String
+  service : String
+  version : @samples.RpcVersion
+  role : MessageRole
+  options : @samples.ValueOptions
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend MessageSetup with Eq::{equal, not_equal}
+
+///|
+pub extend MessageSetup with @debug.Debug::{to_repr}
+
+///|
+pub extend MessageSetup with ToJson::{to_json}
+
+///|
+pub extend MessageSetup with FromJson::{from_json}
+
+///|
+/// What the message of a message lesson is: a request, or a response with the
+/// options `--method`, `--operation`, `--request`, `--envelope-only` and
+/// `--legacy-errors`.
+pub(all) enum MessageRole {
+  Request
+  Response(context~ : LessonContext?, legacy_errors~ : @samples.LegacyErrors)
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend MessageRole with Eq::{equal, not_equal}
+
+///|
+pub extend MessageRole with @debug.Debug::{to_repr}
+
+///|
+pub extend MessageRole with ToJson::{to_json}
+
+///|
+pub extend MessageRole with FromJson::{from_json}
+
+///|
+/// What a response lesson knows of the call: `RequestFile` names a starting
+/// file that holds the request. The check gets the text of that file.
+pub(all) enum LessonContext {
+  Method(String)
+  Operation(String)
+  RequestFile(String)
+  EnvelopeOnly
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend LessonContext with Eq::{equal, not_equal}
+
+///|
+pub extend LessonContext with @debug.Debug::{to_repr}
+
+///|
+pub extend LessonContext with ToJson::{to_json}
+
+///|
+pub extend LessonContext with FromJson::{from_json}
+
+///|
+/// The kind of the message check for `files` (the files of the lesson or of a
+/// case): a `RequestFile` becomes the text of that file. The reader makes sure
+/// that the lesson has the file; a case that deletes it has an empty request.
+/// JSON-RPC 2.0 has no legacy errors, and the CLI rejects the option there, so
+/// the check gets no value for it.
+pub fn MessageSetup::message_kind(
+  self : MessageSetup,
+  files : Array[LessonFile],
+) -> @samples.MessageKind {
+  match self.role {
+    Request => RequestMessage
+    Response(context~, legacy_errors~) => {
+      let context : @samples.ResponseContext? = match context {
+        None => None
+        Some(Method(name)) => Some(Method(name))
+        Some(Operation(id)) => Some(Operation(id))
+        Some(EnvelopeOnly) => Some(@samples.ResponseContext::EnvelopeOnly)
+        Some(RequestFile(name)) =>
+          Some(
+            OriginalRequest(
+              match files.search_by(f => f.name == name) {
+                Some(i) => files[i].text
+                None => ""
+              },
+            ),
+          )
+      }
+      let legacy_errors = match self.version {
+        V1_0 => Some(legacy_errors)
+        V2_0 => None
+      }
+      ResponseMessage(context~, legacy_errors~)
+    }
+  }
+}
+
+///|
 /// The setup of a transcript lesson: the starting file with the transcript
 /// (a `.json` document) and the absolute ID of the protocol shape.
 pub(all) struct TranscriptSetup {
@@ -129,6 +235,11 @@ pub fn Engine::data_files(self : Engine) -> Array[String] {
     Model => []
     Value(setup) => [setup.file]
     Transcript(setup) => [setup.file]
+    Message(setup) =>
+      match setup.role {
+        Response(context=Some(RequestFile(name)), ..) => [setup.file, name]
+        _ => [setup.file]
+      }
     Diff | Static => []
   }
 }
@@ -284,7 +395,7 @@ pub let extension_note : String = "> **Our extension:**"
 pub fn Lesson::needs_extension_note(self : Lesson) -> Bool {
   match self.engine {
     Model => false
-    Value(_) | Transcript(_) => true
+    Value(_) | Message(_) | Transcript(_) => true
     // Smithy has a diff tool: the lesson shows its events.
     Diff => false
     Static => self.extension

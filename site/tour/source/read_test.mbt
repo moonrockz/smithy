@@ -248,6 +248,99 @@ test "a value lesson reads its setup and the findings of a case" {
 }
 
 ///|
+test "a message lesson reads its setup and the findings of a case" {
+  let tour = match read("message-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(
+    lesson.engine,
+    Message({
+      file: "reply.json",
+      service: "example#Calculator",
+      version: V1_0,
+      role: Response(
+        context=Some(RequestFile("call.json")),
+        legacy_errors=CodeMessageData,
+      ),
+      options: { unknown_members: Ignore, member_names: Smithy, },
+    }),
+  )
+  assert_eq(lesson.output, None)
+  assert_eq(lesson.engine.data_files(), ["reply.json", "call.json"])
+  assert_eq(lesson.cases[1].expect.findings, [
+    "TypeMismatch|error|/id|example#Order",
+  ])
+  assert_eq(lesson.case_files(lesson.cases[1]).map(f => f.text), [
+    "{}\n", "namespace example\nstructure Order { quantity: Integer }\n", "{\"jsonrpc\":\"2.0\",\"result\":19,\"id\":1}\n",
+  ])
+}
+
+///|
+test "a message lesson reads the envelope-only context" {
+  let tour = match read("message-envelope-only") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  assert_eq(
+    tour.lessons[0].engine,
+    Message({
+      file: "call.json",
+      service: "example#Calculator",
+      version: V2_0,
+      role: Response(context=Some(EnvelopeOnly), legacy_errors=Opaque),
+      options: @samples.ValueOptions::default(),
+    }),
+  )
+}
+
+///|
+test "a request has no context" {
+  expect_err("message-request-with-context", ["01-a", "\"context\"", "response"])
+}
+
+///|
+test "legacy_errors needs JSON-RPC 1.0" {
+  expect_err("message-legacy-on-2", ["01-a", "legacy_errors", "1.0"])
+}
+
+///|
+test "the request file is not the message file" {
+  expect_err("message-request-file-is-message", ["01-a", "call.json", "request"])
+}
+
+///|
+test "a message lesson that names a missing request file" {
+  expect_err("message-missing-request", ["01-a", "gone.json"])
+}
+
+///|
+test "a message context names one thing" {
+  expect_err("message-bad-context", ["01-a", "context", "one of"])
+}
+
+///|
+test "a message setup with an unknown key" {
+  expect_err("message-unknown-key", ["01-a", "colour"])
+}
+
+///|
+test "a message setup with an unknown version" {
+  expect_err("message-bad-version", ["01-a", "version", "3.0"])
+}
+
+///|
+test "a lesson with a message and a value" {
+  expect_err("message-and-value", ["01-a", "at most one of"])
+}
+
+///|
+test "a message lesson case needs findings" {
+  expect_err("message-no-findings", ["01-a/cases/start", "findings"])
+}
+
+///|
 test "a value lesson that names a missing file" {
   expect_err("value-bad-file", ["01-a", "missing.json"])
 }

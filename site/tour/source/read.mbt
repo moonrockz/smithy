@@ -263,8 +263,8 @@ fn read_extension(
 }
 
 ///|
-/// The engine of a lesson: at most one of `output`, `value`, `diff`, or
-/// `static`. A lesson with none of them validates its model.
+/// The engine of a lesson: at most one of `output`, `value`, `message`, `diff`,
+/// or `static`. A lesson with none of them validates its model.
 fn read_engine(
   meta : Json,
   dir : String,
@@ -286,8 +286,15 @@ fn read_engine(
   }
   let value = m.get("value")
   let transcript = m.get("transcript")
+  let message = m.get("message")
   let diff = flag_field(meta, "diff", where_)
-  let engines = [has_output, value is Some(_), transcript is Some(_), diff]
+  let engines = [
+    has_output,
+    value is Some(_),
+    transcript is Some(_),
+    message is Some(_),
+    diff,
+  ]
   if engines.filter(b => b).length() > 1 {
     fail(
       "\{where_}: I expected at most one of output, value, transcript, message, diff",
@@ -299,6 +306,9 @@ fn read_engine(
   if diff {
     return Diff
   }
+  if message is Some(setup) {
+    return read_message(setup, where_)
+  }
   guard value is Some(setup) else { return Model }
   check_keys(setup, value_keys, "\{where_} \"value\"")
   let file = string_field(setup, "file", "\{where_} \"value\"")
@@ -306,6 +316,14 @@ fn read_engine(
     fail("\{where_}: the value file \"\{file}\" must end in .json")
   }
   let shape = string_field(setup, "shape", "\{where_} \"value\"")
+  let options = read_options(setup, where_)
+  Value({ file, shape, options, })
+}
+
+///|
+/// The options `unknown_members` and `member_names` of a value or message
+/// setup.
+fn read_options(setup : Json, where_ : String) -> @samples.ValueOptions raise {
   let unknown_members : @samples.UnknownMembers = match
     optional_string_field(setup, "unknown_members", where_) {
     None | Some("reject") => Reject
@@ -324,7 +342,130 @@ fn read_engine(
         "\{where_}: \"member_names\" must be \"smithy\" or \"json\", not \"\{other}\"",
       )
   }
-  Value({ file, shape, options: { unknown_members, member_names, }, })
+  { unknown_members, member_names, }
+}
+
+///|
+/// The setup of a message lesson: `message` in `lesson.json`.
+fn read_message(setup : Json, where_ : String) -> @model.Engine raise {
+  let here = "\{where_} \"message\""
+  check_keys(setup, message_keys, here)
+  let file = string_field(setup, "file", here)
+  if !file.has_suffix(".json") {
+    fail("\{where_}: the message file \"\{file}\" must end in .json")
+  }
+  let service = string_field(setup, "service", here)
+  let version : @samples.RpcVersion = match
+    string_field(setup, "version", here) {
+    "1.0" => V1_0
+    "2.0" => V2_0
+    other =>
+      fail(
+        "\{where_}: \"version\" must be \"1.0\" or \"2.0\", not \"\{other}\"",
+      )
+  }
+  let has_context = has_key(setup, "context")
+  let has_legacy = has_key(setup, "legacy_errors")
+  let role : @model.MessageRole = match string_field(setup, "kind", here) {
+    "request" => {
+      if has_context || has_legacy {
+        fail(
+          "\{where_}: \"context\" and \"legacy_errors\" are for a response, but \"kind\" is \"request\"",
+        )
+      }
+      Request
+    }
+    "response" => {
+      let context = if has_context {
+        Some(read_context(setup, file, where_))
+      } else {
+        None
+      }
+      let legacy_errors : @samples.LegacyErrors = match
+        optional_string_field(setup, "legacy_errors", where_) {
+        None | Some("opaque") => Opaque
+        Some("code-message-data") =>
+          if version == V2_0 {
+            fail(
+              "\{where_}: \"legacy_errors\": \"code-message-data\" needs \"version\": \"1.0\", because JSON-RPC 2.0 has no legacy errors",
+            )
+          } else {
+            CodeMessageData
+          }
+        Some(other) =>
+          fail(
+            "\{where_}: \"legacy_errors\" must be \"opaque\" or \"code-message-data\", not \"\{other}\"",
+          )
+      }
+      if has_legacy && version == V2_0 {
+        fail(
+          "\{where_}: \"legacy_errors\" needs \"version\": \"1.0\", because JSON-RPC 2.0 has no legacy errors",
+        )
+      }
+      Response(context~, legacy_errors~)
+    }
+    other =>
+      fail(
+        "\{where_}: \"kind\" must be \"request\" or \"response\", not \"\{other}\"",
+      )
+  }
+  Message({
+    file,
+    service,
+    version,
+    role,
+    options: read_options(setup, where_),
+  })
+}
+
+///|
+/// The `context` of a response: the string "envelope-only", or an object with
+/// exactly one of `method`, `operation` and `request`. A request file is a
+/// starting `.json` file other than the message file.
+fn read_context(
+  setup : Json,
+  file : String,
+  where_ : String,
+) -> @model.LessonContext raise {
+  guard setup is Object(m) && m.get("context") is Some(context) else {
+    fail("\{where_}: I expected a \"context\"")
+  }
+  let here = "\{where_} \"context\""
+  match context {
+    String("envelope-only") => EnvelopeOnly
+    Object(fields) => {
+      let names = fields.keys().collect()
+      if names.length() != 1 {
+        fail(
+          "\{here} must have exactly one of method, operation and request, not \{names.length()}",
+        )
+      }
+      match names[0] {
+        "method" => Method(string_field(context, "method", here))
+        "operation" => Operation(string_field(context, "operation", here))
+        "request" => {
+          let request = string_field(context, "request", here)
+          if !request.has_suffix(".json") {
+            fail("\{here}: the request file \"\{request}\" must end in .json")
+          }
+          if request == file {
+            fail(
+              "\{here}: the request file \"\{request}\" is the message file. The request is another starting file",
+            )
+          }
+          RequestFile(request)
+        }
+        other =>
+          fail(
+            "\{here}: I do not know the key \"\{other}\". Use one of method, operation and request",
+          )
+      }
+    }
+    _ =>
+      fail(
+        "\{here} must be \"envelope-only\" or an object with one of method, operation and request",
+      )
+  }
 }
 
 ///|
@@ -489,9 +630,11 @@ fn read_case(
   let findings = optional_keys_field(json, "findings", where_)
   let diff = optional_keys_field(json, "diff", where_)
   match engine {
-    Value(_) =>
+    Value(_) | Message(_) =>
       if !(json is Object(m) && m.contains("findings")) {
-        fail("\{where_}: a value lesson needs \"findings\" in expect.json")
+        fail(
+          "\{where_}: a \{engine_name(engine)} lesson needs \"findings\" in expect.json",
+        )
       }
     Transcript(_) =>
       if !has_key(json, "findings") {
@@ -579,13 +722,20 @@ fn read_case(
 /// The keys of `lesson.json`.
 let lesson_keys : Array[String] = [
   "slug", "title", "section", "spec", "output", "selector", "value", "transcript",
-  "diff", "static", "extension",
+  "message", "diff", "static", "extension",
 ]
 
 ///|
 /// The keys of `value` in `lesson.json`.
 let value_keys : Array[String] = [
   "file", "shape", "unknown_members", "member_names",
+]
+
+///|
+/// The keys of `message` in `lesson.json`.
+let message_keys : Array[String] = [
+  "file", "service", "version", "kind", "context", "legacy_errors", "unknown_members",
+  "member_names",
 ]
 
 ///|
@@ -732,5 +882,13 @@ fn optional_keys_field(
     string_array_field(json, key, where_)
   } else {
     []
+  }
+}
+
+///|
+fn engine_name(engine : @model.Engine) -> String {
+  match engine {
+    Message(_) => "message"
+    _ => "value"
   }
 }

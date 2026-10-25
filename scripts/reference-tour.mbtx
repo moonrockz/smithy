@@ -386,11 +386,15 @@ fn case_selector(files : Array[(String, String)], fixed : String?) -> String? {
 }
 
 ///|
-/// The names of the files of a lesson that hold data in place of a model: the file of a `value` or a `transcript`
-/// setup. The same rule as `Engine::data_files` in site/tour/model.
+/// The names of the files of a lesson that hold data in place of a model: the value file of a value lesson, the
+/// transcript file of a transcript lesson, and the message file of a message lesson with the request file of its
+/// context. The same rule as `Engine::data_files` in site/tour/model.
 fn data_files(lesson : Json) -> Array[String] {
   match lesson {
     { "value": { "file": String(file), .. }, .. } | { "transcript": { "file": String(file), .. }, .. } => [file]
+    { "message": { "file": String(file), "context": { "request": String(request), .. }, .. }, .. } =>
+      [file, request]
+    { "message": { "file": String(file), .. }, .. } => [file]
     _ => []
   }
 }
@@ -714,6 +718,18 @@ async test "lesson_cases marks a model lesson as no diff case" {
 test "data_files of a value lesson names the value file" {
   let meta = @json.parse("{\"slug\": \"v\", \"value\": {\"file\": \"order.json\", \"shape\": \"a#B\"}}")
   assert_eq(data_files(meta), ["order.json"])
+}
+
+///|
+test "data_files of a message lesson names the message file and the request file" {
+  let request = @json.parse("{\"slug\": \"m\", \"message\": {\"file\": \"call.json\", \"kind\": \"request\"}}")
+  assert_eq(data_files(request), ["call.json"])
+  let response = @json.parse("{\"slug\": \"m\", \"message\": {\"file\": \"reply.json\", \"kind\": \"response\", \"context\": {\"request\": \"call.json\"}}}")
+  assert_eq(data_files(response), ["reply.json", "call.json"])
+  let named = @json.parse("{\"slug\": \"m\", \"message\": {\"file\": \"reply.json\", \"kind\": \"response\", \"context\": {\"method\": \"a\"}}}")
+  assert_eq(data_files(named), ["reply.json"])
+  let envelope = @json.parse("{\"slug\": \"m\", \"message\": {\"file\": \"reply.json\", \"kind\": \"response\", \"context\": \"envelope-only\"}}")
+  assert_eq(data_files(envelope), ["reply.json"])
 }
 
 ///|
