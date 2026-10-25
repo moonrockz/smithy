@@ -1,6 +1,6 @@
 # Ion values
 
-> **Our extension:** Smithy defines no Ion validation. The check is part of [moonrockz/smithy-ion-validation](../../../../pkgs/smithy-ion-validation/README.mbt.md), an optional module. No Java reference exists for it.
+> **Our extension:** Standard Smithy has no command that checks an Ion value against a shape. The check is part of [moonrockz/smithy-ion-validation](../../../../pkgs/smithy-ion-validation/README.mbt.md), an optional module. No Java reference exists for it.
 
 [Ion](https://amazon-ion.github.io/ion-docs/) is a data format with native types, such as timestamps, decimals, blobs and symbols. A Smithy shape checks an Ion value as it checks a JSON value ([lesson 26](../26-validating-values/lesson.md)).
 

@@ -4,14 +4,14 @@ A model changes over time, and some changes break the clients of the old model. 
 
 Our command `smithy diff` and the library [moonrockz/smithy-diff](../../../../pkgs/smithy-diff/README.mbt.md) use the rules of the Java Smithy Diff. The tour check compares the events of each case with the Java tool.
 
-The file tabs are in two groups, Old and New. The Diff tab shows each event as the CLI prints it: the severity, the shape, the message and the event ID. The new model adds the optional member `humidity` to the output. So the Diff tab shows `AddedShape` with the severity NOTE, a compatible change.
+The file tabs are in two groups, Old and New. The Diff tab shows each event as the CLI prints it. A line has the severity, the shape, the message and the event ID. The new model adds the optional member `humidity` to the output. So the Diff tab shows `AddedShape` with the severity NOTE, a compatible change.
 
 Make these changes in the new model one at a time. Change the model back after each change.
 
 - Delete the member `days` from the input. The Diff tab shows `RemovedShape` with the severity ERROR, a breaking change.
 - After `days`, add the member `country: String` with the trait `@required`. The Diff tab shows the ERROR `AddedRequiredMember`. Its message names the traits `default` and `clientOptional`: without one of them, the change is not compatible.
 - Delete the member `humidity`. The two models are now the same. The Diff tab shows "No differences."
-- Change the target of `celsius` to `Celsius`. No shape `Celsius` exists, so the Findings tab shows `Target.UnresolvedShape`. The tool does not compare a model with an ERROR or a DANGER.
+- Change the target of `celsius` to `Celsius`. No shape `Celsius` exists, so the Findings tab shows the ERROR `Target.UnresolvedShape`. The new model has an error, so the tool does not compare the models.
 
 ## On your computer
 

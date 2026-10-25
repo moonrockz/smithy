@@ -707,3 +707,20 @@ for (const colorScheme of ["light", "dark"]) {
     expect(page.errors).toEqual([]);
   });
 }
+
+// Each static lesson of the section "Evolving and sharing models" has its text only: no lesson app, no expand
+// buttons and no Worker.
+for (const slug of ["protocol-tests", "loading-models", "where-next"]) {
+  test(`the static lesson ${slug} has no lesson app, no expand buttons and no Worker`, async ({ page }) => {
+    const workers = [];
+    page.on("worker", (worker) => workers.push(worker.url()));
+    await page.goto(siteUrl(`tour/${slug}/`));
+    await expect(page.locator(".tour-text h1")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator(".tour-static")).toHaveCount(1);
+    await expect(page.locator("#tour-app")).toHaveCount(0);
+    await expect(page.locator(".tour-expand")).toHaveCount(0);
+    expect(workers).toEqual([]);
+    expect(page.errors).toEqual([]);
+  });
+}
