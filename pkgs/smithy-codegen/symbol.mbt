@@ -6,7 +6,13 @@ fn has_blank(text : String) -> Bool {
 
 ///|
 /// The name of a symbol. It is not empty and has no whitespace.
-pub struct SymbolName(String) derive(Eq, Compare, Hash, Debug)
+pub struct SymbolName(String) derive(Eq, Hash, Debug)
+
+///|
+/// Lexical order of the text.
+pub impl Compare for SymbolName with fn compare(self, other) {
+  lexical(self.0, other.0)
+}
 
 ///|
 pub fn SymbolName::parse(text : String) -> SymbolName? {
@@ -28,7 +34,16 @@ pub fn SymbolName::to_string(self : SymbolName) -> String {
 pub struct Namespace {
   text : String
   separator : String
-} derive(Eq, Compare, Hash, Debug)
+} derive(Eq, Hash, Debug)
+
+///|
+/// Lexical order of the text, then of the separator.
+pub impl Compare for Namespace with fn compare(self, other) {
+  match lexical(self.text, other.text) {
+    0 => lexical(self.separator, other.separator)
+    order => order
+  }
+}
 
 ///|
 /// Parse a namespace. Empty text is not valid: use `Namespace::root`.
@@ -52,7 +67,13 @@ pub fn Namespace::is_root(self : Namespace) -> Bool {
 
 ///|
 /// A relative output path with `/` as the only separator.
-pub struct OutputPath(String) derive(Eq, Compare, Hash, Debug)
+pub struct OutputPath(String) derive(Eq, Hash, Debug)
+
+///|
+/// Lexical order of the text.
+pub impl Compare for OutputPath with fn compare(self, other) {
+  lexical(self.0, other.0)
+}
 
 ///|
 /// Parse an output path. I reject empty text, a leading `/`, empty segments,
@@ -80,7 +101,13 @@ pub fn OutputPath::to_string(self : OutputPath) -> String {
 
 ///|
 /// The name of a package that a generated file depends on.
-pub struct PackageName(String) derive(Eq, Compare, Hash, Debug)
+pub struct PackageName(String) derive(Eq, Hash, Debug)
+
+///|
+/// Lexical order of the text.
+pub impl Compare for PackageName with fn compare(self, other) {
+  lexical(self.0, other.0)
+}
 
 ///|
 pub fn PackageName::parse(text : String) -> PackageName? {
@@ -108,7 +135,20 @@ pub(all) struct SymbolDependency {
   package : PackageName
   version : String
   kind : DependencyKind
-} derive(Eq, Compare, Hash, Debug)
+} derive(Eq, Hash, Debug)
+
+///|
+/// Order by package, then version in lexical order, then kind in declaration order.
+pub impl Compare for SymbolDependency with fn compare(self, other) {
+  match Compare::compare(self.package, other.package) {
+    0 =>
+      match lexical(self.version, other.version) {
+        0 => Compare::compare(self.kind, other.kind)
+        order => order
+      }
+    order => order
+  }
+}
 
 ///|
 /// A symbol: the target-language name of a shape, where it is defined and what it needs.

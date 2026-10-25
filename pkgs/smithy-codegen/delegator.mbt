@@ -139,7 +139,7 @@ pub fn WriterDelegator::dependencies(
 /// order. The delegator then has no writers, so a second call gives an empty map.
 pub fn WriterDelegator::flush(self : WriterDelegator) -> Map[String, String] {
   let keys = self.writers.keys().collect()
-  keys.sort()
+  keys.sort_by(lexical)
   let files = Map([])
   for key in keys {
     let entry = self.writers[key]

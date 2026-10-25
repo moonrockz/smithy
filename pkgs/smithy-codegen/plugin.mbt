@@ -40,7 +40,7 @@ pub fn PluginContext::check_settings(
   allowed : Array[String],
 ) -> Unit raise CodegenError {
   let keys = self.settings.keys().to_array()
-  keys.sort()
+  keys.sort_by(lexical)
   for key in keys {
     if key != "service" && !allowed.contains(key) {
       raise InvalidSettings("I found unknown setting `\{key}`.")

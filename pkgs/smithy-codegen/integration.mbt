@@ -88,7 +88,7 @@ pub fn[C] sort_integrations(
       if candidate.priority > current.priority ||
         (
           candidate.priority == current.priority &&
-          candidate.name < current.name
+          lexical(candidate.name, current.name) < 0
         ) {
         best = k
       }
@@ -109,7 +109,7 @@ pub fn[C] sort_integrations(
         left.push(items[i].name)
       }
     }
-    left.sort()
+    left.sort_by(lexical)
     raise IntegrationCycle(left)
   }
   result
