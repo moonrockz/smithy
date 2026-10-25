@@ -866,3 +866,421 @@ test "Open in playground carries the query" {
   assert_eq(state.selector, Some("string\n"))
   assert_eq(state.model, start_text)
 }
+
+///|
+let exchange_text : String = "{\"entries\": [1, 2, 3]}\n"
+
+///|
+/// A transcript lesson: the model file and the file of the transcript.
+fn transcript_page() -> @model.LessonPage {
+  let files : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: start_text, },
+    { name: "exchange.json", text: exchange_text, },
+  ]
+  {
+    ..page(),
+    engine: Transcript({
+      file: "exchange.json",
+      protocol: "example#WeatherProtocol",
+    }),
+    output: None,
+    files,
+    digest: @model.digest(files),
+    playground: None,
+  }
+}
+
+///|
+fn entry_of(index : Int32, sender : String) -> @core.EntryView {
+  {
+    index,
+    sender,
+    receiver: Some(if sender == "client" { "server" } else { "client" }),
+    message: "{\"id\": \{index}}",
+    line: None,
+    column: None,
+  }
+}
+
+///|
+fn three_entries() -> Array[@core.EntryView] {
+  [entry_of(0, "client"), entry_of(1, "server"), entry_of(2, "server")]
+}
+
+///|
+fn finding_at(entry : Int32?, code : String) -> @core.FindingView {
+  {
+    code,
+    severity: "error",
+    message: "I expected a reply.",
+    entry,
+    line: Some(5),
+    column: Some(35),
+    sender: Some("client"),
+    related: [],
+    path: None,
+    shape: None,
+    operation: None,
+  }
+}
+
+///|
+fn summary_of(valid : Bool, errors : Int32) -> @core.SummaryView {
+  {
+    valid,
+    complete: true,
+    entries: 3,
+    errors,
+    outstanding: 0,
+    correlation: true,
+    lines: 0,
+    not_json: 0,
+    skipped: 0,
+    expectations: None,
+  }
+}
+
+///|
+fn progress(
+  entries~ : Array[@core.EntryView] = [],
+  findings~ : Array[@core.FindingView] = [],
+  checked~ : Int32 = 0,
+  done~ : Bool = false,
+  summary~ : @core.SummaryView? = None,
+) -> Answer {
+  Progress(entries~, findings~, checked~, done~, summary~)
+}
+
+///|
+/// A transcript lesson after the model check and the start of the transcript:
+/// three entries, none checked.
+fn started() -> Model {
+  let (m, _) = Model::start(transcript_page(), None)
+  run(m, [
+    Answered(seq=1, answer=Checked([])),
+    Answered(seq=2, answer=progress(entries=three_entries())),
+  ]).0
+}
+
+///|
+/// Edit the transcript file, wait for the debounce, and give a clean check.
+fn edit_transcript(m : Model, text : String) -> (Model, Array[Effect]) {
+  let m = run(m, [SelectFile(1), Edited(text), Debounced(m.edits + 1)]).0
+  update(m, Answered(seq=m.seq, answer=Checked([])))
+}
+
+///|
+test "a transcript lesson validates the model files, then starts the transcript" {
+  let (m, effects) = Model::start(transcript_page(), None)
+  // The transcript file is not part of the model.
+  assert_eq(effects, [
+    LoadEditor(
+      text=start_text,
+      file="model.smithy",
+      fresh=true,
+      language="smithy",
+    ),
+    SendValidate(seq=1, files=[("model.smithy", start_text)]),
+    Wait(ms=10000, msg=TimedOut(1)),
+  ])
+  assert_eq(m.pane, TranscriptPane)
+  let (m, effects) = update(m, Answered(seq=1, answer=Checked([])))
+  assert_eq(effects, [
+    Mark(items=[]),
+    SendTranscriptStart(
+      seq=2,
+      files=[("model.smithy", start_text)],
+      protocol="example#WeatherProtocol",
+      text=exchange_text,
+    ),
+    Wait(ms=10000, msg=TimedOut(2)),
+  ])
+  assert_eq(m.inflight, Transcribing)
+  assert_eq(m.transcript, None)
+}
+
+///|
+test "exchange.json opens in JSON mode" {
+  let (m, _) = Model::start(transcript_page(), None)
+  let (_, effects) = update(m, SelectFile(1))
+  assert_eq(
+    effects[0],
+    LoadEditor(
+      text=exchange_text,
+      file="exchange.json",
+      fresh=false,
+      language="json",
+    ),
+  )
+}
+
+///|
+test "the start answer shows the entries and checks none" {
+  let m = started()
+  assert_false(m.waiting)
+  let t = m.transcript.unwrap()
+  assert_eq(t.entries.length(), 3)
+  assert_eq(t.checked, 0)
+  assert_eq(t.wanted, 0)
+  assert_eq(t.before, None)
+}
+
+///|
+test "Step checks one entry and Run all checks the rest" {
+  let m = started()
+  let (m, effects) = update(m, StepClicked)
+  assert_eq(effects, [
+    SendTranscriptStep(seq=3, count=1),
+    Wait(ms=10000, msg=TimedOut(3)),
+  ])
+  let (m, _) = update(m, Answered(seq=3, answer=progress(checked=1)))
+  let t = m.transcript.unwrap()
+  assert_eq(t.checked, 1)
+  assert_eq(t.wanted, 1)
+  let (m, effects) = update(m, RunAllClicked)
+  assert_eq(effects, [
+    SendTranscriptStep(seq=4, count=2),
+    Wait(ms=10000, msg=TimedOut(4)),
+  ])
+  let missing = finding_at(Some(0), "MissingResponse")
+  let (m, _) = update(
+    m,
+    Answered(
+      seq=4,
+      answer=progress(
+        findings=[missing],
+        checked=3,
+        done=true,
+        summary=Some(summary_of(false, 1)),
+      ),
+    ),
+  )
+  let t = m.transcript.unwrap()
+  // The entries of the start stay; the step adds its findings.
+  assert_eq(t.entries.length(), 3)
+  assert_eq(t.findings, [missing])
+  assert_true(t.done)
+  assert_eq(t.wanted, 3)
+  // Step and Run all do nothing at the end.
+  assert_eq(update(m, StepClicked).1, [])
+  assert_eq(update(m, RunAllClicked).1, [])
+}
+
+///|
+test "an edit restarts the check and steps to the same position" {
+  let m = started()
+  let m = run(m, [StepClicked, Answered(seq=3, answer=progress(checked=1))]).0
+  let m = run(m, [StepClicked, Answered(seq=4, answer=progress(checked=2))]).0
+  let (m, effects) = edit_transcript(m, "{\"entries\": [1, 2, 3, 4]}\n")
+  assert_eq(effects.length(), 3)
+  assert_true(effects[1] is SendTranscriptStart(..))
+  // The new start answer has the new entries and no check yet: it steps to
+  // the position of the reader.
+  let four = [..three_entries(), entry_of(3, "client")]
+  let (m, effects) = update(
+    m,
+    Answered(seq=m.seq, answer=progress(entries=four)),
+  )
+  assert_eq(effects, [
+    SendTranscriptStep(seq=m.seq, count=2),
+    Wait(ms=10000, msg=TimedOut(m.seq)),
+  ])
+  let t = m.transcript.unwrap()
+  assert_eq(t.entries.length(), 4)
+  assert_eq(t.wanted, 2)
+}
+
+///|
+test "an old position past the end runs to the end and disables Step" {
+  let m = started()
+  let m = run(m, [RunAllClicked, Answered(seq=3, answer=progress(checked=3))]).0
+  // The reader deletes entries: two are left.
+  let (m, _) = edit_transcript(m, "{\"entries\": [1, 2]}\n")
+  let two = [entry_of(0, "client"), entry_of(1, "server")]
+  let (m, effects) = update(
+    m,
+    Answered(seq=m.seq, answer=progress(entries=two)),
+  )
+  assert_eq(effects, [
+    SendTranscriptStep(seq=m.seq, count=3),
+    Wait(ms=10000, msg=TimedOut(m.seq)),
+  ])
+  let (m, _) = update(
+    m,
+    Answered(
+      seq=m.seq,
+      answer=progress(checked=2, done=true, summary=Some(summary_of(true, 0))),
+    ),
+  )
+  let t = m.transcript.unwrap()
+  assert_true(t.done)
+  assert_eq(t.checked, 2)
+  assert_eq(update(m, StepClicked).1, [])
+}
+
+///|
+test "a request at a time: Step while a request runs does nothing; a stale answer is dropped" {
+  let m = started()
+  let (m, _) = update(m, StepClicked)
+  assert_true(m.waiting)
+  // Step and Run all while the request runs change nothing.
+  assert_eq(update(m, StepClicked), (m, []))
+  assert_eq(update(m, RunAllClicked), (m, []))
+  // The answer of an older request is dropped.
+  assert_eq(update(m, Answered(seq=2, answer=progress(checked=1))), (m, []))
+  // An edit while the request runs: its answer does not show.
+  let m = run(started(), [SelectFile(1), StepClicked]).0
+  let m = update(m, Edited("{\"entries\": []}\n")).0
+  let (m, effects) = update(m, Answered(seq=3, answer=progress(checked=1)))
+  assert_eq(effects, [])
+  let t = m.transcript.unwrap()
+  assert_eq(t.checked, 0)
+}
+
+///|
+test "a model with errors does not start the transcript and says why" {
+  let (m, _) = Model::start(transcript_page(), None)
+  let (m, effects) = update(
+    m,
+    Answered(seq=1, answer=Checked([error_in("model.smithy", 2)])),
+  )
+  assert_eq(effects, [Mark(items=[error_in("model.smithy", 2)])])
+  assert_eq(m.transcript, None)
+  assert_eq(
+    m.not_run,
+    Some(
+      "The model has 1 error, so I did not check the transcript. The Findings tab shows the error.",
+    ),
+  )
+  assert_eq(m.pane, FindingsPane)
+  assert_eq(update(m, StepClicked).1, [])
+}
+
+///|
+test "a model with errors clears the rows of the check before" {
+  let m = run(started(), [
+      StepClicked,
+      Answered(seq=3, answer=progress(checked=1)),
+    ]).0
+  let m = run(m, [Edited(start_text + "x"), Debounced(m.edits + 1)]).0
+  let (m, _) = update(
+    m,
+    Answered(seq=m.seq, answer=Checked([error_in("model.smithy", 2)])),
+  )
+  assert_eq(m.transcript, None)
+  assert_true(m.not_run is Some(_))
+}
+
+///|
+test "a missing protocol shows the reason and no rows" {
+  let m = run(started(), [
+      StepClicked,
+      Answered(seq=3, answer=progress(checked=1)),
+    ]).0
+  let m = run(m, [Edited(start_text + "x"), Debounced(m.edits + 1)]).0
+  let (m, _) = update(m, Answered(seq=m.seq, answer=Checked([])))
+  let reason = "I found no shape example#WeatherProtocol in the model."
+  let (m, _) = update(m, Answered(seq=m.seq, answer=NotConverted(reason)))
+  assert_eq(m.transcript, None)
+  assert_eq(m.not_run, Some(reason))
+  assert_false(m.waiting)
+  assert_eq(update(m, StepClicked).1, [])
+}
+
+///|
+test "text that is not JSON shows its InvalidTranscript line and no old entries" {
+  let m = run(started(), [
+      StepClicked,
+      Answered(seq=3, answer=progress(checked=1)),
+    ]).0
+  let (m, _) = edit_transcript(m, "{\"entries\": [")
+  let invalid = { ..finding_at(None, "InvalidTranscript"), entry: None, }
+  let (m, effects) = update(
+    m,
+    Answered(
+      seq=m.seq,
+      answer=progress(
+        findings=[invalid],
+        done=true,
+        summary=Some({ ..summary_of(false, 1), entries: 0, }),
+      ),
+    ),
+  )
+  // The document has no entries, so nothing steps further.
+  assert_eq(effects, [])
+  let t = m.transcript.unwrap()
+  assert_eq(t.entries, [])
+  assert_eq(t.findings, [invalid])
+  assert_true(t.done)
+}
+
+///|
+test "the lines that are new since the last edit are highlighted; the first check highlights nothing" {
+  let missing = finding_at(Some(0), "MissingResponse")
+  let m = started()
+  let m = run(m, [
+      RunAllClicked,
+      Answered(
+        seq=3,
+        answer=progress(checked=3, done=true, summary=Some(summary_of(true, 0))),
+      ),
+    ]).0
+  let t = m.transcript.unwrap()
+  assert_eq(t.before, None)
+  assert_eq(t.changed_lines("exchange.json"), [])
+  // An edit stores the lines on the tab.
+  let (m, _) = edit_transcript(m, "{\"entries\": [1, 2]}\n")
+  let t = m.transcript.unwrap()
+  assert_eq(t.before, Some([]))
+  let two = [entry_of(0, "client"), entry_of(1, "server")]
+  let m = run(m, [
+      Answered(seq=m.seq, answer=progress(entries=two)),
+      Answered(
+        seq=m.seq + 1,
+        answer=progress(
+          findings=[missing],
+          checked=2,
+          done=true,
+          summary=Some(summary_of(false, 1)),
+        ),
+      ),
+    ]).0
+  let t = m.transcript.unwrap()
+  assert_eq(t.changed_lines("exchange.json"), [
+    "exchange.json:5:35: entry 0 client: error MissingResponse: I expected a reply.",
+  ])
+}
+
+///|
+test "the lines are not highlighted before the check reached its position" {
+  let m = started()
+  let m = run(m, [
+      RunAllClicked,
+      Answered(
+        seq=3,
+        answer=progress(checked=3, done=true, summary=Some(summary_of(true, 0))),
+      ),
+    ]).0
+  let (m, _) = edit_transcript(m, "{\"entries\": [1, 2, 3]}\n")
+  let m = update(
+      m,
+      Answered(seq=m.seq, answer=progress(entries=three_entries())),
+    ).0
+  // The start gave checked 0 of wanted 3, and the step is on its way.
+  let t = m.transcript.unwrap()
+  assert_eq(t.changed_lines("exchange.json"), [])
+}
+
+///|
+test "a transcript request that takes too long starts the transcript again, then gives up" {
+  let m = started()
+  let (m, _) = update(m, StepClicked)
+  let (m, effects) = update(m, TimedOut(3))
+  assert_eq(effects[0], RestartWorker)
+  assert_true(effects[1] is SendTranscriptStart(..))
+  assert_true(m.retried)
+  let (m, effects) = update(m, TimedOut(m.seq))
+  assert_eq(effects, [RestartWorker])
+  assert_eq(m.transcript, None)
+  assert_eq(m.not_run, Some(timeout_text))
+}

@@ -63,6 +63,77 @@ test "a reply of another build answers the newest request with the mismatch text
 }
 
 ///|
+test "a transcript progress answers with its state" {
+  let entry : @core.EntryView = {
+    index: 0,
+    sender: "client",
+    receiver: Some("server"),
+    message: "{}",
+    line: Some(3),
+    column: Some(5),
+  }
+  assert_eq(
+    reply_msg(
+      reply(
+        TranscriptProgress(
+          seq=6,
+          entries=[entry],
+          findings=[],
+          checked=1,
+          done=false,
+          summary=None,
+        ),
+      ),
+      9,
+    ),
+    Answered(
+      seq=6,
+      answer=Progress(
+        entries=[entry],
+        findings=[],
+        checked=1,
+        done=false,
+        summary=None,
+      ),
+    ),
+  )
+}
+
+///|
+test "the transcript effects send the model files in the JSON format, and the step count" {
+  let page = test_runtime([]).page
+  assert_eq(
+    request_of(
+      page,
+      SendTranscriptStart(
+        seq=3,
+        files=[("model.smithy", "m")],
+        protocol="example#P",
+        text="{}",
+      ),
+    ),
+    Some(
+      (
+        3,
+        TranscriptStartFiles(
+          seq=3,
+          files=[("model.smithy", "m")],
+          protocol="example#P",
+          format=Json,
+          complete=false,
+          text="{}",
+        ),
+      ),
+    ),
+  )
+  assert_eq(
+    request_of(page, SendTranscriptStep(seq=4, count=2)),
+    Some((4, TranscriptStep(seq=4, count=2))),
+  )
+  assert_eq(request_of(page, Remeasure), None)
+}
+
+///|
 test "the output editor language follows the lesson output" {
   assert_eq(output_language(Some(JsonAst)), "json")
   assert_eq(output_language(Some(OpenApi31)), "json")

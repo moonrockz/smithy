@@ -176,6 +176,163 @@ fn output_notice(m : Model) -> Array[Html] {
 }
 
 ///|
+/// The message of an entry, cut to `MESSAGE_CHARS` characters.
+fn short_message(message : String) -> String {
+  let chars = message.to_array()
+  if chars.length() > MESSAGE_CHARS {
+    String::from_array(chars[:MESSAGE_CHARS]) + " …"
+  } else {
+    message
+  }
+}
+
+///|
+/// The lines of the CLI for the findings of one entry, or of no entry.
+fn line_items(lines : Array[String], changed : Array[String]) -> Array[Html] {
+  lines.map(line => {
+    @html.li(
+      class=if changed.contains(line) {
+        "tour-finding tour-changed"
+      } else {
+        "tour-finding"
+      },
+      [@html.code(class="tour-cli", line)],
+    )
+  })
+}
+
+///|
+fn entry_row(
+  t : Transcript,
+  file : String,
+  changed : Array[String],
+  entry : @core.EntryView,
+) -> Html {
+  let own = t.findings.filter(f => f.entry == Some(entry.index))
+  let lines = own.map(f => f.cli_line(file~))
+  let pending = entry.index >= t.checked
+  let route = match entry.receiver {
+    Some(receiver) => "\{entry.sender} → \{receiver}"
+    None => "\{entry.sender} → reply"
+  }
+  let mark : Array[Html] = if !pending && own.is_empty() {
+    [@html.span(class="tour-check", "✓")]
+  } else {
+    []
+  }
+  @html.li(
+    class=if pending { "tour-entry tour-entry-pending" } else { "tour-entry" },
+    [
+      @html.div(
+        class="tour-entry-head",
+        [
+          @html.span(class="tour-entry-no", "#\{entry.index}"),
+          @html.span(class="tour-entry-route", route),
+          ..mark,
+        ],
+      ),
+      @html.div(class="tour-entry-message", short_message(entry.message)),
+      @html.ul(class="tour-findings", line_items(lines, changed)),
+    ],
+  )
+}
+
+///|
+fn verdict(summary : @core.SummaryView) -> Html {
+  let valid = if summary.valid { "valid" } else { "not valid" }
+  let complete = if summary.complete { "complete" } else { "partial" }
+  @html.div(class="tour-verdict", [
+    @html.strong("\{valid}, \{complete}"),
+    @html.span(
+      class="tour-counts",
+      " · " +
+      plural(summary.entries, "entry checked", "entries checked") +
+      ", " +
+      plural(summary.errors, "error finding", "error findings") +
+      ", " +
+      plural(
+        summary.outstanding,
+        "call without a reply",
+        "calls without a reply",
+      ),
+    ),
+  ])
+}
+
+///|
+/// The buttons Step and Run all.
+fn step_buttons(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
+  let off = m.busy() || m.transcript.map(t => t.done).unwrap_or(true)
+  @html.div(class="tour-steps", [
+    @html.button(
+      id="tour-step",
+      class="tour-btn",
+      disabled=off,
+      title="Check the next entry",
+      on_click=emit(StepClicked),
+      "Step",
+    ),
+    @html.button(
+      id="tour-runall",
+      class="tour-btn",
+      disabled=off,
+      title="Check all the entries that are left",
+      on_click=emit(RunAllClicked),
+      "Run all",
+    ),
+  ])
+}
+
+///|
+/// The Transcript tab: the entries of the transcript with the CLI lines of
+/// their findings, then the findings with no entry, then the verdict.
+fn transcript_panel(m : Model, emit : @rabbita.Emit[Msg]) -> Array[Html] {
+  let buttons = step_buttons(m, emit)
+  match (m.transcript, m.not_run) {
+    (Some(t), _) => {
+      let file = m.transcript_file()
+      let changed = t.changed_lines(file)
+      let loose = t.findings
+        .filter(f => f.entry is None)
+        .map(f => f.cli_line(file~))
+      let expect : Array[String] = match t.summary {
+        Some({ expectations: Some(expectations), .. }) =>
+          expectations.cli_lines(file~)
+        _ => []
+      }
+      let rest : Array[Html] = []
+      if !loose.is_empty() {
+        rest.push(@html.p(class="tour-note", "Findings with no entry"))
+        rest.push(@html.ul(class="tour-findings", line_items(loose, changed)))
+      }
+      if !expect.is_empty() {
+        rest.push(@html.p(class="tour-note", "Expectations"))
+        rest.push(@html.ul(class="tour-findings", line_items(expect, changed)))
+      }
+      if t.summary is Some(summary) {
+        rest.push(verdict(summary))
+      }
+      [
+        buttons,
+        @html.p(
+          class="tour-note tour-progress",
+          "\{t.checked} of \{t.entries.length()} entries checked",
+        ),
+        @html.ul(
+          class="tour-entries",
+          t.entries.map(entry => entry_row(t, file, changed, entry)),
+        ),
+        ..rest,
+      ]
+    }
+    (None, Some(reason)) =>
+      [buttons, @html.p(class="tour-note tour-err", reason)]
+    (None, None) =>
+      [buttons, @html.p(class="tour-note", "I am checking the transcript.")]
+  }
+}
+
+///|
 fn panel(on : Bool, children : Array[Html]) -> Html {
   @html.div(
     class=if on { "tour-panel" } else { "tour-panel tour-off" },
@@ -200,47 +357,65 @@ fn output_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       ]
     None => []
   }
+  let transcript_tab = if m.transcript_setup() is Some(_) {
+    [
+      tab(m.pane == TranscriptPane, emit(SelectPane(TranscriptPane)), [
+        @html.text("Transcript"),
+      ]),
+    ]
+  } else {
+    []
+  }
   let busy = if m.busy() {
     [@html.span(class="tour-busy", "checking…")]
   } else {
     []
   }
   let on_output = m.page.output is Some(_) && m.pane == OutputPane
-  @html.section(class="tour-pane tour-out", [
-    head(
-      @html.div(
-        class="tour-tabs",
-        attrs=@html.Attrs::build().role("tablist").aria_label("Results"),
-        [
-          tab(
-            m.pane == FindingsPane,
-            emit(SelectPane(FindingsPane)),
-            [@html.text("Findings"), ..count],
-          ),
-          ..output_tab,
-          ..busy,
-        ],
+  @html.section(
+    class="tour-pane tour-out",
+    [
+      head(
+        @html.div(
+          class="tour-tabs",
+          attrs=@html.Attrs::build().role("tablist").aria_label("Results"),
+          [
+            tab(
+              m.pane == FindingsPane,
+              emit(SelectPane(FindingsPane)),
+              [@html.text("Findings"), ..count],
+            ),
+            ..output_tab,
+            ..transcript_tab,
+            ..busy,
+          ],
+        ),
+        m,
+        OutputSide,
+        emit,
       ),
-      m,
-      OutputSide,
-      emit,
-    ),
-    panel(m.pane == FindingsPane, findings_panel(m)),
-    // The output editor owns the children of its element. Every slot stays
-    // at the same place in every render, so the editor keeps its element;
-    // a lesson without an output keeps it hidden.
-    panel(on_output, [
-      @html.div(class="tour-notices", output_notice(m)),
-      @html.div(
-        class=if m.output is Shown(..) {
-          "tour-outwrap"
-        } else {
-          "tour-outwrap tour-off"
-        },
-        [@html.div(id=OUTPUT_ID, class="tour-output", ([] : Array[Html]))],
-      ),
-    ]),
-  ])
+      panel(m.pane == FindingsPane, findings_panel(m)),
+      ..if m.transcript_setup() is Some(_) {
+        [panel(m.pane == TranscriptPane, transcript_panel(m, emit))]
+      } else {
+        []
+      },
+      // The output editor owns the children of its element. Every slot stays
+      // at the same place in every render, so the editor keeps its element;
+      // a lesson without an output keeps it hidden.
+      panel(on_output, [
+        @html.div(class="tour-notices", output_notice(m)),
+        @html.div(
+          class=if m.output is Shown(..) {
+            "tour-outwrap"
+          } else {
+            "tour-outwrap tour-off"
+          },
+          [@html.div(id=OUTPUT_ID, class="tour-output", ([] : Array[Html]))],
+        ),
+      ]),
+    ],
+  )
 }
 
 ///|

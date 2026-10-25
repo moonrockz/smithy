@@ -177,3 +177,88 @@ async test "both panes and both editor elements stay in the DOM in every layout"
     assert_true(html.contains("id=\"\{OUTPUT_ID}\""))
   }
 }
+
+///|
+#cfg(not(target="js"))
+async test "a transcript lesson has the tabs Findings and Transcript, Step and Run all, and no Open in playground link" {
+  let (m, _) = Model::start(transcript_page(), None)
+  let html = render(m)
+  assert_true(html.contains(">Findings"))
+  assert_true(html.contains(">Transcript</button>"))
+  // The Findings and Transcript tabs, and the two file tabs.
+  assert_eq(html.split("role=\"tab\"").count() - 1, 4)
+  assert_true(html.contains("id=\"tour-step\""))
+  assert_true(html.contains("id=\"tour-runall\""))
+  assert_true(html.contains(">Step</button>"))
+  assert_true(html.contains(">Run all</button>"))
+  assert_false(html.contains("Open in playground"))
+  // The editors keep their elements.
+  assert_true(html.contains("id=\"\{EDITOR_ID}\""))
+  assert_true(html.contains("id=\"\{OUTPUT_ID}\""))
+}
+
+///|
+#cfg(not(target="js"))
+async test "a checked entry without findings has a check mark; a pending entry has tour-entry-pending" {
+  let m = started()
+  let m = run(m, [StepClicked, Answered(seq=3, answer=progress(checked=1))]).0
+  let html = render(m)
+  assert_true(html.contains("1 of 3 entries checked"))
+  assert_eq(html.split("class=\"tour-check\"").count() - 1, 1)
+  assert_eq(html.split("tour-entry tour-entry-pending").count() - 1, 2)
+  assert_true(html.contains("client → server"))
+  assert_true(html.contains("server → client"))
+  // Step and Run all work while entries are left.
+  assert_false(html.contains("disabled"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "the Transcript tab shows the CLI lines, the findings with no entry and the verdict" {
+  let m = started()
+  let owned = finding_at(Some(0), "MissingResponse")
+  let loose = finding_at(None, "InvalidTranscript")
+  let m = run(m, [
+      RunAllClicked,
+      Answered(
+        seq=3,
+        answer=progress(
+          findings=[owned, loose],
+          checked=3,
+          done=true,
+          summary=Some({ ..summary_of(false, 2), outstanding: 1, }),
+        ),
+      ),
+    ]).0
+  let html = render(m)
+  assert_true(html.contains("3 of 3 entries checked"))
+  assert_true(
+    html.contains(
+      "exchange.json:5:35: entry 0 client: error MissingResponse: I expected a reply.",
+    ),
+  )
+  assert_true(html.contains("Findings with no entry"))
+  assert_true(html.contains("InvalidTranscript"))
+  assert_true(html.contains("not valid, complete"))
+  assert_true(
+    html.contains("3 entries checked, 2 error findings, 1 call without a reply"),
+  )
+  // Step and Run all are disabled at the end.
+  assert_true(html.contains("disabled"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "a long message is cut with a mark and the model error text shows" {
+  let long = String::make(130, 'a')
+  assert_eq(short_message(long), String::make(120, 'a') + " …")
+  assert_eq(short_message("short"), "short")
+  let (m, _) = Model::start(transcript_page(), None)
+  let (m, _) = update(
+    m,
+    Answered(seq=1, answer=Checked([error_in("model.smithy", 2)])),
+  )
+  let (m, _) = update(m, SelectPane(TranscriptPane))
+  let html = render(m)
+  assert_true(html.contains("I did not check the transcript."))
+}

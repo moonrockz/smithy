@@ -34,6 +34,8 @@ pub let too_large_text : String = "The model is too large for a link to the play
 pub(all) enum Pane {
   FindingsPane
   OutputPane
+  /// The steps of a transcript lesson.
+  TranscriptPane
 } derive(Eq, Debug)
 
 ///|
@@ -92,6 +94,16 @@ pub(all) enum Answer {
   Converted(String)
   /// The Worker did not run the request; the text says why.
   NotConverted(String)
+  /// The state of the transcript check after a start or a step, as the
+  /// Worker gives it: a start gives every entry, a step gives none; the
+  /// findings are the new ones.
+  Progress(
+    entries~ : Array[@core.EntryView],
+    findings~ : Array[@core.FindingView],
+    checked~ : Int32,
+    done~ : Bool,
+    summary~ : @core.SummaryView?
+  )
 } derive(Eq, Debug)
 
 ///|
@@ -116,6 +128,10 @@ pub(all) enum Msg {
   OpenPlayground
   /// The reader pressed the expand button of a pane.
   ToggleExpand(Expandable)
+  /// The reader pressed Step: check one more entry of the transcript.
+  StepClicked
+  /// The reader pressed Run all: check the rest of the entries.
+  RunAllClicked
 } derive(Eq, Debug)
 
 ///|
@@ -136,6 +152,16 @@ pub(all) enum Effect {
     output~ : @samples.Output,
     selector~ : String?
   )
+  /// Send the model files and the text of the transcript to the Worker, which
+  /// loads the transcript and checks its first entries.
+  SendTranscriptStart(
+    seq~ : Int32,
+    files~ : Array[(String, String)],
+    protocol~ : String,
+    text~ : String
+  )
+  /// Check the next `count` entries of the transcript that the Worker holds.
+  SendTranscriptStep(seq~ : Int32, count~ : Int32)
   /// Send `msg` after `ms` milliseconds.
   Wait(ms~ : Int32, msg~ : Msg)
   /// Put this text, of the selected file `file`, in the model editor, in
@@ -172,6 +198,7 @@ pub extend Effect with @debug.Debug::{to_repr}
 pub(all) enum Kind {
   Validating
   Transforming
+  Transcribing
 } derive(Eq, Debug)
 
 ///|
@@ -214,6 +241,68 @@ pub extend Output with Eq::{equal, not_equal}
 pub extend Output with @debug.Debug::{to_repr}
 
 ///|
+/// The number of characters of a message that the Transcript tab shows.
+pub const MESSAGE_CHARS : Int32 = 120
+
+///|
+/// The state of the Transcript tab: the entries of the transcript, the
+/// findings so far and the position of the check.
+pub(all) struct Transcript {
+  entries : Array[@core.EntryView]
+  findings : Array[@core.FindingView]
+  checked : Int32
+  done : Bool
+  summary : @core.SummaryView?
+  /// The number of entries that the reader asked to check. An edit keeps it.
+  wanted : Int32
+  /// The CLI lines before the last edit; a line that is not in them is
+  /// highlighted. `None`: no highlight.
+  before : Array[String]?
+} derive(Eq, Debug)
+
+///|
+pub extend Transcript with Eq::{equal, not_equal}
+
+///|
+pub extend Transcript with @debug.Debug::{to_repr}
+
+///|
+/// The lines that `smithy validate rpc transcript` writes for the findings of
+/// the transcript in `file`: the line of each finding, then the lines of the
+/// `expect` list.
+pub fn transcript_lines(t : Transcript, file : String) -> Array[String] {
+  let lines = t.findings.map(f => f.cli_line(file~))
+  match t.summary {
+    Some({ expectations: Some(expectations), .. }) =>
+      lines.append(expectations.cli_lines(file~))
+    _ => ()
+  }
+  lines
+}
+
+///|
+/// True when the check reached the position that the reader asked for, or
+/// the end of the transcript.
+fn Transcript::reached(self : Transcript) -> Bool {
+  self.done || self.checked >= self.wanted
+}
+
+///|
+/// The lines of the transcript that the page highlights: the lines that are
+/// not in the lines before the last edit, once the check reached its
+/// position.
+pub fn Transcript::changed_lines(
+  self : Transcript,
+  file : String,
+) -> Array[String] {
+  match self.before {
+    Some(before) if self.reached() =>
+      transcript_lines(self, file).filter(line => !before.contains(line))
+    _ => []
+  }
+}
+
+///|
 pub(all) struct Model {
   page : @model.LessonPage
   /// The files as the reader edited them, in the order of the starting files.
@@ -242,6 +331,13 @@ pub(all) struct Model {
   retried : Bool
   findings : Findings
   output : Output
+  /// The Transcript tab of a transcript lesson; `None` before the first
+  /// answer and while the transcript did not run.
+  transcript : Transcript?
+  /// Why the transcript did not run, until the next answer.
+  not_run : String?
+  /// True when the newest transcript request is a step, not a start.
+  stepping : Bool
   /// Why Open in playground did not open the model, until the next edit.
   link_problem : String?
 } derive(Eq, Debug)
@@ -266,9 +362,10 @@ fn pairs(files : Array[@model.LessonFile]) -> Array[(String, String)] {
 }
 
 ///|
-/// The files that the Worker loads: all files without the query file.
+/// The files that the Worker loads as the model: all files without the query
+/// file and the data files of the engine.
 fn model_pairs(model : Model) -> Array[(String, String)] {
-  pairs(model.files.filter(f => !@model.is_query_file(f.name)))
+  pairs(@model.model_files(model.page.engine, model.files))
 }
 
 ///|
@@ -321,7 +418,9 @@ pub fn Model::start(
     page,
     files,
     selected: 0,
-    pane: if page.output is Some(_) {
+    pane: if page.engine is Transcript(_) {
+      TranscriptPane
+    } else if page.output is Some(_) {
       OutputPane
     } else {
       FindingsPane
@@ -337,6 +436,9 @@ pub fn Model::start(
     retried: false,
     findings: Unchecked,
     output: NoOutput,
+    transcript: None,
+    not_run: None,
+    stepping: false,
     link_problem: None,
   }
   let (m, sent) = m.send_validate()

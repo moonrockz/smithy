@@ -77,9 +77,13 @@ fn reply_msg(text : String, newest : Int32) -> @lesson.Msg {
     Transformed(seq~, files~, ..) =>
       Answered(seq~, answer=Converted(@model.output_text(files)))
     Blocked(seq~, reason~, ..) => Answered(seq~, answer=NotConverted(reason))
-    // The page sends no transcript, value check, message check or diff
-    // request.
-    TranscriptProgress(..) | DataChecked(..) | Diffed(..) => mismatch
+    TranscriptProgress(seq~, entries~, findings~, checked~, done~, summary~) =>
+      Answered(
+        seq~,
+        answer=Progress(entries~, findings~, checked~, done~, summary~),
+      )
+    // The page sends no value check, message check or diff request.
+    DataChecked(..) | Diffed(..) => mismatch
   }
 }
 
@@ -138,15 +142,48 @@ fn Runtime::post(self : Runtime, seq : Int32, request : @core.Request) -> Unit {
 }
 
 ///|
-fn Runtime::run(self : Runtime, effect : @lesson.Effect) -> Unit {
+/// The request that an effect sends to the Worker, with its number; `None`
+/// for an effect that sends none.
+fn request_of(
+  page : @model.LessonPage,
+  effect : @lesson.Effect,
+) -> (Int32, @core.Request)? {
   match effect {
     SendValidate(seq~, files~) =>
-      self.post(
-        seq,
-        @core.lesson_validate(seq~, files~, output=self.page.output),
-      )
+      Some((seq, @core.lesson_validate(seq~, files~, output=page.output)))
     SendTransform(seq~, files~, output~, selector~) =>
-      self.post(seq, TransformFiles(seq~, files~, output~, selector~))
+      Some((seq, TransformFiles(seq~, files~, output~, selector~)))
+    SendTranscriptStart(seq~, files~, protocol~, text~) =>
+      Some(
+        (
+          seq,
+          TranscriptStartFiles(
+            seq~,
+            files~,
+            protocol~,
+            format=Json,
+            complete=false,
+            text~,
+          ),
+        ),
+      )
+    SendTranscriptStep(seq~, count~) =>
+      Some((seq, TranscriptStep(seq~, count~)))
+    _ => None
+  }
+}
+
+///|
+fn Runtime::run(self : Runtime, effect : @lesson.Effect) -> Unit {
+  match effect {
+    SendValidate(..)
+    | SendTransform(..)
+    | SendTranscriptStart(..)
+    | SendTranscriptStep(..) =>
+      match request_of(self.page, effect) {
+        Some((seq, request)) => self.post(seq, request)
+        None => ()
+      }
     Wait(ms~, msg~) => set_timeout(ms, () => (self.dispatch)(msg))
     LoadEditor(text~, file~, fresh~, language~) => {
       editor_load_file(@lesson.EDITOR_ID, text, file, fresh, language)

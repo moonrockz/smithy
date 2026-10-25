@@ -45,6 +45,96 @@ fn Model::send_transform(self : Model) -> (Model, Array[Effect]) {
 }
 
 ///|
+/// The setup of a transcript lesson; `None` for every other lesson.
+fn Model::transcript_setup(self : Model) -> @model.TranscriptSetup? {
+  match self.page.engine {
+    Transcript(setup) => Some(setup)
+    _ => None
+  }
+}
+
+///|
+/// The name of the file of the transcript; "" for a lesson with none.
+pub fn Model::transcript_file(self : Model) -> String {
+  match self.transcript_setup() {
+    Some(setup) => setup.file
+    None => ""
+  }
+}
+
+///|
+/// Send the model files and the transcript to the Worker. The check starts
+/// at the first entry; the answer decides about the steps up to the position
+/// that the reader asked for. Call it only for a transcript lesson.
+fn Model::send_transcript_start(self : Model) -> (Model, Array[Effect]) {
+  guard self.transcript_setup() is Some(setup) else { return (self, []) }
+  let text = match self.files.iter().find_first(f => f.name == setup.file) {
+    Some(file) => file.text
+    None => ""
+  }
+  let seq = self.seq + 1
+  (
+    {
+      ..self,
+      seq,
+      sent_edits: self.edits,
+      waiting: true,
+      inflight: Transcribing,
+      stepping: false,
+      pending: false,
+    },
+    [
+      SendTranscriptStart(
+        seq~,
+        files=model_pairs(self),
+        protocol=setup.protocol,
+        text~,
+      ),
+      Wait(ms=TIMEOUT_MS, msg=TimedOut(seq)),
+    ],
+  )
+}
+
+///|
+/// Ask the Worker to check the next `count` entries.
+fn Model::send_transcript_step(
+  self : Model,
+  count : Int32,
+) -> (Model, Array[Effect]) {
+  let seq = self.seq + 1
+  (
+    {
+      ..self,
+      seq,
+      sent_edits: self.edits,
+      waiting: true,
+      inflight: Transcribing,
+      stepping: true,
+      pending: false,
+    },
+    [SendTranscriptStep(seq~, count~), Wait(ms=TIMEOUT_MS, msg=TimedOut(seq))],
+  )
+}
+
+///|
+/// The model after an edit: the lines on the Transcript tab, so that the next
+/// check can highlight the lines that are new. A check that did not reach its
+/// position yet keeps the lines that it has.
+fn Model::remember_lines(self : Model) -> Model {
+  match self.transcript {
+    Some(t) if !(t.before is Some(_) && !t.reached()) =>
+      {
+        ..self,
+        transcript: Some({
+          ..t,
+          before: Some(transcript_lines(t, self.transcript_file())),
+        }),
+      }
+    _ => self
+  }
+}
+
+///|
 /// After the newest request ended: send the newest files when their wait
 /// ended while it ran. One request runs at a time, so the time limit of a
 /// request measures that request only.
@@ -95,6 +185,16 @@ fn errors_text(errors : Int32, output : @samples.Output) -> String {
 }
 
 ///|
+/// Why the transcript did not run: the model has errors.
+fn not_run_text(errors : Int32) -> String {
+  if errors == 1 {
+    "The model has 1 error, so I did not check the transcript. The Findings tab shows the error."
+  } else {
+    "The model has \{errors} errors, so I did not check the transcript. The Findings tab shows the errors."
+  }
+}
+
+///|
 /// Whether the finding stops the output (`Severity::blocks_output`).
 fn is_error(d : @core.Diagnostic) -> Bool {
   @model.Severity::parse(d.severity) is Some(severity) &&
@@ -125,6 +225,16 @@ fn Model::checked(
   }
   let m = { ..self, findings: Found(items), pane, }
   let marked = [Mark(items=m.selected_findings())]
+  if m.transcript_setup() is Some(_) {
+    let errors = items.filter(is_error).length()
+    if errors == 0 {
+      let (sent, more) = { ..m, waiting: false, retried: false, not_run: None, }.send_transcript_start()
+      return (sent, [..marked, ..more])
+    }
+    return { ..m, transcript: None, not_run: Some(not_run_text(errors)), }.next(
+      marked,
+    )
+  }
   match self.page.output {
     None => m.next(marked)
     Some(output) => {
@@ -141,6 +251,43 @@ fn Model::checked(
 }
 
 ///|
+/// The state of the transcript check arrived. A start gives every entry and
+/// replaces the rows; a step adds its findings. The check goes on to the
+/// position that the reader asked for.
+fn Model::progressed(
+  self : Model,
+  entries : Array[@core.EntryView],
+  findings : Array[@core.FindingView],
+  checked : Int32,
+  done : Bool,
+  summary : @core.SummaryView?,
+) -> (Model, Array[Effect]) {
+  let old = self.transcript
+  let t : Transcript = match (self.stepping, old) {
+    (true, Some(t)) =>
+      { ..t, findings: [..t.findings, ..findings], checked, done, summary, }
+    _ =>
+      {
+        entries,
+        findings,
+        checked,
+        done,
+        summary,
+        wanted: old.map(t => t.wanted).unwrap_or(0),
+        before: old.bind(t => t.before),
+      }
+  }
+  let m = { ..self, transcript: Some(t), not_run: None, }
+  if t.wanted > t.checked && !t.done {
+    { ..m, waiting: false, retried: false, }.send_transcript_step(
+      t.wanted - t.checked,
+    )
+  } else {
+    m.next([])
+  }
+}
+
+///|
 pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
   match msg {
     Edited(text) => {
@@ -150,7 +297,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       let files = m.files.copy()
       files[m.selected] = { ..file, text, }
       let edits = m.edits + 1
-      let m = { ..m, files, edits, link_problem: None, }
+      let m = { ..m, files, edits, link_problem: None, }.remember_lines()
       let keep = if files == m.page.files {
         Clear(key=m.page.storage_key)
       } else {
@@ -168,7 +315,8 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         _ => (m, [])
       }
     SelectPane(pane) =>
-      if pane == OutputPane && m.page.output is None {
+      if (pane == OutputPane && m.page.output is None) ||
+        (pane == TranscriptPane && m.transcript_setup() is None) {
         (m, [])
       } else {
         ({ ..m, pane, chosen: true, }, [])
@@ -206,6 +354,11 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
           let (m, shown) = m.not_shown(reason)
           m.next(shown)
         }
+        (Transcribing, Progress(entries~, findings~, checked~, done~, summary~)) =>
+          m.progressed(entries, findings, checked, done, summary)
+        // No rows of an older text stay.
+        (Transcribing, NotConverted(reason)) =>
+          { ..m, transcript: None, not_run: Some(reason), }.next([])
         // An answer of the other kind cannot come; the request ends.
         _ => m.next([])
       }
@@ -223,6 +376,10 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         // restart the Worker again and again.
         // A transform that stops keeps the findings of its files.
         match (m.inflight, m.page.output) {
+          (Transcribing, _) =>
+            { ..m, transcript: None, not_run: Some(timeout_text), }.next([
+              RestartWorker,
+            ])
           (Transforming, _) => {
             let (m, shown) = m.not_shown(timeout_text)
             m.next([RestartWorker, ..shown])
@@ -243,10 +400,30 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         let (sent, more) = match m.inflight {
           Validating => m.send_validate()
           Transforming => m.send_transform()
+          // The new Worker holds no transcript: start it again. The answer
+          // steps to the position of the reader.
+          Transcribing => m.send_transcript_start()
         }
         ({ ..sent, retried: true, }, [RestartWorker, ..more])
       }
     }
+    StepClicked =>
+      match m.transcript {
+        Some(t) if !m.busy() && !t.done => {
+          let t = { ..t, wanted: t.checked + 1, before: None, }
+          { ..m, transcript: Some(t), }.send_transcript_step(1)
+        }
+        _ => (m, [])
+      }
+    RunAllClicked =>
+      match m.transcript {
+        Some(t) if !m.busy() && !t.done => {
+          let wanted = t.entries.length().max(t.checked)
+          let t = { ..t, wanted, before: None, }
+          { ..m, transcript: Some(t), }.send_transcript_step(wanted - t.checked)
+        }
+        _ => (m, [])
+      }
     ToggleExpand(side) =>
       ({ ..m, layout: m.layout.toggled(side), }, [Remeasure])
     Reset => {
@@ -256,6 +433,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         edits: m.edits + 1,
         link_problem: None,
       }
+      let m = m.remember_lines()
       let (m, sent) = m.check_now()
       (m, [Clear(key=m.page.storage_key), m.load_selected(fresh=true), ..sent])
     }
