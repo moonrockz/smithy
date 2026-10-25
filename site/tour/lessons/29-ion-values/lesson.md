@@ -6,9 +6,9 @@
 
 This lesson does not run in the browser. The blocks below show the CLI and the MoonBit library. The tests of this repository run them.
 
-The shape `example#Reading` has the member `takenAt`, which targets `Timestamp`. The first reading has a native Ion timestamp, so it is valid. The second reading has a string in its place. Native values do not use the coercions of a JSON serialization: in Ion, a string cannot stand in for a timestamp. So the check reports `TypeMismatch`. Also, an integral decimal cannot stand in for an integer. A symbol cannot stand in for a string.
+The shape `example#Reading` has the member `takenAt`, which targets `Timestamp`. The first reading has a native Ion timestamp, so it is valid. The second reading has a string in its place. Native values do not use the coercions of a JSON serialization. In Ion, a string cannot stand in for a timestamp. So the check reports `TypeMismatch`. Also, an integral decimal cannot stand in for an integer. A symbol cannot stand in for a string.
 
-The finding has the same form as a finding of a JSON value: the file name, the JSON pointer `/takenAt`, the code and the member `example#Reading$takenAt`. The JSON diagnostics also give the Ion type of the value as `nativeKind`. The library gives it as `native_kind`, here the type `string`.
+The finding has the same form as a finding of a JSON value. It has the file name, the JSON pointer `/takenAt`, the code and the member `example#Reading$takenAt`. The JSON diagnostics also give the Ion type of the value as `nativeKind`. The library gives it as `native_kind`, here the type `string`.
 
 The option `--input-format ion-text` reads Ion text, and `--input-format ion-binary` reads binary Ion.
 

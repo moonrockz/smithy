@@ -6,7 +6,7 @@ A transcript is a conversation between the two peers of a `@jsonRpcProtocol` str
 
 In `exchange.json`, each entry names its sender in `from` and holds one message. The receiver is the other peer.
 
-Select the Transcript tab and click Step: the checker reads one entry. Run all reads the rest. The start transcript is valid. The checker matches each reply with its call by the sender and the ID.
+Select the Transcript tab and click Step: the checker reads one entry. Run all reads the rest. The start transcript is valid. The checker matches a reply with its call by the caller, the responder and the exact ID.
 
 Make these changes one at a time. Change the transcript back after each change.
 

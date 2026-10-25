@@ -1,6 +1,6 @@
 # Validating JSON values
 
-> **Our extension:** Smithy defines no value validation. This check is part of [moonrockz/smithy-validation](../../../../pkgs/smithy-validation/README.mbt.md). No Java reference exists for it.
+> **Our extension:** Standard Smithy has no command that checks a JSON value against a shape. This check is part of [moonrockz/smithy-validation](../../../../pkgs/smithy-validation/README.mbt.md). No Java reference exists for it.
 
 This check compares a JSON value with a shape of the model, as the command `smithy validate value` does. Here the shape is `example.orders#Order`, and the value is the file `order.json`.
 
