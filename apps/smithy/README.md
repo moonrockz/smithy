@@ -109,6 +109,148 @@ $ smithy convert --to json greeting.smithy
 ```
 <!-- tour:end convert-json-cli -->
 
+### Convert the JSON AST to IDL
+
+This command writes the IDL of a JSON AST model to standard output. The IDL output uses absolute shape IDs.
+
+<!-- tour:start convert-idl-cli -->
+```json file=greeting.json
+{
+    "smithy": "2.0",
+    "shapes": {
+        "example#Greeting": {
+            "type": "structure",
+            "members": {
+                "message": {
+                    "target": "smithy.api#String"
+                }
+            }
+        }
+    }
+}
+```
+
+```console
+$ smithy convert --to idl greeting.json
+$version: "2"
+
+namespace example
+
+structure Greeting {
+    message: smithy.api#String
+}
+```
+<!-- tour:end convert-idl-cli -->
+
+### Select shapes
+
+This command prints the ID of each shape that the selector matches, one on each line.
+
+<!-- tour:start select-cli -->
+```smithy file=weather.smithy
+$version: "2"
+
+namespace example
+
+service Weather {
+    version: "2024-01-01"
+    operations: [GetForecast, PutCity]
+}
+
+@readonly
+operation GetForecast {}
+
+@idempotent
+operation PutCity {}
+```
+
+```console
+$ smithy select --selector 'operation[trait|readonly]' weather.smithy
+example#GetForecast
+```
+<!-- tour:end select-cli -->
+
+### Build a projection
+
+A projection is a changed copy of the model. This build removes the shapes with the `@internal` trait from the projection `public`. The projection `source` is the model with no change.
+
+<!-- tour:start build-projection-cli -->
+```json file=smithy-build.json
+{
+    "version": "1.0",
+    "sources": ["forecast.smithy"],
+    "projections": {
+        "public": {
+            "transforms": [
+                {"name": "excludeShapesByTrait", "args": {"traits": ["internal"]}}
+            ]
+        }
+    }
+}
+```
+
+```smithy file=forecast.smithy
+$version: "2"
+
+namespace example
+
+service Weather {
+    version: "2024-01-01"
+    operations: [GetForecast, GetDebugInfo]
+}
+
+@readonly
+operation GetForecast {}
+
+@internal
+@readonly
+operation GetDebugInfo {}
+```
+
+```console
+$ smithy build --config smithy-build.json
+$ smithy select --selector operation build/smithy/source/model/model.json
+example#GetDebugInfo
+example#GetForecast
+$ smithy select --selector operation build/smithy/public/model/model.json
+example#GetForecast
+```
+<!-- tour:end build-projection-cli -->
+
+### Check contract traits
+
+The validate command prints nothing for a model with no findings. The selector finds the shapes that have conditions.
+
+<!-- tour:start contracts-cli -->
+```smithy file=time-range.smithy
+$version: "2"
+
+namespace example
+
+use smithy.contracts#conditions
+
+@conditions({
+    StartBeforeEnd: {
+        expression: "start < end"
+        documentation: "The start time must be before the end time."
+    }
+})
+structure TimeRange {
+    @required
+    start: Timestamp
+
+    @required
+    end: Timestamp
+}
+```
+
+```console
+$ smithy validate time-range.smithy
+$ smithy select --selector '[trait|smithy.contracts#conditions]' time-range.smithy
+example#TimeRange
+```
+<!-- tour:end contracts-cli -->
+
 ### JSONL diff output
 
 Use `--format jsonl` for automation. `--format=jsonl` also works. Text remains

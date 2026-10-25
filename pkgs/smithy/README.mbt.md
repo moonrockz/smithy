@@ -169,6 +169,39 @@ test {
 }
 ```
 
+<!-- tour:start select-api -->
+```mbt check
+///|
+test {
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "weather.smithy",
+    (
+      #|$version: "2"
+      #|
+      #|namespace example
+      #|
+      #|service Weather {
+      #|    version: "2024-01-01"
+      #|    operations: [GetForecast, PutCity]
+      #|}
+      #|
+      #|@readonly
+      #|operation GetForecast {}
+      #|
+      #|@idempotent
+      #|operation PutCity {}
+    ),
+  )
+  .assemble().model.unwrap()
+  let ids = @smithy.Selector::parse("operation[trait|readonly]").select_ids(
+    model,
+  )
+  assert_eq(ids, ["example#GetForecast"])
+}
+```
+<!-- tour:end select-api -->
+
 ## Contract traits
 
 The loader includes [`smithy.contracts#conditions`](https://smithy.io/2.0/additional-specs/contract-traits.html).
@@ -215,6 +248,42 @@ needs their type; analysis uses an explicit stack. Mixed element or branch
 types can become unknown. Unknown data permits operations that cannot be
 disproved, but an unknown final result does not establish a boolean contract.
 This analysis does not prove that a condition will hold for runtime values.
+
+<!-- tour:start contracts-api -->
+```mbt check
+///|
+test {
+  let result = @smithy.Loader::new()
+    .add_idl(
+      "time-range.smithy",
+      (
+        #|$version: "2"
+        #|
+        #|namespace example
+        #|
+        #|use smithy.contracts#conditions
+        #|
+        #|@conditions({
+        #|    StartBeforeEnd: {
+        #|        expression: "start"
+        #|        documentation: "The start time must be before the end time."
+        #|    }
+        #|})
+        #|structure TimeRange {
+        #|    @required
+        #|    start: Timestamp
+        #|
+        #|    @required
+        #|    end: Timestamp
+        #|}
+      ),
+    )
+    .assemble()
+  let events = result.validation_events().map(e => "\{e.id}|\{e.severity}")
+  assert_eq(events, ["ConditionsTrait|DANGER"])
+}
+```
+<!-- tour:end contracts-api -->
 
 Syntax errors use `SM-MODEL-015`, invalid operations and function calls use
 `SM-MODEL-016`, and non-boolean results use `SM-MODEL-017`. Invalid ordering
@@ -339,6 +408,49 @@ built-in definitions, flattens inherited contents and uses absolute references.
 Metadata appears once, in the first namespace. An empty or metadata-only model
 uses the empty namespace key. Generated text is deterministic and retains exact
 node numbers; conversion does not retain comments or original source layout.
+
+<!-- tour:start convert-idl-api -->
+```mbt check
+///|
+test {
+  let model = @smithy.Loader::new()
+  .add_json(
+    "greeting.json",
+    (
+      #|{
+      #|    "smithy": "2.0",
+      #|    "shapes": {
+      #|        "example#Greeting": {
+      #|            "type": "structure",
+      #|            "members": {
+      #|                "message": {
+      #|                    "target": "smithy.api#String"
+      #|                }
+      #|            }
+      #|        }
+      #|    }
+      #|}
+    ),
+  )
+  .assemble().model.unwrap()
+  assert_eq(
+    model.to_idl().get("example"),
+    Some(
+      (
+        #|$version: "2"
+        #|
+        #|namespace example
+        #|
+        #|structure Greeting {
+        #|    message: smithy.api#String
+        #|}
+        #|
+      ),
+    ),
+  )
+}
+```
+<!-- tour:end convert-idl-api -->
 
 ```mbt check
 ///|

@@ -116,6 +116,61 @@ plugins return relative filenames; absolute paths and parent traversal are
 rejected.
 
 
+## Projections
+
+`BuildRunner::run` gives each artifact by its path. A projection model is a JSON AST that you can load again.
+
+<!-- tour:start build-projection-api -->
+```mbt check
+///|
+test {
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "forecast.smithy",
+    (
+      #|$version: "2"
+      #|
+      #|namespace example
+      #|
+      #|service Weather {
+      #|    version: "2024-01-01"
+      #|    operations: [GetForecast, GetDebugInfo]
+      #|}
+      #|
+      #|@readonly
+      #|operation GetForecast {}
+      #|
+      #|@internal
+      #|@readonly
+      #|operation GetDebugInfo {}
+    ),
+  )
+  .assemble().model.unwrap()
+  let config = @build.BuildConfig::parse(
+    (
+      #|{
+      #|    "version": "1.0",
+      #|    "projections": {
+      #|        "public": {
+      #|            "transforms": [
+      #|                {"name": "excludeShapesByTrait", "args": {"traits": ["internal"]}}
+      #|            ]
+      #|        }
+      #|    }
+      #|}
+    ),
+  )
+  let artifacts = @build.BuildRunner::new(config).run(model)
+  let public = @smithy.Loader::new()
+  .add_json("public.json", artifacts["public/model/model.json"])
+  .assemble().model.unwrap()
+  assert_eq(@smithy.Selector::parse("operation").select_ids(public), [
+    "example#GetForecast",
+  ])
+}
+```
+<!-- tour:end build-projection-api -->
+
 ## Acquisition settings
 
 `BuildConfig::parse` accepts top-level `cacheDirectory`, a portable filesystem
