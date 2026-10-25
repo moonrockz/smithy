@@ -1,0 +1,8 @@
+import {
+  "moonrockz/smithy",
+}
+
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-codegen" @codegen,
+} for "test"
