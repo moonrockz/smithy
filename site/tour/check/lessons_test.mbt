@@ -166,6 +166,71 @@ fn data_keys(findings : Array[@core.DataFinding]) -> Array[String] {
 }
 
 ///|
+/// Check one case of a diff lesson. The model events are those of the old and
+/// the new model together. The diff events are compared only when both models
+/// can be compared; a case with an ERROR or a DANGER in a model claims none.
+fn check_diff_case(
+  session : @core.Session,
+  where_ : String,
+  case : @model.Case,
+  all_files : Array[@model.LessonFile],
+) -> Unit raise {
+  let (old, new) = @model.sides(all_files)
+  let (old_findings, new_findings, events) = match
+    @core.handle(
+      session,
+      DiffModels(seq=1, old=files_of(old), new=files_of(new)),
+    ) {
+    Diffed(old~, new~, events~, ..) => (old, new, events)
+    Blocked(reason~, ..) => fail(where_ + ": the diff was blocked: " + reason)
+    _ => fail(where_ + ": unexpected answer")
+  }
+  let actual = compared(old_findings + new_findings)
+  let expected = case.expect.events.copy()
+  expected.sort_by(@model.compare_events)
+  actual.sort_by(@model.compare_events)
+  if actual != expected {
+    fail(
+      where_ +
+      ": events differ.\n  expected: " +
+      show_events(expected) +
+      "\n  actual:   " +
+      show_events(actual),
+    )
+  }
+  let keys = match events {
+    Some(events) => events.map(e => @model.diff_key(e.id, e.severity, e.shape))
+    None => []
+  }
+  keys.sort_by(@model.compare_code_units)
+  let wanted = case.expect.diff.copy()
+  wanted.sort_by(@model.compare_code_units)
+  if keys != wanted {
+    fail(
+      where_ +
+      ": diff events differ.\n  expected: " +
+      show(wanted) +
+      "\n  actual:   " +
+      show(keys),
+    )
+  }
+  if case.expect.output_contains.length() > 0 && events is None {
+    fail(
+      where_ + ": output_contains cannot run: a model has an ERROR or a DANGER",
+    )
+  }
+  let text = match events {
+    Some(events) => events.map(e => e.cli_line()).join("\n")
+    None => ""
+  }
+  for needle in case.expect.output_contains {
+    if !text.contains(needle) {
+      fail(where_ + ": the output has no " + needle + "\n" + text)
+    }
+  }
+}
+
+///|
 /// Check one case of a lesson: its events, its findings and its output text.
 fn check_case(
   session : @core.Session,
@@ -174,6 +239,9 @@ fn check_case(
 ) -> Unit raise {
   let where_ = lesson.case_id(case).to_string()
   let all_files = lesson.case_files(case)
+  if lesson.engine is Diff {
+    return check_diff_case(session, where_, case, all_files)
+  }
   let files = files_of(@model.model_files(lesson.engine, all_files))
   let selector = @model.query_of(all_files, fixed=lesson.selector)
   let actual = match
@@ -289,8 +357,9 @@ fn check_case(
         }
         check_transcript(where_, files, setup, text, case.expect)
       }
+    // `check_diff_case` checks a diff lesson.
     // A static lesson has no cases.
-    Static => ()
+    Diff | Static => ()
   }
 }
 
@@ -639,6 +708,81 @@ test "a static extension lesson says that the feature is our extension" {
     Err(e) => fail("I cannot read the fixture: " + e)
   }
   assert_eq(lessons_without_note(bad), ["01-a"])
+}
+
+///|
+fn diff_fixture() -> @model.Lesson raise {
+  match @source.read_tour("tour/source/testdata/diff-level1", repo="..") {
+    Ok(tour) => tour.lessons[0]
+    Err(e) => fail("I cannot read the fixture: " + e)
+  }
+}
+
+///|
+fn diff_case(lesson : @model.Lesson, name : String) -> @model.Case raise {
+  match lesson.cases.search_by(c => c.name == name) {
+    Some(i) => lesson.cases[i]
+    None => fail("the fixture has no " + name + " case")
+  }
+}
+
+///|
+test "a diff lesson case gives the events that its expect.json names" {
+  let lesson = diff_fixture()
+  assert_eq(lesson.engine, Diff)
+  let session = @core.Session::new()
+  for case in lesson.cases {
+    check_case(session, lesson, case)
+  }
+  // A key that the core does not give is an error.
+  let start = diff_case(lesson, "start")
+  let wrong : @model.Case = {
+    ..start,
+    expect: { ..start.expect, diff: ["AddedShape|NOTE|example#C"], },
+  }
+  assert_true(
+    raises_with("diff events differ", () => check_case(session, lesson, wrong)),
+  )
+  let wrong_severity : @model.Case = {
+    ..start,
+    expect: { ..start.expect, diff: ["AddedShape|ERROR|example#B"], },
+  }
+  assert_true(
+    raises_with("diff events differ", () => {
+      check_case(session, lesson, wrong_severity)
+    }),
+  )
+  let wrong_text : @model.Case = {
+    ..start,
+    expect: { ..start.expect, output_contains: ["no such text"], },
+  }
+  assert_true(
+    raises_with("the output has no", () => {
+      check_case(session, lesson, wrong_text)
+    }),
+  )
+}
+
+///|
+test "a diff case with a model error claims no diff events and the model events of both sides" {
+  let lesson = diff_fixture()
+  let session = @core.Session::new()
+  let broken = diff_case(lesson, "broken-new")
+  assert_true(broken.expect.events.any(e => e.severity.blocks_output()))
+  let claims : @model.Case = {
+    ..broken,
+    expect: { ..broken.expect, diff: ["AddedShape|NOTE|example#B"], },
+  }
+  assert_true(
+    raises_with("diff events differ", () => check_case(session, lesson, claims)),
+  )
+  let no_events : @model.Case = {
+    ..broken,
+    expect: { ..broken.expect, events: [], },
+  }
+  assert_true(
+    raises_with("events differ", () => check_case(session, lesson, no_events)),
+  )
 }
 
 ///|

@@ -336,6 +336,51 @@ test "query_of prefers the query file" {
 }
 
 ///|
+test "sides splits the files of a diff lesson by their prefix" {
+  let files : Array[LessonFile] = [
+    { name: "new/b.smithy", text: "n", },
+    { name: "old/a.smithy", text: "o", },
+    { name: "old/b.smithy", text: "o2", },
+  ]
+  let (old, new) = sides(files)
+  assert_eq(old.map(f => f.name), ["old/a.smithy", "old/b.smithy"])
+  assert_eq(new.map(f => f.name), ["new/b.smithy"])
+  assert_eq(Diff.data_files(), [])
+  assert_eq(model_files(Diff, files).length(), 3)
+  assert_true(!lesson_of(1, "D", [], []).needs_extension_note())
+  assert_true(
+    !{ ..lesson_of(1, "D", [], []), engine: Diff, }.needs_extension_note(),
+  )
+}
+
+///|
+test "is_diff_severity names the severities of a diff event that a lesson can claim" {
+  for s in ["NOTE", "WARNING", "DANGER", "ERROR"] {
+    assert_true(is_diff_severity(s))
+  }
+  assert_false(is_diff_severity("SUPPRESSED"))
+  assert_false(is_diff_severity("note"))
+  assert_false(is_diff_severity(""))
+}
+
+///|
+test "is_diff_key reads id|SEVERITY|shape" {
+  assert_true(is_diff_key("AddedShape|NOTE|example#B"))
+  assert_true(is_diff_key("ChangedMemberOrder|WARNING|-"))
+  assert_false(is_diff_key("AddedShape|SUPPRESSED|example#B"))
+  assert_false(is_diff_key("AddedShape|NOTE"))
+  assert_false(is_diff_key("|NOTE|a#B"))
+  assert_false(is_diff_key("AddedShape|NOTE|"))
+}
+
+///|
+test "diff_key writes id|SEVERITY|shape" {
+  assert_eq(diff_key("AddedShape", "NOTE", Some("a#B")), "AddedShape|NOTE|a#B")
+  assert_eq(diff_key("X", "ERROR", None), "X|ERROR|-")
+  assert_true(is_diff_key(diff_key("X", "ERROR", None)))
+}
+
+///|
 test "transcript_key joins code, severity, entry and sender" {
   assert_eq(
     transcript_key("MissingResponse", "error", Some(0), Some("client")),

@@ -1,0 +1,1 @@
+{"events": [], "diff": ["AddedShape|NOTE|example#B", "RemovedShape|ERROR|example#A"], "output_contains": ["[ERROR] example#A:", "| RemovedShape"]}

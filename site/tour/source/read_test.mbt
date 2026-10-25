@@ -380,6 +380,68 @@ test "a case cannot add a query file" {
 }
 
 ///|
+test "a diff lesson reads the old and the new files and a case override" {
+  let tour = match read("diff-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(lesson.engine, Diff)
+  assert_eq(lesson.files.map(f => f.name), [
+    "new/model.smithy", "old/model.smithy",
+  ])
+  assert_eq(lesson.cases[0].expect.diff, ["AddedShape|NOTE|example#B"])
+  assert_eq(lesson.cases[1].files.map(f => f.name), ["new/model.smithy"])
+  let merged = lesson.case_files(lesson.cases[1])
+  assert_eq(merged.map(f => f.name), ["new/model.smithy", "old/model.smithy"])
+  assert_eq(merged[0].text, merged[1].text)
+  let (old, new) = @model.sides(merged)
+  assert_eq(old.length(), 1)
+  assert_eq(new.length(), 1)
+}
+
+///|
+test "a diff lesson needs a files/new folder" {
+  expect_err("diff-no-new", ["01-a", "files/new"])
+}
+
+///|
+test "a file directly in files/ of a diff lesson is an error" {
+  expect_err("diff-top-level-file", ["01-a/files/stray.smithy", "old/", "new/"])
+}
+
+///|
+test "a case file outside old/ and new/ names the case and the file" {
+  expect_err("diff-case-outside-sides", [
+    "01-a/cases/start/files/model.smithy", "old/", "new/",
+  ])
+}
+
+///|
+test "a diff key with the severity SUPPRESSED is an error" {
+  expect_err("diff-suppressed-key", [
+    "01-a/cases/start", "AddedShape|SUPPRESSED|example#B", "NOTE, WARNING, DANGER or ERROR",
+  ])
+}
+
+///|
+test "findings are not for a diff lesson" {
+  expect_err("findings-in-diff-lesson", [
+    "01-a/cases/start", "\"findings\" is for a value or message lesson",
+  ])
+}
+
+///|
+test "a diff lesson case needs diff" {
+  expect_err("diff-no-diff-key", ["01-a/cases/start", "\"diff\""])
+}
+
+///|
+test "a lesson with diff and value" {
+  expect_err("diff-and-value", ["01-a", "at most one of"])
+}
+
+///|
 test "a transcript lesson reads its setup and the fields of a case" {
   let tour = match read("transcript-ok") {
     Ok(t) => t

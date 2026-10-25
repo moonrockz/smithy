@@ -160,9 +160,19 @@ fn read_lesson(
     }
   }
   let data = engine.data_files()
-  let files = read_files("\{base}/files", "\{dir}/files", data)
+  let files = read_lesson_files(engine, "\{base}/files", "\{dir}/files")
   if files.is_empty() {
     fail("\{dir}: I found no starting file in files/")
+  }
+  if engine is Diff {
+    let (old, new) = @model.sides(files)
+    for side in [("old", old), ("new", new)] {
+      if side.1.is_empty() {
+        fail(
+          "\{dir}: a diff lesson needs at least one .smithy file in files/\{side.0}",
+        )
+      }
+    }
   }
   for name in data {
     if !files.any(f => f.name == name) {
@@ -253,8 +263,8 @@ fn read_extension(
 }
 
 ///|
-/// The engine of a lesson: at most one of `output`, `value`, or `static`. A
-/// lesson with none of them validates its model.
+/// The engine of a lesson: at most one of `output`, `value`, `diff`, or
+/// `static`. A lesson with none of them validates its model.
 fn read_engine(
   meta : Json,
   dir : String,
@@ -276,7 +286,8 @@ fn read_engine(
   }
   let value = m.get("value")
   let transcript = m.get("transcript")
-  let engines = [has_output, value is Some(_), transcript is Some(_)]
+  let diff = flag_field(meta, "diff", where_)
+  let engines = [has_output, value is Some(_), transcript is Some(_), diff]
   if engines.filter(b => b).length() > 1 {
     fail(
       "\{where_}: I expected at most one of output, value, transcript, message, diff",
@@ -284,6 +295,9 @@ fn read_engine(
   }
   if transcript is Some(setup) {
     return read_transcript(setup, where_)
+  }
+  if diff {
+    return Diff
   }
   guard value is Some(setup) else { return Model }
   check_keys(setup, value_keys, "\{where_} \"value\"")
@@ -367,6 +381,57 @@ fn read_files(
 }
 
 ///|
+/// The files of the folder `path` of a lesson or a case: for a diff lesson the
+/// files of `old/` and `new/`, for the others the files directly in it.
+fn read_lesson_files(
+  engine : @model.Engine,
+  path : String,
+  where_ : String,
+) -> Array[@model.LessonFile] raise {
+  match engine {
+    Diff => read_sides(path, where_)
+    _ => read_files(path, where_, engine.data_files())
+  }
+}
+
+///|
+/// The files of a diff lesson in `path`: the `.smithy` files of its folders
+/// `old` and `new`, named `old/<name>` and `new/<name>`. The model of one side
+/// is a flat list of files, as in `read_files`.
+fn read_sides(path : String, where_ : String) -> Array[@model.LessonFile] raise {
+  let files : Array[@model.LessonFile] = []
+  if !@fs.path_exists(path) {
+    return files
+  }
+  for side in list_dir(path) {
+    let folder = "\{path}/\{side}"
+    if !(side == "old" || side == "new") || !is_dir(folder) {
+      fail(
+        "\{where_}/\{side}: a diff lesson keeps its files in the folders old/ and new/, not directly in \{where_}",
+      )
+    }
+    for name in list_dir(folder) {
+      let file = "\{folder}/\{name}"
+      if is_dir(file) {
+        fail(
+          "\{where_}/\{side}/\{name}: I found a folder in the files of a lesson. Put each file directly in \{where_}/\{side}",
+        )
+      }
+      if !name.has_suffix(".smithy") {
+        fail(
+          "\{where_}/\{side}/\{name}: the name of a lesson file must end in .smithy, because the playground core reads every file as IDL",
+        )
+      }
+      files.push({
+        name: "\{side}/\{name}",
+        text: io(file, () => @fs.read_file_to_string(file)),
+      })
+    }
+  }
+  files
+}
+
+///|
 fn read_cases(
   dir : String,
   path : String,
@@ -433,7 +498,7 @@ fn read_case(
         fail("\{where_}: a transcript lesson needs \"findings\" in expect.json")
       }
     Static => fail("\{where_}: a static lesson has no cases")
-    Model =>
+    Model | Diff =>
       if !findings.is_empty() || has_key(json, "findings") {
         fail("\{where_}: \"findings\" is for a value or message lesson")
       }
@@ -456,8 +521,19 @@ fn read_case(
     _ => None
   }
   let steps = read_steps(json, where_)
-  if !diff.is_empty() || has_key(json, "diff") {
+  if engine is Diff {
+    if !has_key(json, "diff") {
+      fail("\{where_}: a diff lesson needs \"diff\" in expect.json")
+    }
+  } else if !diff.is_empty() || has_key(json, "diff") {
     fail("\{where_}: \"diff\" is for a diff lesson")
+  }
+  for key in diff {
+    if !@model.is_diff_key(key) {
+      fail(
+        "\{where_}: the diff key \"\{key}\" must have the form id|SEVERITY|shape, and SEVERITY must be NOTE, WARNING, DANGER or ERROR",
+      )
+    }
   }
   for key in findings {
     if is_transcript {
@@ -484,11 +560,7 @@ fn read_case(
       )
     }
   }
-  let files = read_files(
-    "\{base}/files",
-    "\{where_}/files",
-    engine.data_files(),
-  )
+  let files = read_lesson_files(engine, "\{base}/files", "\{where_}/files")
   for file in files {
     if @model.is_query_file(file.name) && query != Some(file.name) {
       fail(
@@ -507,7 +579,7 @@ fn read_case(
 /// The keys of `lesson.json`.
 let lesson_keys : Array[String] = [
   "slug", "title", "section", "spec", "output", "selector", "value", "transcript",
-  "static", "extension",
+  "diff", "static", "extension",
 ]
 
 ///|

@@ -60,6 +60,8 @@ pub(all) enum Engine {
   Model
   /// Check a JSON value against a shape of the model.
   Value(ValueSetup)
+  /// Compare the models in `old/` and `new/`, as `smithy diff` does.
+  Diff
   /// Step through a JSON-RPC transcript against a protocol of the model.
   Transcript(TranscriptSetup)
   /// No editor, no files and no cases: the blocks of the text come from
@@ -127,7 +129,7 @@ pub fn Engine::data_files(self : Engine) -> Array[String] {
     Model => []
     Value(setup) => [setup.file]
     Transcript(setup) => [setup.file]
-    Static => []
+    Diff | Static => []
   }
 }
 
@@ -159,6 +161,51 @@ pub fn query_of(files : Array[LessonFile], fixed~ : String?) -> String? {
     }
   }
   fixed
+}
+
+///|
+/// The folder of the old model in the files of a diff lesson, and the prefix of
+/// the names of its files.
+pub let old_prefix : String = "old/"
+
+///|
+/// The folder of the new model, as `old_prefix`.
+pub let new_prefix : String = "new/"
+
+///|
+/// The files of the old and of the new model of a diff lesson, by the prefix
+/// `old/` and `new/`. The names keep their prefix, in the same order.
+pub fn sides(
+  files : Array[LessonFile],
+) -> (Array[LessonFile], Array[LessonFile]) {
+  (
+    files.filter(f => f.name.has_prefix(old_prefix)),
+    files.filter(f => f.name.has_prefix(new_prefix)),
+  )
+}
+
+///|
+/// Whether the text is the severity of a diff event that a lesson can claim.
+/// SUPPRESSED events are not shown, so no lesson claims them.
+pub fn is_diff_severity(s : String) -> Bool {
+  s == "NOTE" || s == "WARNING" || s == "DANGER" || s == "ERROR"
+}
+
+///|
+/// Whether the text has the form `id|SEVERITY|shape` of a diff key, with `-`
+/// for no shape.
+pub fn is_diff_key(key : String) -> Bool {
+  guard key.split("|").map(p => p.to_owned()).to_array()
+    is [id, severity, shape] else {
+    return false
+  }
+  id != "" && shape != "" && is_diff_severity(severity)
+}
+
+///|
+/// The key of a diff event: `id|SEVERITY|shape`, with `-` for no shape.
+pub fn diff_key(id : String, severity : String, shape : String?) -> String {
+  "\{id}|\{severity}|\{shape.unwrap_or("-")}"
 }
 
 ///|
@@ -235,6 +282,8 @@ pub fn Lesson::needs_extension_note(self : Lesson) -> Bool {
   match self.engine {
     Model => false
     Value(_) | Transcript(_) => true
+    // Smithy has a diff tool: the lesson shows its events.
+    Diff => false
     Static => self.extension
   }
 }

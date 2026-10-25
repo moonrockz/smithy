@@ -18,7 +18,7 @@ site/tour/lessons/NN-<slug>/
 
 - Lesson numbers start at 01 and have no gap. The folder name is `NN-<slug>`, and `<slug>` is the `slug` of
   `lesson.json`. Two lessons cannot have the same number or the same slug.
-- `lesson.json` has the keys `slug`, `title`, `section`, `spec`, and optionally `output` and `selector` (and `value`, `static` and `extension`, see below).
+- `lesson.json` has the keys `slug`, `title`, `section`, `spec`, and optionally `output` and `selector` (and `value`, `diff`, `static` and `extension`, see below).
   Another key is an error. `section` groups consecutive lessons on the contents page. `spec` is the link to what
   the lesson teaches: a URL that starts with `https://smithy.io/`, or the repository path of a docs page, such as
   `pkgs/smithy-openrpc/README.mbt.md`. The reader rejects any other value. A docs path links to the page on the
@@ -29,7 +29,7 @@ site/tour/lessons/NN-<slug>/
 - `lesson.md` starts with the line `# <title>`, with the `title` of `lesson.json`.
 - A case runs the starting files with its own `files/` on top. A case file replaces a starting file of the same
   name, or adds a new file.
-- A lesson file is directly in `files/` or in `cases/<case>/files/`. A sub-folder there is an error. The name of
+- A lesson file is directly in `files/` or in `cases/<case>/files/`. A sub-folder there is an error (a diff lesson keeps its files in `old/` and `new/`, see below). The name of
   a lesson file must end in `.smithy`, because the playground core reads every file as IDL. (Java picks the
   format by the extension. Remove this rule when the core does the same.) The exceptions are the data file of a
   value lesson and the query file.
@@ -301,6 +301,27 @@ The text of a transcript lesson must have a note that starts with
 `> **Our extension:**`. Smithy defines no transcript check, and no Java
 reference exists for it. Level 1 checks the note. Level 2 compares only the
 model events of the model files.
+
+## Diff lessons
+
+A diff lesson compares two models, as `smithy diff --old --new` does. `lesson.json` has `"diff": true` in place
+of `"output"` and `"value"`: a lesson has at most one of them.
+
+- The starting files are in two folders, `files/old/` and `files/new/`. Each folder holds at least one file, and
+  the name of each file ends in `.smithy`. A file directly in `files/`, another folder, or a sub-folder in
+  `old/` or `new/` is an error.
+- The names of the files are `old/<name>` and `new/<name>`: they stay unique in one file list, so the digest,
+  the merge and the stored edits work as for any lesson. A case replaces or adds a file by this name, for
+  example `cases/<case>/files/new/model.smithy`. A case file outside `old/` and `new/` is an error that names
+  the case and the file.
+- `expect.json` of a diff lesson needs `"diff"` (a lesson of another kind cannot have it). Each item is
+  `id|SEVERITY|shape`, with `-` for an event without a shape. The severity is `NOTE`, `WARNING`, `DANGER` or
+  `ERROR`; `SUPPRESSED` events are not shown, so a key cannot claim them. `"findings"` is an error.
+- `"events"` holds the model events of both models together (WARNING, DANGER and ERROR, as for any lesson).
+  When a model has an ERROR or a DANGER, `smithy diff` does not compare: the case claims `"diff": []`.
+- `output_contains` is checked against the lines that `smithy diff` prints, joined with a line break.
+- The text has no extension note: Smithy has a diff tool. The text says that our CLI prints the events of the
+  Java `smithy-diff`.
 
 ## Static lessons
 
