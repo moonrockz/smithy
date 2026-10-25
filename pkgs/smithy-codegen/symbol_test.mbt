@@ -107,3 +107,17 @@ test "codegen error messages name the construct" {
   assert_eq(@codegen.WriterConflict("m").message(), "m")
   assert_eq(@codegen.StateError("m").message(), "m")
 }
+
+///|
+test "with_name copies the symbol under a new name" {
+  let ns = @codegen.Namespace::parse("a.b", separator=".").unwrap()
+  let s = @codegen.Symbol::new(
+    @codegen.SymbolName::parse("Order").unwrap(),
+    namespace=ns,
+  ).with_property("k", Json::number(1.0))
+  let renamed = s.with_name(@codegen.SymbolName::parse("Order_").unwrap())
+  assert_eq(renamed.name.to_string(), "Order_")
+  assert_eq(renamed.namespace, ns)
+  assert_eq(renamed.property("k"), Some(Json::number(1.0)))
+  assert_eq(s.name.to_string(), "Order")
+}

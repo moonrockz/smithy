@@ -145,6 +145,12 @@ pub fn Symbol::new(
 }
 
 ///|
+/// A copy of the symbol with another name.
+pub fn Symbol::with_name(self : Symbol, name : SymbolName) -> Symbol {
+  { ..self, name, }
+}
+
+///|
 /// A copy of the symbol with one more reference.
 pub fn Symbol::with_reference(
   self : Symbol,
