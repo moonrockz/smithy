@@ -34,7 +34,7 @@ let scratch : String = ".dev/out/reference-tour"
 let smithy_rpc_path : String = "site/tour/smithy-rpc-traits.smithy"
 
 ///|
-/// Reads the cases (`[{"id", "json_schema", "http_protocols", "smithy_rpc", "files": [{"name", "text"}], "openapi"?}]`)
+/// Reads the cases (`[{"id", "json_schema", "json_ast", "http_protocols", "smithy_rpc", "files": [{"name", "text"}], "openapi"?}]`)
 /// from args[0] and writes the results to args[1], with args[2] as the reference SHA. A case with `smithy_rpc` also
 /// loads the smithy.rpc trait definitions from args[3]. The digest is SHA-256 over the files sorted by name of
 /// name + NUL + text + NUL, in UTF-8: the case files and, for a `smithy_rpc` case, the definitions as the file
@@ -125,6 +125,13 @@ let harness : String =
   #|          }
   #|        }
   #|        entry.withMember("openapi", openapi);
+  #|      }
+  #|      if (test.expectBooleanMember("json_ast").getValue() && !blocked) {
+  #|        entry.withMember("json_ast", ModelSerializer.builder()
+  #|            .shapeFilter(shape -> !shape.getId().getNamespace().equals("smithy.rpc")
+  #|                && !shape.getId().getNamespace().equals("smithy.contracts"))
+  #|            .build()
+  #|            .serialize(result.unwrap()));
   #|      }
   #|      if (test.getMember("selector").isPresent() && !blocked) {
   #|        Node selected;
@@ -264,6 +271,7 @@ async fn read_files(path : String) -> Array[(String, String)] {
 /// What the harness writes for a case, from the lesson output name.
 struct Flags {
   json_schema : Bool
+  json_ast : Bool
   openapi : String?
   http_protocols : Bool
   selector : Bool
@@ -272,11 +280,12 @@ struct Flags {
 ///|
 fn flags_of(output : String?) -> Flags {
   match output {
-    Some("JsonSchema") => { json_schema: true, openapi: None, http_protocols: false, selector: false }
-    Some("OpenApi30") => { json_schema: false, openapi: Some("3.0.2"), http_protocols: true, selector: false }
-    Some("OpenApi31") => { json_schema: false, openapi: Some("3.1.0"), http_protocols: true, selector: false }
-    Some("Selector") => { json_schema: false, openapi: None, http_protocols: false, selector: true }
-    _ => { json_schema: false, openapi: None, http_protocols: false, selector: false }
+    Some("JsonAst") => { json_schema: false, json_ast: true, openapi: None, http_protocols: false, selector: false }
+    Some("JsonSchema") => { json_schema: true, json_ast: false, openapi: None, http_protocols: false, selector: false }
+    Some("OpenApi30") => { json_schema: false, json_ast: false, openapi: Some("3.0.2"), http_protocols: true, selector: false }
+    Some("OpenApi31") => { json_schema: false, json_ast: false, openapi: Some("3.1.0"), http_protocols: true, selector: false }
+    Some("Selector") => { json_schema: false, json_ast: false, openapi: None, http_protocols: false, selector: true }
+    _ => { json_schema: false, json_ast: false, openapi: None, http_protocols: false, selector: false }
   }
 }
 
@@ -328,6 +337,7 @@ async fn lesson_cases(root : String) -> Array[Json] {
       let entry : Map[String, Json] = {
         "id": Json::string(dir + "/" + name),
         "json_schema": Json::boolean(flags.json_schema),
+        "json_ast": Json::boolean(flags.json_ast),
         "http_protocols": Json::boolean(flags.http_protocols),
         "smithy_rpc": Json::boolean(uses_smithy_rpc(files)),
         "files": Json::array(files.map(f => Json::object({ "name": Json::string(f.0), "text": Json::string(f.1) }))),
@@ -465,17 +475,17 @@ test "javac argument files quote spaces and Windows path separators" {
 
 ///|
 test "the lesson output gives the harness flags" {
-  let none = { json_schema: false, openapi: None, http_protocols: false, selector: false }
+  let none = { json_schema: false, json_ast: false, openapi: None, http_protocols: false, selector: false }
   assert_eq(flags_of(None), none)
-  assert_eq(flags_of(Some("JsonAst")), none)
+  assert_eq(flags_of(Some("JsonAst")), { ..none, json_ast: true })
   assert_eq(flags_of(Some("JsonSchema")), { ..none, json_schema: true })
   assert_eq(
     flags_of(Some("OpenApi30")),
-    { json_schema: false, openapi: Some("3.0.2"), http_protocols: true, selector: false },
+    { json_schema: false, json_ast: false, openapi: Some("3.0.2"), http_protocols: true, selector: false },
   )
   assert_eq(
     flags_of(Some("OpenApi31")),
-    { json_schema: false, openapi: Some("3.1.0"), http_protocols: true, selector: false },
+    { json_schema: false, json_ast: false, openapi: Some("3.1.0"), http_protocols: true, selector: false },
   )
   assert_eq(flags_of(Some("Selector")), { ..none, selector: true })
 }

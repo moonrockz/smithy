@@ -8,7 +8,20 @@
         },
         "01-hello-smithy/start": {
             "digest": "9e02d76db2e3c58b3b4d8e8308ea1589a2ba9adc03f3fe514a7f6e95cbe6a23c",
-            "events": []
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#Greeting": {
+                        "members": {
+                            "message": {
+                                "target": "smithy.api#String"
+                            }
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
         },
         "02-simple-shapes/count-as-string": {
             "digest": "4b24fb4de1877a456dc4c74cb4c1e379382635d6bebe79e0957b4205d38d13c9",
@@ -84,15 +97,66 @@
         },
         "03-documentation/member-documentation": {
             "digest": "648b3bc6e0570f3a2e2511b74ec242e4097820434b71dd47cff4b0cb97a67172",
-            "events": []
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#Greeting": {
+                        "members": {
+                            "message": {
+                                "target": "smithy.api#String",
+                                "traits": {
+                                    "smithy.api#documentation": "The text of the greeting."
+                                }
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A greeting for one person."
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
         },
         "03-documentation/start": {
             "digest": "5e9cc1e2677bcfb09714b95afe5001240f5b34c14fdb5423d24084dd276f4077",
-            "events": []
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#Greeting": {
+                        "members": {
+                            "message": {
+                                "target": "smithy.api#String"
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A greeting for one person."
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
         },
         "03-documentation/two-lines": {
             "digest": "99f7f97b70e35a42d0a558de5120a4cc1a8922dab79893503e05a5c9888efb21",
-            "events": []
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#Greeting": {
+                        "members": {
+                            "message": {
+                                "target": "smithy.api#String"
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A greeting for one person.\nIt has one message."
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
         },
         "04-shape-ids/absolute-id": {
             "digest": "eeb681fbb9c45f11646d7cecbe597d1f955c7c2133947732f99a9d23a8b631ba",
@@ -624,7 +688,43 @@
         },
         "13-applying-traits/start": {
             "digest": "c55941dec951d7ddf083bfc725103f09ff1e370342dc5cddc9a1ba67f9ea121f",
-            "events": []
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#City": {
+                        "members": {
+                            "latitude": {
+                                "target": "smithy.api#Float",
+                                "traits": {
+                                    "smithy.api#documentation": "Degrees north of the equator.",
+                                    "smithy.api#range": {
+                                        "max": 90,
+                                        "min": -90
+                                    }
+                                }
+                            },
+                            "name": {
+                                "target": "smithy.api#String",
+                                "traits": {
+                                    "smithy.api#length": {
+                                        "max": 64,
+                                        "min": 1
+                                    },
+                                    "smithy.api#required": {}
+                                }
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A city on the map.",
+                            "smithy.api#tags": [
+                                "geo"
+                            ]
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
         },
         "13-applying-traits/unknown-trait": {
             "digest": "8d3ce24c316faab910e8742472be633d4cd6a81446c070eaa3ef07c3b7f35eae",
