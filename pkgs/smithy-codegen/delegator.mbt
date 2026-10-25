@@ -90,8 +90,9 @@ pub fn WriterDelegator::use_file_writer(
 
 ///|
 /// Run `body` with the writer of the file that defines the shape. The path and
-/// the namespace come from the symbol of the shape. It raises
-/// `MissingDefinition` when the symbol has no definition file.
+/// the namespace come from the symbol of the shape. The writer reserves the name of
+/// the symbol, so `$T` writes a foreign symbol with that name by its full name. It
+/// raises `MissingDefinition` when the symbol has no definition file.
 pub fn WriterDelegator::use_shape_writer(
   self : WriterDelegator,
   shape : @smithy.Shape,
@@ -101,7 +102,10 @@ pub fn WriterDelegator::use_shape_writer(
   guard symbol.definition is Some(path) else {
     raise MissingDefinition(shape.id)
   }
-  self.use_file_writer(path, symbol.ns, body)
+  self.use_file_writer(path, symbol.ns, writer => {
+    writer.reserve_name(symbol.name)
+    body(writer)
+  })
 }
 
 ///|

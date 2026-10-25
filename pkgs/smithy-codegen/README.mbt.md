@@ -80,6 +80,10 @@ More rules:
 - A template that fails writes nothing and leaves the import tracker unchanged.
 - Two symbols with the same name from two namespaces in one file: the writer
   writes the name of the second one in full.
+- A name that the file uses for its own symbols blocks a foreign import of that
+  name: the writer writes the foreign symbol in full and does not import it. The
+  file's own names are the symbols of the writer namespace and the names that
+  `reserve_name` reserves. `use_shape_writer` reserves the name of its shape.
 - Use `push_state` and `pop_state` to save and restore the indentation, the
   newline prefix, the context and the formatters.
 

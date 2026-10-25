@@ -10,14 +10,19 @@ pub(all) struct ImportEntry {
 ///|
 /// The tracker of imports and dependencies. All writers of one file share it
 /// by reference. `imports` maps the name that the file uses (the local name, or the
-/// name of the symbol) to the first import of that name.
+/// name of the symbol) to the first import of that name. `locals` holds the names
+/// that the file itself uses for its own symbols: the symbols of the writer
+/// namespace and the reserved names. A foreign symbol with one of these names is
+/// written by its full name and is not imported.
 priv struct ImportTracker {
   imports : Map[SymbolName, ImportEntry]
   dependencies : Map[SymbolDependency, Unit]
+  locals : Map[SymbolName, Unit]
   // The keys in the order that I added them. A rollback removes the keys
   // after a mark. Nothing changes or removes an entry in another way.
   import_log : Array[SymbolName]
   dependency_log : Array[SymbolDependency]
+  local_log : Array[SymbolName]
 }
 
 ///|
@@ -25,6 +30,7 @@ priv struct ImportTracker {
 priv struct TrackerMark {
   imports : Int32
   dependencies : Int32
+  locals : Int32
 }
 
 ///|
@@ -32,8 +38,10 @@ fn ImportTracker::new() -> ImportTracker {
   {
     imports: Map([]),
     dependencies: Map([]),
+    locals: Map([]),
     import_log: [],
     dependency_log: [],
+    local_log: [],
   }
 }
 
@@ -42,15 +50,22 @@ fn ImportTracker::mark(self : ImportTracker) -> TrackerMark {
   {
     imports: self.import_log.length(),
     dependencies: self.dependency_log.length(),
+    locals: self.local_log.length(),
   }
 }
 
 ///|
-/// Remove the imports and the dependencies that I added after the mark.
+/// Remove the imports, the dependencies and the local names that I added after
+/// the mark.
 fn ImportTracker::rollback(self : ImportTracker, mark : TrackerMark) -> Unit {
   while self.import_log.length() > mark.imports {
     if self.import_log.pop() is Some(key) {
       self.imports.remove(key)
+    }
+  }
+  while self.local_log.length() > mark.locals {
+    if self.local_log.pop() is Some(name) {
+      self.locals.remove(name)
     }
   }
   while self.dependency_log.length() > mark.dependencies {
@@ -72,6 +87,16 @@ fn ImportTracker::add_dependency(
 }
 
 ///|
+/// Record a name that the file uses for one of its own symbols. A name that the
+/// file imported before keeps its import.
+fn ImportTracker::add_local(self : ImportTracker, name : SymbolName) -> Unit {
+  if !self.locals.contains(name) {
+    self.locals[name] = ()
+    self.local_log.push(name)
+  }
+}
+
+///|
 /// Record the use of one symbol, without its references. It gives the text to
 /// write for the symbol.
 fn ImportTracker::use_one(
@@ -83,12 +108,19 @@ fn ImportTracker::use_one(
   for dependency in symbol.dependencies {
     self.add_dependency(dependency)
   }
-  if symbol.ns.is_root() || symbol.ns == ns {
+  if symbol.ns.is_root() {
+    return symbol.name.to_string()
+  }
+  if symbol.ns == ns {
+    self.add_local(symbol.name)
     return symbol.name.to_string()
   }
   let key = match local_name {
     Some(local_name) => local_name
     None => symbol.name
+  }
+  if self.locals.contains(key) {
+    return symbol.full_name()
   }
   match self.imports.get(key) {
     Some(existing) =>
@@ -165,6 +197,15 @@ pub fn CodeWriter::add_dependency(
   dependency : SymbolDependency,
 ) -> Unit {
   self.tracker.add_dependency(dependency)
+}
+
+///|
+/// Reserve a name for a symbol that the file defines, such as the shape that the
+/// file declares. Later, `$T` writes a foreign symbol with this name by its full
+/// name and does not import it. A reserved name does not change an import that
+/// the file made before.
+pub fn CodeWriter::reserve_name(self : CodeWriter, name : SymbolName) -> Unit {
+  self.tracker.add_local(name)
 }
 
 ///|

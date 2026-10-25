@@ -170,3 +170,24 @@ test "the conflict check compares the requested namespaces" {
   }
   assert_eq(delegator.flush()["a/one.txt"], "x\n\ny\n")
 }
+
+///|
+test "a shape writer reserves the name of its shape" {
+  let model = delegator_model()
+  let delegator = @codegen.WriterDelegator::new(delegator_provider())
+  let order = model.get("example#Order").unwrap()
+  let foreign = @codegen.Symbol::new(
+    @codegen.SymbolName::parse("Order").unwrap(),
+    ns=delegator_ns("other"),
+  )
+  let imports : Ref[Array[@codegen.ImportEntry]] = Ref([])
+  delegator.use_shape_writer(order, w => {
+    w.write("structure Order { previous: $T }", args=[@codegen.Sym(foreign)])
+    imports.val = w.imports()
+  })
+  assert_eq(imports.val, [])
+  assert_eq(
+    delegator.flush()["gen/Order.txt"],
+    "structure Order { previous: other.Order }\n",
+  )
+}

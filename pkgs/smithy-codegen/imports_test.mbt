@@ -181,3 +181,42 @@ test "a failed nested body leaves the parent tracker unchanged" {
   assert_eq(w.imports(), [imp_entry("d", "Kept")])
   assert_eq(w.dependencies(), [])
 }
+
+///|
+test "a name of the writer namespace blocks a foreign import of that name" {
+  let w = @codegen.CodeWriter::new(ns=imp_ns("a"))
+  w.write("$T $T", args=[
+    @codegen.Sym(imp_symbol("a", "Item")),
+    @codegen.Sym(imp_symbol("b", "Item")),
+  ])
+  assert_eq(w.to_string(), "Item b.Item\n")
+  assert_eq(w.imports(), [])
+}
+
+///|
+test "a reserved name blocks a foreign import of that name" {
+  let w = @codegen.CodeWriter::new(ns=imp_ns("a"))
+  w.reserve_name(imp_name("Item"))
+  w.write("$T $T", args=[
+    @codegen.Sym(imp_symbol("b", "Item")),
+    @codegen.Sym(imp_symbol("c", "Other")),
+  ])
+  assert_eq(w.to_string(), "b.Item Other\n")
+  assert_eq(w.imports(), [imp_entry("c", "Other")])
+}
+
+///|
+test "a failed template also removes the local names it recorded" {
+  let w = @codegen.CodeWriter::new(ns=imp_ns("a"))
+  try
+    w.write("$T $missing:L", args=[@codegen.Sym(imp_symbol("a", "Item"))])
+  catch {
+    @codegen.InvalidTemplate(_) => ()
+    e => fail("unexpected error: \{e.message()}")
+  } noraise {
+    _ => fail("expected InvalidTemplate")
+  }
+  w.write("$T", args=[@codegen.Sym(imp_symbol("b", "Item"))])
+  assert_eq(w.to_string(), "Item\n")
+  assert_eq(w.imports(), [imp_entry("b", "Item")])
+}
