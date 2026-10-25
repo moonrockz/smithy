@@ -151,13 +151,15 @@ fn CodeWriter::emit(self : CodeWriter, text : String, end_line : Bool) -> Unit {
 
 ///|
 /// Write a template and end the line. The template can have several lines.
+/// When the template ends with a block tag that is alone on its line, the
+/// rendered text already ends its line, so I add no newline.
 pub fn CodeWriter::write(
   self : CodeWriter,
   template : String,
   args~ : Array[TemplateValue] = [],
 ) -> Unit raise CodegenError {
-  let text = self.render(template, args)
-  self.emit(text, true)
+  let (text, ended) = self.render(template, args)
+  self.emit(text, !ended)
 }
 
 ///|
@@ -168,7 +170,7 @@ pub fn CodeWriter::write_inline(
   template : String,
   args~ : Array[TemplateValue] = [],
 ) -> Unit raise CodegenError {
-  let text = self.render(template, args)
+  let (text, _) = self.render(template, args)
   self.emit(text, false)
 }
 
@@ -477,12 +479,14 @@ fn resolve_arguments(
 ///|
 /// Render a template to text with the arguments and the current state. It
 /// writes nothing, so a bad template leaves the output as it was. It also
-/// leaves the imports and the dependencies as they were when it raises.
+/// leaves the imports and the dependencies as they were when it raises. The
+/// second value is true when the text already ends its line: the template ends
+/// with a standalone block tag and the text is empty or ends with a newline.
 fn CodeWriter::render(
   self : CodeWriter,
   template : String,
   args : Array[TemplateValue],
-) -> String raise CodegenError {
+) -> (String, Bool) raise CodegenError {
   let mark = self.tracker.mark()
   errdefer self.tracker.rollback(mark)
   self.render_tokens(template, args)
@@ -495,7 +499,7 @@ fn CodeWriter::render_tokens(
   self : CodeWriter,
   template : String,
   args : Array[TemplateValue],
-) -> String raise CodegenError {
+) -> (String, Bool) raise CodegenError {
   let parsed = parse_template(template)
   let used = Array::make(args.length(), false)
   let arg_index = resolve_arguments(parsed, template, args, used)
@@ -636,5 +640,6 @@ fn CodeWriter::render_tokens(
       template,
     )
   }
-  out.to_string()
+  let text = out.to_string()
+  (text, parsed.ends_line && (text.is_empty() || text.has_suffix("\n")))
 }

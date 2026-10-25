@@ -36,11 +36,14 @@ priv enum Token {
 ///|
 /// A parsed template: its tokens and its length in characters. For an opening
 /// or closing tag, `matching` has the index of the other tag of the block. For
-/// all other tokens it has -1.
+/// all other tokens it has -1. `ends_line` is true when the template ends with
+/// a block tag that is alone on its line and has no newline after it. The
+/// rendered text then already ends its line.
 priv struct ParsedTemplate {
   tokens : Array[Token]
   matching : Array[Int32]
   length : Int32
+  ends_line : Bool
 }
 
 ///|
@@ -160,6 +163,7 @@ fn parse_template(template : String) -> ParsedTemplate raise CodegenError {
   // The indexes of the opening tags that are not closed yet.
   let open_tags : Array[Int32] = []
   let literal = StringBuilder()
+  let mut ends_line = false
   fn push_token(token : Token) -> Unit {
     if !literal.is_empty() {
       tokens.push(Literal(literal.to_string()))
@@ -211,6 +215,7 @@ fn parse_template(template : String) -> ParsedTemplate raise CodegenError {
         Some(line_end) => {
           trim_literal_end(literal, " \t")
           pos = line_end
+          ends_line = line_end >= length && chars[line_end - 1] != '\n'
         }
         None => pos = block.end
       }
@@ -294,7 +299,7 @@ fn parse_template(template : String) -> ParsedTemplate raise CodegenError {
     tokens.push(Literal(literal.to_string()))
     matching.push(-1)
   }
-  { tokens, matching, length, }
+  { tokens, matching, length, ends_line, }
 }
 
 ///|

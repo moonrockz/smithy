@@ -260,3 +260,48 @@ test "a custom formatter can replace a built-in one" {
   w.write("$L", args=[@codegen.List([])])
   assert_eq(w.to_string(), "custom\n")
 }
+
+///|
+test "a template that ends in a standalone tag does not add a blank line" {
+  let w = @codegen.CodeWriter::new()
+  w.put_context("on", @codegen.Bool(true))
+  w.write("a\n${?on}\nb\n${/on}")
+  w.write("c")
+  assert_eq(w.to_string(), "a\nb\nc\n")
+}
+
+///|
+test "a skipped block at the end of a template adds no blank line" {
+  let w = @codegen.CodeWriter::new()
+  w.put_context("on", @codegen.Bool(false))
+  w.write("a\n${?on}\nb\n${/on}")
+  w.write("c")
+  assert_eq(w.to_string(), "a\nc\n")
+}
+
+///|
+test "a template that is only a skipped standalone block writes nothing" {
+  let w = @codegen.CodeWriter::new()
+  w.put_context("on", @codegen.Bool(false))
+  w.write("${?on}\nb\n${/on}")
+  w.write("c")
+  assert_eq(w.to_string(), "c\n")
+}
+
+///|
+test "a newline after the last standalone tag still ends with a blank line" {
+  let w = @codegen.CodeWriter::new()
+  w.put_context("on", @codegen.Bool(true))
+  w.write("a\n${?on}\nb\n${/on}\n")
+  w.write("c")
+  assert_eq(w.to_string(), "a\nb\n\nc\n")
+}
+
+///|
+test "write_inline keeps the text of a template that ends in a standalone tag" {
+  let w = @codegen.CodeWriter::new()
+  w.put_context("on", @codegen.Bool(true))
+  w.write_inline("a\n${?on}\nb\n${/on}")
+  w.write("c")
+  assert_eq(w.to_string(), "a\nb\nc\n")
+}
