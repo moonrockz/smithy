@@ -131,7 +131,9 @@ test "prelude, member and simple shapes are skipped" {
     #|list Tags { member: String }
     #|map Scores { key: String, value: Integer }
     #|enum Kind { A, B }
-    #|intEnum Level { LOW = 1 }
+    #|intEnum Level {
+    #|    LOW = 1
+    #|}
     #|union Choice { text: String, number: Integer }
     #|resource Thing { identifiers: { id: String } }
   let log = []

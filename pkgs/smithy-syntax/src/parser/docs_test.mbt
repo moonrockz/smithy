@@ -16,6 +16,29 @@ fn dcodes(body : String) -> Array[String] {
 }
 
 ///|
+/// smithy-2qe.41.19. Java 30bdab5 reports Model|ERROR:
+/// "Expected IDENTIFIER but found RBRACE('}')".
+test "documentation before an enum closing brace requires another member" {
+  for
+    body in [
+      "enum E {\n    A\n    /// orphan\n}\n", "enum E {\n    A = \"a\"\n    /// orphan\n}\n",
+      "intEnum E {\n    A = 1\n    /// orphan\n}\n", "enum E {\n    /// orphan\n}\n",
+    ] {
+    let r = dmodel(body)
+    assert_eq(r.diagnostics.map(d => d.code), ["SM-PARSE-001"])
+    assert_true(r.has_errors())
+    assert_eq(
+      r.cst.to_source(),
+      "$version: \"2\"\nnamespace com.foo\n\n" + body,
+    )
+  }
+  assert_eq(dcodes("enum E { A\n // ordinary\n}\n"), [])
+  assert_eq(dcodes("structure S { a: String\n /// orphan\n}\n"), [
+    "SM-PARSE-009",
+  ])
+}
+
+///|
 test "doc comments attach to shapes, members, enum members and inline shapes" {
   let r = dmodel(
     (
@@ -171,7 +194,7 @@ test "documentation comments after member traits, before a brace or on a stateme
 ///|
 test "documentation comments that Smithy reads or drops are not warnings" {
   @expect.expect_all(e => {
-    // On the line before a member: Smithy reads it, the AST keeps it as a comment.
+    // Java 30bdab5 has no event and documents S$b with "x".
     let r = dmodel(
       (
         #|structure S {
@@ -185,9 +208,8 @@ test "documentation comments that Smithy reads or drops are not warnings" {
     guard r.ast is Some(f) && f.shapes()[0].shape is Aggregate(members~, ..) else {
       fail("no members")
     }
-    // Smithy documents `S$b` with `x` here (smithy-2qe.41.20). Change this
-    // expectation when the AST follows it.
-    e.expect(members[1].docs.length()).to_equal(0)
+    // smithy-2qe.41.20: the trailing comment documents the next member.
+    e.expect(members[1].docs.map(d => d.text)).to_equal([" x"])
     // Before `:=`.
     e
     .expect(
@@ -359,7 +381,9 @@ test "version 1 files reject 2.0 syntax with the reference's facts" {
     .expect(
       v1(
         (
-          #|structure S { a: String = "x" }
+          #|structure S {
+          #|    a: String = "x"
+          #|}
           #|
         ),
       ),

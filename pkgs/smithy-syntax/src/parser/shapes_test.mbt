@@ -163,7 +163,9 @@ test "enum and intEnum members with values and traits" {
       #|  RED = "red"
       #|  BLUE
       #|}
-      #|intEnum N { ONE = 1 }
+      #|intEnum N {
+      #|    ONE = 1
+      #|}
       #|
     ),
   )
@@ -457,6 +459,47 @@ test "a member's value assignment still needs a line break before the next membe
       ),
     ),
   ).to_equal(["SM-PARSE-003"])
+}
+
+///|
+/// smithy-2qe.41.26. Java 30bdab5 reports Model|ERROR for each case:
+/// "Expected a line break, but found RBRACE('}')".
+test "a value assignment needs a line break before the closing brace" {
+  for
+    body in [
+      "structure S { flag: Boolean = true }\n", "enum E { A = \"a\" }\n", "intEnum E { A = 1 }\n",
+    ] {
+    let r = model(body)
+    assert_eq(r.diagnostics.map(d => d.code), ["SM-PARSE-003"])
+    assert_true(r.has_errors())
+    assert_eq(
+      r.cst.to_source(),
+      "$version: \"2\"\nnamespace com.foo\n\n" + body,
+    )
+  }
+}
+
+///|
+/// smithy-2qe.41.18. Java 30bdab5 reports Model|ERROR:
+/// "Expected COLON(':') but found COMMENT" or "DOC_COMMENT" before `:`,
+/// and "Expected IDENTIFIER but found COMMENT" or "DOC_COMMENT" after `:`.
+test "member names colons and targets allow only spaces between them" {
+  for gap in ["\n", " // ordinary\n", " /// docs\n"] {
+    for
+      body in [
+        "structure S { a" + gap + ": String\n}\n",
+        "structure S { a:" + gap + "String\n}\n",
+      ] {
+      let r = model(body)
+      assert_eq(r.errors().map(d => d.code), ["SM-PARSE-001"])
+      assert_true(r.has_errors())
+      assert_eq(
+        r.cst.to_source(),
+        "$version: \"2\"\nnamespace com.foo\n\n" + body,
+      )
+    }
+  }
+  assert_eq(scodes("structure S { a \t: \tString\n}\n"), [])
 }
 
 ///|

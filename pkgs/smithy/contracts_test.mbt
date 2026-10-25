@@ -87,7 +87,7 @@ test "conditions are accepted on every data shape kind and on members" {
       "blob S", "boolean S", "string S", "byte S", "short S", "integer S", "long S",
       "float S", "double S", "bigInteger S", "bigDecimal S", "timestamp S", "document S",
       "list S { member: String }", "map S { key: String, value: String }", "structure S {}",
-      "union S { value: String }", "enum S { A }", "intEnum S { A = 1 }",
+      "union S { value: String }", "enum S { A }", "intEnum S { A = 1\n}",
     ] {
     loaded(
       @smithy.Loader::new().add_idl(
@@ -110,7 +110,9 @@ test "conditions are accepted on every data shape kind and on members" {
         #|list L { @conditions member: String }
         #|map M { @conditions key: String, @conditions value: String }
         #|enum E { @conditions A }
-        #|intEnum I { @conditions A = 1 }
+        #|intEnum I {
+        #|    @conditions A = 1
+        #|}
       ),
     ),
   )
@@ -288,7 +290,9 @@ test "conditions inherit through mixins and survive JSON AST export" {
         #|structure S with [Base] {}
         #|@conditions(Positive: {expression: "@ > `0`", documentation: "Positive value."})
         #|integer N
-        #|structure WithDefault { n: N = 1 }
+        #|structure WithDefault {
+        #|    n: N = 1
+        #|}
       ),
     ),
   )

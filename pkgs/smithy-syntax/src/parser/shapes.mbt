@@ -333,6 +333,7 @@ fn[T] Parser::parse_block_items(
   parse_item : () -> Result[T, ParseError],
   needs_br? : (T) -> Bool,
   name_of? : (T) -> @ast.Node[String],
+  enum_members~ : Bool = false,
 ) -> Array[T] raise ParseError {
   let items : Array[T] = []
   let seen_names : Array[String] = []
@@ -370,18 +371,12 @@ fn[T] Parser::parse_block_items(
           None => ()
         }
         items.push(m)
-        if !self.at_kind(RBrace) {
-          // `ValueAssignment` ends with a true `BR`, stricter than the
-          // `[WS]` that otherwise separates members (`FOO = 1 BAR = 2` on
-          // one line is invalid, but `FOO BAR` is fine).
-          if strict {
-            self.expect_br()
-          } else {
-            self.expect_separator()
-          }
-        } else if strict {
-          // Smithy reads the `BR` of a value assignment before `}` too.
-          self.end_line()
+        // `ValueAssignment` requires `BR`, including before `}`.
+        // Bare members need only whitespace between them.
+        if strict {
+          self.expect_br(after="a value assignment")
+        } else if !self.at_kind(RBrace) {
+          self.expect_separator()
         }
       }
       Err(e) => {
@@ -399,6 +394,21 @@ fn[T] Parser::parse_block_items(
         }
       }
     }
+  }
+  // In an enum, a doc comment starts another member even before `}`.
+  // Structures instead report a dangling doc comment as a warning.
+  if enum_members &&
+    self.doc_head < self.doc_comments.length() &&
+    self.doc_comments[self.doc_head].comment.span.start < self.here().start {
+    self.report(
+      "SM-PARSE-001",
+      Error,
+      "UNEXPECTED TOKEN",
+      "I was expecting an enum member name but found \{self.found()}",
+      self.here(),
+      hint="Add the enum member after its documentation, or use `//` for an ordinary comment.",
+    )
+    ignore(self.take_docs_before(self.here().start))
   }
   // Doc comments before `}` document no member.
   self.stray_docs_before(self.here().start)
@@ -486,6 +496,7 @@ fn Parser::parse_member(self : Parser) -> @ast.Member raise ParseError {
       )
     }
     let n = self.expect_identifier("a member name")
+    self.expect_sp_after("`:` after the member name `\{n.value}`")
     guard self.at_kind(Colon) else {
       self.fail(
         "SM-PARSE-001",
@@ -496,7 +507,18 @@ fn Parser::parse_member(self : Parser) -> @ast.Member raise ParseError {
       )
     }
     ignore(self.advance())
+    let gap_error = try {
+      self.expect_sp_after("the member target")
+      None
+    } catch {
+      e => Some(e)
+    }
     let target = self.parse_shape_id()
+    // Consume the target before recovery, so its name is not retried as
+    // a new member after a forbidden comment or newline after `:`.
+    if gap_error is Some(e) {
+      raise e
+    }
     (n, Explicit(target))
   }
   let mut end = match target {
@@ -548,6 +570,7 @@ fn Parser::parse_enum_members(
     },
     needs_br=m => m.value is Some(_),
     name_of=m => m.name,
+    enum_members=true,
   )
   ignore(self.expect_kind(RBrace, "`}`"))
   self.leave()

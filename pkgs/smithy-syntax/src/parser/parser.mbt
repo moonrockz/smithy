@@ -7,8 +7,8 @@ priv struct Context {
 
 ///|
 /// A `///` comment in source order. A trailing one follows a token on the
-/// same line: Smithy reads it like any other, but the AST keeps it as an
-/// ordinary comment.
+/// same line. A statement or value `BR` clears it. In a member block it
+/// can document the next member or inline shape.
 priv struct SourceDoc {
   comment : @ast.DocComment
   trailing : Bool
@@ -68,8 +68,7 @@ fn Parser::new(stream : @scanner.TokenStream) -> Parser {
   gather(stream.trivia)
   for token in stream.tokens {
     gather(token.trivia_before)
-    // A comment after a token on the same line is an ordinary comment in
-    // the AST, even when it starts with three slashes.
+    // Retain the line position for the statement/value `BR` check.
     let mut next_line = false
     for trivia in token.trivia_after {
       if trivia is Comment(c) && c.kind == Doc {
@@ -399,15 +398,19 @@ fn Parser::expect_sp_present(
 ///|
 /// The grammar's `BR`: after a statement there must be a line break or a
 /// comment before the next token (or the end of the file).
-fn Parser::expect_br(self : Parser) -> Unit raise ParseError {
+fn Parser::expect_br(self : Parser, after? : String) -> Unit raise ParseError {
   self.end_line()
   guard self.pos > 0 else { return }
   guard self.peek() is Some(next) else { return }
   if !self.has_br_before() {
+    let where_ = match after {
+      Some(construct) => "after \{construct}"
+      None => "here"
+    }
     self.fail(
       "SM-PARSE-003",
       "MISSING LINE BREAK",
-      "I was expecting a line break here but found \{self.found()}",
+      "I was expecting a line break \{where_} but found \{self.found()}",
       next.span,
       notes=[
         "Each statement must end with a line break (or a comment, which ends at a line break). Commas are whitespace in Smithy, so a comma does not separate statements.",
@@ -455,7 +458,8 @@ fn Parser::take_docs_before(
 /// The documentation of the construct that starts at `offset`: the doc
 /// comments right before it. When there are some, Smithy also reads the
 /// stray doc comments into that documentation, so they are not reported.
-/// Trailing comments stay ordinary comments in the AST.
+/// A trailing comment also documents a member or inline shape when no
+/// statement or value `BR` has cleared it.
 fn Parser::claim_docs_before(
   self : Parser,
   offset : @span.Offset,
@@ -464,7 +468,7 @@ fn Parser::claim_docs_before(
   if docs.length() > 0 {
     self.stray_docs.clear()
   }
-  docs.filter(d => !d.trailing).map(d => d.comment)
+  docs.map(d => d.comment)
 }
 
 ///|
