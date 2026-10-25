@@ -6,7 +6,7 @@ This lesson checks a type expression of IR version 4 in `type.json` against the 
 
 Each node of this value has the expanded spelling. In this spelling, a node is a wrapper object with an object payload. The payload can start with `attributes`, and then it has the members of the node ([decision 0005](https://github.com/finos/morphir/blob/ab8d5c9198c0f1ac8a3cabfd11b9ab59a468c409/kb/bundles/morphir/morphir-ir/decisions/0005-attributes-are-an-optional-first-member-of-every-node-payload.md?plain=1#L13-L16)). The value check reads a union as an object with one member, and a structure as an object. So the value passes.
 
-The value check also checks the rules of the model. Make these changes in `type.json` one at a time:
+Make these changes in `type.json` one at a time:
 
 - Change the field name `price` to `Price`. You get a `Pattern` error, because the model makes each field name a `Name`.
 - Change the value to `{"Variable": {"name": "a"}, "Unit": {}}`. You get a `UnionMember` error. A node has exactly one member.
@@ -17,4 +17,4 @@ Also try the type of `add`, `number -> number -> number`: a `Function` whose `re
 
 The Morphir example file does not use the expanded spelling. Morphir writers use the compact spelling, unless you select the expanded output ([JSON profile](https://github.com/finos/morphir/blob/ab8d5c9198c0f1ac8a3cabfd11b9ab59a468c409/docs/spec/ir/schemas/v4/json-profile.md?plain=1#L31)). [Lesson 39](../39-morphir-limits/lesson.md) checks the compact spelling.
 
-The tour also checks this model against the Morphir examples of names and types. They come from the schema, the example files, the compatibility kit and the naming corpus. Each expanded example passes. Each compact example fails as lesson 39 shows. Each example that Morphir rejects or accepts with a warning also fails.
+The tour also checks this model against the name and type examples of the Morphir sources. Each expanded example passes, and each other example fails.
