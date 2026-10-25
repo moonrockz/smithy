@@ -14,11 +14,61 @@ pub(all) struct ImportEntry {
 priv struct ImportTracker {
   imports : Map[SymbolName, ImportEntry]
   dependencies : Map[SymbolDependency, Unit]
+  // The keys in the order that I added them. A rollback removes the keys
+  // after a mark. Nothing changes or removes an entry in another way.
+  import_log : Array[SymbolName]
+  dependency_log : Array[SymbolDependency]
+}
+
+///|
+/// A place in the history of the tracker, to which `rollback` can return.
+priv struct TrackerMark {
+  imports : Int32
+  dependencies : Int32
 }
 
 ///|
 fn ImportTracker::new() -> ImportTracker {
-  { imports: Map([]), dependencies: Map([]), }
+  {
+    imports: Map([]),
+    dependencies: Map([]),
+    import_log: [],
+    dependency_log: [],
+  }
+}
+
+///|
+fn ImportTracker::mark(self : ImportTracker) -> TrackerMark {
+  {
+    imports: self.import_log.length(),
+    dependencies: self.dependency_log.length(),
+  }
+}
+
+///|
+/// Remove the imports and the dependencies that I added after the mark.
+fn ImportTracker::rollback(self : ImportTracker, mark : TrackerMark) -> Unit {
+  while self.import_log.length() > mark.imports {
+    if self.import_log.pop() is Some(key) {
+      self.imports.remove(key)
+    }
+  }
+  while self.dependency_log.length() > mark.dependencies {
+    if self.dependency_log.pop() is Some(dependency) {
+      self.dependencies.remove(dependency)
+    }
+  }
+}
+
+///|
+fn ImportTracker::add_dependency(
+  self : ImportTracker,
+  dependency : SymbolDependency,
+) -> Unit {
+  if !self.dependencies.contains(dependency) {
+    self.dependencies[dependency] = ()
+    self.dependency_log.push(dependency)
+  }
 }
 
 ///|
@@ -31,7 +81,7 @@ fn ImportTracker::use_one(
   alias : SymbolName?,
 ) -> String {
   for dependency in symbol.dependencies {
-    self.dependencies[dependency] = ()
+    self.add_dependency(dependency)
   }
   if symbol.namespace.is_root() || symbol.namespace == namespace {
     return symbol.name.to_string()
@@ -55,6 +105,7 @@ fn ImportTracker::use_one(
         name: symbol.name,
         alias,
       }
+      self.import_log.push(key)
       key.to_string()
     }
   }
@@ -117,7 +168,7 @@ pub fn CodeWriter::add_dependency(
   self : CodeWriter,
   dependency : SymbolDependency,
 ) -> Unit {
-  self.tracker.dependencies[dependency] = ()
+  self.tracker.add_dependency(dependency)
 }
 
 ///|

@@ -443,9 +443,22 @@ fn resolve_arguments(
 
 ///|
 /// Render a template to text with the arguments and the current state. It
-/// writes nothing, so a bad template leaves the output as it was. It walks the
-/// tokens with an index and a stack of the loops that run; it does not recurse.
+/// writes nothing, so a bad template leaves the output as it was. It also
+/// leaves the imports and the dependencies as they were when it raises.
 fn CodeWriter::render(
+  self : CodeWriter,
+  template : String,
+  args : Array[TemplateValue],
+) -> String raise CodegenError {
+  let mark = self.tracker.mark()
+  errdefer self.tracker.rollback(mark)
+  self.render_tokens(template, args)
+}
+
+///|
+/// The rendering itself. It walks the tokens with an index and a stack of the
+/// loops that run; it does not recurse.
+fn CodeWriter::render_tokens(
   self : CodeWriter,
   template : String,
   args : Array[TemplateValue],

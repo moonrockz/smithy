@@ -131,3 +131,50 @@ test "a cycle of references does not loop" {
   assert_eq(w.to_string(), "First\n")
   assert_eq(w.imports(), [imp_entry("b", "First"), imp_entry("c", "Second")])
 }
+
+///|
+test "a failed template leaves the imports and dependencies unchanged" {
+  let dep = imp_dep("pkg-a", "1.0.0")
+  let item = @codegen.Sym(imp_symbol("b", "Item").with_dependency(dep))
+  let w = @codegen.CodeWriter::new(namespace=imp_ns("a"))
+  // The first template fails when I parse it. The second one fails while I
+  // render it, after the `$T` recorded the import.
+  for template in ["$T $", "$T $missing:L"] {
+    try w.write(template, args=[item]) catch {
+      @codegen.InvalidTemplate(_) => ()
+      e => fail("unexpected error: \{e.message()}")
+    } noraise {
+      _ => fail("expected an InvalidTemplate error")
+    }
+    assert_eq(w.imports(), [])
+    assert_eq(w.dependencies(), [])
+  }
+  w.write("$T", args=[@codegen.Sym(imp_symbol("c", "Item"))])
+  assert_eq(w.to_string(), "Item\n")
+  assert_eq(w.imports(), [imp_entry("c", "Item")])
+}
+
+///|
+test "a failed nested body leaves the parent tracker unchanged" {
+  let dep = imp_dep("pkg-a", "1.0.0")
+  let w = @codegen.CodeWriter::new(namespace=imp_ns("a"))
+  w.write("$T", args=[@codegen.Sym(imp_symbol("d", "Kept"))])
+  try
+    w.write("$C", args=[
+      @codegen.Call(child => {
+        child.write("$T", args=[
+          @codegen.Sym(imp_symbol("b", "Item").with_dependency(dep)),
+        ])
+        raise @codegen.StateError("stop")
+      }),
+    ])
+  catch {
+    @codegen.StateError(_) => ()
+    e => fail("unexpected error: \{e.message()}")
+  } noraise {
+    _ => fail("expected a StateError error")
+  }
+  assert_eq(w.to_string(), "Kept\n")
+  assert_eq(w.imports(), [imp_entry("d", "Kept")])
+  assert_eq(w.dependencies(), [])
+}
