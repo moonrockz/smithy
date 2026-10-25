@@ -167,9 +167,9 @@ fn findings_panel(m : Model) -> Array[Html] {
 
 ///|
 fn output_notice(m : Model) -> Array[Html] {
-  match (m.output, m.page.output) {
-    (NoOutput, Some(output)) =>
-      [@html.p(class="tour-note", "I am making the \{output_label(output)}.")]
+  match (m.output, output_label(m.page.engine, m.page.output)) {
+    (NoOutput, Some(label)) =>
+      [@html.p(class="tour-note", "I am making the \{label}.")]
     (NotShown(reason), _) => [@html.p(class="tour-note tour-err", reason)]
     _ => []
   }
@@ -348,11 +348,11 @@ fn output_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
       [@html.span(class="tour-count", " \{items.length()}")]
     _ => []
   }
-  let output_tab = match m.page.output {
-    Some(output) =>
+  let output_tab = match output_label(m.page.engine, m.page.output) {
+    Some(label) =>
       [
         tab(m.pane == OutputPane, emit(SelectPane(OutputPane)), [
-          @html.text(output_label(output)),
+          @html.text(label),
         ]),
       ]
     None => []
@@ -371,7 +371,7 @@ fn output_pane(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   } else {
     []
   }
-  let on_output = m.page.output is Some(_) && m.pane == OutputPane
+  let on_output = has_output_pane(m.page) && m.pane == OutputPane
   @html.section(
     class="tour-pane tour-out",
     [

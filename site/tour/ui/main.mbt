@@ -82,8 +82,10 @@ fn reply_msg(text : String, newest : Int32) -> @lesson.Msg {
         seq~,
         answer=Progress(entries~, findings~, checked~, done~, summary~),
       )
-    // The page sends no value check, message check or diff request.
-    DataChecked(..) | Diffed(..) => mismatch
+    DataChecked(seq~, valid~, findings~) =>
+      Answered(seq~, answer=DataChecked(valid~, findings~))
+    // The page sends no message check or diff request.
+    Diffed(..) => mismatch
   }
 }
 
@@ -153,6 +155,8 @@ fn request_of(
       Some((seq, @core.lesson_validate(seq~, files~, output=page.output)))
     SendTransform(seq~, files~, output~, selector~) =>
       Some((seq, TransformFiles(seq~, files~, output~, selector~)))
+    SendCheckValue(seq~, files~, shape~, value~, options~) =>
+      Some((seq, CheckValue(seq~, files~, shape~, value~, options~)))
     SendTranscriptStart(seq~, files~, protocol~, text~) =>
       Some(
         (
@@ -178,6 +182,7 @@ fn Runtime::run(self : Runtime, effect : @lesson.Effect) -> Unit {
   match effect {
     SendValidate(..)
     | SendTransform(..)
+    | SendCheckValue(..)
     | SendTranscriptStart(..)
     | SendTranscriptStep(..) =>
       match request_of(self.page, effect) {

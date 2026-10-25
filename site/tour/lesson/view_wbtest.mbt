@@ -106,10 +106,18 @@ async test "the view marks the selected tabs" {
 
 ///|
 test "each output has a tab name" {
-  assert_eq(output_label(JsonAst), "JSON AST")
-  assert_eq(output_label(JsonSchema), "JSON Schema")
-  assert_eq(output_label(Selector), "Selector")
-  assert_eq(output_label(Idl), "IDL (flattened)")
+  assert_eq(output_label(Model, Some(JsonAst)), Some("JSON AST"))
+  assert_eq(output_label(Model, Some(JsonSchema)), Some("JSON Schema"))
+  assert_eq(output_label(Model, Some(Selector)), Some("Selector"))
+  assert_eq(output_label(Model, Some(Idl)), Some("IDL (flattened)"))
+  assert_eq(output_label(Model, None), None)
+  assert_eq(output_label(Diff, None), None)
+  let setup : @model.ValueSetup = {
+    file: "order.json",
+    shape: "example#Order",
+    options: @samples.ValueOptions::default(),
+  }
+  assert_eq(output_label(Value(setup), None), Some("Value findings"))
 }
 
 ///|
@@ -176,6 +184,22 @@ async test "both panes and both editor elements stay in the DOM in every layout"
     assert_true(html.contains("id=\"\{EDITOR_ID}\""))
     assert_true(html.contains("id=\"\{OUTPUT_ID}\""))
   }
+}
+
+///|
+#cfg(not(target="js"))
+async test "a value lesson has the tabs Findings and Value findings and no Open in playground link" {
+  let (m, _) = Model::start(value_page(), None)
+  let html = render(m)
+  assert_true(html.contains(">Findings"))
+  assert_true(html.contains(">Value findings</button>"))
+  assert_true(
+    button_tag(html, "Value findings").contains("aria-selected=\"true\""),
+  )
+  assert_false(html.contains("Open in playground"))
+  // The expand buttons stay.
+  assert_true(expand_tag(html, "Expand the output") != "")
+  assert_true(expand_tag(html, "Expand the editor") != "")
 }
 
 ///|
@@ -260,5 +284,5 @@ async test "a long message is cut with a mark and the model error text shows" {
   )
   let (m, _) = update(m, SelectPane(TranscriptPane))
   let html = render(m)
-  assert_true(html.contains("I did not check the transcript."))
+  assert_true(html.contains(not_run_text))
 }

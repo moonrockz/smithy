@@ -104,6 +104,8 @@ pub(all) enum Answer {
     done~ : Bool,
     summary~ : @core.SummaryView?
   )
+  /// The result of the value check.
+  DataChecked(valid~ : Bool, findings~ : Array[@core.DataFinding])
 } derive(Eq, Debug)
 
 ///|
@@ -162,6 +164,14 @@ pub(all) enum Effect {
   )
   /// Check the next `count` entries of the transcript that the Worker holds.
   SendTranscriptStep(seq~ : Int32, count~ : Int32)
+  /// Send the model files and the value to the Worker for a value check.
+  SendCheckValue(
+    seq~ : Int32,
+    files~ : Array[(String, String)],
+    shape~ : String,
+    value~ : String,
+    options~ : @samples.ValueOptions
+  )
   /// Send `msg` after `ms` milliseconds.
   Wait(ms~ : Int32, msg~ : Msg)
   /// Put this text, of the selected file `file`, in the model editor, in
@@ -199,6 +209,7 @@ pub(all) enum Kind {
   Validating
   Transforming
   Transcribing
+  CheckingValue
 } derive(Eq, Debug)
 
 ///|
@@ -369,6 +380,46 @@ fn model_pairs(model : Model) -> Array[(String, String)] {
 }
 
 ///|
+/// The tab of a lesson that comes after Findings: the name of its output, or
+/// "Value findings" for a value lesson. `None` when the lesson has no such tab.
+pub fn output_label(
+  engine : @model.Engine,
+  output : @samples.Output?,
+) -> String? {
+  match engine {
+    Model => output.map(output_name)
+    Value(_) => Some("Value findings")
+    Diff | Transcript(_) | Static => None
+  }
+}
+
+///|
+/// Whether the lesson has a tab after Findings.
+fn has_output_pane(page : @model.LessonPage) -> Bool {
+  output_label(page.engine, page.output) is Some(_)
+}
+
+///|
+/// The text of the value pane when the value is valid.
+pub let valid_text : String = "No findings. The value is valid."
+
+///|
+/// The text of the value and the transcript pane when the model has errors:
+/// their check needs a model without errors.
+pub let not_run_text : String = "The check did not run, because the model has errors. See the Findings tab."
+
+///|
+/// The text of the value pane: the CLI line of each finding, as for the value
+/// file `file`; `valid_text` when there is none.
+pub fn data_text(findings : Array[@core.DataFinding], file : String) -> String {
+  if findings.is_empty() {
+    valid_text
+  } else {
+    findings.map(f => f.cli_line(file~)).join("\n")
+  }
+}
+
+///|
 /// The language of the editor for a file: `.smithy` is IDL, `.json` is JSON,
 /// every other name (the query file) is plain text.
 fn editor_language(name : String) -> String {
@@ -420,7 +471,7 @@ pub fn Model::start(
     selected: 0,
     pane: if page.engine is Transcript(_) {
       TranscriptPane
-    } else if page.output is Some(_) {
+    } else if has_output_pane(page) {
       OutputPane
     } else {
       FindingsPane

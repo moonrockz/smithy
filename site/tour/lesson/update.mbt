@@ -159,8 +159,39 @@ fn Model::check_now(self : Model) -> (Model, Array[Effect]) {
 }
 
 ///|
+/// Send the value check. Call it only for a value lesson.
+fn Model::send_check_value(self : Model) -> (Model, Array[Effect]) {
+  guard self.page.engine is Value(setup) else { return (self, []) }
+  let seq = self.seq + 1
+  let value = match self.files.search_by(f => f.name == setup.file) {
+    Some(i) => self.files[i].text
+    None => ""
+  }
+  (
+    {
+      ..self,
+      seq,
+      sent_edits: self.edits,
+      waiting: true,
+      inflight: CheckingValue,
+      pending: false,
+    },
+    [
+      SendCheckValue(
+        seq~,
+        files=model_pairs(self),
+        shape=setup.shape,
+        value~,
+        options=setup.options,
+      ),
+      Wait(ms=TIMEOUT_MS, msg=TimedOut(seq)),
+    ],
+  )
+}
+
+///|
 /// The name of the output tab.
-pub fn output_label(output : @samples.Output) -> String {
+fn output_name(output : @samples.Output) -> String {
   match output {
     JsonAst => "JSON AST"
     Idl => "IDL (flattened)"
@@ -176,21 +207,11 @@ pub fn output_label(output : @samples.Output) -> String {
 /// Why the output did not run: the model has errors. ERROR and DANGER stop
 /// a transform in the playground core.
 fn errors_text(errors : Int32, output : @samples.Output) -> String {
-  let label = output_label(output)
+  let label = output_name(output)
   if errors == 1 {
     "The model has 1 error, so I did not make the \{label}. The Findings tab shows the error."
   } else {
     "The model has \{errors} errors, so I did not make the \{label}. The Findings tab shows the errors."
-  }
-}
-
-///|
-/// Why the transcript did not run: the model has errors.
-fn not_run_text(errors : Int32) -> String {
-  if errors == 1 {
-    "The model has 1 error, so I did not check the transcript. The Findings tab shows the error."
-  } else {
-    "The model has \{errors} errors, so I did not check the transcript. The Findings tab shows the errors."
   }
 }
 
@@ -206,6 +227,15 @@ fn is_error(d : @core.Diagnostic) -> Bool {
 /// empty output editor with no highlight.
 fn Model::not_shown(self : Model, reason : String) -> (Model, Array[Effect]) {
   ({ ..self, output: NotShown(reason), }, [ShowOutput(text="", highlight=[])])
+}
+
+///|
+/// The name of the value file of a value lesson, "" for another lesson.
+fn Model::value_file(self : Model) -> String {
+  match self.page.engine {
+    Value(setup) => setup.file
+    _ => ""
+  }
 }
 
 ///|
@@ -226,14 +256,22 @@ fn Model::checked(
   let m = { ..self, findings: Found(items), pane, }
   let marked = [Mark(items=m.selected_findings())]
   if m.transcript_setup() is Some(_) {
-    let errors = items.filter(is_error).length()
-    if errors == 0 {
+    if items.filter(is_error).length() == 0 {
       let (sent, more) = { ..m, waiting: false, retried: false, not_run: None, }.send_transcript_start()
       return (sent, [..marked, ..more])
     }
-    return { ..m, transcript: None, not_run: Some(not_run_text(errors)), }.next(
-      marked,
-    )
+    // The transcript check needs a model without errors. The pane says so.
+    return { ..m, transcript: None, not_run: Some(not_run_text), }.next(marked)
+  }
+  if self.page.engine is Value(_) {
+    return if items.filter(is_error).length() == 0 {
+      let (sent, more) = { ..m, waiting: false, retried: false, }.send_check_value()
+      (sent, [..marked, ..more])
+    } else {
+      // The value check needs a model without errors. The pane says so.
+      let shown = { ..m, output: NotShown(not_run_text), }
+      shown.next([..marked, ShowOutput(text=not_run_text, highlight=[])])
+    }
   }
   match self.page.output {
     None => m.next(marked)
@@ -315,7 +353,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         _ => (m, [])
       }
     SelectPane(pane) =>
-      if (pane == OutputPane && m.page.output is None) ||
+      if (pane == OutputPane && !has_output_pane(m.page)) ||
         (pane == TranscriptPane && m.transcript_setup() is None) {
         (m, [])
       } else {
@@ -331,7 +369,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         (Validating, Checked(items)) => m.checked(items)
         (Validating, NotConverted(reason)) => {
           let m = { ..m, findings: NotChecked(reason), }
-          if m.page.output is Some(_) {
+          if has_output_pane(m.page) {
             let (m, shown) = m.not_shown(reason)
             m.next([Mark(items=[]), ..shown])
           } else {
@@ -350,7 +388,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
             ShowOutput(text~, highlight~),
           ])
         }
-        (Transforming, NotConverted(reason)) => {
+        (Transforming | CheckingValue, NotConverted(reason)) => {
           let (m, shown) = m.not_shown(reason)
           m.next(shown)
         }
@@ -359,6 +397,17 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         // No rows of an older text stay.
         (Transcribing, NotConverted(reason)) =>
           { ..m, transcript: None, not_run: Some(reason), }.next([])
+        (CheckingValue, DataChecked(valid=_, findings~)) => {
+          let text = data_text(findings, m.value_file())
+          let before = match m.output {
+            Shown(text~, ..) => text
+            _ => ""
+          }
+          let highlight = changed_lines(before, text)
+          { ..m, output: Shown(text~, highlight~), }.next([
+            ShowOutput(text~, highlight~),
+          ])
+        }
         // An answer of the other kind cannot come; the request ends.
         _ => m.next([])
       }
@@ -375,21 +424,21 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         // The second try also took too long: a model that is too slow would
         // restart the Worker again and again.
         // A transform that stops keeps the findings of its files.
-        match (m.inflight, m.page.output) {
+        match (m.inflight, has_output_pane(m.page)) {
           (Transcribing, _) =>
             { ..m, transcript: None, not_run: Some(timeout_text), }.next([
               RestartWorker,
             ])
-          (Transforming, _) => {
+          (Transforming | CheckingValue, _) => {
             let (m, shown) = m.not_shown(timeout_text)
             m.next([RestartWorker, ..shown])
           }
-          (Validating, None) =>
+          (Validating, false) =>
             { ..m, findings: NotChecked(timeout_text), }.next([
               RestartWorker,
               Mark(items=[]),
             ])
-          (Validating, Some(_)) => {
+          (Validating, true) => {
             let (m, shown) = { ..m, findings: NotChecked(timeout_text), }.not_shown(
               timeout_text,
             )
@@ -403,6 +452,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
           // The new Worker holds no transcript: start it again. The answer
           // steps to the position of the reader.
           Transcribing => m.send_transcript_start()
+          CheckingValue => m.send_check_value()
         }
         ({ ..sent, retried: true, }, [RestartWorker, ..more])
       }

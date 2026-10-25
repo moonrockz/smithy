@@ -44,6 +44,20 @@ test "a transform answers with the text of its files" {
 }
 
 ///|
+test "a value check answers with its findings" {
+  let finding : @core.DataFinding = Stopped(
+    code="InvalidJson",
+    message="m",
+    source=None,
+    offset=None,
+  )
+  assert_eq(
+    reply_msg(reply(DataChecked(seq=5, valid=false, findings=[finding])), 9),
+    Answered(seq=5, answer=DataChecked(valid=false, findings=[finding])),
+  )
+}
+
+///|
 test "a blocked request answers with its reason" {
   assert_eq(
     reply_msg(reply(Blocked(seq=3, reason="no", kind=ModelErrors)), 3),

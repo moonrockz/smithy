@@ -868,6 +868,213 @@ test "Open in playground carries the query" {
 }
 
 ///|
+let order_text : String = "{\"quantity\": 3}\n"
+
+///|
+let order_options : @samples.ValueOptions = @samples.ValueOptions::default()
+
+///|
+/// A value lesson: the model and the value file `order.json`.
+fn value_page() -> @model.LessonPage {
+  let files : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: start_text, },
+    { name: "order.json", text: order_text, },
+  ]
+  {
+    ..page(),
+    engine: Value({
+      file: "order.json",
+      shape: "example#Order",
+      options: order_options,
+    }),
+    output: None,
+    files,
+    digest: @model.digest(files),
+    playground: None,
+  }
+}
+
+///|
+fn range_finding() -> @core.DataFinding {
+  Found(
+    code="Range",
+    severity="error",
+    path="/quantity",
+    shape="example#Order",
+    message="The value 0 is below the minimum 1.",
+    offset=None,
+  )
+}
+
+///|
+fn check_value_effect(seq : Int32, value : String) -> Effect {
+  SendCheckValue(
+    seq~,
+    files=[("model.smithy", start_text)],
+    shape="example#Order",
+    value~,
+    options=order_options,
+  )
+}
+
+///|
+/// A started value lesson whose model is clean: the value check is sent
+/// (request 2).
+fn value_checking() -> Model {
+  let (m, _) = Model::start(value_page(), None)
+  update(m, Answered(seq=1, answer=Checked([]))).0
+}
+
+///|
+test "a value lesson validates the model files only, then checks the value" {
+  let (m, effects) = Model::start(value_page(), None)
+  assert_eq(
+    effects[1],
+    SendValidate(seq=1, files=[("model.smithy", start_text)]),
+  )
+  let (m, effects) = update(m, Answered(seq=1, answer=Checked([])))
+  assert_eq(m.inflight, CheckingValue)
+  assert_eq(effects, [
+    Mark(items=[]),
+    check_value_effect(2, order_text),
+    Wait(ms=10000, msg=TimedOut(2)),
+  ])
+}
+
+///|
+test "a value lesson with model errors does not check the value and says why" {
+  let (m, _) = Model::start(value_page(), None)
+  let (m, effects) = update(
+    m,
+    Answered(seq=1, answer=Checked([error_in("model.smithy", 3)])),
+  )
+  assert_false(effects.any(e => e is SendCheckValue(..)))
+  assert_true(effects.contains(ShowOutput(text=not_run_text, highlight=[])))
+  assert_eq(m.output, NotShown(not_run_text))
+  assert_false(m.busy())
+}
+
+///|
+test "the value check uses the current text of the value file" {
+  let (m, _) = Model::start(value_page(), None)
+  let (m, effects) = run(m, [
+    SelectFile(1),
+    Edited("{\"quantity\": 0}"),
+    Debounced(1),
+    Answered(seq=1, answer=Checked([])),
+    Answered(seq=2, answer=Checked([])),
+  ])
+  assert_true(effects.contains(check_value_effect(3, "{\"quantity\": 0}")))
+  assert_eq(m.seq, 3)
+}
+
+///|
+test "the value answer shows the CLI lines and highlights the changed lines" {
+  let m = value_checking()
+  let first = [range_finding()]
+  let (m, effects) = update(
+    m,
+    Answered(seq=2, answer=DataChecked(valid=false, findings=first)),
+  )
+  assert_eq(effects, [
+    ShowOutput(text=data_text(first, "order.json"), highlight=[]),
+  ])
+  assert_eq(
+    data_text(first, "order.json"),
+    "order.json/quantity: error[Range] example#Order: The value 0 is below the minimum 1.",
+  )
+  // A second answer: the lines that differ from the first are highlighted.
+  let second = [range_finding(), range_finding()]
+  let m = run(m, [Edited("{\"quantity\": 9}"), Debounced(1)]).0
+  let m = update(m, Answered(seq=3, answer=Checked([]))).0
+  let (_, effects) = update(
+    m,
+    Answered(seq=4, answer=DataChecked(valid=false, findings=second)),
+  )
+  let text = data_text(second, "order.json")
+  assert_eq(effects, [
+    ShowOutput(
+      text~,
+      highlight=changed_lines(data_text(first, "order.json"), text),
+    ),
+  ])
+}
+
+///|
+test "a value that is not JSON shows its InvalidJson line, not the old lines" {
+  let m = value_checking()
+  let m = update(
+      m,
+      Answered(
+        seq=2,
+        answer=DataChecked(valid=false, findings=[range_finding()]),
+      ),
+    ).0
+  let m = run(m, [Edited("{\"quantity\": "), Debounced(1)]).0
+  let m = update(m, Answered(seq=3, answer=Checked([]))).0
+  let bad : Array[@core.DataFinding] = [
+    Stopped(
+      code="InvalidJson",
+      message="I expected a value, but found the end of the text.",
+      source=None,
+      offset=None,
+    ),
+  ]
+  let (_, effects) = update(
+    m,
+    Answered(seq=4, answer=DataChecked(valid=false, findings=bad)),
+  )
+  match effects[0] {
+    ShowOutput(text~, ..) => {
+      assert_eq(
+        text, "order.json: error[InvalidJson]: I expected a value, but found the end of the text.",
+      )
+      assert_false(text.contains("Range"))
+    }
+    _ => fail("expected ShowOutput")
+  }
+}
+
+///|
+test "a valid value shows valid_text" {
+  let (_, effects) = update(
+    value_checking(),
+    Answered(seq=2, answer=DataChecked(valid=true, findings=[])),
+  )
+  assert_eq(effects, [ShowOutput(text=valid_text, highlight=[])])
+  assert_eq(valid_text, "No findings. The value is valid.")
+}
+
+///|
+test "the value file opens in JSON mode" {
+  let (m, _) = Model::start(value_page(), None)
+  let (_, effects) = update(m, SelectFile(1))
+  assert_eq(
+    effects[0],
+    LoadEditor(text=order_text, file="order.json", fresh=false, language="json"),
+  )
+}
+
+///|
+test "a value lesson opens on the Value findings tab and keeps the expand control" {
+  let (m, _) = Model::start(value_page(), None)
+  assert_eq(m.pane, OutputPane)
+  let (m, effects) = update(m, ToggleExpand(OutputSide))
+  assert_eq(m.layout, OutputOnly)
+  assert_eq(effects, [Remeasure])
+}
+
+///|
+test "the second timeout of a value check shows the timeout text" {
+  let m = value_checking()
+  let (m, _) = update(m, TimedOut(2))
+  assert_true(m.retried)
+  let (m, effects) = update(m, TimedOut(3))
+  assert_eq(m.output, NotShown(timeout_text))
+  assert_true(effects.contains(RestartWorker))
+}
+
+///|
 let exchange_text : String = "{\"entries\": [1, 2, 3]}\n"
 
 ///|
@@ -1146,12 +1353,7 @@ test "a model with errors does not start the transcript and says why" {
   )
   assert_eq(effects, [Mark(items=[error_in("model.smithy", 2)])])
   assert_eq(m.transcript, None)
-  assert_eq(
-    m.not_run,
-    Some(
-      "The model has 1 error, so I did not check the transcript. The Findings tab shows the error.",
-    ),
-  )
+  assert_eq(m.not_run, Some(not_run_text))
   assert_eq(m.pane, FindingsPane)
   assert_eq(update(m, StepClicked).1, [])
 }
