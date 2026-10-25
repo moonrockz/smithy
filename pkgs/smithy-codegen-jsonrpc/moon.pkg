@@ -1,0 +1,13 @@
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-codegen" @codegen,
+  "moonrockz/smithy-validation" @validation,
+  "moonrockz/smithy-validation/rpc",
+}
+
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-codegen-jsonrpc" @jsonrpc,
+  "moonrockz/smithy-validation" @validation,
+  "moonrockz/smithy-validation/rpc",
+} for "test"
