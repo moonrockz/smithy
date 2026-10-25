@@ -146,3 +146,27 @@ test "flush renders sorted paths and clears the writers" {
   assert_eq(delegator.flush().length(), 0)
   assert_eq(delegator.dependencies(), [dependency])
 }
+
+///|
+test "the conflict check compares the requested namespaces" {
+  // The factory ignores the namespace, so the writers have the root namespace.
+  let delegator = @codegen.WriterDelegator::new(delegator_provider(), factory=(
+    _,
+    _,
+  ) => @codegen.CodeWriter::new())
+  let path = delegator_path("a/one.txt")
+  delegator.use_file_writer(path, delegator_ns("a"), w => w.write("x"))
+  delegator.use_file_writer(path, delegator_ns("a"), w => w.write("y"))
+  try
+    delegator.use_file_writer(path, delegator_ns("b"), w => w.write("z"))
+  catch {
+    WriterConflict(text) =>
+      assert_eq(
+        text, "I found two namespaces, `a` and `b`, for output file `a/one.txt`.",
+      )
+    _ => fail("expected WriterConflict")
+  } noraise {
+    _ => fail("expected WriterConflict")
+  }
+  assert_eq(delegator.flush()["a/one.txt"], "x\n\ny\n")
+}

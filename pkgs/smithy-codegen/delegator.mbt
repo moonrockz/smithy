@@ -1,4 +1,12 @@
 ///|
+/// A writer with the namespace that the first use of its path asked for. The
+/// factory can return a writer with another namespace, so I keep this one.
+priv struct RequestedWriter {
+  namespace : Namespace
+  writer : CodeWriter
+}
+
+///|
 /// Gives one writer to each output path. A generator asks for the writer of a
 /// file or of a shape, and the delegator makes sure that one file has one
 /// writer with one namespace.
@@ -7,7 +15,7 @@ pub struct WriterDelegator {
   priv factory : (OutputPath, Namespace) -> CodeWriter
   priv render : (CodeWriter) -> String
   // The writers by the text of their path.
-  priv writers : Map[String, CodeWriter]
+  priv writers : Map[String, RequestedWriter]
   // The interceptors, in the order that they were added.
   priv interceptors : Array[Interceptor]
   // The dependencies that were added, and those of the writers that were flushed.
@@ -39,8 +47,8 @@ pub fn WriterDelegator::add_interceptors(
 ) -> Unit {
   for interceptor in interceptors {
     self.interceptors.push(interceptor)
-    for _, writer in self.writers {
-      writer.on_section(interceptor)
+    for _, entry in self.writers {
+      entry.writer.on_section(interceptor)
     }
   }
 }
@@ -58,22 +66,22 @@ pub fn WriterDelegator::use_file_writer(
 ) -> Unit raise CodegenError {
   let key = path.to_string()
   let writer = match self.writers.get(key) {
-    Some(writer) => {
-      let first = writer.namespace()
+    Some(entry) => {
+      let first = entry.namespace
       if first != namespace {
         raise WriterConflict(
           "I found two namespaces, `\{first.text}` and `\{namespace.text}`, for output file `\{key}`.",
         )
       }
-      writer.blank_line()
-      writer
+      entry.writer.blank_line()
+      entry.writer
     }
     None => {
       let writer = (self.factory)(path, namespace)
       for interceptor in self.interceptors {
         writer.on_section(interceptor)
       }
-      self.writers[key] = writer
+      self.writers[key] = { namespace, writer, }
       writer
     }
   }
@@ -112,8 +120,8 @@ pub fn WriterDelegator::dependencies(
   self : WriterDelegator,
 ) -> Array[SymbolDependency] {
   let found = self.kept.copy()
-  for _, writer in self.writers {
-    found.append(writer.dependencies())
+  for _, entry in self.writers {
+    found.append(entry.writer.dependencies())
   }
   found.sort()
   let result = []
@@ -134,9 +142,9 @@ pub fn WriterDelegator::flush(self : WriterDelegator) -> Map[String, String] {
   keys.sort()
   let files = Map([])
   for key in keys {
-    let writer = self.writers[key]
-    self.kept.append(writer.dependencies())
-    files[key] = (self.render)(writer)
+    let entry = self.writers[key]
+    self.kept.append(entry.writer.dependencies())
+    files[key] = (self.render)(entry.writer)
   }
   self.writers.clear()
   files
