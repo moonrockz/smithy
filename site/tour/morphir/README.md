@@ -26,7 +26,11 @@ tree and fails on any difference.
    removes `upstream/` and writes it again, so a path that leaves `files` leaves no file.
 2. Check out that commit in `.dev/out/finos-morphir`.
 3. Run `mise run tour:vendor:morphir`.
-4. Run `cd site && moon test --target native -p moonrockz/smithy-site/tour/check --update`.
-5. Review the snapshot diff.
-6. Run `mise run tour:check`.
-7. Ask the owner to review.
+4. Change the commit in each finos/morphir link of lessons 34 to 39, and check each cited line again. A test of
+   `mise run tour:check` fails while a link names another commit than `inventory.json`.
+5. Check that `morphir-ir-v4.json` and `morphir-ir-v4.yaml` still define the in-scope definitions in the same way.
+   The pattern test reads the JSON, and the lesson texts cite the YAML, which is not vendored.
+6. Run `cd site && moon test --target native -p moonrockz/smithy-site/tour/check --update`.
+7. Review the snapshot diff.
+8. Run `mise run tour:check`.
+9. Ask the owner to review.

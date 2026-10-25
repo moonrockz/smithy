@@ -144,7 +144,7 @@ test "a new spelling is named in the snapshot line" {
     verdict: Accepted,
     value: { "Hole": {} },
   }
-  assert_eq(example.line(), "Accepted unknown() Type s.json /a")
+  assert_eq(example.line(), "Accepted unknown(#) Type s.json /a")
 }
 
 ///|
@@ -172,8 +172,11 @@ test "snapshot lines for each verdict and form" {
   }
   assert_eq(
     compact.line(),
-    "Accepted compact(/Function/parameterType,/Function/returnType) Type k.feature line 6",
+    "Accepted compact(#/Function/parameterType,#/Function/returnType) Type k.feature line 6",
   )
+  // A finding at the root of the value prints as `#`, not as nothing.
+  let root : Example = { ..compact, at: "line 8", value: "a", }
+  assert_eq(root.line(), "Accepted compact(#) Type k.feature line 8")
   let expanded : Example = { ..compact, at: "line 7", value: { "Unit": {} }, }
   assert_eq(expanded.line(), "Accepted expanded Type k.feature line 7")
 }

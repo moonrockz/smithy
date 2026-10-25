@@ -423,3 +423,68 @@ test "quoted Morphir values are the upstream values" {
     }
   }
 }
+
+///|
+/// The commit of the vendored Morphir sources, from inventory.json.
+fn morphir_commit() -> String raise {
+  let path = "tour/morphir/inventory.json"
+  let text = @fs.read_file_to_string(path) catch {
+    IOError(reason) => fail(path + ": " + reason)
+  }
+  let json = @json.parse(text) catch {
+    _ => fail(path + ": it is not valid JSON")
+  }
+  match json {
+    Object({ "commit": String(commit), .. }) => commit
+    _ => fail(path + ": I expected the string \"commit\"")
+  }
+}
+
+///|
+/// The commits in the finos/morphir links of a text, in order.
+fn morphir_link_commits(text : String) -> Array[String] {
+  let prefix = "https://github.com/finos/morphir/blob/"
+  let found : Array[String] = []
+  for part in text.split(prefix).drop(1) {
+    let rest = part.to_owned()
+    let end = rest.find("/").unwrap_or(rest.length())
+    found.push(rest[:end].to_owned())
+  }
+  found
+}
+
+///|
+test "morphir_link_commits finds the commit of each finos/morphir link" {
+  let text = "[a](https://github.com/finos/morphir/blob/abc/x.md#L1) and " +
+    "[b](https://github.com/finos/morphir-elm/blob/def/y.elm) and " +
+    "[c](https://github.com/finos/morphir/blob/ghi/z.json)"
+  assert_eq(morphir_link_commits(text), ["abc", "ghi"])
+}
+
+///|
+/// A lesson cites the Morphir lines of the vendored commit. After a refresh,
+/// each link must name the new commit, and its lines must be checked again.
+test "every lesson link to finos/morphir uses the vendored commit" {
+  let commit = morphir_commit()
+  let tour = match @source.read_tour(lessons_root, repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the tour: " + e)
+  }
+  let mut links = 0
+  for lesson in tour.lessons {
+    for found in morphir_link_commits(lesson.text) {
+      links += 1
+      if found != commit {
+        fail(
+          lesson.dir +
+          ": a finos/morphir link uses the commit " +
+          found +
+          ", but inventory.json has " +
+          commit +
+          ". Change the link and check the cited lines",
+        )
+      }
+    }
+  }
+  assert_true(links > 0)
+}

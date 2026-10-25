@@ -75,6 +75,7 @@ fn kind_text(kind : Kind) -> String {
 ///|
 /// One line of the review snapshot: `<verdict> <form> <kind> <source> <at>`.
 /// The form is `expanded`, `compact(<pointer>,...)` or `unknown(<pointer>)`.
+/// Each pointer is written as `#` and the JSON pointer, so the root is `#`.
 /// Only an accepted example is sorted; the form of another verdict is `-`.
 pub fn Example::line(self : Example) -> String {
   let form = match self.verdict {
@@ -82,8 +83,8 @@ pub fn Example::line(self : Example) -> String {
       match sort(self.kind, self.value) {
         Expanded => "expanded"
         Compact(found) =>
-          "compact(\{found.map(fn(f) { f.pointer }).join(","  )})"
-        Unknown(pointer) => "unknown(\{pointer})"
+          "compact(\{found.map(fn(f) { "#" + f.pointer }).join(",")})"
+        Unknown(pointer) => "unknown(#\{pointer})"
       }
     _ => "-"
   }

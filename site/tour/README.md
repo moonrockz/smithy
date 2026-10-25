@@ -447,8 +447,10 @@ line of a pinned Morphir commit. A test checks the lesson model against the exam
 `morphir/upstream/` holds the Morphir files at their paths in finos/morphir, byte for byte, at one pinned commit:
 the v4 JSON schema, the v4 and v3 IR examples, the kit files `types.feature` and `names.feature`, and the naming
 corpus. `morphir/inventory.json` holds the Git blob hash of each file. [morphir/README.md](morphir/README.md) gives
-the licence and the refresh steps. A refresh runs `mise run tour:vendor:morphir`, writes the snapshot again with
-`--update`, and needs a review of the snapshot diff and of the lesson texts.
+the licence and the refresh steps. A refresh runs `mise run tour:vendor:morphir`, changes the commit in each
+finos/morphir link of the lessons, writes the snapshot again with `--update`, and needs a review of the snapshot diff
+and of the lesson texts. A test requires that each finos/morphir link of a lesson names the commit of
+`inventory.json`.
 
 The package `morphir/` (`moonrockz/smithy-site/tour/morphir`) reads the examples, sorts each one and predicts its
 findings. The tests in `check/morphir_test.mbt` run each example through the value check of the playground core.
@@ -475,7 +477,9 @@ The verdict comes from the Morphir source. The form comes from the sort.
 
 A Morphir diagnostic that `rejected_code` does not know fails the check. Each message of a compact example must be
 in the `output_contains` of a lesson 39 case. `check/__snapshot__/morphir-examples.txt` lists each example with its
-verdict and form, one line each: `<verdict> <form> <kind> <source> <at>`.
+verdict and form, one line each: `<verdict> <form> <kind> <source> <at>`. The form is `expanded`,
+`compact(<pointer>,...)` with the pointer of each predicted finding, or `unknown(<pointer>)`. Each pointer is `#` and
+then the JSON pointer, so `compact(#)` is one finding at the root. A Legacy or Rejected example has the form `-`.
 
 ### The shared model files and the patterns
 
