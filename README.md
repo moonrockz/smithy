@@ -57,6 +57,7 @@ protocol implementations. Validate case definitions with
 | `pkgs/smithy-ion-validation` | `moonrockz/smithy-ion-validation` | Validate native Ion values directly against Smithy data shapes |
 | `pkgs/smithy-diff` | `moonrockz/smithy-diff` | Compare models and report compatibility changes |
 | `pkgs/smithy-build` | `moonrockz/smithy-build` | Build configuration, projections and plugins |
+| `pkgs/smithy-codegen` | `moonrockz/smithy-codegen` | Language-neutral core for code generators: symbols, code writer, delegator and director |
 | `pkgs/smithy-jsonschema` | `moonrockz/smithy-jsonschema` | Convert assembled value shapes to JSON Schema |
 | `pkgs/smithy-openapi` | `moonrockz/smithy-openapi` | Convert services to OpenAPI with REST JSON and RPC v2 JSON protocols |
 | `pkgs/smithy-openrpc` | `moonrockz/smithy-openrpc` | Export JSON-RPC 2.0 services as OpenRPC 1.3.2 |
@@ -205,6 +206,7 @@ smithy/
 ├── pkgs/smithy-validation/    # Direct application value validation and typed findings
 ├── pkgs/smithy-ion-validation/ # Optional native Ion validation adapter
 ├── pkgs/smithy-build/         # build projections and plugins
+├── pkgs/smithy-codegen/       # code generation core
 ├── pkgs/smithy-diff/          # Model compatibility differences
 ├── pkgs/smithy-jsonschema/    # JSON Schema converter
 ├── pkgs/smithy-openapi/       # OpenAPI service converter and protocols

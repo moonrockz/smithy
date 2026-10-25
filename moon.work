@@ -6,6 +6,7 @@ members = [
   "./pkgs/smithy-validation",
   "./pkgs/smithy-ion-validation",
   "./pkgs/smithy-build",
+  "./pkgs/smithy-codegen",
   "./pkgs/smithy-diff",
   "./pkgs/smithy-jsonschema",
   "./pkgs/smithy-openapi",

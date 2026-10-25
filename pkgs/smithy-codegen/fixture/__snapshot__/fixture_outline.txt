@@ -1,0 +1,88 @@
+== dependencies.txt ==
+outline-collections@1.0.0 (runtime)
+== example/items/Item.outline ==
+// generated
+structure Item {
+    sku: String
+}
+== example/legacy/Item.outline ==
+// generated
+structure Item {
+    code: String
+}
+== example/orders/Category.outline ==
+// generated
+structure Category {
+    children: CategoryList
+}
+== example/orders/CategoryList.outline ==
+// generated
+list CategoryList of Category
+== example/orders/Currency.outline ==
+// generated
+enum Currency {
+    USD
+    EUR
+}
+== example/orders/GetOrder.outline ==
+// generated
+operation GetOrder(GetOrderInput) -> GetOrderOutput
+    errors: Throttled
+== example/orders/GetOrderInput.outline ==
+// generated
+structure GetOrderInput {
+    id: String
+}
+== example/orders/GetOrderOutput.outline ==
+// generated
+structure GetOrderOutput {
+    order: Order
+    payment: Payment
+    categories: CategoryList
+}
+== example/orders/ItemList.outline ==
+use example.items.Item
+
+// generated
+list ItemList of Item
+== example/orders/ListOrders.outline ==
+// generated
+operation ListOrders(Unit) -> Unit
+== example/orders/Order.outline ==
+use example.items.Item
+
+// generated
+structure Order {
+    id: String
+    type_: OrderType
+    items: ItemList
+    tags: TagMap
+    primary: Item
+    legacy: example.legacy.Item
+}
+== example/orders/OrderType.outline ==
+// generated
+intEnum OrderType {
+    STANDARD
+    EXPRESS
+}
+== example/orders/Orders.outline ==
+// generated
+service Orders {
+    operation GetOrder
+    operation ListOrders
+}
+== example/orders/Payment.outline ==
+// generated
+union Payment {
+    card: String
+    cash: Currency
+}
+== example/orders/TagMap.outline ==
+// generated
+map TagMap of String to String
+== example/orders/Throttled.outline ==
+// generated
+error Throttled {
+    message: String
+}
