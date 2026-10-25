@@ -858,6 +858,22 @@ test "lesson 27 includes its own starting files" {
 }
 
 ///|
+test "lesson 28 includes its own starting files" {
+  let lesson = lesson_in("28-transcripts")
+  let model = case_file(lesson, "start", "model.smithy")
+  let exchange = case_file(lesson, "start", "exchange.json")
+  check_included_files(
+    lesson,
+    cli=[
+      ("weather-peers.smithy", model),
+      ("weather-exchange.json", exchange),
+      ("weather-no-reply.json", case_file(lesson, "no-reply", "exchange.json")),
+    ],
+    api=[model, exchange],
+  )
+}
+
+///|
 test "a static extension lesson says that the feature is our extension" {
   let ok = match
     @source.read_tour("tour/source/testdata/static-ok", repo="..") {

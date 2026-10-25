@@ -1912,6 +1912,31 @@ test "the lines are not highlighted before the check reached its position" {
 }
 
 ///|
+test "after a timeout the new start steps back to the position of the reader" {
+  let m = started()
+  let (m, _) = update(m, StepClicked)
+  let (m, effects) = update(m, TimedOut(3))
+  assert_eq(effects[0], RestartWorker)
+  assert_true(effects[1] is SendTranscriptStart(..))
+  // The new Worker answers the start with no entry checked: the page sends
+  // the step that timed out again.
+  let (m, effects) = update(
+    m,
+    Answered(seq=m.seq, answer=progress(entries=three_entries())),
+  )
+  assert_eq(effects, [
+    SendTranscriptStep(seq=m.seq, count=1),
+    Wait(ms=10000, msg=TimedOut(m.seq)),
+  ])
+  let (m, _) = update(m, Answered(seq=m.seq, answer=progress(checked=1)))
+  let t = m.transcript.unwrap()
+  assert_eq(t.checked, 1)
+  assert_eq(t.wanted, 1)
+  assert_eq(t.entries.length(), 3)
+  assert_false(m.busy())
+}
+
+///|
 test "a transcript request that takes too long starts the transcript again, then gives up" {
   let m = started()
   let (m, _) = update(m, StepClicked)

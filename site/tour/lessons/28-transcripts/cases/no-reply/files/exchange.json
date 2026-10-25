@@ -1,0 +1,8 @@
+{
+  "version": "2.0",
+  "complete": true,
+  "entries": [
+    {"from": "client", "message": {"jsonrpc": "2.0", "id": 1, "method": "weather/forecast", "params": {"cityId": "oslo"}}},
+    {"from": "server", "message": {"jsonrpc": "2.0", "method": "weather/alert", "params": {"text": "Storm at 18:00"}}}
+  ]
+}

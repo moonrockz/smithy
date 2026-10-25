@@ -506,6 +506,110 @@ and one located `InvalidTranscript` finding. `match_expected` pairs each item wi
 finding of the same code name (`to_string`), entry and related entry. `ExpectationResult::is_match`
 holds when no item is missing and every unlisted finding is an advisory.
 
+This test checks two weather exchanges. The first exchange is valid, and in the second exchange the call has no reply.
+
+<!-- tour:start transcript-api -->
+```mbt check
+///|
+test "check the weather exchange" {
+  let model = @rpc.loader()
+  .add_idl(
+    "weather-peers.smithy",
+    (
+      #|$version: "2"
+      #|namespace example
+      #|
+      #|use smithy.rpc#jsonRpc
+      #|use smithy.rpc#jsonRpcProtocol
+      #|use smithy.rpc#method
+      #|
+      #|/// The two peers of the weather protocol.
+      #|@jsonRpcProtocol(
+      #|    versions: ["2.0"]
+      #|    peers: [
+      #|        { name: "client", accepts: WeatherClient }
+      #|        { name: "server", accepts: WeatherApi }
+      #|    ]
+      #|)
+      #|structure WeatherProtocol {}
+      #|
+      #|/// The server answers forecast calls.
+      #|@jsonRpc(versions: ["2.0"])
+      #|service WeatherApi {
+      #|    version: "2024-01-01"
+      #|    operations: [GetForecast]
+      #|}
+      #|
+      #|/// The client receives alerts from the server.
+      #|@jsonRpc(versions: ["2.0"])
+      #|service WeatherClient {
+      #|    version: "2024-01-01"
+      #|    operations: [Alert]
+      #|}
+      #|
+      #|@method(name: "weather/forecast", params: "named", resultMember: "chanceOfRain")
+      #|operation GetForecast {
+      #|    input := {
+      #|        @required
+      #|        cityId: String
+      #|    }
+      #|    output := {
+      #|        @required
+      #|        chanceOfRain: Float
+      #|    }
+      #|}
+      #|
+      #|@method(name: "weather/alert", params: "named", nullResult: true)
+      #|operation Alert {
+      #|    input := {
+      #|        @required
+      #|        text: String
+      #|    }
+      #|}
+    ),
+  )
+  .assemble().model.unwrap()
+  let (document, problems) = @rpc.read_json_transcript(
+    (
+      #|{
+      #|  "version": "2.0",
+      #|  "complete": true,
+      #|  "entries": [
+      #|    {"from": "client", "message": {"jsonrpc": "2.0", "id": 1, "method": "weather/forecast", "params": {"cityId": "oslo"}}},
+      #|    {"from": "server", "message": {"jsonrpc": "2.0", "method": "weather/alert", "params": {"text": "Storm at 18:00"}}},
+      #|    {"from": "server", "message": {"jsonrpc": "2.0", "id": 1, "result": 0.8}}
+      #|  ]
+      #|}
+    ),
+  )
+  let protocol = @rpc.ProtocolDescription::from_smithy(
+    model,
+    @smithy.ShapeId::parse("example#WeatherProtocol").unwrap(),
+    document.version.unwrap(),
+  )
+  let run = @rpc.run_transcript(protocol, document, problems)
+  assert_eq(run.findings, [])
+  assert_eq(run.summary.entries, 3)
+  assert_eq(run.summary.outstanding, 0)
+  let (no_reply, problems) = @rpc.read_json_transcript(
+    (
+      #|{
+      #|  "version": "2.0",
+      #|  "complete": true,
+      #|  "entries": [
+      #|    {"from": "client", "message": {"jsonrpc": "2.0", "id": 1, "method": "weather/forecast", "params": {"cityId": "oslo"}}},
+      #|    {"from": "server", "message": {"jsonrpc": "2.0", "method": "weather/alert", "params": {"text": "Storm at 18:00"}}}
+      #|  ]
+      #|}
+    ),
+  )
+  let run = @rpc.run_transcript(protocol, no_reply, problems)
+  assert_eq(run.findings.map(f => f.code.to_string()), ["MissingResponse"])
+  assert_eq(run.findings.map(f => f.entry), [Some(0)])
+}
+```
+<!-- tour:end transcript-api -->
+
 ## Markdown transcript documents
 
 `read_markdown_transcript` reads the same `TranscriptDocument` from Markdown. A fenced block (three or

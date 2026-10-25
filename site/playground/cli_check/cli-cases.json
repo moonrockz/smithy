@@ -804,11 +804,11 @@
       "files": [
         {
           "name": "weather-peers.smithy",
-          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+          "from": "site/tour/lessons/28-transcripts/files/model.smithy"
         },
         {
           "name": "exchange.json",
-          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"result\": \"Rain\"}}\n  ]\n}"
+          "from": "site/tour/lessons/28-transcripts/files/exchange.json"
         }
       ],
       "status": 0,
@@ -828,11 +828,11 @@
       "files": [
         {
           "name": "weather-peers.smithy",
-          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+          "from": "site/tour/lessons/28-transcripts/files/model.smithy"
         },
         {
           "name": "no-reply.json",
-          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}}\n  ]\n}"
+          "from": "site/tour/lessons/28-transcripts/cases/no-reply/files/exchange.json"
         }
       ],
       "status": 1,
@@ -854,11 +854,11 @@
       "files": [
         {
           "name": "weather-peers.smithy",
-          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+          "from": "site/tour/lessons/28-transcripts/files/model.smithy"
         },
         {
           "name": "partial.json",
-          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": false,\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}}\n  ]\n}"
+          "from": "site/tour/lessons/28-transcripts/cases/partial/files/exchange.json"
         }
       ],
       "status": 0,
@@ -880,11 +880,11 @@
       "files": [
         {
           "name": "weather-peers.smithy",
-          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+          "from": "site/tour/lessons/28-transcripts/files/model.smithy"
         },
         {
           "name": "wrong-id.json",
-          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 2, \"result\": \"Rain\"}}\n  ]\n}"
+          "from": "site/tour/lessons/28-transcripts/cases/wrong-id/files/exchange.json"
         }
       ],
       "status": 1,
@@ -907,11 +907,11 @@
       "files": [
         {
           "name": "weather-peers.smithy",
-          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+          "from": "site/tour/lessons/28-transcripts/files/model.smithy"
         },
         {
           "name": "wrong-sender.json",
-          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"result\": \"Rain\"}}\n  ]\n}"
+          "from": "site/tour/lessons/28-transcripts/cases/wrong-sender/files/exchange.json"
         }
       ],
       "status": 1,
@@ -933,7 +933,7 @@
       "files": [
         {
           "name": "weather-peers.smithy",
-          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+          "from": "site/tour/lessons/28-transcripts/files/model.smithy"
         },
         {
           "name": "not-json.json",
@@ -959,11 +959,11 @@
       "files": [
         {
           "name": "weather-peers.smithy",
-          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+          "from": "site/tour/lessons/28-transcripts/files/model.smithy"
         },
         {
           "name": "expect-missing.json",
-          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"expect\": [{\"code\": \"MissingResponse\", \"entry\": 0}],\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"result\": \"Rain\"}}\n  ]\n}"
+          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"expect\": [{\"code\": \"MissingResponse\", \"entry\": 0}],\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/forecast\", \"params\": {\"cityId\": \"oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Storm at 18:00\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"result\": 0.8}}\n  ]\n}\n"
         }
       ],
       "status": 1,
@@ -985,11 +985,11 @@
       "files": [
         {
           "name": "weather-peers.smithy",
-          "text": "$version: \"2\"\nnamespace example\n\nuse smithy.rpc#jsonRpc\nuse smithy.rpc#jsonRpcProtocol\nuse smithy.rpc#method\n\n@jsonRpcProtocol(\n    versions: [\"2.0\"]\n    peers: [\n        { name: \"client\", accepts: WeatherClient }\n        { name: \"server\", accepts: WeatherServer }\n    ]\n)\nstructure WeatherProtocol {}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherServer {\n    version: \"1\"\n    operations: [GetWeather]\n}\n\n@jsonRpc(versions: [\"2.0\"])\nservice WeatherClient {\n    version: \"1\"\n    operations: [Alert]\n}\n\n@method(name: \"weather/get\", params: \"named\", resultMember: \"forecast\")\noperation GetWeather { input: GetWeatherInput, output: GetWeatherOutput }\n\nstructure GetWeatherInput { @required city: String }\n\nstructure GetWeatherOutput { forecast: String }\n\n@method(name: \"weather/alert\", params: \"named\", nullResult: true)\noperation Alert { input: AlertInput }\n\nstructure AlertInput { text: String }"
+          "from": "site/tour/lessons/28-transcripts/files/model.smithy"
         },
         {
           "name": "expect-empty.json",
-          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"expect\": [],\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/get\", \"params\": {\"city\": \"Oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Wind\"}}}\n  ]\n}"
+          "text": "{\n  \"version\": \"2.0\",\n  \"complete\": true,\n  \"expect\": [],\n  \"entries\": [\n    {\"from\": \"client\", \"message\": {\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"weather/forecast\", \"params\": {\"cityId\": \"oslo\"}}},\n    {\"from\": \"server\", \"message\": {\"jsonrpc\": \"2.0\", \"method\": \"weather/alert\", \"params\": {\"text\": \"Storm at 18:00\"}}}\n  ]\n}\n"
         }
       ],
       "status": 1,

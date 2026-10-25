@@ -783,6 +783,96 @@ methods (`StateViolation`), the advertised capabilities (`CapabilityNotAdvertise
 of calls that are not active (`CancelInactiveCall`, advisory). An order trait that names an undeclared
 state or capability is an invalid protocol (exit 2). See `examples/json-rpc/lifecycle.smithy`.
 
+These commands check two weather exchanges. The first exchange is valid, and in the second exchange the call has no reply.
+
+<!-- tour:start transcript-cli -->
+```smithy file=weather-peers.smithy
+$version: "2"
+namespace example
+
+use smithy.rpc#jsonRpc
+use smithy.rpc#jsonRpcProtocol
+use smithy.rpc#method
+
+/// The two peers of the weather protocol.
+@jsonRpcProtocol(
+    versions: ["2.0"]
+    peers: [
+        { name: "client", accepts: WeatherClient }
+        { name: "server", accepts: WeatherApi }
+    ]
+)
+structure WeatherProtocol {}
+
+/// The server answers forecast calls.
+@jsonRpc(versions: ["2.0"])
+service WeatherApi {
+    version: "2024-01-01"
+    operations: [GetForecast]
+}
+
+/// The client receives alerts from the server.
+@jsonRpc(versions: ["2.0"])
+service WeatherClient {
+    version: "2024-01-01"
+    operations: [Alert]
+}
+
+@method(name: "weather/forecast", params: "named", resultMember: "chanceOfRain")
+operation GetForecast {
+    input := {
+        @required
+        cityId: String
+    }
+    output := {
+        @required
+        chanceOfRain: Float
+    }
+}
+
+@method(name: "weather/alert", params: "named", nullResult: true)
+operation Alert {
+    input := {
+        @required
+        text: String
+    }
+}
+```
+
+```json file=weather-exchange.json
+{
+  "version": "2.0",
+  "complete": true,
+  "entries": [
+    {"from": "client", "message": {"jsonrpc": "2.0", "id": 1, "method": "weather/forecast", "params": {"cityId": "oslo"}}},
+    {"from": "server", "message": {"jsonrpc": "2.0", "method": "weather/alert", "params": {"text": "Storm at 18:00"}}},
+    {"from": "server", "message": {"jsonrpc": "2.0", "id": 1, "result": 0.8}}
+  ]
+}
+```
+
+```json file=weather-no-reply.json
+{
+  "version": "2.0",
+  "complete": true,
+  "entries": [
+    {"from": "client", "message": {"jsonrpc": "2.0", "id": 1, "method": "weather/forecast", "params": {"cityId": "oslo"}}},
+    {"from": "server", "message": {"jsonrpc": "2.0", "method": "weather/alert", "params": {"text": "Storm at 18:00"}}}
+  ]
+}
+```
+
+```console
+$ smithy validate rpc transcript --protocol example#WeatherProtocol --diagnostics json weather-peers.smithy weather-exchange.json
+{"valid":true,"complete":true,"entries":3,"outstanding":0,"correlation":true,"findings":[]}
+```
+
+```console status=1
+$ smithy validate rpc transcript --protocol example#WeatherProtocol weather-peers.smithy weather-no-reply.json
+weather-no-reply.json:5:35: entry 0 client: error MissingResponse: I expected a reply from server to entry 0 from client with id 1; the complete transcript has none.
+```
+<!-- tour:end transcript-cli -->
+
 - `--protocol` names the protocol structure. It is required.
 - `--version 1.0|2.0` is required when the document gives no version. When both give it, they must agree.
 - `--complete` makes a call without a reply an error (`MissingResponse`). `--partial`, the default, makes

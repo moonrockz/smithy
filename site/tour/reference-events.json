@@ -2447,6 +2447,26 @@
         "27-validating-messages/wrong-type": {
             "digest": "4216787f98e3dbae7db52ba8bebf1e9062d7bd8d627059857b8f1cc565a7ba29",
             "events": []
+        },
+        "28-transcripts/no-reply": {
+            "digest": "33c324b1c62b447c3720f60f7fd469fcf3a3e443872fe853ce49fa763675f93b",
+            "events": []
+        },
+        "28-transcripts/partial": {
+            "digest": "18a89cae573c766b3e1b8029c1aff5eaf260bb9d37af064734ee4ed2585be3fc",
+            "events": []
+        },
+        "28-transcripts/start": {
+            "digest": "23eac4b987f4d7ffbbf2a510a2903acf841238c5e68706b5c3572cddea134e99",
+            "events": []
+        },
+        "28-transcripts/wrong-id": {
+            "digest": "813d7585af565652b402c27c87cba07ffb8b95ae38b29c2946421d3fe69becb7",
+            "events": []
+        },
+        "28-transcripts/wrong-sender": {
+            "digest": "b2aecd767f4dc4df33bf5c2daa2ed1813072eb62f1260c0a676305682e131cff",
+            "events": []
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"

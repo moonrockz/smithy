@@ -1,6 +1,5 @@
 // The first tour lesson on Chromium: the output, a changed line, a stored edit, Reset, a model with a
 // finding and the expand buttons of the two right-hand panes. Key input needs Chromium (README.md).
-import { readFileSync } from "node:fs";
 import { expect, test } from "./fixtures.js";
 import { siteUrl } from "./site.js";
 
@@ -418,51 +417,10 @@ test("the include tabs switch with JavaScript off", async ({ browser }) => {
   await context.close();
 });
 
-// No transcript lesson is published yet, so this test turns the page of the first lesson into one. The files
-// are the files of a lesson of the tour reader tests: a weather model and an exchange of three entries.
-const weatherDir = new URL("../../tour/source/testdata/transcript-ok/01-weather/files/", import.meta.url);
-
-// The page data of the response, in the meta element `smithy-data`, with the lesson of the first page changed
-// by `change`.
-function withLesson(html, change) {
-  const unescape = (text) =>
-    text.replaceAll("&quot;", '"').replaceAll("&#39;", "'").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");
-  const escape = (text) =>
-    text.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-  return html.replace(/<meta name="smithy-data" content="([^"]*)"/, (_, content) => {
-    const data = JSON.parse(unescape(content));
-    // A page with no lesson (another request of the glob) stays as it is.
-    if (data.tour) {
-      change(data.tour[1]);
-    }
-    return `<meta name="smithy-data" content="${escape(JSON.stringify(data))}"`;
-  });
-}
-
-async function openTranscriptLesson(page) {
-  const files = ["model.smithy", "exchange.json"].map((name) => ({
-    name,
-    text: readFileSync(new URL(name, weatherDir), "utf8"),
-  }));
-  await page.route("**/tour/hello-smithy/", async (route) => {
-    const response = await route.fetch();
-    const body = withLesson(await response.text(), (lesson) => {
-      lesson.engine = ["Transcript", { file: "exchange.json", protocol: "example#WeatherProtocol" }];
-      delete lesson.output;
-      delete lesson.playground;
-      lesson.files = files;
-      lesson.digest = "transcript-test";
-      lesson.storage_key = "smithy-tour:next:transcript-test";
-    });
-    await route.fulfill({ response, body });
-  });
-  await page.goto(lessonUrl);
+test("a transcript lesson steps through the exchange", async ({ page }) => {
+  await page.goto(siteUrl("tour/transcripts/"));
   await expect(page.locator("#tour-editor .cm-content")).toBeVisible();
   await settled(page);
-}
-
-test("a transcript lesson steps through the exchange", async ({ page }) => {
-  await openTranscriptLesson(page);
   const rows = page.locator(".tour-entry");
 
   // The Transcript tab is the first one; no entry is checked.
