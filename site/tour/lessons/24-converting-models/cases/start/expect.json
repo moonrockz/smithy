@@ -1,0 +1,1 @@
+{"events": [], "output_contains": ["\"example#City\": {", "\"smithy.api#required\": {}", "\"smithy.api#documentation\": \"A city on the map.\"", "\"target\": \"smithy.api#String\""]}

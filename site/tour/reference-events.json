@@ -2267,6 +2267,100 @@
                 "example#GetForecast",
                 "example#ListCities"
             ]
+        },
+        "24-converting-models/add-member": {
+            "digest": "7a4711e633e1d4dc887e86dff068483762be68f3c1ff195d2589a91d1579ec79",
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#City": {
+                        "members": {
+                            "country": {
+                                "target": "example#CountryCode"
+                            },
+                            "name": {
+                                "target": "smithy.api#String",
+                                "traits": {
+                                    "smithy.api#required": {}
+                                }
+                            },
+                            "population": {
+                                "target": "smithy.api#Integer"
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A city on the map."
+                        },
+                        "type": "structure"
+                    },
+                    "example#CountryCode": {
+                        "traits": {
+                            "smithy.api#length": {
+                                "max": 2,
+                                "min": 2
+                            }
+                        },
+                        "type": "string"
+                    }
+                },
+                "smithy": "2.0"
+            }
+        },
+        "24-converting-models/apply": {
+            "digest": "887eb83d8613d57ba851e36162ed8995a633f90578e8db7a53a8de09304be9af",
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#City": {
+                        "members": {
+                            "name": {
+                                "target": "smithy.api#String",
+                                "traits": {
+                                    "smithy.api#length": {
+                                        "max": 64,
+                                        "min": 1
+                                    },
+                                    "smithy.api#required": {}
+                                }
+                            },
+                            "population": {
+                                "target": "smithy.api#Integer"
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A city on the map."
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
+        },
+        "24-converting-models/start": {
+            "digest": "ae0b7dd83d07832a886d9f2117b6de0f5e087f032001dcd1cc6cf8a099538870",
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#City": {
+                        "members": {
+                            "name": {
+                                "target": "smithy.api#String",
+                                "traits": {
+                                    "smithy.api#required": {}
+                                }
+                            },
+                            "population": {
+                                "target": "smithy.api#Integer"
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A city on the map."
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"

@@ -1,6 +1,6 @@
 # Selectors
 
-A [selector](https://smithy.io/2.0/spec/selectors.html) matches shapes in a model. It can match shapes by type, by attribute and by relationship. Smithy uses selectors to build custom validators and to tell where a [trait](../14-defining-traits/lesson.md) can apply. A build projection can also use a selector to [keep shapes](https://smithy.io/2.0/guides/smithy-build-json.html#includeshapesbyselector).
+A [selector](https://smithy.io/2.0/spec/selectors.html) matches shapes in a model. It can match shapes by type, by attribute and by relationship. Smithy uses selectors to build custom validators and to tell where a [trait](../14-defining-traits/lesson.md) can apply. A [build projection](../24-converting-models/lesson.md) can also use a selector to [keep shapes](https://smithy.io/2.0/guides/smithy-build-json.html#includeshapesbyselector).
 
 The tab `query.selector` holds the selector. Edit it, and the output tab shows the shape ID of each match. It shows one ID on each line, in sorted order.
 
