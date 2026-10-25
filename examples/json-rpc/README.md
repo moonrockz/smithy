@@ -77,10 +77,11 @@ smithy validate rpc transcript --protocol example.lifecycle#Lifecycle examples/j
 ```
 
 ```text
-examples/json-rpc/transcripts/lifecycle-violation.json:11:34: entry 0 host: error StateViolation: I expected method compile only in state ready; entry 0 from host sent it in state starting.
-examples/json-rpc/transcripts/lifecycle-violation.json:14:39: entry 3 extension: error CapabilityNotAdvertised: I expected capability progress to be advertised before method progress; entry 3 from extension sent it, and no initialize result advertised it.
-examples/json-rpc/transcripts/lifecycle-violation.json:16:34: entry 5 host: advisory CancelInactiveCall: I expected $/cancelRequest at entry 5 from host to name an active call from host; it names id 9, which is not active.
-examples/json-rpc/transcripts/lifecycle-violation.json:20:34: entry 9 host: error StateViolation: I expected method compile only in state ready; entry 9 from host sent it in state stopping.
+examples/json-rpc/transcripts/lifecycle-violation.json:12:34: entry 0 host: error StateViolation: I expected method compile only in state ready; entry 0 from host sent it in state starting.
+examples/json-rpc/transcripts/lifecycle-violation.json:15:39: entry 3 extension: error CapabilityNotAdvertised: I expected capability progress to be advertised before method progress; entry 3 from extension sent it, and no initialize result advertised it.
+examples/json-rpc/transcripts/lifecycle-violation.json:17:34: entry 5 host: advisory CancelInactiveCall: I expected $/cancelRequest at entry 5 from host to name an active call from host; it names id 9, which is not active.
+examples/json-rpc/transcripts/lifecycle-violation.json:18:39: entry 6 extension: error RefusalExpected: I expected an error reply to the refused call at entry 0; I found no integer error code.
+examples/json-rpc/transcripts/lifecycle-violation.json:21:34: entry 9 host: error StateViolation: I expected method compile only in state ready; entry 9 from host sent it in state stopping.
 ```
 
 `editor-negative.json` works the same way: it reports `UnsolicitedResponse` and two `MissingResponse` findings.
