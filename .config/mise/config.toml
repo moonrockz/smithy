@@ -144,8 +144,8 @@ description = "Vendor the pinned finos/morphir sources for the tour, hash-verifi
 run = "moonx scripts/vendor-morphir.mbtx"
 
 [tasks."tour:check"]
-description = "Check the tour lessons against the playground core and the committed Java reference results (no bun, Java or browser)"
-run = "moon -C site test --target native -p moonrockz/smithy-site/tour/check"
+description = "Check the tour lessons against the playground core and the committed Java reference results, and the pinned Morphir examples against the case study model (no bun, Java or browser)"
+run = "moon -C site test --target native -p moonrockz/smithy-site/tour/check -p moonrockz/smithy-site/tour/morphir"
 
 [tasks."test:native-zig"]
 description = "Run the native tests with zig as the C compiler (the host wrapper of zig-cross)"

@@ -16,3 +16,5 @@ The value check also checks the rules of the model. Make these changes in `type.
 Also try the type of `add`, `number -> number -> number`: a `Function` whose `returnType` is a second `Function`. It passes. A function type in the IR has one parameter ([schema, line 950](https://github.com/finos/morphir/blob/ab8d5c9198c0f1ac8a3cabfd11b9ab59a468c409/website/static/schemas/morphir-ir-v4.yaml#L950-L970)). A function with two parameters is a function that returns a function.
 
 The Morphir example file does not use the expanded spelling. Morphir writers use the compact spelling, unless you select the expanded output ([JSON profile](https://github.com/finos/morphir/blob/ab8d5c9198c0f1ac8a3cabfd11b9ab59a468c409/docs/spec/ir/schemas/v4/json-profile.md?plain=1#L31)). [Lesson 39](../39-morphir-limits/lesson.md) checks the compact spelling.
+
+The tour also checks this model against the Morphir examples of names and types. They come from the schema, the example files, the compatibility kit and the naming corpus. Each expanded example passes. Each compact example fails as lesson 39 shows. Each example that Morphir rejects or accepts with a warning also fails.
