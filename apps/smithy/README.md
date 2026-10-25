@@ -260,6 +260,14 @@ projection. The `openapi` plugin writes `<ServiceName>.openapi.json` in OpenAPI
 protocol selection, configuration and conversion boundaries. `clean` removes
 that configured output directory.
 
+The `codegenFixture` plugin is a small outline generator that exercises the
+`smithy-codegen` library. Its required `service` setting selects the service
+ID. The optional `header` setting is the first line of each file, written as a
+`//` comment. It writes one `.outline` file for each shape of the service,
+under a directory for the namespace of the shape, and a `dependencies.txt` file.
+The output has the same bytes for the same model. A missing service fails the
+build with exit code 1.
+
 The `openrpc` plugin writes `openrpc.json` for a JSON-RPC 2.0 service. Its
 required `service` setting selects the Smithy service ID; the CLI supplies the
 opt-in `smithy.rpc` traits. OpenRPC document version 1.3.2, JSON Schema draft-07,
