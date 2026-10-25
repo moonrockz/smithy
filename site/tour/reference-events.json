@@ -2361,6 +2361,40 @@
                 },
                 "smithy": "2.0"
             }
+        },
+        "25-contracts/bad-default": {
+            "digest": "f015d322af9270a9dd98e0cc02fb18e8557176a9caa5b738adf88d7279324cc0",
+            "events": [
+                "DefaultTrait.NoSpaces|ERROR|example#Search$cityId"
+            ]
+        },
+        "25-contracts/bad-function": {
+            "digest": "f39a7ce731bb8874dbd58862574fe6b2e4c240b92c189f603fed681d426b6789",
+            "events": [
+                "ConditionsTrait|ERROR|example#TimeRange"
+            ]
+        },
+        "25-contracts/bad-name": {
+            "digest": "1119f216709903537e71b671b5c001a5ec2e14546612f1c9a35b1d6deeb0d7e0",
+            "events": [
+                "TraitValue|ERROR|example#TimeRange"
+            ]
+        },
+        "25-contracts/not-boolean": {
+            "digest": "9472d3e25186b48287935281bfb215b2b70d4e6e6c98b3f189cf6be5b1f3169a",
+            "events": [
+                "ConditionsTrait|DANGER|example#TimeRange"
+            ]
+        },
+        "25-contracts/start": {
+            "digest": "e8f15665d70697c98240b867ababf0505986120b115a9522acb5bd9c6d0221cf",
+            "events": []
+        },
+        "25-contracts/syntax": {
+            "digest": "00e3f2c412ac8caffc293e8fa3b3d4a43ca05b3ba90bfd5e06711e6721e88e94",
+            "events": [
+                "Model|ERROR|example#TimeRange"
+            ]
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
