@@ -632,6 +632,45 @@ smithy validate value --shape example#Input --value request.ion --input-format i
 smithy validate value --shape example#Input --value request.10n --input-format ion-binary --diagnostics json model.smithy
 ```
 
+These commands check two Ion readings. The first reading has a native timestamp, and the second reading has a
+string in its place.
+
+<!-- tour:start ion-value-cli -->
+```smithy file=reading.smithy
+$version: "2"
+namespace example
+
+structure Reading {
+    @required
+    sensor: String
+
+    @required
+    @range(min: -50, max: 60)
+    celsius: Integer
+
+    @required
+    takenAt: Timestamp
+}
+```
+
+```ion file=reading.ion
+{sensor: "roof", celsius: 21, takenAt: 2026-10-24T09:30:00Z}
+```
+
+```ion file=reading-text-time.ion
+{sensor: "roof", celsius: 21, takenAt: "2026-10-24T09:30:00Z"}
+```
+
+```console
+$ smithy validate value --shape example#Reading --value reading.ion --input-format ion-text reading.smithy
+```
+
+```console status=1
+$ smithy validate value --shape example#Reading --value reading-text-time.ion --input-format ion-text reading.smithy
+reading-text-time.ion/takenAt: error[TypeMismatch] example#Reading$takenAt: I expected a timestamp value, but found string.
+```
+<!-- tour:end ion-value-cli -->
+
 Ion input uses the released `moonrockz/ion` text and binary codecs. By default the datagram must contain
 exactly one user value. Pass `--ion-index 1` to select its second user value explicitly; symbol-table
 declarations are handled by the codecs. Both encodings and stdin support this selection. Decode errors

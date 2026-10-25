@@ -663,3 +663,51 @@ test("a diff lesson groups the files under Old and New, shows the diff and marks
   await expect(page.getByRole("button", { name: "Expand the output" })).toHaveAttribute("aria-pressed", "true");
   expect(page.errors).toEqual([]);
 });
+
+// A static lesson: the text with its include blocks, and no panes, no expand buttons and no Worker.
+async function openStaticLesson(page) {
+  const workers = [];
+  page.on("worker", (worker) => workers.push(worker.url()));
+  await page.goto(siteUrl("tour/ion-values/"));
+  await expect(page.locator(".tour-text h1")).toContainText("Ion values");
+  await page.waitForLoadState("networkidle");
+  return workers;
+}
+
+for (const colorScheme of ["light", "dark"]) {
+  test(`a static lesson has only its text, up to the reading measure, in ${colorScheme} mode`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    await page.setViewportSize({ width: 1600, height: 900 });
+    const workers = await openStaticLesson(page);
+    await expect(page.locator(".tour-static")).toHaveCount(1);
+    await expect(page.locator("#tour-app")).toHaveCount(0);
+    await expect(page.locator(".tour-expand")).toHaveCount(0);
+    expect(workers).toEqual([]);
+    await expect(includeTabs(page).cli).toContainText(
+      "$ smithy validate value --shape example#Reading --value reading.ion --input-format ion-text reading.smithy",
+    );
+
+    // On a wide screen the text takes the reading measure of the docs pages, not the whole width.
+    const [width, measure] = await page.locator(".tour-text").evaluate((el) => [
+      el.getBoundingClientRect().width,
+      parseFloat(getComputedStyle(el).maxWidth),
+    ]);
+    expect(measure).toBeGreaterThan(0);
+    expect(width).toBeLessThanOrEqual(measure + 0.5);
+    expect(width).toBeGreaterThan(measure - 1);
+    expect(width).toBeLessThan(1600 - 100);
+
+    // The text shows against its background.
+    const [color, background] = await page.evaluate(() => {
+      const text = getComputedStyle(document.querySelector(".tour-text p"));
+      return [text.color, getComputedStyle(document.body).backgroundColor];
+    });
+    expect(color).not.toEqual(background);
+
+    // On a phone the text fits the width: no page scrolls sideways.
+    await page.setViewportSize({ width: 375, height: 800 });
+    await expect(page.locator(".tour-text h1")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect(page.errors).toEqual([]);
+  });
+}

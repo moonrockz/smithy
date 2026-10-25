@@ -21,6 +21,57 @@ test {
 }
 ```
 
+This test checks two Ion readings. The first reading has a native timestamp, and the second reading has a string in
+its place.
+
+<!-- tour:start ion-value-api -->
+```mbt check
+///|
+test "validate an Ion reading" {
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "reading.smithy",
+    (
+      #|$version: "2"
+      #|namespace example
+      #|
+      #|structure Reading {
+      #|    @required
+      #|    sensor: String
+      #|
+      #|    @required
+      #|    @range(min: -50, max: 60)
+      #|    celsius: Integer
+      #|
+      #|    @required
+      #|    takenAt: Timestamp
+      #|}
+    ),
+  )
+  .assemble().model.unwrap()
+  let prepared = @adapter.PreparedValidator::prepare(
+    model,
+    @smithy.ShapeId::parse("example#Reading").unwrap(),
+  )
+  let reading = @text.read_ion(
+    "{sensor: \"roof\", celsius: 21, takenAt: 2026-10-24T09:30:00Z}",
+  )
+  assert_true(prepared.validate(reading).is_valid())
+  let text_time = @text.read_ion(
+    "{sensor: \"roof\", celsius: 21, takenAt: \"2026-10-24T09:30:00Z\"}",
+  )
+  let result = prepared.validate(text_time)
+  assert_false(result.is_valid())
+  assert_eq(result.findings.length(), 1)
+  let finding = result.findings[0]
+  assert_eq(finding.code.to_string(), "TypeMismatch")
+  assert_eq(finding.path.pointer(), "/takenAt")
+  assert_eq(finding.shape.to_string(), "example#Reading$takenAt")
+  assert_eq(finding.native_kind, Some(@ion.IonType::String))
+}
+```
+<!-- tour:end ion-value-api -->
+
 `PreparedValidator::prepare(model, shape, config~)` raises the shared validator's `PreparationError`. It preserves the supplied configuration's policies and limits, and selects `NativeProfile`. `validate(value)` returns `ValidationResult` with `complete`, `findings` and `is_valid()`. Reuse a prepared validator for multiple values. The executable [consumer example](../../examples/ion-validation-consumer/main.mbtx) pins every published import.
 
 Each finding exposes `code`, `severity`, `path`, `shape`, `message` and `native_kind : @ion.IonType?`. Missing required members have no native kind. Duplicate fields retain zero-based occurrences in structured paths. Map-key findings identify the field-name symbol. Unresolved names use `FieldNamePosition(index)`; their values use `FieldPosition(index)`. Both project to `/index` in the convenience pointer, so retain the structured path when distinguishing them matters. JSON diagnostics include `nativeKind` and the complete structured path.

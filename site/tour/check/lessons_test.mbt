@@ -770,6 +770,56 @@ fn as_block(text : String) -> String {
 }
 
 ///|
+/// The CLI snippets and the lines of the MoonBit snippets of the first include
+/// block of a lesson. Each line is trimmed.
+fn include_tabs(
+  lesson : @model.Lesson,
+) -> (Array[@markdown.Snippet], Array[String]) raise {
+  let doc = @markdown.parse(lesson.text, {
+    source: "",
+    resolve: _ => None,
+    repo_url: "",
+    git_ref: "",
+  })
+  let cli : Array[@markdown.Snippet] = []
+  let api : Array[String] = []
+  let mut seen = false
+  @markdown.walk_blocks(doc.blocks, block => {
+    if !seen && block is Tabs(_, tabs) {
+      seen = true
+      for tab in tabs {
+        for s in tab.snippets {
+          if tab.label == "CLI" {
+            cli.push(s)
+          } else if tab.label == "MoonBit" {
+            for line in s.code.split("\n") {
+              api.push(line.trim().to_owned())
+            }
+          }
+        }
+      }
+    }
+  })
+  guard seen else { fail(lesson.dir + " has no include block") }
+  (cli, api)
+}
+
+///|
+/// Require each line of `text` to be a `#|` line of the MoonBit tab.
+fn check_api_has(
+  lesson : @model.Lesson,
+  lines : Array[String],
+  text : String,
+) -> Unit raise {
+  for line in as_block(text).split("\n") {
+    let hashed = ("#|" + line.to_owned()).trim_end().to_owned()
+    if !lines.contains(hashed) {
+      fail(lesson.dir + ": the MoonBit tab has no line " + hashed)
+    }
+  }
+}
+
+///|
 /// Require the first include block of a lesson to show the lesson files. The
 /// CLI tab writes each `(fixture, text)` of `cli` as that text, and the
 /// MoonBit tab has each line of each text of `api` as a `#|` line.
@@ -778,30 +828,7 @@ fn check_included_files(
   cli~ : Array[(String, String)],
   api~ : Array[String],
 ) -> Unit raise {
-  let doc = @markdown.parse(lesson.text, {
-    source: "",
-    resolve: _ => None,
-    repo_url: "",
-    git_ref: "",
-  })
-  let cli_snippets : Array[@markdown.Snippet] = []
-  let api_code : Array[String] = []
-  let mut seen = false
-  @markdown.walk_blocks(doc.blocks, block => {
-    if !seen && block is Tabs(_, tabs) {
-      seen = true
-      for tab in tabs {
-        for s in tab.snippets {
-          if tab.label == "CLI" {
-            cli_snippets.push(s)
-          } else if tab.label == "MoonBit" {
-            api_code.push(s.code)
-          }
-        }
-      }
-    }
-  })
-  guard seen else { fail(lesson.dir + " has no include block") }
+  let (cli_snippets, lines) = include_tabs(lesson)
   for item in cli {
     let (fixture, text) = item
     match cli_snippets.search_by(s => s.file == Some(fixture)) {
@@ -809,19 +836,8 @@ fn check_included_files(
       None => fail(lesson.dir + ": the CLI tab has no file " + fixture)
     }
   }
-  let lines : Array[String] = []
-  for code in api_code {
-    for line in code.split("\n") {
-      lines.push(line.trim().to_owned())
-    }
-  }
   for text in api {
-    for line in as_block(text).split("\n") {
-      let hashed = ("#|" + line.to_owned()).trim_end().to_owned()
-      if !lines.contains(hashed) {
-        fail(lesson.dir + ": the MoonBit tab has no line " + hashed)
-      }
-    }
+    check_api_has(lesson, lines, text)
   }
 }
 
@@ -871,6 +887,16 @@ test "lesson 28 includes its own starting files" {
     ],
     api=[model, exchange],
   )
+}
+
+///|
+test "lesson 29 shows the same model in both tabs" {
+  let lesson = lesson_in("29-ion-values")
+  let (cli, lines) = include_tabs(lesson)
+  guard cli.search_by(s => s.file == Some("reading.smithy")) is Some(i) else {
+    fail("lesson 29: the CLI tab has no file reading.smithy")
+  }
+  check_api_has(lesson, lines, cli[i].code)
 }
 
 ///|
