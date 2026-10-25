@@ -28,7 +28,7 @@ MoonBit: pkgs/smithy/README.mbt.md#convert-idl-api
 
 ## Projections
 
-The command `smithy build` reads the [projections](https://smithy.io/2.0/guides/smithy-build-json.html#projections) of the file `smithy-build.json`. A projection is a copy of the model that its transforms change. The transform [`excludeShapesByTrait`](https://smithy.io/2.0/guides/smithy-build-json.html#excludeshapesbytrait) removes the shapes that have a given trait. The projection `source` is the model with no change. The tour does not run a build in the browser.
+The command `smithy build` reads the [projections](https://smithy.io/2.0/guides/smithy-build-json.html#projections) of the file `smithy-build.json`. A projection is a copy of the model that its transforms change. The transform [`excludeShapesByTrait`](https://smithy.io/2.0/guides/smithy-build-json.html#excludeshapesbytrait) removes the shapes that have a given trait. In the CLI tab, the projection `source` keeps both operations, and `public` keeps only `example#GetForecast`. The tour does not run a build in the browser.
 
 ```include
 CLI: apps/smithy/README.md#build-projection-cli
