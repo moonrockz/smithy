@@ -1,13 +1,20 @@
 ///|
+/// A formatter of a template. A built-in formatter returns the text, or the
+/// problem phrase when it cannot format the value; `render` makes the full
+/// error from the phrase. A custom formatter raises its own errors, and `render`
+/// does not change them.
+priv enum Formatter {
+  Builtin((TemplateValue) -> Result[String, String])
+  Custom((CodeWriter, TemplateValue) -> String raise CodegenError)
+}
+
+///|
 /// The part of the writer that `push_state` copies and `pop_state` restores.
 priv struct WriterState {
   mut indent_level : Int32
   mut newline_prefix : String
   context : Map[String, TemplateValue]
-  formatters : Map[
-    Char,
-    (CodeWriter, TemplateValue) -> String raise CodegenError,
-  ]
+  formatters : Map[Char, Formatter]
 }
 
 ///|
@@ -37,23 +44,17 @@ pub struct CodeWriter {
 }
 
 ///|
-fn format_literal(
-  _writer : CodeWriter,
-  value : TemplateValue,
-) -> String raise CodegenError {
+fn format_literal(value : TemplateValue) -> Result[String, String] {
   match value {
-    Text(text) => text
-    Int(number) => number.to_string()
-    Bool(flag) => flag.to_string()
-    Null => ""
-    Sym(symbol) => symbol.full_name()
-    Ref(_) =>
-      raise InvalidTemplate("a value that `L` cannot format: a reference")
-    Call(_) =>
-      raise InvalidTemplate("a value that `L` cannot format: a function")
-    List(_) => raise InvalidTemplate("a value that `L` cannot format: a list")
-    Record(_) =>
-      raise InvalidTemplate("a value that `L` cannot format: a record")
+    Text(text) => Ok(text)
+    Int(number) => Ok(number.to_string())
+    Bool(flag) => Ok(flag.to_string())
+    Null => Ok("")
+    Sym(symbol) => Ok(symbol.full_name())
+    Ref(_) => Err("a value that `L` cannot format: a reference")
+    Call(_) => Err("a value that `L` cannot format: a function")
+    List(_) => Err("a value that `L` cannot format: a list")
+    Record(_) => Err("a value that `L` cannot format: a record")
   }
 }
 
@@ -63,17 +64,14 @@ pub fn CodeWriter::new(
   indent_text~ : String = "    ",
   string_literal~ : (String) -> String = json_string_literal,
 ) -> CodeWriter {
-  let formatters : Map[
-    Char,
-    (CodeWriter, TemplateValue) -> String raise CodegenError,
-  ] = Map([])
-  formatters['L'] = format_literal
-  formatters['S'] = (_, value) => {
+  let formatters : Map[Char, Formatter] = Map([])
+  formatters['L'] = Builtin(format_literal)
+  formatters['S'] = Builtin(value => {
     match value {
-      Text(text) => string_literal(text)
-      _ => raise InvalidTemplate("a value that `S` cannot format: only text")
+      Text(text) => Ok(string_literal(text))
+      _ => Err("a value that `S` cannot format: only text")
     }
-  }
+  })
   {
     namespace,
     indent_text,
@@ -224,7 +222,7 @@ pub fn CodeWriter::put_formatter(
   character : Char,
   formatter : (CodeWriter, TemplateValue) -> String raise CodegenError,
 ) -> Unit {
-  self.state().formatters[character] = formatter
+  self.state().formatters[character] = Custom(formatter)
 }
 
 ///|
@@ -336,14 +334,12 @@ fn CodeWriter::render(
               offset,
               template,
             )
-          Some(formatter) =>
-            out.write_string(
-              formatter(self, value) catch {
-                InvalidTemplate(problem) =>
-                  raise template_error(problem, offset, template)
-                other => raise other
-              },
-            )
+          Some(Builtin(format)) =>
+            match format(value) {
+              Ok(text) => out.write_string(text)
+              Err(problem) => raise template_error(problem, offset, template)
+            }
+          Some(Custom(format)) => out.write_string(format(self, value))
         }
       }
     }

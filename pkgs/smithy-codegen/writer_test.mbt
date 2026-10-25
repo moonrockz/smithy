@@ -221,3 +221,42 @@ test "a custom string literal function replaces the default" {
   w.write("$S", args=[@codegen.Text("a")])
   assert_eq(w.to_string(), "'a'\n")
 }
+
+///|
+test "a custom formatter error passes through unchanged" {
+  let w = @codegen.CodeWriter::new()
+  w.put_formatter('Z', (_, _) => raise @codegen.InvalidTemplate("I found x."))
+  assert_eq(
+    invalid_template(() => w.write("a $Z", args=[@codegen.Null])),
+    "I found x.",
+  )
+  // an error of another kind passes through, too
+  w.put_formatter('Y', (_, _) => raise @codegen.StateError("I found y."))
+  assert_eq(
+    state_error(() => w.write("$Y", args=[@codegen.Null])),
+    "I found y.",
+  )
+  assert_eq(w.to_string(), "")
+}
+
+///|
+test "a formatter that writes with a child writer keeps the child error" {
+  let w = @codegen.CodeWriter::new()
+  w.put_formatter('C', (_, _) => {
+    let child = @codegen.CodeWriter::new()
+    child.write("ab $Q", args=[@codegen.Null])
+    child.to_string()
+  })
+  assert_eq(
+    invalid_template(() => w.write("$C", args=[@codegen.Null])),
+    "I found a formatter `Q` that does not exist at offset 3 in template `ab $Q`.",
+  )
+}
+
+///|
+test "a custom formatter can replace a built-in one" {
+  let w = @codegen.CodeWriter::new()
+  w.put_formatter('L', (_, _) => "custom")
+  w.write("$L", args=[@codegen.List([])])
+  assert_eq(w.to_string(), "custom\n")
+}
