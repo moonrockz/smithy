@@ -230,11 +230,18 @@ pub fn Symbol::full_name(self : Symbol) -> String {
 
 ///|
 /// The dependencies of the symbol and of its references, sorted and without duplicates.
-/// A walk keeps its own stack, so deep reference chains do not overflow.
+/// The walk keeps its own stack, so deep reference chains do not overflow, and a set of
+/// the full names that it has seen, so a cycle or a diamond of references ends.
 pub fn Symbol::all_dependencies(self : Symbol) -> Array[SymbolDependency] {
   let found = []
+  let seen : Map[String, Unit] = Map([])
   let stack = [self]
   while stack.pop() is Some(symbol) {
+    let key = symbol.full_name()
+    if seen.contains(key) {
+      continue
+    }
+    seen[key] = ()
     found.append(symbol.dependencies)
     for reference in symbol.references {
       stack.push(reference.symbol)

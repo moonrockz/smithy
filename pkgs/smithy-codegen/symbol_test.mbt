@@ -121,3 +121,13 @@ test "with_name copies the symbol under a new name" {
   assert_eq(renamed.property("k"), Some(Json::number(1.0)))
   assert_eq(s.name.to_string(), "Order")
 }
+
+///|
+test "all dependencies stop at a cycle of references" {
+  let first = named("First").with_dependency(dependency("a"))
+  let second = named("Second").with_dependency(dependency("b"))
+  first.references.push(@codegen.SymbolReference::new(second))
+  second.references.push(@codegen.SymbolReference::new(first))
+  let names = first.all_dependencies().map(d => d.package_name.to_string())
+  assert_eq(names, ["a", "b"])
+}
