@@ -1,0 +1,1 @@
+{"slug": "morphir-limits", "title": "Where Smithy stops", "section": "Case study: a DSL for the Morphir IR", "spec": "https://smithy.io/2.0/spec/aggregate-types.html#union", "value": {"file": "deal.json", "shape": "morphir.ir.v4#Type"}}

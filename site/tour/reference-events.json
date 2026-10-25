@@ -3145,6 +3145,26 @@
         "38-morphir-values/two-variants": {
             "digest": "c63a51ca20b6070ba46a6a6621d243e38bfa87e8ca48f2f5d4a8c9cf0909a88c",
             "events": []
+        },
+        "39-morphir-limits/legacy-name": {
+            "digest": "0cc5920b0029a055e589f33caf91f9929cf4c8a64f47a4918d36f1f659553248",
+            "events": []
+        },
+        "39-morphir-limits/reference-args": {
+            "digest": "b61a82c337795516a9df75c14cf68eaf5b1974978bffffc3b6e29a90cb43d408",
+            "events": []
+        },
+        "39-morphir-limits/reference-string": {
+            "digest": "53febe4527e1dc645274697ce39448d65aef97ef98a4255622317841683b9eb0",
+            "events": []
+        },
+        "39-morphir-limits/start": {
+            "digest": "b504c34138804b626a3c57fe1f34112bec73e3ca7269ebcc22ed24935c323a12",
+            "events": []
+        },
+        "39-morphir-limits/v3": {
+            "digest": "52813d9d49ce7622ddf426dd338e829613ee17c0c0602b3f26ee80989202a408",
+            "events": []
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"
