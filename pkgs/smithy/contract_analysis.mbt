@@ -270,7 +270,10 @@ fn ContractAnalysis::analyze(
                           node.span,
                           "I could not resolve member \{Json::string(name).stringify()} in the JMESPath object.",
                         )
-                        Null
+                        // A missing field is a known null value, not only an
+                        // inferred null result type. Keep that fact when the
+                        // field is either operand of a comparison.
+                        Constant(Json::null())
                       }
                     }
                 }
@@ -402,9 +405,14 @@ fn ContractAnalysis::analyze(
           Binary(op, _, _) => {
             let left = args[0].name(self.model)
             let right = args[1].name(self.model)
-            // RuntimeType.compare returns BOOLEAN for unlike types, including
-            // number versus a missing field's NULL. Two references return NULL
-            // for every comparator, even equality, and produce a warning.
+            let null_number = match (args[0], args[1]) {
+              (Constant(Null), other) | (other, Constant(Null)) =>
+                other.resolve(self.model) is Number
+              _ => false
+            }
+            // RuntimeType.compare returns BOOLEAN for a known NULL versus a
+            // number on either side. Two references return NULL for every
+            // comparator, even equality, and produce a warning.
             if left == "expression reference" && right == left {
               self.problem(
                 event=Warning,
@@ -414,7 +422,7 @@ fn ContractAnalysis::analyze(
               Null
             } else if op is (Equal | NotEqual) {
               Boolean
-            } else if (left == "number" && right == "null") ||
+            } else if null_number ||
               (
                 left != right &&
                 (

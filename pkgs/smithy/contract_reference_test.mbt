@@ -174,6 +174,9 @@ test "condition bug cases agree with Java 30bdab5" {
     "ConditionsTrait.JmespathProblem.JmespathEventDanger.StartBeforeEnd|DANGER|example#TimeRange",
   ])
   assert_eq(contract_keys(time_range("start < end && end")), [])
+  assert_eq(contract_keys(time_range("finish < start")), [
+    "ConditionsTrait.JmespathProblem.JmespathEventDanger.StartBeforeEnd|DANGER|example#TimeRange",
+  ])
   for
     text in [
       time_range("start < end").replace(
