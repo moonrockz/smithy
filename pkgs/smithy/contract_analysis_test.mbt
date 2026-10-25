@@ -64,7 +64,7 @@ test "conditions use the Smithy JMESPath data model for all shape kinds" {
       ("boolean S", "@"),
       ("string S", "ends_with(@, 'a')"),
       ("enum S { A }", "contains(@, 'A')"),
-      ("intEnum S { A = 1 }", "@ >= `0`"),
+      ("intEnum S { A = 1\n}", "@ >= `0`"),
       ("timestamp S", "@ > `0`"),
       ("byte S", "@ > `0`"),
       ("short S", "@ > `0`"),

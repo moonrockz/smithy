@@ -69,6 +69,40 @@ Feature: Parsing Smithy IDL
     And the member "Foo$baz" is elided
     And the CST prints the model back unchanged
 
+  Scenario: A documentation comment at the end of an enum requires another member
+    Given the Smithy model:
+      """smithy
+      $version: "2"
+      namespace example
+      enum E {
+          A
+          /// orphan
+      }
+      """
+    When I parse the model
+    Then the diagnostics are "SM-PARSE-001"
+    And the first message is "I was expecting an enum member name but found `}`"
+    And the CST prints the model back unchanged
+
+  Scenario Outline: A value assignment requires a line break before the closing brace
+    Given the Smithy model:
+      """smithy
+      $version: "2"
+      namespace example
+      <shape>
+      """
+    When I parse the model
+    Then the diagnostics are "SM-PARSE-003"
+    And the first title is "MISSING LINE BREAK"
+    And the first message is "I was expecting a line break after a value assignment but found `}`"
+    And the CST prints the model back unchanged
+
+    Examples:
+      | shape                                  |
+      | structure S { flag: Boolean = true }    |
+      | enum E { A = "a" }                     |
+      | intEnum E { A = 1 }                     |
+
   Scenario: Shape IDs are read as written, not resolved
     Given the Smithy model:
       """smithy
@@ -84,6 +118,28 @@ Feature: Parsing Smithy IDL
     Then there are no diagnostics
     And the member "S$x" targets "c.d#E$f"
     And the member "S$y" targets "Local"
+
+  Scenario Outline: A member name colon and target cannot have a comment between them
+    Given the Smithy model:
+      """smithy
+      $version: "2"
+      namespace example
+      structure S {
+          <before> <comment> comment
+          <after>
+      }
+      """
+    When I parse the model
+    Then there is 1 error
+    And the first title is "UNEXPECTED LINE BREAK"
+    And the CST prints the model back unchanged
+
+    Examples:
+      | before | comment | after    |
+      | a      | //      | : String |
+      | a      | ///     | : String |
+      | a:     | //      | String   |
+      | a:     | ///     | String   |
 
   Scenario: Text blocks decode per the specification
     Given the Smithy model:

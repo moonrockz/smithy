@@ -291,7 +291,7 @@ test "recursive caller values and structural comparisons terminate at limits" {
 
 ///|
 test "defaults never change input or excuse a missing required member" {
-  let m = model("structure Value { count: Integer = 2 }")
+  let m = model("structure Value { count: Integer = 2\n}")
   m.shapes.get(target("Value$count")).unwrap().traits[@smithy.ShapeId::parse(
     "smithy.api#required",
   ).unwrap()] = @smithy.Object(Map([]))
