@@ -41,6 +41,7 @@ let smithy_rpc_path : String = "site/tour/smithy-rpc-traits.smithy"
 /// `<smithy-rpc-traits>` (`reference_digest` in site/tour/check/reference_test.mbt), so that a change of the
 /// definitions makes the result stale.
 let harness : String =
+  #|import java.io.InputStream;
   #|import java.nio.charset.StandardCharsets;
   #|import java.nio.file.*;
   #|import java.security.MessageDigest;
@@ -83,6 +84,11 @@ let harness : String =
   #|        if (name.endsWith(".selector")) continue;
   #|        // A lesson file name ends in .smithy; the definitions load as IDL under such a name.
   #|        assembler.addUnparsedModel(name.equals("<smithy-rpc-traits>") ? "smithy-rpc-traits.smithy" : name, text);
+  #|      }
+  #|      if (test.expectBooleanMember("smithy_contracts").getValue()) {
+  #|        try (InputStream in = ReferenceTour.class.getResourceAsStream("/META-INF/smithy/contracts.smithy")) {
+  #|          assembler.addUnparsedModel("contracts.smithy", new String(in.readAllBytes(), StandardCharsets.UTF_8));
+  #|        }
   #|      }
   #|      ValidatedResult<Model> result = assembler.assemble();
   #|      List<String> events = new ArrayList<>();
@@ -297,6 +303,13 @@ fn uses_smithy_rpc(files : Array[(String, String)]) -> Bool {
 }
 
 ///|
+/// Whether a case uses the contract traits: a file names the namespace. The harness loads `contracts.smithy` from
+/// the compiled `smithy-contract-traits` module only for these cases.
+fn uses_smithy_contracts(files : Array[(String, String)]) -> Bool {
+  files.iter().any(file => file.1.contains("smithy.contracts#"))
+}
+
+///|
 /// Whether `lesson.json` is that of a static lesson: it has no files/ and no cases/.
 fn is_static(meta : Json) -> Bool {
   meta is { "static": True, .. }
@@ -340,6 +353,7 @@ async fn lesson_cases(root : String) -> Array[Json] {
         "json_ast": Json::boolean(flags.json_ast),
         "http_protocols": Json::boolean(flags.http_protocols),
         "smithy_rpc": Json::boolean(uses_smithy_rpc(files)),
+        "smithy_contracts": Json::boolean(uses_smithy_contracts(files)),
         "files": Json::array(files.map(f => Json::object({ "name": Json::string(f.0), "text": Json::string(f.1) }))),
       }
       if flags.openapi is Some(version) { entry["openapi"] = Json::string(version) }
@@ -371,7 +385,7 @@ async fn compile_reference(source : String, classes : String) -> Unit {
   let resources : Map[String, String] = Map([])
   let verified : Array[Json] = []
   for module_ in [
-    "smithy-utils", "smithy-jmespath", "smithy-model", "smithy-build", "smithy-diff",
+    "smithy-utils", "smithy-jmespath", "smithy-model", "smithy-model-jmespath", "smithy-contract-traits", "smithy-build", "smithy-diff",
     "smithy-protocol-traits", "smithy-aws-traits", "smithy-jsonschema", "smithy-openapi-traits", "smithy-openapi",
   ] {
     let java_prefix = module_ + "/src/main/java"
@@ -494,6 +508,12 @@ test "the lesson output gives the harness flags" {
 test "a case uses smithy.rpc when a file names the namespace" {
   assert_true(uses_smithy_rpc([("a.smithy", "use smithy.rpc#jsonRpc")]))
   assert_false(uses_smithy_rpc([("a.smithy", "namespace example")]))
+}
+
+///|
+test "a case uses the contract traits when a file names the namespace" {
+  assert_true(uses_smithy_contracts([("a.smithy", "use smithy.contracts#conditions")]))
+  assert_false(uses_smithy_contracts([("a.smithy", "namespace example")]))
 }
 
 ///|

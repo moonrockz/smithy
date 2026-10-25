@@ -128,6 +128,12 @@ from `site/tour/smithy-rpc-traits.smithy`. A test of `reference_test.mbt` requir
 case also covers the definitions, as the file `<smithy-rpc-traits>`, so a change of the definitions makes its
 reference result stale. The digest of another case covers the case files only.
 
+The contract traits (`smithy.contracts#conditions`) are standard Smithy. The harness compiles `smithy-model-jmespath`
+and `smithy-contract-traits` and sets the case member `smithy_contracts` when a file contains `smithy.contracts#`.
+It then loads `META-INF/smithy/contracts.smithy` from the compiled module. The digest does not cover these
+definitions: they come from the pinned checkout, and `reference_sha` already pins it. A case with the flag is
+checked at level 2 like any other case.
+
 ## The allow list
 
 `site/tour/reference-allow.json` lists the known differences between the playground core and the Java reference.
