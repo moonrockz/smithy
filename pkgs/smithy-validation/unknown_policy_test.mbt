@@ -2,7 +2,18 @@
 fn policy_model(source : String) -> @smithy.Model raise {
   let loaded = @smithy.Loader::new()
     .add_idl(
-      "policy.smithy", "$version: \"2\"\nnamespace smithy.rpc\n@trait(selector: \":is(service, structure)\") enum unknownMembers { REJECT = \"reject\"\n IGNORE = \"ignore\" }\n@trait(selector: \"structure > member\") structure criticalPaths { @required separator: String }",
+      "policy.smithy",
+      (
+        #|$version: "2"
+        #|namespace smithy.rpc
+        #|@trait(selector: ":is(service, structure)")
+        #|enum unknownMembers {
+        #|  REJECT = "reject"
+        #|  IGNORE = "ignore"
+        #|}
+        #|@trait(selector: "structure > member")
+        #|structure criticalPaths { @required separator: String }
+      ),
     )
     .add_idl(
       "value.smithy",
