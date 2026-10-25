@@ -505,10 +505,9 @@ test("a transcript lesson steps through the exchange", async ({ page }) => {
   expect(page.errors).toEqual([]);
 });
 
-
-// No lesson uses the value engine yet, so this test gives the first lesson page the data of a value lesson.
-// The checker, the editors and the Worker are the real ones.
-async function openValueLesson(page) {
+// No lesson uses the value or message engine yet, so these tests give the first lesson page the data of such a
+// lesson. The checker, the editors and the Worker are the real ones.
+async function openEngineLesson(page, engine, files) {
   await page.route("**/tour/hello-smithy/", async (route) => {
     const response = await route.fetch();
     const html = await response.text();
@@ -524,26 +523,31 @@ async function openValueLesson(page) {
       return;
     }
     const lesson = data.tour[1];
-    lesson.engine = [
-      "Value",
-      { file: "order.json", shape: "example#Order", options: { unknown_members: "Reject", member_names: "Smithy" } },
-    ];
+    lesson.engine = engine;
     delete lesson.output;
     delete lesson.playground;
-    lesson.digest = "value-lesson-fixture";
-    lesson.files = [
-      {
-        name: "model.smithy",
-        text: '$version: "2"\n\nnamespace example\n\nstructure Order {\n    @range(min: 1, max: 10)\n    quantity: Integer\n}\n',
-      },
-      { name: "order.json", text: '{"quantity": 3}' },
-    ];
+    lesson.digest = "engine-lesson-fixture";
+    lesson.files = files;
     await route.fulfill({ response, body: html.replace(meta[1], escape(JSON.stringify(data))) });
   });
   await page.goto(lessonUrl);
   await expect(page.locator("#tour-editor .cm-content")).toBeVisible();
   await expect(page.locator("#tour-output .cm-content")).toBeAttached();
   await settled(page);
+}
+
+async function openValueLesson(page) {
+  await openEngineLesson(
+    page,
+    ["Value", { file: "order.json", shape: "example#Order", options: { unknown_members: "Reject", member_names: "Smithy" } }],
+    [
+      {
+        name: "model.smithy",
+        text: '$version: "2"\n\nnamespace example\n\nstructure Order {\n    @range(min: 1, max: 10)\n    quantity: Integer\n}\n',
+      },
+      { name: "order.json", text: '{"quantity": 3}' },
+    ],
+  );
 }
 
 test("a value lesson shows the value findings, marks the changed line and reports a broken value", async ({ page }) => {
@@ -573,6 +577,79 @@ test("a value lesson shows the value findings, marks the changed line and report
   await expect(output).not.toContainText("error[Range]");
 
   // The expand button of the output pane works with the value pane.
+  await page.getByRole("button", { name: "Expand the output" }).click();
+  await expect(page.getByRole("button", { name: "Expand the output" })).toHaveAttribute("aria-pressed", "true");
+  expect(page.errors).toEqual([]);
+});
+
+const calculator = `$version: "2"
+namespace example
+
+use smithy.rpc#jsonRpc
+use smithy.rpc#method
+
+@jsonRpc(versions: ["1.0", "2.0"])
+service Calculator {
+    version: "1"
+    operations: [Subtract]
+}
+
+@method(name: "subtract", params: "either", positional: ["minuend", "subtrahend"], resultMember: "value")
+operation Subtract { input: SubtractInput, output: SubtractOutput }
+
+structure SubtractInput {
+    @required
+    minuend: Integer
+    @required
+    subtrahend: Integer
+}
+
+structure SubtractOutput { value: Integer }
+`;
+
+test("a message lesson shows the message findings, marks the changed line and reports a broken message", async ({ page }) => {
+  await openEngineLesson(
+    page,
+    [
+      "Message",
+      {
+        file: "call.json",
+        service: "example#Calculator",
+        version: "V2_0",
+        role: "Request",
+        options: { unknown_members: "Reject", member_names: "Smithy" },
+      },
+    ],
+    [
+      { name: "model.smithy", text: calculator },
+      { name: "call.json", text: '{"jsonrpc":"2.0","method":"subtract","params":[42,23],"id":1}' },
+    ],
+  );
+  const output = page.locator("#tour-output .cm-content");
+  await expect(page.getByRole("tab", { name: "Message findings" })).toHaveAttribute("aria-selected", "true");
+  await expect(output).toContainText("No findings. The message is valid.");
+  await expect(page.getByRole("button", { name: "Open in playground" })).toHaveCount(0);
+
+  // Change 23 to "23": the pane shows the TypeMismatch line at /params/1.
+  await page.getByRole("tab", { name: "call.json" }).click();
+  const editor = page.locator("#tour-editor .cm-content");
+  await expect(editor).toContainText('"params":[42,23]');
+  await editor.getByText("23").dblclick();
+  await page.keyboard.type('"23"');
+  await settled(page);
+  await expect(output).toContainText("call.json/params/1: error[TypeMismatch]");
+  await expect(output.locator(".cm-line")).toHaveCount(1);
+  await expect(page.locator("#tour-output .cm-line.tour-changed")).toHaveCount(1);
+
+  // Delete the last brace: the old line goes, the InvalidJson line comes.
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Backspace");
+  await settled(page);
+  await expect(output).toContainText("error[InvalidJson]");
+  await expect(output).not.toContainText("error[TypeMismatch]");
+
+  // The expand button of the output pane works with the message pane.
   await page.getByRole("button", { name: "Expand the output" }).click();
   await expect(page.getByRole("button", { name: "Expand the output" })).toHaveAttribute("aria-pressed", "true");
   expect(page.errors).toEqual([]);

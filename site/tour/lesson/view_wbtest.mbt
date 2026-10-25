@@ -118,6 +118,14 @@ test "each output has a tab name" {
     options: @samples.ValueOptions::default(),
   }
   assert_eq(output_label(Value(setup), None), Some("Value findings"))
+  let message : @model.MessageSetup = {
+    file: "call.json",
+    service: "example#Calculator",
+    version: V2_0,
+    role: Request,
+    options: @samples.ValueOptions::default(),
+  }
+  assert_eq(output_label(Message(message), None), Some("Message findings"))
 }
 
 ///|
@@ -198,6 +206,22 @@ async test "a value lesson has the tabs Findings and Value findings and no Open 
   )
   assert_false(html.contains("Open in playground"))
   // The expand buttons stay.
+  assert_true(expand_tag(html, "Expand the output") != "")
+  assert_true(expand_tag(html, "Expand the editor") != "")
+}
+
+///|
+#cfg(not(target="js"))
+async test "a message lesson has the tab Message findings and keeps the expand buttons" {
+  let (m, _) = Model::start(message_page(), None)
+  let html = render(m)
+  assert_true(html.contains(">Findings"))
+  assert_true(html.contains(">Message findings</button>"))
+  assert_true(
+    button_tag(html, "Message findings").contains("aria-selected=\"true\""),
+  )
+  assert_false(html.contains("Value findings"))
+  assert_false(html.contains("Open in playground"))
   assert_true(expand_tag(html, "Expand the output") != "")
   assert_true(expand_tag(html, "Expand the editor") != "")
 }

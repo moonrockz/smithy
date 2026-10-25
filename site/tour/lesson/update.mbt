@@ -159,33 +159,52 @@ fn Model::check_now(self : Model) -> (Model, Array[Effect]) {
 }
 
 ///|
-/// Send the value check. Call it only for a value lesson.
-fn Model::send_check_value(self : Model) -> (Model, Array[Effect]) {
-  guard self.page.engine is Value(setup) else { return (self, []) }
-  let seq = self.seq + 1
-  let value = match self.files.search_by(f => f.name == setup.file) {
-    Some(i) => self.files[i].text
-    None => ""
+/// Send the value or message check. Call it only for a value or message lesson.
+fn Model::send_check(self : Model) -> (Model, Array[Effect]) {
+  let text_of = (name : String) => {
+    match self.files.search_by(f => f.name == name) {
+      Some(i) => self.files[i].text
+      None => ""
+    }
   }
+  let (inflight, request) = match self.page.engine {
+    Value(setup) =>
+      (
+        CheckingValue,
+        SendCheckValue(
+          seq=self.seq + 1,
+          files=model_pairs(self),
+          shape=setup.shape,
+          value=text_of(setup.file),
+          options=setup.options,
+        ),
+      )
+    Message(setup) =>
+      (
+        CheckingMessage,
+        SendCheckMessage(
+          seq=self.seq + 1,
+          files=model_pairs(self),
+          service=setup.service,
+          version=setup.version,
+          message=text_of(setup.file),
+          kind=setup.message_kind(self.files),
+          options=setup.options,
+        ),
+      )
+    _ => return (self, [])
+  }
+  let seq = self.seq + 1
   (
     {
       ..self,
       seq,
       sent_edits: self.edits,
       waiting: true,
-      inflight: CheckingValue,
+      inflight,
       pending: false,
     },
-    [
-      SendCheckValue(
-        seq~,
-        files=model_pairs(self),
-        shape=setup.shape,
-        value~,
-        options=setup.options,
-      ),
-      Wait(ms=TIMEOUT_MS, msg=TimedOut(seq)),
-    ],
+    [request, Wait(ms=TIMEOUT_MS, msg=TimedOut(seq))],
   )
 }
 
@@ -230,10 +249,12 @@ fn Model::not_shown(self : Model, reason : String) -> (Model, Array[Effect]) {
 }
 
 ///|
-/// The name of the value file of a value lesson, "" for another lesson.
-fn Model::value_file(self : Model) -> String {
+/// The name of the data file of a value or message lesson, "" for another
+/// lesson.
+fn Model::data_file(self : Model) -> String {
   match self.page.engine {
     Value(setup) => setup.file
+    Message(setup) => setup.file
     _ => ""
   }
 }
@@ -263,12 +284,12 @@ fn Model::checked(
     // The transcript check needs a model without errors. The pane says so.
     return { ..m, transcript: None, not_run: Some(not_run_text), }.next(marked)
   }
-  if self.page.engine is Value(_) {
+  if self.page.engine is (Value(_) | Message(_)) {
     return if items.filter(is_error).length() == 0 {
-      let (sent, more) = { ..m, waiting: false, retried: false, }.send_check_value()
+      let (sent, more) = { ..m, waiting: false, retried: false, }.send_check()
       (sent, [..marked, ..more])
     } else {
-      // The value check needs a model without errors. The pane says so.
+      // The value or message check needs a model without errors. The pane says so.
       let shown = { ..m, output: NotShown(not_run_text), }
       shown.next([..marked, ShowOutput(text=not_run_text, highlight=[])])
     }
@@ -388,7 +409,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
             ShowOutput(text~, highlight~),
           ])
         }
-        (Transforming | CheckingValue, NotConverted(reason)) => {
+        (Transforming | CheckingValue | CheckingMessage, NotConverted(reason)) => {
           let (m, shown) = m.not_shown(reason)
           m.next(shown)
         }
@@ -397,8 +418,14 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
         // No rows of an older text stay.
         (Transcribing, NotConverted(reason)) =>
           { ..m, transcript: None, not_run: Some(reason), }.next([])
-        (CheckingValue, DataChecked(valid=_, findings~)) => {
-          let text = data_text(findings, m.value_file())
+        (CheckingValue, DataChecked(valid=_, findings~))
+        | (CheckingMessage, DataChecked(valid=_, findings~)) => {
+          let empty = if m.inflight == CheckingMessage {
+            message_valid_text
+          } else {
+            valid_text
+          }
+          let text = data_text(findings, m.data_file(), empty~)
           let before = match m.output {
             Shown(text~, ..) => text
             _ => ""
@@ -429,7 +456,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
             { ..m, transcript: None, not_run: Some(timeout_text), }.next([
               RestartWorker,
             ])
-          (Transforming | CheckingValue, _) => {
+          (Transforming | CheckingValue | CheckingMessage, _) => {
             let (m, shown) = m.not_shown(timeout_text)
             m.next([RestartWorker, ..shown])
           }
@@ -452,7 +479,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
           // The new Worker holds no transcript: start it again. The answer
           // steps to the position of the reader.
           Transcribing => m.send_transcript_start()
-          CheckingValue => m.send_check_value()
+          CheckingValue | CheckingMessage => m.send_check()
         }
         ({ ..sent, retried: true, }, [RestartWorker, ..more])
       }

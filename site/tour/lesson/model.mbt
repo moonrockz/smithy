@@ -172,6 +172,16 @@ pub(all) enum Effect {
     value~ : String,
     options~ : @samples.ValueOptions
   )
+  /// Send the model files and the message to the Worker for a message check.
+  SendCheckMessage(
+    seq~ : Int32,
+    files~ : Array[(String, String)],
+    service~ : String,
+    version~ : @samples.RpcVersion,
+    message~ : String,
+    kind~ : @samples.MessageKind,
+    options~ : @samples.ValueOptions
+  )
   /// Send `msg` after `ms` milliseconds.
   Wait(ms~ : Int32, msg~ : Msg)
   /// Put this text, of the selected file `file`, in the model editor, in
@@ -210,6 +220,7 @@ pub(all) enum Kind {
   Transforming
   Transcribing
   CheckingValue
+  CheckingMessage
 } derive(Eq, Debug)
 
 ///|
@@ -406,16 +417,24 @@ fn has_output_pane(page : @model.LessonPage) -> Bool {
 pub let valid_text : String = "No findings. The value is valid."
 
 ///|
-/// The text of the value and the transcript pane when the model has errors:
-/// their check needs a model without errors.
+/// The text of the message pane when the message is valid.
+pub let message_valid_text : String = "No findings. The message is valid."
+
+///|
+/// The text of the value, message and transcript panes when the model has
+/// errors: their check needs a model without errors.
 pub let not_run_text : String = "The check did not run, because the model has errors. See the Findings tab."
 
 ///|
-/// The text of the value pane: the CLI line of each finding, as for the value
-/// file `file`; `valid_text` when there is none.
-pub fn data_text(findings : Array[@core.DataFinding], file : String) -> String {
+/// The text of the value or message pane: the CLI line of each finding, as for
+/// the data file `file`; `empty` (`valid_text` by default) when there is none.
+pub fn data_text(
+  findings : Array[@core.DataFinding],
+  file : String,
+  empty~ : String = valid_text,
+) -> String {
   if findings.is_empty() {
-    valid_text
+    empty
   } else {
     findings.map(f => f.cli_line(file~)).join("\n")
   }

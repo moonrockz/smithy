@@ -1075,6 +1075,212 @@ test "the second timeout of a value check shows the timeout text" {
 }
 
 ///|
+let call_text : String = "{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,23],\"id\":1}\n"
+
+///|
+let reply_text : String = "{\"jsonrpc\":\"2.0\",\"result\":19,\"id\":1}\n"
+
+///|
+/// A request lesson: the model and the message file `call.json`.
+fn message_page() -> @model.LessonPage {
+  let files : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: start_text, },
+    { name: "call.json", text: call_text, },
+  ]
+  {
+    ..page(),
+    engine: Message({
+      file: "call.json",
+      service: "example#Calculator",
+      version: V2_0,
+      role: Request,
+      options: order_options,
+    }),
+    output: None,
+    files,
+    digest: @model.digest(files),
+    playground: None,
+  }
+}
+
+///|
+/// A response lesson: the reply and the request that it answers.
+fn response_page() -> @model.LessonPage {
+  let files : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: start_text, },
+    { name: "reply.json", text: reply_text, },
+    { name: "call.json", text: call_text, },
+  ]
+  {
+    ..message_page(),
+    engine: Message({
+      file: "reply.json",
+      service: "example#Calculator",
+      version: V2_0,
+      role: Response(
+        context=Some(RequestFile("call.json")),
+        legacy_errors=Opaque,
+      ),
+      options: order_options,
+    }),
+    files,
+    digest: @model.digest(files),
+  }
+}
+
+///|
+fn check_message_effect(
+  seq : Int32,
+  message : String,
+  kind~ : @samples.MessageKind,
+) -> Effect {
+  SendCheckMessage(
+    seq~,
+    files=[("model.smithy", start_text)],
+    service="example#Calculator",
+    version=V2_0,
+    message~,
+    kind~,
+    options=order_options,
+  )
+}
+
+///|
+fn mismatch_finding() -> @core.DataFinding {
+  Found(
+    code="TypeMismatch",
+    severity="error",
+    path="/params/1",
+    shape="example#SubtractInput$subtrahend",
+    message="I expected an integer, but found a string.",
+    offset=None,
+  )
+}
+
+///|
+test "a message lesson validates the model files, then checks the message" {
+  let (m, effects) = Model::start(message_page(), None)
+  assert_eq(
+    effects[1],
+    SendValidate(seq=1, files=[("model.smithy", start_text)]),
+  )
+  let (m, effects) = update(m, Answered(seq=1, answer=Checked([])))
+  assert_eq(m.inflight, CheckingMessage)
+  assert_eq(effects, [
+    Mark(items=[]),
+    check_message_effect(2, call_text, kind=RequestMessage),
+    Wait(ms=10000, msg=TimedOut(2)),
+  ])
+}
+
+///|
+test "a message lesson with model errors does not check the message and says why" {
+  let (m, _) = Model::start(message_page(), None)
+  let (m, effects) = update(
+    m,
+    Answered(seq=1, answer=Checked([error_in("model.smithy", 3)])),
+  )
+  assert_false(effects.any(e => e is SendCheckMessage(..)))
+  assert_true(effects.contains(ShowOutput(text=not_run_text, highlight=[])))
+  assert_eq(m.output, NotShown(not_run_text))
+}
+
+///|
+test "a response lesson sends the text of the request file as the original request" {
+  let (m, _) = Model::start(response_page(), None)
+  let (m, effects) = update(m, Answered(seq=1, answer=Checked([])))
+  assert_true(
+    effects.contains(
+      check_message_effect(
+        2,
+        reply_text,
+        kind=ResponseMessage(
+          context=Some(OriginalRequest(call_text)),
+          legacy_errors=None,
+        ),
+      ),
+    ),
+  )
+  // Edit call.json (the third file): the next check has the edited text.
+  let edited = "{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[1,2],\"id\":7}"
+  let (_, effects) = run(m, [
+    Answered(seq=2, answer=DataChecked(valid=true, findings=[])),
+    SelectFile(2),
+    Edited(edited),
+    Debounced(1),
+    Answered(seq=3, answer=Checked([])),
+  ])
+  assert_true(
+    effects.contains(
+      check_message_effect(
+        4,
+        reply_text,
+        kind=ResponseMessage(
+          context=Some(OriginalRequest(edited)),
+          legacy_errors=None,
+        ),
+      ),
+    ),
+  )
+}
+
+///|
+test "the message answer shows the CLI lines for the message file" {
+  let (m, _) = Model::start(message_page(), None)
+  let m = update(m, Answered(seq=1, answer=Checked([]))).0
+  let findings = [mismatch_finding()]
+  let (_, effects) = update(
+    m,
+    Answered(seq=2, answer=DataChecked(valid=false, findings~)),
+  )
+  let text = data_text(findings, "call.json", empty=message_valid_text)
+  assert_eq(effects, [ShowOutput(text~, highlight=[])])
+  assert_eq(
+    text, "call.json/params/1: error[TypeMismatch] example#SubtractInput$subtrahend: I expected an integer, but found a string.",
+  )
+}
+
+///|
+test "a valid message shows the message text, a valid value the value text" {
+  let (m, _) = Model::start(message_page(), None)
+  let m = update(m, Answered(seq=1, answer=Checked([]))).0
+  let (_, effects) = update(
+    m,
+    Answered(seq=2, answer=DataChecked(valid=true, findings=[])),
+  )
+  assert_eq(effects, [
+    ShowOutput(text="No findings. The message is valid.", highlight=[]),
+  ])
+  assert_eq(message_valid_text, "No findings. The message is valid.")
+  assert_eq(valid_text, "No findings. The value is valid.")
+}
+
+///|
+test "a message file opens in JSON mode and a message lesson keeps the expand control" {
+  let (m, _) = Model::start(message_page(), None)
+  assert_eq(m.pane, OutputPane)
+  let (_, effects) = update(m, SelectFile(1))
+  assert_eq(
+    effects[0],
+    LoadEditor(text=call_text, file="call.json", fresh=false, language="json"),
+  )
+  let (m, effects) = update(m, ToggleExpand(OutputSide))
+  assert_eq(m.layout, OutputOnly)
+  assert_eq(effects, [Remeasure])
+}
+
+///|
+test "the second timeout of a message check shows the timeout text" {
+  let (m, _) = Model::start(message_page(), None)
+  let m = update(m, Answered(seq=1, answer=Checked([]))).0
+  let (m, _) = update(m, TimedOut(2))
+  assert_true(m.retried)
+  let (m, effects) = update(m, TimedOut(3))
+  assert_eq(m.output, NotShown(timeout_text))
+  assert_true(effects.contains(RestartWorker))
+}
+
+///|
 let exchange_text : String = "{\"entries\": [1, 2, 3]}\n"
 
 ///|
