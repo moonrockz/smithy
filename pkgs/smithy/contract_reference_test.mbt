@@ -398,3 +398,50 @@ test "a failed condition says why when the result is not boolean or the evaluati
     ],
   )
 }
+
+///|
+test "large numbers compare as in Smithy" {
+  // Java compares two integers, or a number that a double cannot hold, exactly,
+  // and compares with a double only when one side is a double. Keys from the
+  // Smithy reference.
+  let failed = ["DefaultTrait.C|ERROR|example#S$n"]
+  for
+    (shape, expression, default, expected) in [
+      ("long", "@ > `9007199254740992`", "9007199254740993", []),
+      ("long", "@ <= `9007199254740992`", "9007199254740993", failed),
+      ("long", "@ == `9007199254740992`", "9007199254740993", failed),
+      ("long", "@ == `9223372036854775806`", "9223372036854775807", failed),
+      ("bigInteger", "@ > `9007199254740992`", "9007199254740993", []),
+      ("bigInteger", "@ == `9007199254740992`", "9007199254740993", failed),
+      ("bigInteger", "@ > `18446744073709551616`", "18446744073709551617", []),
+      (
+        "bigInteger", "@ == `18446744073709551616`", "18446744073709551617", failed,
+      ),
+      ("bigDecimal", "@ > `9007199254740992`", "9007199254740993", []),
+      ("bigDecimal", "@ == `9007199254740992`", "9007199254740993", failed),
+      (
+        "bigDecimal",
+        "@ > `0.10000000000000000001`",
+        "0.10000000000000000002",
+        [],
+      ),
+      (
+        "bigDecimal", "@ == `0.10000000000000000001`", "0.10000000000000000002",
+        failed,
+      ),
+      // The default is an integer token, so both sides are exact.
+      ("double", "@ > `9007199254740992`", "9007199254740993", []),
+      // A literal with a decimal point that a double holds is a double, so the
+      // comparison rounds the integer to a double, as in Smithy.
+      ("long", "@ > `9007199254740992.0`", "9007199254740993", failed),
+    ] {
+    let model = "$version: \"2\"\nnamespace example\nuse smithy.contracts#conditions\n@conditions({C: {expression: " +
+      Json::string(expression).stringify() +
+      ", documentation: \"x\"}})\n" +
+      shape +
+      " N\nstructure S {\n    n: N = " +
+      default +
+      "\n}\n"
+    assert_eq(contract_keys(model), expected, msg=shape + " " + expression)
+  }
+}

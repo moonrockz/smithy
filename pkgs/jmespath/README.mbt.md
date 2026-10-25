@@ -37,6 +37,38 @@ evaluate eagerly; logical `&&` and `||` short-circuit. Projections omit null
 results; `map` retains them. Strings use Unicode code points for length, reverse
 and ordering. Object iteration order is unspecified, as in JMESPath.
 
+## Numbers
+
+Comparisons, equality, `contains`, `sort`, `max` and `min` treat numbers as the
+JMESPath runtime of the Smithy reference does. A number token without `.`, `e`
+or `E` is a 64-bit integer, or a big integer beyond 64 bits. A decimal token is
+a double when a double holds its exact value, and a big decimal otherwise. Two
+integers, or a big integer or big decimal on either side, compare exactly. A
+double on either side makes the comparison use doubles, so `9007199254740993`
+equals `` `9007199254740992.0` `` but not `` `9007199254740992` ``.
+
+The class and the exact value come from the token in the `repr` of a JSON
+number. Number literals keep their token, and `to_number` reads a string as a
+64-bit integer or a double, as in Smithy. `@json.parse` keeps the token only of
+an integer that a double cannot hold, so give a decimal input its token in
+`repr` when its exact value matters. A number without its token is an integer
+when it is a whole number in the 64-bit range, and a double otherwise.
+
+```mbt check
+///|
+test {
+  let input = @json.parse("9007199254740993")
+  assert_eq(
+    @jmespath.search("@ > `9007199254740992`", input),
+    Json::boolean(true),
+  )
+  assert_eq(
+    @jmespath.search("@ == `9007199254740992.0`", input),
+    Json::boolean(true),
+  )
+}
+```
+
 ## Inspect expressions and errors
 
 `Expression` retains the original `source` and an inspectable `root: Node`.

@@ -93,10 +93,12 @@ fn finite_number(value : Double, span : Span) -> Json raise JmespathError {
 }
 
 ///|
-/// Compare strings by Unicode code point rather than UTF-16 code unit.
+/// Compare numbers as the Smithy reference does (see `number_order`), and
+/// strings by Unicode code point rather than UTF-16 code unit.
 fn compare_json(a : Json, b : Json) -> Int32 {
   match (a, b) {
-    (Number(a, ..), Number(b, ..)) => a.compare(b)
+    (Number(x, repr=x_repr), Number(y, repr=y_repr)) =>
+      number_order(x, x_repr, y, y_repr)
     (String(a), String(b)) => {
       let a = a.iter()
       let b = b.iter()
@@ -193,15 +195,12 @@ fn call(
       }
     "to_number" =>
       match first {
-        Number(n, ..) => finite_number(n, span)
-        String(s) => {
-          let n = @string.parse_double(s) catch { _ => return Json::null() }
-          if n.is_nan() || n.is_inf() {
-            Json::null()
-          } else {
-            Json::number(n)
-          }
+        Number(n, ..) => {
+          ignore(finite_number(n, span))
+          // Keep the source token, so the number keeps its exact value.
+          first
         }
+        String(s) => to_number_of_string(s)
         _ => Json::null()
       }
     "not_null" => {
@@ -256,7 +255,7 @@ fn call(
             String(needle) => Json::boolean(s.contains(needle))
             _ => type_error(name, "a string search value", nodes[1].span)
           }
-        Array(xs) => Json::boolean(xs.contains(needle))
+        Array(xs) => Json::boolean(xs.iter().any(x => json_equal(x, needle)))
         _ => type_error(name, "string or array", span)
       }
     }
@@ -395,4 +394,35 @@ fn apply_keys(
     }
     best.map(entry => entry.1).unwrap_or(Json::null())
   }
+}
+
+///|
+/// `to_number` of a string, as in the Smithy reference: a string with `.`,
+/// `e` or `E` is a double, and any other string is a 64-bit integer or null.
+fn to_number_of_string(s : String) -> Json {
+  if is_decimal_token(s) {
+    let n = @string.parse_double(s) catch { _ => return Json::null() }
+    if n.is_nan() || n.is_inf() {
+      return Json::null()
+    }
+    // A decimal token that a double holds makes the number a double.
+    let text = n.to_string()
+    return Json::number(
+      n,
+      repr=if is_decimal_token(text) { text } else { text + ".0" },
+    )
+  }
+  let digits = if s.has_prefix("-") || s.has_prefix("+") {
+    s[1:].to_owned()
+  } else {
+    s
+  }
+  guard !digits.is_empty() && digits.iter().all(c => c >= '0' && c <= '9') else {
+    return Json::null()
+  }
+  let token = if s.has_prefix("+") { digits } else { s }
+  let whole = BigInt::from_string(token)
+  guard whole >= long_min && whole <= long_max else { return Json::null() }
+  let n = @string.parse_double(token) catch { _ => return Json::null() }
+  Json::number(n, repr=token)
 }

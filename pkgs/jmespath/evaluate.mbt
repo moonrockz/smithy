@@ -314,20 +314,22 @@ pub fn Expression::evaluate(
       Compare(op, a) => {
         let b = values.pop().unwrap()
         let result = match op {
-          Equal => Json::boolean(a == b)
-          NotEqual => Json::boolean(a != b)
+          Equal => Json::boolean(json_equal(a, b))
+          NotEqual => Json::boolean(!json_equal(a, b))
           _ =>
             match (a, b) {
-              (Number(a, ..), Number(b, ..)) =>
+              (Number(a, repr=a_repr), Number(b, repr=b_repr)) => {
+                let order = number_order(a, a_repr, b, b_repr)
                 Json::boolean(
                   match op {
-                    Less => a < b
-                    LessEqual => a <= b
-                    Greater => a > b
-                    GreaterEqual => a >= b
+                    Less => order < 0
+                    LessEqual => order <= 0
+                    Greater => order > 0
+                    GreaterEqual => order >= 0
                     _ => false
                   },
                 )
+              }
               _ => Json::null()
             }
         }

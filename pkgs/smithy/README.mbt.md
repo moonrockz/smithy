@@ -236,7 +236,10 @@ Model validation evaluates the conditions on the values in the model, as the
 Smithy reference does: trait values, default values, example values, typed
 metadata and protocol test parameters. Each shape that a value reaches checks
 its own conditions, so a member and its target both apply. A shape does not
-check a document value or a value of the wrong type. When the result is not
+check a document value or a value of the wrong type. Numbers in the model keep
+their exact tokens, so a `long`, `bigInteger` or `bigDecimal` value compares
+exactly, with the number rules of the
+[`moonrockz/jmespath`](../jmespath/README.mbt.md#numbers) package. When the result is not
 `true`, the event ID is the event ID of the value plus the condition name:
 `TraitValue.<Name>`, `DefaultTrait.<Name>`, `ExamplesTrait.<Name>`,
 `TypedMetadata.<key>.<Name>`, or `HttpRequestTestsInput.<Name>` and the other
