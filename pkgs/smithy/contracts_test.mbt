@@ -271,7 +271,7 @@ test "contract names require imports and local conditions traits remain local" {
 }
 
 ///|
-test "conditions inherit through mixins and preserve expressions without evaluation" {
+test "conditions inherit through mixins and survive JSON AST export" {
   let model = loaded(
     @smithy.Loader::new().add_idl(
       "mixin.smithy",
@@ -286,7 +286,7 @@ test "conditions inherit through mixins and preserve expressions without evaluat
         #|    value: Integer
         #|}
         #|structure S with [Base] {}
-        #|@conditions(Never: {expression: "`false`", documentation: "Preserved without evaluation."})
+        #|@conditions(Positive: {expression: "@ > `0`", documentation: "Positive value."})
         #|integer N
         #|structure WithDefault { n: N = 1 }
       ),
@@ -302,6 +302,8 @@ test "conditions inherit through mixins and preserve expressions without evaluat
       model.get(inherited).unwrap().trait_value("smithy.contracts#conditions"),
     )
   }
+  // The default value 1 matches the condition of its target.
+  assert_eq(model.validation_events().filter(e => e.severity == "ERROR"), [])
   let restored = loaded(
     @smithy.Loader::new().add_ast("export.json", model.to_json_ast()),
   )

@@ -54,6 +54,77 @@ fn IdRefSelections::selects(
 }
 
 ///|
+/// The parsed form of a condition expression, kept in `parsed` so each
+/// expression is parsed once per walk. An expression that does not parse is
+/// `None`: the contract analysis reports it, and no value is checked with it.
+fn parsed_condition(
+  parsed : Map[String, @jmespath.Expression?],
+  expression : String,
+) -> @jmespath.Expression? {
+  match parsed.get(expression) {
+    Some(result) => result
+    None => {
+      let result = Some(@jmespath.parse(expression)) catch { _ => None }
+      parsed[expression] = result
+      result
+    }
+  }
+}
+
+///|
+/// Evaluate a condition on a value. `None` means the condition holds. A
+/// failure gives the text to add to the message: empty for a `false` result,
+/// as in Smithy, and the reason for a result that is not boolean or an
+/// evaluation error. Smithy stops the validation in these two cases.
+fn condition_failure(
+  expression : @jmespath.Expression,
+  value : NodeValue,
+) -> String? {
+  let result = expression.evaluate(@json.to_json(value)) catch {
+    @jmespath.JmespathError(diagnostic) =>
+      return Some(", but I could not evaluate it: " + diagnostic.message)
+  }
+  let kind = match result {
+    True => return None
+    False => return Some("")
+    Null => "null"
+    Number(_) => "a number"
+    String(_) => "a string"
+    Array(_) => "an array"
+    Object(_) => "an object"
+  }
+  Some(", but the result is " + kind + ", not a boolean")
+}
+
+///|
+/// Tell whether the value reaches the node validator plugins of a shape with
+/// this body, as in Smithy's `NodeValidationVisitor`: a member always, a
+/// document never, a timestamp always, and any other shape only when the value
+/// has its node type (and an integer is in range).
+fn conditions_apply(body : ShapeBody, value : NodeValue) -> Bool {
+  match (body, value) {
+    (Member(..), _) => true
+    (Simple(Document), _) => false
+    (Simple(Timestamp), _) => true
+    (Simple(Boolean), Boolean(_)) => true
+    (Simple(String | Blob), String(_)) => true
+    (Enum(_), String(_)) => true
+    (Simple(Float | Double), Number(_) | String(_)) => true
+    (Simple(BigDecimal), Number(_)) => true
+    (Simple(BigInteger), Number(n)) => n.is_integer()
+    (Simple(Byte), Number(n)) => n.in_range("-128", "127")
+    (Simple(Short), Number(n)) => n.in_range("-32768", "32767")
+    (Simple(Integer) | IntEnum(_), Number(n)) =>
+      n.in_range("-2147483648", "2147483647")
+    (Simple(Long), Number(n)) =>
+      n.in_range("-9223372036854775808", "9223372036854775807")
+    (List(_), Array(_)) => true
+    (Map(..) | Structure(_) | Union(_), Object(_)) => true
+    _ => false
+  }
+}
+
+///|
 fn Model::node_validation_events(
   self : Model,
   value : NodeValue,
@@ -68,6 +139,7 @@ fn Model::node_validation_events(
   let events : Array[ValidationEvent] = []
   let stack = [(target, value, "")]
   let seen : Set[String] = Set([])
+  let conditions_parsed : Map[String, @jmespath.Expression?] = Map([])
   let constraint_severity = if allow_constraint_errors {
     "WARNING"
   } else {
@@ -246,6 +318,28 @@ fn Model::node_validation_events(
       }
       if duplicate {
         emit("", severity, "Collection contains duplicate values.")
+      }
+    }
+    if shape.trait_value("smithy.contracts#conditions")
+      is Some(Object(conditions)) &&
+      conditions_apply(shape.body, value) {
+      for name, condition in conditions {
+        guard validation_string(condition, "expression") is Some(expression) &&
+          parsed_condition(conditions_parsed, expression) is Some(parsed) else {
+          continue
+        }
+        if condition_failure(parsed, value) is Some(reason) {
+          emit(
+            "." + name,
+            constraint_severity,
+            "Value provided for `" +
+            target.to_string() +
+            "` must match the " +
+            name +
+            " condition expression" +
+            reason,
+          )
+        }
       }
     }
     let valid = match (shape.body, value) {

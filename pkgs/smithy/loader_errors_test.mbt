@@ -151,3 +151,41 @@ test "law: arbitrary IDL and JSON inputs never panic during assembly" {
     seed=6032,
   )
 }
+
+///|
+test "SM-MODEL-008 problems keep their event, shape and message" {
+  // The duplicate mixin and the conflicting member differ from Smithy
+  // (smithy-2qe.41.29); change those two rows with the fix.
+  for
+    (body, expected) in [
+      (
+        "@mixin\nstructure A {\n    x: String\n}\n@mixin\nstructure B {\n    x: Integer\n}\nstructure S with [A, B] {}",
+        "Model|example#S$x|I found conflicting targets for member example#S$x: smithy.api#String and smithy.api#Integer.",
+      ),
+      (
+        "@mixin\nstructure M {}\nstructure S with [M, M] {}", "Model|example#S|I found the duplicate mixin example#M on example#S.",
+      ),
+      (
+        "structure A {}\nstructure B with [A] {}", "Target|example#B|I expected a structure mixin for example#B, but found example#A.",
+      ),
+      (
+        "@mixin\nstring A\nstructure B with [A] {}", "Model|example#B|I expected a structure mixin for example#B, but found example#A.",
+      ),
+    ] {
+    let result = @smithy.Loader::new()
+      .add_idl("m.smithy", "$version: \"2\"\nnamespace example\n" + body + "\n")
+      .assemble()
+    let problems = result.diagnostics
+      .filter(d => d.code == "SM-MODEL-008")
+      .map(d => {
+        assert_eq(d.severity, Error)
+        assert_eq(d.source.file, "m.smithy")
+        d.event_id +
+        "|" +
+        d.shape.map(s => s.to_string()).unwrap_or("-") +
+        "|" +
+        d.message
+      })
+    assert_eq(problems, [expected])
+  }
+}

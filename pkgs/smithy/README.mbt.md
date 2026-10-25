@@ -231,7 +231,29 @@ Diagnostics retain the owning shape's source location and add a JSON Pointer
 to the condition's expression. The message contains the condition name,
 expression-relative line and column, and UTF-16 offsets. Expression offsets
 are never treated as offsets into the enclosing IDL or JSON file.
-Serialization and default-value validation do not evaluate contracts.
+
+Model validation evaluates the conditions on the values in the model, as the
+Smithy reference does: trait values, default values, example values, typed
+metadata and protocol test parameters. Each shape that a value reaches checks
+its own conditions, so a member and its target both apply. A shape does not
+check a document value or a value of the wrong type. Numbers in the model keep
+their exact tokens, so a `long`, `bigInteger` or `bigDecimal` value compares
+exactly, with the number rules of the
+[`moonrockz/jmespath`](../jmespath/README.mbt.md#numbers) package. When the result is not
+`true`, the event ID is the event ID of the value plus the condition name:
+`TraitValue.<Name>`, `DefaultTrait.<Name>`, `ExamplesTrait.<Name>`,
+`TypedMetadata.<key>.<Name>`, or `HttpRequestTestsInput.<Name>` and the other
+protocol test IDs. The severity is ERROR, or WARNING for an example with
+`allowConstraintErrors`. A failed trait value prevents assembly, as every other
+`TraitValue` error does; the other values give validation events, and the
+model still assembles. A result that is not boolean and an evaluation error
+also fail the condition, and the message says why; the Smithy reference stops
+the validation in these two cases. Protocol test parameters need the
+protocol test traits, `Loader::new(protocol_tests=true)`; without them the
+protocol test traits do not resolve, and that is an error. Serialization does not evaluate contracts,
+and value validation in
+[`moonrockz/smithy-validation`](../smithy-validation/README.mbt.md) reports
+`UnsupportedConstraint` for a condition.
 
 ## Diagnostics
 

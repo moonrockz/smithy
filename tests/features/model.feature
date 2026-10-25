@@ -252,7 +252,7 @@ Feature: Semantic model assembly
       | unknown(name) == `true`        | SM-MODEL-016 |
       | name                          | SM-MODEL-017 |
 
-  Scenario: Analyze contracts without enforcing their truth during conversion
+  Scenario: Check a default value against its conditions, as in Smithy, and keep them in conversion
     Given the IDL model file "false.smithy":
       """smithy
       $version: "2"
@@ -260,10 +260,13 @@ Feature: Semantic model assembly
       use smithy.contracts#conditions
       @conditions(Never: {expression: "`false`", documentation: "A runtime condition."})
       boolean Flag
-      structure Request { flag: Flag = true }
+      structure Request {
+          flag: Flag = true
+      }
       """
     When I assemble the semantic model
     Then the model has no errors
+    And the validation events are "DefaultTrait.Never|ERROR|example#Request$flag"
     And the assembled model exports and reloads unchanged
     And converting the model to IDL and back preserves the JSON AST
 

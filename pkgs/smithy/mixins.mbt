@@ -191,6 +191,18 @@ fn set_members(fields : Map[String, Json], members : Map[String, Json]) -> Unit 
 }
 
 ///|
+/// Report an invalid mixin (SM-MODEL-008) on `shape`.
+fn Assembly::mixin_problem(
+  self : Assembly,
+  message : String,
+  source : SourceLocation,
+  shape : String,
+  event_id~ : String = "Model",
+) -> Unit {
+  self.problem("SM-MODEL-008", message, source, shape~, event_id~)
+}
+
+///|
 fn Assembly::merge_member(
   self : Assembly,
   out : Map[String, Json],
@@ -204,11 +216,10 @@ fn Assembly::merge_member(
     if string_field(old, "target") is Some(a) &&
       string_field(fields, "target") is Some(b) &&
       a != b {
-      self.problem(
-        "SM-MODEL-008",
+      self.mixin_problem(
         "I found conflicting targets for member \{parent}$\{name}: \{a} and \{b}.",
         source,
-        shape=parent + "$" + name,
+        parent + "$" + name,
       )
     }
     let merged = copy(old)
@@ -294,32 +305,24 @@ fn Assembly::flatten_one(
   for mixin in mixin_ids {
     guard string_field(object(mixin), "target") is Some(id) else { continue }
     if seen.contains(id) {
-      self.problem(
-        "SM-MODEL-008",
+      self.mixin_problem(
         "I found the duplicate mixin \{id} on \{raw.id}.",
         raw.source,
-        shape=raw.id,
+        raw.id,
       )
     }
     seen.add(id)
     guard finished.get(id) is Some(base) else { continue }
     let base_traits = object_field(base.fields, "traits")
-    if !base_traits.contains("smithy.api#mixin") {
-      self.problem(
-        "SM-MODEL-008",
+    let marked = base_traits.contains("smithy.api#mixin")
+    if !marked || string_field(base.fields, "type") != Some(kind) {
+      self.mixin_problem(
         "I expected a \{kind} mixin for \{raw.id}, but found \{id}.",
         raw.source,
-        shape=raw.id,
-        event_id="Target",
-      )
-      continue
-    }
-    if string_field(base.fields, "type") != Some(kind) {
-      self.problem(
-        "SM-MODEL-008",
-        "I expected a \{kind} mixin for \{raw.id}, but found \{id}.",
-        raw.source,
-        shape=raw.id,
+        raw.id,
+        // Smithy reports a shape without @mixin as a Target error, and a
+        // mixin of another shape type as a Model error.
+        event_id=if marked { "Model" } else { "Target" },
       )
       continue
     }

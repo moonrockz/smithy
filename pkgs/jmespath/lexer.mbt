@@ -118,6 +118,11 @@ fn lex(source : String) -> Array[Token] raise JmespathError {
             Json::null()
           }
         }
+        // Keep the token of a number literal, so the number keeps its class
+        // and exact value in comparisons (see `number_order`).
+        if c == 96 && value is Number(n, repr=None) {
+          value = Json::number(n, repr=text.trim().to_owned())
+        }
       }
     } else {
       i += 1

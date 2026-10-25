@@ -34,8 +34,59 @@ test {
 
 Neither parsing nor evaluation changes caller-owned JSON. Function arguments
 evaluate eagerly; logical `&&` and `||` short-circuit. Projections omit null
-results; `map` retains them. Strings use Unicode code points for length, reverse
-and ordering. Object iteration order is unspecified, as in JMESPath.
+results; `map` retains them. Strings use Unicode code points for length and
+reverse. `sort`, `max`, `min` and the `_by` functions order strings by UTF-16
+code unit, as Java's `String.compareTo` in the Smithy reference does, so
+U+10000 comes before U+FFFF. Object iteration order is unspecified, as in
+JMESPath.
+
+## Numbers
+
+Comparisons, equality, `contains`, `sort`, `max` and `min` treat numbers as the
+JMESPath runtime of the Smithy reference does. A number token without `.`, `e`
+or `E` is a 64-bit integer, or a big integer beyond 64 bits. A decimal token is
+a double when a double holds its exact value, and a big decimal otherwise. Two
+integers, or a big integer or big decimal on either side, compare exactly. A
+double on either side makes the comparison use doubles, so `9007199254740993`
+equals `` `9007199254740992.0` `` but not `` `9007199254740992` ``.
+
+The class and the exact value come from the token in the `repr` of a JSON
+number. Number literals keep their token, and `to_number` reads a string as a
+64-bit integer or a double, as in Smithy. `@json.parse` keeps the token only of
+an integer that a double cannot hold, so give a decimal input its token in
+`repr` when its exact value matters. A number without its token is an integer
+when it is a whole number in the 64-bit range, and a double otherwise.
+
+```mbt check
+///|
+test {
+  let input = @json.parse("9007199254740993")
+  assert_eq(
+    @jmespath.search("@ > `9007199254740992`", input),
+    Json::boolean(true),
+  )
+  assert_eq(
+    @jmespath.search("@ == `9007199254740992.0`", input),
+    Json::boolean(true),
+  )
+}
+```
+
+### Behaviour changes
+
+This release changes these results to match the Smithy reference:
+
+- `to_number` of a string gives a double when the string has `.`, `e` or `E`,
+  and a 64-bit integer otherwise. A string that this rule does not parse, such
+  as `" 12 "` or `"9223372036854775808"`, gives null.
+- `` -0.0 == `0` `` is false, because the token `-0.0` is a double and Java's
+  `Double.compare` puts it before 0. The token `-0` is an integer and equals 0.
+- A number literal keeps its token, so `` `1e2` `` prints as `1e2`, not `100`.
+  The value does not change.
+- Strings order by UTF-16 code unit, not by code point.
+- `sum`, `avg`, `abs`, `ceil` and `floor` still compute with doubles. Their
+  results have no token, so they compare by the rule for a number without a
+  token.
 
 ## Inspect expressions and errors
 
