@@ -1,10 +1,13 @@
 ///|
 /// A formatter of a template. A built-in formatter returns the text, or the
 /// problem phrase when it cannot format the value; `render` makes the full
-/// error from the phrase. A custom formatter raises its own errors, and `render`
+/// error from the phrase. The nested formatter needs a writer, so `render`
+/// runs it. A custom formatter raises its own errors, and `render`
 /// does not change them.
 priv enum Formatter {
   Builtin((TemplateValue) -> Result[String, String])
+  /// `C`: run a `Call` value on a child writer and give its text.
+  Nested
   Custom((CodeWriter, TemplateValue) -> String raise CodegenError)
 }
 
@@ -66,6 +69,7 @@ pub fn CodeWriter::new(
 ) -> CodeWriter {
   let formatters : Map[Char, Formatter] = Map([])
   formatters['L'] = Builtin(format_literal)
+  formatters['C'] = Nested
   formatters['S'] = Builtin(value => {
     match value {
       Text(text) => Ok(string_literal(text))
@@ -262,8 +266,183 @@ pub fn CodeWriter::to_string(self : CodeWriter) -> String {
 }
 
 ///|
+/// A new writer for a nested piece of code. It has the namespace and the import
+/// tracker of this writer, and a copy of its context and formatters. Its
+/// indentation and newline prefix are empty.
+pub fn CodeWriter::child(self : CodeWriter) -> CodeWriter {
+  let state = self.state()
+  {
+    namespace: self.namespace,
+    indent_text: self.indent_text,
+    imports: self.imports,
+    buffers: [StringBuilder()],
+    at_line_start: true,
+    states: [
+      {
+        indent_level: 0,
+        newline_prefix: "",
+        context: state.context.copy(),
+        formatters: state.formatters.copy(),
+      },
+    ],
+  }
+}
+
+///|
+/// The variables of one loop that runs, and its place in it.
+priv struct LoopFrame {
+  entries : Array[(TemplateValue, TemplateValue)]
+  key_name : String
+  value_name : String
+  mut index : Int32
+  vars : Map[String, TemplateValue]
+}
+
+///|
+fn LoopFrame::bind(self : LoopFrame) -> Unit {
+  let (key, value) = self.entries[self.index]
+  self.vars[self.key_name] = key
+  self.vars[self.value_name] = value
+  self.vars["\{self.key_name}.first"] = Bool(self.index == 0)
+  self.vars["\{self.key_name}.last"] = Bool(
+    self.index == self.entries.length() - 1,
+  )
+}
+
+///|
+/// The value of a name. The variables of the loops come first, the innermost
+/// loop first, then the context.
+fn lookup_name(
+  frames : Array[LoopFrame],
+  context : Map[String, TemplateValue],
+  name : String,
+) -> TemplateValue? {
+  for i = frames.length() - 1; i >= 0; i = i - 1 {
+    if frames[i].vars.get(name) is Some(value) {
+      return Some(value)
+    }
+  }
+  context.get(name)
+}
+
+///|
+/// True when the name has a truthy value. A missing name is falsy.
+fn name_is_truthy(
+  frames : Array[LoopFrame],
+  context : Map[String, TemplateValue],
+  name : String,
+) -> Bool {
+  match lookup_name(frames, context, name) {
+    Some(value) => value.is_truthy()
+    None => false
+  }
+}
+
+///|
+fn TemplateValue::kind_name(self : TemplateValue) -> String {
+  match self {
+    Null => "a null value"
+    Bool(_) => "a boolean"
+    Int(_) => "a number"
+    Text(_) => "a text"
+    Sym(_) => "a symbol"
+    Ref(_) => "a reference"
+    Call(_) => "a function"
+    List(_) => "a list"
+    Record(_) => "a record"
+  }
+}
+
+///|
+/// Write the text to the output. When `align` is true, each line after the
+/// first starts with the whitespace that starts the current line of the output.
+fn write_aligned(out : StringBuilder, text : String, align : Bool) -> Unit {
+  if !align || !text.contains("\n") {
+    out.write_string(text)
+    return
+  }
+  let written = out.to_string().to_array()
+  let mut line_start = written.length()
+  while line_start > 0 && written[line_start - 1] != '\n' {
+    line_start -= 1
+  }
+  let prefix = StringBuilder()
+  let mut at = line_start
+  while at < written.length() && (written[at] == ' ' || written[at] == '\t') {
+    prefix.write_char(written[at])
+    at += 1
+  }
+  let prefix = prefix.to_string()
+  let lines = text.split("\n").map(line => line.to_owned()).collect()
+  for index, line in lines {
+    if index > 0 {
+      out.write_char('\n')
+      if !line.is_empty() {
+        out.write_string(prefix)
+      }
+    }
+    out.write_string(line)
+  }
+}
+
+///|
+/// Give the index of the argument of each expression of the template, or -1
+/// for an expression without an argument. Relative arguments take their place
+/// in the order of the expressions in the template, so a block that is not
+/// rendered still uses its arguments. It marks the arguments that I use.
+fn resolve_arguments(
+  parsed : ParsedTemplate,
+  template : String,
+  args : Array[TemplateValue],
+  used : Array[Bool],
+) -> Array[Int32] raise CodegenError {
+  let indexes : Array[Int32] = []
+  // 0: no argument yet, 1: relative, 2: positional
+  let mut mode = 0
+  let mut next_relative = 0
+  for token in parsed.tokens {
+    match token {
+      Expr(Relative, name, _, offset) => {
+        if mode == 2 {
+          raise template_error(
+            "a relative argument mixed with positional arguments", offset, template,
+          )
+        }
+        mode = 1
+        if next_relative >= args.length() {
+          raise template_error("no argument for `$\{name}`", offset, template)
+        }
+        used[next_relative] = true
+        indexes.push(next_relative)
+        next_relative += 1
+      }
+      Expr(Positional(index), name, _, offset) => {
+        if mode == 1 {
+          raise template_error(
+            "a positional argument mixed with relative arguments", offset, template,
+          )
+        }
+        mode = 2
+        if index > args.length() {
+          raise template_error(
+            "no argument at position \{index} for `$\{index}\{name}`",
+            offset,
+            template,
+          )
+        }
+        used[index - 1] = true
+        indexes.push(index - 1)
+      }
+      _ => indexes.push(-1)
+    }
+  }
+  indexes
+}
+
+///|
 /// Render a template to text with the arguments and the current state. It
-/// writes nothing, so a bad template leaves the output as it was.
+/// writes nothing, so a bad template leaves the output as it was. It walks the
+/// tokens with an index and a stack of the loops that run; it does not recurse.
 fn CodeWriter::render(
   self : CodeWriter,
   template : String,
@@ -271,53 +450,19 @@ fn CodeWriter::render(
 ) -> String raise CodegenError {
   let parsed = parse_template(template)
   let used = Array::make(args.length(), false)
+  let arg_index = resolve_arguments(parsed, template, args, used)
   let state = self.state()
-  // 0: no argument yet, 1: relative, 2: positional
-  let mut mode = 0
-  let mut next_relative = 0
+  let frames : Array[LoopFrame] = []
   let out = StringBuilder()
-  for token in parsed.tokens {
-    match token {
+  let mut pc = 0
+  while pc < parsed.tokens.length() {
+    match parsed.tokens[pc] {
       Literal(text) => out.write_string(text)
-      Expr(source, name, offset) => {
+      Expr(source, name, align, offset) => {
         let value = match source {
-          Relative => {
-            if mode == 2 {
-              raise template_error(
-                "a relative argument mixed with positional arguments", offset, template,
-              )
-            }
-            mode = 1
-            if next_relative >= args.length() {
-              raise template_error(
-                "no argument for `$\{name}`",
-                offset,
-                template,
-              )
-            }
-            used[next_relative] = true
-            next_relative += 1
-            args[next_relative - 1]
-          }
-          Positional(index) => {
-            if mode == 1 {
-              raise template_error(
-                "a positional argument mixed with relative arguments", offset, template,
-              )
-            }
-            mode = 2
-            if index > args.length() {
-              raise template_error(
-                "no argument at position \{index} for `$\{index}\{name}`",
-                offset,
-                template,
-              )
-            }
-            used[index - 1] = true
-            args[index - 1]
-          }
+          Relative | Positional(_) => args[arg_index[pc]]
           Named(key) =>
-            match state.context.get(key) {
+            match lookup_name(frames, state.context, key) {
               Some(value) => value
               None =>
                 raise template_error(
@@ -336,13 +481,84 @@ fn CodeWriter::render(
             )
           Some(Builtin(format)) =>
             match format(value) {
-              Ok(text) => out.write_string(text)
+              Ok(text) => write_aligned(out, text, align)
               Err(problem) => raise template_error(problem, offset, template)
             }
-          Some(Custom(format)) => out.write_string(format(self, value))
+          Some(Nested) =>
+            match value {
+              Call(body) => {
+                let child = self.child()
+                body(child)
+                let text = child.to_string()
+                write_aligned(out, text.trim_end(chars="\n").to_owned(), align)
+              }
+              _ =>
+                raise template_error(
+                  "a value that `C` cannot format: only a function", offset, template,
+                )
+            }
+          Some(Custom(format)) => write_aligned(out, format(self, value), align)
         }
       }
+      Open(If, name, _) =>
+        if !name_is_truthy(frames, state.context, name) {
+          pc = parsed.matching[pc]
+        }
+      Open(Unless, name, _) =>
+        if name_is_truthy(frames, state.context, name) {
+          pc = parsed.matching[pc]
+        }
+      Open(Loop(key_name, value_name), name, offset) => {
+        let entries : Array[(TemplateValue, TemplateValue)] = []
+        match lookup_name(frames, state.context, name) {
+          Some(List(items)) =>
+            for index, item in items {
+              entries.push((Int(index), item))
+            }
+          Some(Record(fields)) =>
+            for key, item in fields {
+              entries.push((Text(key), item))
+            }
+          Some(other) =>
+            raise template_error(
+              "a loop over `\{name}`, which is \{other.kind_name()} and not a list or a record",
+              offset,
+              template,
+            )
+          None =>
+            raise template_error(
+              "a loop over `\{name}`, which has no value in the context",
+              offset,
+              template,
+            )
+        }
+        if entries.is_empty() {
+          pc = parsed.matching[pc]
+        } else {
+          let frame = {
+            entries,
+            key_name,
+            value_name,
+            index: 0,
+            vars: Map([]),
+          }
+          frame.bind()
+          frames.push(frame)
+        }
+      }
+      Close =>
+        if parsed.tokens[parsed.matching[pc]] is Open(Loop(_, _), _, _) {
+          let frame = frames[frames.length() - 1]
+          if frame.index + 1 < frame.entries.length() {
+            frame.index += 1
+            frame.bind()
+            pc = parsed.matching[pc]
+          } else {
+            let _ = frames.pop()
+          }
+        }
     }
+    pc += 1
   }
   if used.iter().any(flag => !flag) {
     let count = used.iter().filter(flag => !flag).count()
