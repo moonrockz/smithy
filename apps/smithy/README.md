@@ -564,6 +564,53 @@ JSON output contains `valid`, `complete`, and findings with codes, typed path st
 shape/member IDs and messages. Invalid JSON and duplicate decoded names produce structured input
 findings too. Input files remain unchanged; defaults and coercions are not applied.
 
+These commands check two orders. The first order is valid, and the second order has a quantity out of range.
+
+<!-- tour:start value-cli -->
+```smithy file=order.smithy
+$version: "2"
+
+namespace example.orders
+
+/// An order in a shop.
+structure Order {
+    @required
+    id: String
+
+    @range(min: 1, max: 10)
+    quantity: Integer
+
+    @length(max: 20)
+    note: String
+}
+```
+
+```json file=order.json
+{
+    "id": "A-1001",
+    "quantity": 2,
+    "note": "Leave at the door"
+}
+```
+
+```json file=order-too-many.json
+{
+    "id": "A-1001",
+    "quantity": 11,
+    "note": "Leave at the door"
+}
+```
+
+```console
+$ smithy validate value --shape example.orders#Order --value order.json order.smithy
+```
+
+```console status=1
+$ smithy validate value --shape example.orders#Order --value order-too-many.json order.smithy
+order-too-many.json/quantity: error[Range] example.orders#Order$quantity: I expected the number to satisfy the modeled range.
+```
+<!-- tour:end value-cli -->
+
 Use `--value -` to read the value from stdin. Alternatively use `--from idl -` or `--from json -` for
 a model from stdin, with a value file. Stdin may be used only once across both inputs. Multiple model
 files assemble together. `--unknown-members ignore` permits unknown structure fields, and

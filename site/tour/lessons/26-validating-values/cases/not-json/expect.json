@@ -1,0 +1,1 @@
+{"events": [], "findings": ["InvalidJson|stopped|-"], "output_contains": ["order.json: error[InvalidJson]"]}

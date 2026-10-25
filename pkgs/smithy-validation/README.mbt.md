@@ -45,6 +45,66 @@ can preserve only numbers the caller retained: ordinary core JSON parsing may al
 decimals. A valid numeric `repr` is authoritative; without one, only the supplied finite Double
 value is available.
 
+This test checks two orders. The first order is valid, and the second order has a quantity out of range.
+
+<!-- tour:start value-api -->
+```mbt check
+///|
+test "validate an order" {
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "order.smithy",
+    (
+      #|$version: "2"
+      #|
+      #|namespace example.orders
+      #|
+      #|/// An order in a shop.
+      #|structure Order {
+      #|    @required
+      #|    id: String
+      #|
+      #|    @range(min: 1, max: 10)
+      #|    quantity: Integer
+      #|
+      #|    @length(max: 20)
+      #|    note: String
+      #|}
+    ),
+  )
+  .assemble().model.unwrap()
+  let prepared = @validation.PreparedValidator::prepare(
+    model,
+    @smithy.ShapeId::parse("example.orders#Order").unwrap(),
+  )
+  let order =
+    #|{
+    #|    "id": "A-1001",
+    #|    "quantity": 2,
+    #|    "note": "Leave at the door"
+    #|}
+  assert_true(
+    prepared.validate_json(@validation.parse_json_value(order)).is_valid(),
+  )
+  let too_many =
+    #|{
+    #|    "id": "A-1001",
+    #|    "quantity": 11,
+    #|    "note": "Leave at the door"
+    #|}
+  let result = prepared.validate_json(@validation.parse_json_value(too_many))
+  assert_false(result.is_valid())
+  assert_eq(result.findings.length(), 1)
+  assert_eq(result.findings[0].code, @validation.Range)
+  assert_eq(result.findings[0].path.pointer(), "/quantity")
+  assert_eq(
+    result.findings[0].shape.to_string(),
+    "example.orders#Order$quantity",
+  )
+}
+```
+<!-- tour:end value-api -->
+
 ## CLI
 
 ```sh

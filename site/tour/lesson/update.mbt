@@ -461,6 +461,12 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
             ShowOutput(text~, highlight~),
           ])
         }
+        // A value or message check is sent only after a validate of the same
+        // files found no ERROR and no DANGER, and the guard above drops an
+        // answer for older files. So the core does not block it for model
+        // errors, and level 1 fails a lesson whose shape or service ID does not
+        // parse. The one block that can come is a model that the core cannot
+        // build with no error to show, and its own reason is the right text.
         (Transforming | CheckingValue | CheckingMessage, NotConverted(reason)) => {
           let (m, shown) = m.not_shown(reason)
           m.next(shown)

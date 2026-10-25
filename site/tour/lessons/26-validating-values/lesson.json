@@ -1,0 +1,1 @@
+{"slug": "validating-values", "title": "Validating JSON values", "section": "Validating data", "spec": "pkgs/smithy-validation/README.mbt.md", "value": {"file": "order.json", "shape": "example.orders#Order"}}

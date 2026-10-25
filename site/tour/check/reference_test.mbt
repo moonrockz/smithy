@@ -929,6 +929,26 @@ fn compare_diff(
 }
 
 ///|
+/// Our events of a case, from the files that the page sends: the model files
+/// (not the data file of a value, message or transcript lesson), or both sides
+/// of a diff lesson with their diff events.
+fn our_case_events(
+  session : @core.Session,
+  where_ : String,
+  lesson : @model.Lesson,
+  case : @model.Case,
+) -> (Array[@model.EventKey], Array[String]?) raise {
+  if lesson.engine is Diff {
+    our_diffed(session, where_, lesson.case_files(case))
+  } else {
+    let files = files_of(
+      @model.model_files(lesson.engine, lesson.case_files(case)),
+    )
+    (our_events(session, where_, files, lesson.output), None)
+  }
+}
+
+///|
 /// Compare our events and JSON Schema with the reference for every case, and
 /// mark the allow list entries that remove a difference.
 fn compare_all(
@@ -956,11 +976,7 @@ fn compare_all(
         fixed=lesson.selector,
       )
       let expected = reference_of(reference, case_id)
-      let (ours, diffed) = if lesson.engine is Diff {
-        our_diffed(session, where_, lesson.case_files(case))
-      } else {
-        (our_events(session, where_, files, lesson.output), None)
-      }
+      let (ours, diffed) = our_case_events(session, where_, lesson, case)
       let theirs = expected.events.copy()
       remove_allowed_events(case_id, ours, theirs, allow, used)
       ours.sort_by(@model.compare_events)
@@ -1965,22 +1981,25 @@ test "our diff events agree with the reference diff events" {
 }
 
 ///|
-test "our_events of a value lesson validates only the model files" {
+test "the events of a value case come from the model files only" {
   let tour = match
     @source.read_tour("tour/source/testdata/value-level1", repo="..") {
     Ok(tour) => tour
     Err(e) => fail("I cannot read the fixture: " + e)
   }
   let lesson = tour.lessons[0]
-  let all = lesson.case_files(lesson.cases[0])
-  let model = @model.model_files(lesson.engine, all)
-  assert_true(all.length() > model.length())
-  assert_true(model.all(f => f.name.has_suffix(".smithy")))
-  let events = our_events(
-    @core.Session::new(),
+  let case = lesson.cases[0]
+  let session = @core.Session::new()
+  let (events, diffed) = our_case_events(session, "value", lesson, case)
+  assert_eq(events, [])
+  assert_eq(diffed, None)
+  // The same files with the value file loaded as a model file give a parse
+  // error, so the empty list above proves that the value file is left out.
+  let all = our_events(
+    session,
     "value",
-    files_of(model),
+    files_of(lesson.case_files(case)),
     lesson.output,
   )
-  assert_eq(events, [])
+  assert_true(all.any(e => e.severity == Error))
 }

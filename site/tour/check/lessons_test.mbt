@@ -733,6 +733,115 @@ test "lesson 01 includes its own starting model" {
 }
 
 ///|
+/// The lesson of the tour in the folder `dir`.
+fn lesson_in(dir : String) -> @model.Lesson raise {
+  let tour = match @source.read_tour(lessons_root, repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the tour: " + e)
+  }
+  match tour.lessons.search_by(l => l.dir == dir) {
+    Some(i) => tour.lessons[i]
+    None => fail("the tour has no lesson " + dir)
+  }
+}
+
+///|
+/// The text of the file `name` of a case of a lesson.
+fn case_file(
+  lesson : @model.Lesson,
+  case : String,
+  name : String,
+) -> String raise {
+  guard lesson.cases.search_by(c => c.name == case) is Some(i) else {
+    fail(lesson.dir + " has no case " + case)
+  }
+  let files = lesson.case_files(lesson.cases[i])
+  match files.search_by(f => f.name == name) {
+    Some(j) => files[j].text
+    None => fail(lesson.dir + "/" + case + " has no file " + name)
+  }
+}
+
+///|
+/// A lesson file as a README block holds it: LF line ends and no final
+/// newline. A Windows checkout gives the lesson file CRLF line ends.
+fn as_block(text : String) -> String {
+  text.replace_all(old="\r\n", new="\n").trim_end(chars="\n").to_owned()
+}
+
+///|
+/// Require the first include block of a lesson to show the lesson files. The
+/// CLI tab writes each `(fixture, text)` of `cli` as that text, and the
+/// MoonBit tab has each line of each text of `api` as a `#|` line.
+fn check_included_files(
+  lesson : @model.Lesson,
+  cli~ : Array[(String, String)],
+  api~ : Array[String],
+) -> Unit raise {
+  let doc = @markdown.parse(lesson.text, {
+    source: "",
+    resolve: _ => None,
+    repo_url: "",
+    git_ref: "",
+  })
+  let cli_snippets : Array[@markdown.Snippet] = []
+  let api_code : Array[String] = []
+  let mut seen = false
+  @markdown.walk_blocks(doc.blocks, block => {
+    if !seen && block is Tabs(_, tabs) {
+      seen = true
+      for tab in tabs {
+        for s in tab.snippets {
+          if tab.label == "CLI" {
+            cli_snippets.push(s)
+          } else if tab.label == "MoonBit" {
+            api_code.push(s.code)
+          }
+        }
+      }
+    }
+  })
+  guard seen else { fail(lesson.dir + " has no include block") }
+  for item in cli {
+    let (fixture, text) = item
+    match cli_snippets.search_by(s => s.file == Some(fixture)) {
+      Some(i) => assert_eq(cli_snippets[i].code, as_block(text))
+      None => fail(lesson.dir + ": the CLI tab has no file " + fixture)
+    }
+  }
+  let lines : Array[String] = []
+  for code in api_code {
+    for line in code.split("\n") {
+      lines.push(line.trim().to_owned())
+    }
+  }
+  for text in api {
+    for line in as_block(text).split("\n") {
+      let hashed = ("#|" + line.to_owned()).trim_end().to_owned()
+      if !lines.contains(hashed) {
+        fail(lesson.dir + ": the MoonBit tab has no line " + hashed)
+      }
+    }
+  }
+}
+
+///|
+test "lesson 26 includes its own starting files" {
+  let lesson = lesson_in("26-validating-values")
+  let model = case_file(lesson, "start", "model.smithy")
+  let order = case_file(lesson, "start", "order.json")
+  check_included_files(
+    lesson,
+    cli=[
+      ("order.smithy", model),
+      ("order.json", order),
+      ("order-too-many.json", case_file(lesson, "out-of-range", "order.json")),
+    ],
+    api=[model, order],
+  )
+}
+
+///|
 test "a static extension lesson says that the feature is our extension" {
   let ok = match
     @source.read_tour("tour/source/testdata/static-ok", repo="..") {

@@ -2395,6 +2395,34 @@
             "events": [
                 "Model|ERROR|example#TimeRange"
             ]
+        },
+        "26-validating-values/long-note": {
+            "digest": "a660916cf2196c6ccdef28a06f00adfefc862e62244b690cda0f78847f002013",
+            "events": []
+        },
+        "26-validating-values/missing-id": {
+            "digest": "d6784e361cd5998d700ee80a09e85932b16d38d406082a5ee690b5bd0d038743",
+            "events": []
+        },
+        "26-validating-values/not-json": {
+            "digest": "b1a51fa584c46c5b446a72fa0efa1024a5b24f3aeb7a37e4b6afdc8c32188f10",
+            "events": []
+        },
+        "26-validating-values/out-of-range": {
+            "digest": "3568f388379f6f23082ef02109867e4cab04972ca1142bc1e4c665175c84280d",
+            "events": []
+        },
+        "26-validating-values/start": {
+            "digest": "65ffb7c8f9cd4ef6128e8c03d3c436c9db4b62b9da7bfda92268d03caff7f100",
+            "events": []
+        },
+        "26-validating-values/string-quantity": {
+            "digest": "4e37f88a98c8fcc13d12d4b44c8206ad0f9202e06d2d6929443ac863e73c98b6",
+            "events": []
+        },
+        "26-validating-values/unknown-member": {
+            "digest": "4cd59a4c9fe7121b3ef4e6c9fafdf2462c27c6d1e02f1c8198c2c409609ada9d",
+            "events": []
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"

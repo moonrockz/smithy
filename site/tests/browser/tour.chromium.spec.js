@@ -505,7 +505,7 @@ test("a transcript lesson steps through the exchange", async ({ page }) => {
   expect(page.errors).toEqual([]);
 });
 
-// No lesson uses the value or message engine yet, so these tests give the first lesson page the data of such a
+// No lesson uses the message or diff engine yet, so these tests give the first lesson page the data of such a
 // lesson. The checker, the editors and the Worker are the real ones.
 async function openEngineLesson(page, engine, files) {
   await page.route("**/tour/hello-smithy/", async (route) => {
@@ -536,44 +536,91 @@ async function openEngineLesson(page, engine, files) {
   await settled(page);
 }
 
-async function openValueLesson(page) {
-  await openEngineLesson(
-    page,
-    ["Value", { file: "order.json", shape: "example#Order", options: { unknown_members: "Reject", member_names: "Smithy" } }],
-    [
-      {
-        name: "model.smithy",
-        text: '$version: "2"\n\nnamespace example\n\nstructure Order {\n    @range(min: 1, max: 10)\n    quantity: Integer\n}\n',
-      },
-      { name: "order.json", text: '{"quantity": 3}' },
-    ],
-  );
+// The color of the editor for a property name (editor.js): only the JSON mode tags the keys of a JSON object
+// with it.
+const propertyNameColor = "rgb(126, 231, 135)";
+
+// Undo in the editor until the text stops changing, and give the text.
+async function undoAll(page, times = 30) {
+  const editor = page.locator("#tour-editor .cm-content");
+  await editor.click();
+  let before = "";
+  for (let i = 0; i < times; i++) {
+    const text = await editorText(page);
+    if (text === before) break;
+    before = text;
+    await page.keyboard.press("ControlOrMeta+z");
+    await settled(page);
+  }
+  return editorText(page);
 }
 
-test("a value lesson shows the value findings, marks the changed line and reports a broken value", async ({ page }) => {
-  await openValueLesson(page);
+test("a value lesson opens the value in JSON mode, shows its findings, keeps Undo in each file and reports a broken value", async ({
+  page,
+}) => {
+  await page.goto(siteUrl("tour/validating-values/"));
+  await expect(page.locator("#tour-editor .cm-content")).toBeVisible();
+  await expect(page.locator("#tour-output .cm-content")).toBeAttached();
+  await settled(page);
   const output = page.locator("#tour-output .cm-content");
+  const editor = page.locator("#tour-editor .cm-content");
+  const modelTab = page.getByRole("tab", { name: "model.smithy" });
+  const valueTab = page.getByRole("tab", { name: "order.json" });
   await expect(page.getByRole("tab", { name: "Value findings" })).toHaveAttribute("aria-selected", "true");
   await expect(output).toContainText("No findings. The value is valid.");
   await expect(page.getByRole("button", { name: "Open in playground" })).toHaveCount(0);
 
+  await modelTab.click();
+  await expect(editor).toContainText("structure Order");
+  const modelStart = await editorText(page);
+
+  // The value file opens in JSON mode: its keys have the property name color.
+  await valueTab.click();
+  await expect(editor).toContainText('"quantity": 2,');
+  const valueStart = await editorText(page);
+  const key = editor.locator("span", { hasText: /^"id"$/ });
+  await expect(key).toHaveCount(1);
+  await expect(key).toHaveCSS("color", propertyNameColor);
+
   // Set the quantity out of range.
-  await page.getByRole("tab", { name: "order.json" }).click();
-  const editor = page.locator("#tour-editor .cm-content");
-  await expect(editor).toContainText('"quantity": 3');
-  await editor.getByText("3").dblclick();
-  await page.keyboard.type("99");
+  await editor.locator(".cm-line", { hasText: '"quantity"' }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("11");
   await settled(page);
-  await expect(output).toContainText("error[Range]");
+  await expect(output).toContainText("order.json/quantity: error[Range] example.orders#Order$quantity");
   await expect(output.locator(".cm-line")).toHaveCount(1);
   await expect(page.locator("#tour-output .cm-line.tour-changed")).toHaveCount(1);
 
-  // Delete the last brace: the old line goes, the InvalidJson line comes.
+  // Switch to the model and back. Undo then gives the start value back, never the text of the model.
+  await modelTab.click();
+  await expect(editor).toContainText("structure Order");
+  expect(await editorText(page)).toEqual(modelStart);
+  await valueTab.click();
+  await expect(editor).toContainText('"quantity": 11,');
+  const valueUndone = await undoAll(page);
+  expect(valueUndone).toEqual(valueStart);
+  expect(valueUndone).not.toContain("structure Order");
+  await expect(output).toContainText("No findings. The value is valid.");
+
+  // The model is unchanged, and Undo there has nothing to undo.
+  await modelTab.click();
+  await expect(editor).toContainText("structure Order");
+  await editor.locator(".cm-line").first().click();
+  await page.keyboard.press("ControlOrMeta+z");
+  await settled(page);
+  expect(await editorText(page)).toEqual(modelStart);
+
+  // Delete the last brace: the InvalidJson line comes.
+  await valueTab.click();
+  await expect(editor).toContainText('"quantity": 2,');
   await editor.click();
   await page.keyboard.press("ControlOrMeta+End");
   await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
   await settled(page);
-  await expect(output).toContainText("error[InvalidJson]");
+  await expect(output).toContainText("order.json: error[InvalidJson]");
   await expect(output).not.toContainText("error[Range]");
 
   // The expand button of the output pane works with the value pane.

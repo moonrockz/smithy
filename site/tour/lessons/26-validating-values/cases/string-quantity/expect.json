@@ -1,0 +1,1 @@
+{"events": [], "findings": ["TypeMismatch|error|/quantity|example.orders#Order$quantity"], "output_contains": ["order.json/quantity: error[TypeMismatch]"]}
