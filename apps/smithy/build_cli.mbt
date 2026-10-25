@@ -769,6 +769,7 @@ fn run_build(
     .register_plugin("jsonSchema", json_schema_plugin)
     .register_plugin("openapi", openapi_plugin)
     .register_plugin("openrpc", openrpc_plugin)
+    .register_plugin("codegenFixture", @codegen_fixture.plugin)
   for input in config.sources {
     build_add_input(
       loader,

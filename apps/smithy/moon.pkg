@@ -13,6 +13,7 @@ import {
   "moonrockz/ion/binary" @ion_binary,
   "moonrockz/smithy-validation/rpc",
   "moonrockz/smithy-build" @build,
+  "moonrockz/smithy-codegen/fixture" @codegen_fixture,
   "moonrockz/smithy-diff" @diff,
   "moonrockz/smithy-jsonschema" @jsonschema,
   "moonrockz/smithy-openapi" @openapi,
