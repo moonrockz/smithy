@@ -1,0 +1,13 @@
+import {
+  "moonrockz/smithy-codegen" @codegen,
+  "moonrockz/smithy",
+  "moonrockz/smithy-build" @build,
+}
+
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-build" @build,
+  "moonrockz/smithy-codegen/fixture",
+  "moonbitlang/core/json",
+  "moonbitlang/core/test",
+} for "test"
