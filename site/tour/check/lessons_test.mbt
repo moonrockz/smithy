@@ -916,6 +916,29 @@ test "lesson 30 includes its own old and new models" {
 }
 
 ///|
+test "lesson 31 shows the protocol-tests example" {
+  let lesson = lesson_in("31-protocol-tests")
+  let (cli, _) = include_tabs(lesson)
+  let snippet = name => {
+    match cli.search_by(s => s.file == Some(name)) {
+      Some(i) => cli[i].code
+      None => fail("lesson 31: the CLI tab has no file " + name)
+    }
+  }
+  let example = as_block(
+    read_text("../examples/protocol-tests/greeting.smithy"),
+  )
+  assert_eq(snippet("protocol-tests.smithy"), example)
+  // The bad model differs only in the params of the request case.
+  let good_params = "params: {name: \"Ada\"}"
+  assert_eq(example.split(good_params).count(), 2)
+  assert_eq(
+    snippet("protocol-tests-bad.smithy"),
+    example.replace(old=good_params, new="params: {name: 1}"),
+  )
+}
+
+///|
 test "a static extension lesson says that the feature is our extension" {
   let ok = match
     @source.read_tour("tour/source/testdata/static-ok", repo="..") {

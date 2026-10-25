@@ -178,6 +178,92 @@ $ smithy diff --old old-weather.smithy --new new-weather-removed.smithy
 ```
 <!-- tour:end diff-cli -->
 
+### Validate protocol test cases
+
+`--protocol-tests` loads the `smithy.test` traits, so `validate` checks the cases of
+`@httpRequestTests` and `@httpResponseTests`. These commands check the greeting model of the
+[protocol-tests example](../../examples/protocol-tests/README.md). In the second model the
+request case has the wrong type of value for `name` in `params`, so the command exits 1.
+
+<!-- tour:start protocol-tests-cli -->
+```smithy file=protocol-tests.smithy
+$version: "2"
+namespace example
+
+use smithy.test#httpRequestTests
+use smithy.test#httpResponseTests
+
+@trait
+@protocolDefinition
+structure fixtureProtocol {}
+
+@httpRequestTests([{
+    id: "GreetingRequest"
+    protocol: fixtureProtocol
+    method: "POST"
+    uri: "/greeting"
+    params: {name: "Ada"}
+    headers: {"Content-Type": "application/json"}
+    forbidHeaders: ["X-Secret"]
+    body: "{\"name\":\"Ada\"}"
+    bodyMediaType: "application/json"
+}])
+@httpResponseTests([{
+    id: "GreetingResponse"
+    protocol: fixtureProtocol
+    code: 200
+    params: {greeting: "Hello, Ada"}
+}])
+operation Greet { input: Input, output: Output }
+
+structure Input { @required name: String }
+structure Output { greeting: String }
+```
+
+```smithy file=protocol-tests-bad.smithy
+$version: "2"
+namespace example
+
+use smithy.test#httpRequestTests
+use smithy.test#httpResponseTests
+
+@trait
+@protocolDefinition
+structure fixtureProtocol {}
+
+@httpRequestTests([{
+    id: "GreetingRequest"
+    protocol: fixtureProtocol
+    method: "POST"
+    uri: "/greeting"
+    params: {name: 1}
+    headers: {"Content-Type": "application/json"}
+    forbidHeaders: ["X-Secret"]
+    body: "{\"name\":\"Ada\"}"
+    bodyMediaType: "application/json"
+}])
+@httpResponseTests([{
+    id: "GreetingResponse"
+    protocol: fixtureProtocol
+    code: 200
+    params: {greeting: "Hello, Ada"}
+}])
+operation Greet { input: Input, output: Output }
+
+structure Input { @required name: String }
+structure Output { greeting: String }
+```
+
+```console
+$ smithy validate --protocol-tests protocol-tests.smithy
+```
+
+```console status=1
+$ smithy validate --protocol-tests protocol-tests-bad.smithy
+[ERROR] example#Greet: smithy.test#httpRequestTests.0.params: Error validating value/name: Expected string value for `smithy.api#String`. | HttpRequestTestsInput
+```
+<!-- tour:end protocol-tests-cli -->
+
 ### Convert a model to the JSON AST
 
 This command writes the JSON AST of the model to standard output.
