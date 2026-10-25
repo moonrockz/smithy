@@ -204,3 +204,24 @@ test "bad blocks report the offset of the tag" {
     assert_true(message.contains("offset 0"))
   }
 }
+
+///|
+test "a loop over a missing name raises InvalidTemplate" {
+  let w = @codegen.CodeWriter::new()
+  assert_eq(
+    block_error(() => w.write("${#x}${/x}")),
+    "I found a loop over `x`, which has no value in the context at offset 0 in template `${#x}${/x}`.",
+  )
+  assert_eq(w.to_string(), "")
+}
+
+///|
+test "a loop over Null raises InvalidTemplate" {
+  let w = @codegen.CodeWriter::new()
+  w.put_context("x", @codegen.Null)
+  assert_eq(
+    block_error(() => w.write("${#x}${/x}")),
+    "I found a loop over `x`, which is a null value and not a list or a record at offset 0 in template `${#x}${/x}`.",
+  )
+  assert_eq(w.to_string(), "")
+}

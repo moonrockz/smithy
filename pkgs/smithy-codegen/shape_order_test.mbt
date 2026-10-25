@@ -225,3 +225,32 @@ test "a chain of 20000 structures does not overflow the stack" {
   assert_eq(ours[count], id_of("example#Op"))
   assert_eq(ours[count + 1], id_of("example#Svc"))
 }
+
+///|
+test "a cycle comes after the other shapes that are ready" {
+  let model = load_model(
+    "$version: \"2\"\nnamespace example\nstructure Aaa { b: Bbb }\nstructure Bbb { a: Aaa }\nstructure Zzz {}\n",
+  )
+  let order = @codegen.topological_order(model, [
+    id_of("example#Aaa"),
+    id_of("example#Bbb"),
+    id_of("example#Zzz"),
+  ])
+  assert_eq(texts(order), ["example#Zzz", "example#Aaa", "example#Bbb"])
+}
+
+///|
+test "a shape that depends on a cycle comes after it, whatever its name" {
+  let model = load_model(
+    "$version: \"2\"\nnamespace example\nstructure Aaa { m: Mmm }\nstructure Mmm { n: Nnn }\nstructure Nnn { m: Mmm }\nstructure Zzz {}\n",
+  )
+  let order = @codegen.topological_order(model, [
+    id_of("example#Aaa"),
+    id_of("example#Mmm"),
+    id_of("example#Nnn"),
+    id_of("example#Zzz"),
+  ])
+  assert_eq(texts(order), [
+    "example#Zzz", "example#Mmm", "example#Nnn", "example#Aaa",
+  ])
+}
