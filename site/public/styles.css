@@ -321,6 +321,7 @@ code, pre, kbd { font-family: var(--mono); }
 /* The Old and New groups of a diff lesson: a label before the tabs of a side. */
 .tour-group { display: flex; align-self: stretch; align-items: center; gap: 2px; }
 .tour-group + .tour-group { margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--border); }
+.tour-group-tabs { display: flex; align-self: stretch; align-items: center; gap: 2px; }
 .tour-group-label { padding-right: 6px; color: var(--muted); font-size: 0.75rem; font-weight: 700;
   letter-spacing: 0.04em; text-transform: uppercase; }
 .tour-head .tour-tabs { flex: 1; min-width: 0; border-bottom: 0; }

@@ -99,11 +99,19 @@ fn group_tabs(
       tabs.push(file_tab(m, emit, i, label.to_owned()))
     }
   }
-  @html.div(
-    class="tour-group",
-    attrs=@html.Attrs::build().role("group").aria_label(title + " model"),
-    [@html.span(class="tour-group-label", title), ..tabs],
-  )
+  // The label is outside the tablist, which holds tabs only.
+  @html.div(class="tour-group", [
+    @html.span(
+      class="tour-group-label",
+      attrs=@html.Attrs::build().aria_hidden("true"),
+      title,
+    ),
+    @html.div(
+      class="tour-group-tabs",
+      attrs=@html.Attrs::build().role("tablist").aria_label(title + " model"),
+      tabs,
+    ),
+  ])
 }
 
 ///|
@@ -116,11 +124,16 @@ fn file_tabs(m : Model, emit : @rabbita.Emit[Msg]) -> Html {
   } else {
     m.files.mapi((i, file) => file_tab(m, emit, i, file.name))
   }
-  @html.div(
-    class="tour-tabs",
-    attrs=@html.Attrs::build().role("tablist").aria_label("Files"),
-    tabs,
-  )
+  if m.page.engine is Diff {
+    // Two tablists, one for each side, in a plain row.
+    @html.div(class="tour-tabs", tabs)
+  } else {
+    @html.div(
+      class="tour-tabs",
+      attrs=@html.Attrs::build().role("tablist").aria_label("Files"),
+      tabs,
+    )
+  }
 }
 
 ///|

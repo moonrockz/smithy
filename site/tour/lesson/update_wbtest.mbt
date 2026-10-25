@@ -1487,6 +1487,32 @@ test "each file of a diff lesson has its own editor state" {
 }
 
 ///|
+test "Reset of a diff lesson sends the diff of the starting files" {
+  let (m, _) = Model::start(diff_page(), None)
+  let (m, _) = update(
+    m,
+    Answered(seq=1, answer=Diffed(old=[], new=[], events=Some([]))),
+  )
+  let (m, _) = update(m, SelectFile(1))
+  let (m, _) = update(m, Edited("namespace x\n"))
+  let (m, _) = update(m, Debounced(1))
+  let (m, _) = update(
+    m,
+    Answered(seq=2, answer=Diffed(old=[], new=[], events=Some([]))),
+  )
+  let (m, effects) = update(m, Reset)
+  assert_eq(m.inflight, Diffing)
+  assert_true(
+    effects.contains(
+      SendDiff(seq=3, old=[("old/model.smithy", start_text)], new=[
+        ("new/model.smithy", new_text),
+      ]),
+    ),
+  )
+  assert_false(effects.any(e => e is SendValidate(..)))
+}
+
+///|
 let exchange_text : String = "{\"entries\": [1, 2, 3]}\n"
 
 ///|

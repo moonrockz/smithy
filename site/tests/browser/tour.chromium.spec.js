@@ -668,9 +668,10 @@ test("a diff lesson groups the files under Old and New, shows the diff and marks
   await expect(page.getByRole("button", { name: "Open in playground" })).toHaveCount(0);
 
   // The tabs are under Old and New, without the folder in the name.
-  const oldGroup = page.getByRole("group", { name: "Old model" });
-  const newGroup = page.getByRole("group", { name: "New model" });
-  await expect(oldGroup).toContainText("Old");
+  const oldGroup = page.getByRole("tablist", { name: "Old model" });
+  const newGroup = page.getByRole("tablist", { name: "New model" });
+  await expect(page.locator(".tour-group-label", { hasText: "Old" })).toBeVisible();
+  await expect(page.locator(".tour-group-label", { hasText: "New" })).toBeVisible();
   await expect(newGroup.getByRole("tab", { name: "model.smithy" })).toBeVisible();
 
   // Delete the member in the new model: an ERROR line comes and is marked as changed.

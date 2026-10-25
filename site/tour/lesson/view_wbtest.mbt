@@ -268,6 +268,26 @@ async test "a diff lesson has the tabs Findings and Diff and keeps the expand bu
 
 ///|
 #cfg(not(target="js"))
+async test "the Findings list of a diff lesson shows the file of each finding" {
+  let (m, _) = Model::start(diff_page(), None)
+  let (m, _) = update(
+    m,
+    Answered(
+      seq=1,
+      answer=Diffed(
+        old=[error_in("old/model.smithy", 3)],
+        new=[error_in("new/model.smithy", 5)],
+        events=None,
+      ),
+    ),
+  )
+  let html = render(m)
+  assert_true(html.contains("old/model.smithy:3:1"))
+  assert_true(html.contains("new/model.smithy:5:1"))
+}
+
+///|
+#cfg(not(target="js"))
 async test "a transcript lesson has the tabs Findings and Transcript, Step and Run all, and no Open in playground link" {
   let (m, _) = Model::start(transcript_page(), None)
   let html = render(m)
