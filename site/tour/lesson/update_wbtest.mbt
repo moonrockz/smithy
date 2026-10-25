@@ -1949,3 +1949,34 @@ test "a transcript request that takes too long starts the transcript again, then
   assert_eq(m.transcript, None)
   assert_eq(m.not_run, Some(timeout_text))
 }
+
+///|
+test "a validate that is not converted clears the rows and the steps" {
+  let m = run(started(), [
+      StepClicked,
+      Answered(seq=3, answer=progress(checked=1)),
+    ]).0
+  let m = run(m, [Edited(start_text + "x"), Debounced(m.edits + 1)]).0
+  assert_eq(m.inflight, Validating)
+  assert_true(m.transcript is Some(_))
+  let reason = "I cannot convert this model."
+  let (m, _) = update(m, Answered(seq=m.seq, answer=NotConverted(reason)))
+  assert_eq(m.transcript, None)
+  assert_eq(m.not_run, Some(reason))
+  assert_eq(update(m, StepClicked).1, [])
+}
+
+///|
+test "a second validate timeout clears the rows and the steps" {
+  let m = run(started(), [
+      StepClicked,
+      Answered(seq=3, answer=progress(checked=1)),
+    ]).0
+  let m = run(m, [Edited(start_text + "x"), Debounced(m.edits + 1)]).0
+  assert_eq(m.inflight, Validating)
+  let (m, _) = update(m, TimedOut(m.seq))
+  let (m, _) = update(m, TimedOut(m.seq))
+  assert_eq(m.transcript, None)
+  assert_eq(m.not_run, Some(timeout_text))
+  assert_eq(update(m, StepClicked).1, [])
+}

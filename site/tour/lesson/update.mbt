@@ -50,6 +50,17 @@ fn Model::send_transform(self : Model) -> (Model, Array[Effect]) {
 }
 
 ///|
+/// A check that did not run: a transcript lesson shows no old rows and
+/// disables Step.
+fn Model::stop_transcript(self : Model, reason : String) -> Model {
+  if self.transcript_setup() is Some(_) {
+    { ..self, transcript: None, not_run: Some(reason), }
+  } else {
+    self
+  }
+}
+
+///|
 /// The setup of a transcript lesson; `None` for every other lesson.
 fn Model::transcript_setup(self : Model) -> @model.TranscriptSetup? {
   match self.page.engine {
@@ -460,7 +471,7 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
       match (m.inflight, answer) {
         (Validating, Checked(items)) => m.checked(items)
         (Validating, NotConverted(reason)) => {
-          let m = { ..m, findings: NotChecked(reason), }
+          let m = { ..m, findings: NotChecked(reason), }.stop_transcript(reason)
           if has_output_pane(m.page) {
             let (m, shown) = m.not_shown(reason)
             m.next([Mark(items=[]), ..shown])
@@ -539,14 +550,13 @@ pub fn update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
             m.next([RestartWorker, Mark(items=[]), ..shown])
           }
           (Validating, false) =>
-            { ..m, findings: NotChecked(timeout_text), }.next([
-              RestartWorker,
-              Mark(items=[]),
-            ])
+            { ..m, findings: NotChecked(timeout_text), }
+            .stop_transcript(timeout_text)
+            .next([RestartWorker, Mark(items=[])])
           (Validating, true) => {
-            let (m, shown) = { ..m, findings: NotChecked(timeout_text), }.not_shown(
-              timeout_text,
-            )
+            let (m, shown) = { ..m, findings: NotChecked(timeout_text), }
+              .stop_transcript(timeout_text)
+              .not_shown(timeout_text)
             m.next([RestartWorker, Mark(items=[]), ..shown])
           }
         }
