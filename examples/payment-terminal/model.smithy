@@ -63,7 +63,9 @@ structure InitializeInput {
     @required posName: String
 }
 
-enum ProtocolVersion { V1 = "1" }
+enum ProtocolVersion {
+    V1 = "1"
+}
 
 structure InitializeOutput {
     @required protocolVersion: ProtocolVersion
