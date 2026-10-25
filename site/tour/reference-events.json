@@ -3121,6 +3121,30 @@
                 "morphir.sdk.string#IsEmpty",
                 "morphir.sdk.string#Length"
             ]
+        },
+        "38-morphir-values/constraints-number": {
+            "digest": "92f0e2dcc708a6ed69eb175fe1cb766ec45136e4f21ad8d6e6c3444dc13b765b",
+            "events": []
+        },
+        "38-morphir-values/curried-add": {
+            "digest": "d173227c3e223dd891a71ac34e107dc42d00271020ffa44ad71c36d7263f77e8",
+            "events": []
+        },
+        "38-morphir-values/field-name": {
+            "digest": "3e01379e7380c8ea4e54920279704822c6cf4b2da94342b97eacb6caa2e4b8ce",
+            "events": []
+        },
+        "38-morphir-values/legacy-attrs": {
+            "digest": "72d929aa64b00a515fb46eb517f4053f8b77a77a5855b067fe3febc25852832d",
+            "events": []
+        },
+        "38-morphir-values/start": {
+            "digest": "d12c002a285b4cd0517ae843f8c4495e19d66945effbb942e1ec135994a8dc8d",
+            "events": []
+        },
+        "38-morphir-values/two-variants": {
+            "digest": "c63a51ca20b6070ba46a6a6621d243e38bfa87e8ca48f2f5d4a8c9cf0909a88c",
+            "events": []
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"

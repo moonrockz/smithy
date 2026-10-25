@@ -19,4 +19,4 @@ structure Loop {
 
 The Findings tab shows an error with the event ID `ShapeRecursion` on `morphir.ir.v4#Loop`. A `Loop` value can never end, because each `Loop` must contain one more `Loop`. Now remove `@required`. The error goes away, and the schema gets a `Loop` definition.
 
-Each kind has an optional member `attributes`. Its `TypeAttributes` hold data such as the source location of the type ([schema, line 154](https://github.com/finos/morphir/blob/ab8d5c9198c0f1ac8a3cabfd11b9ab59a468c409/website/static/schemas/morphir-ir-v4.yaml#L154-L167)).
+Each kind has an optional member `attributes`. Its `TypeAttributes` hold data such as the source location of the type ([schema, line 154](https://github.com/finos/morphir/blob/ab8d5c9198c0f1ac8a3cabfd11b9ab59a468c409/website/static/schemas/morphir-ir-v4.yaml#L154-L167)). [Lesson 38](../38-morphir-values/lesson.md) checks IR values against this model.

@@ -1,0 +1,1 @@
+{"Function": {"parameterType": {"Variable": {"name": "number"}}, "returnType": {"Function": {"parameterType": {"Variable": {"name": "number"}}, "returnType": {"Variable": {"name": "number"}}}}}}
