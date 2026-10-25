@@ -16,4 +16,5 @@ warnings = "-implicit_impl_as_method-reserved_keyword"
 
 import {
   "moonrockz/smithy@0.6.0",
+  "moonrockz/smithy-build@0.6.0",
 }

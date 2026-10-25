@@ -1,8 +1,11 @@
 import {
   "moonrockz/smithy",
+  "moonrockz/smithy-build" @build,
 }
 
 import {
   "moonrockz/smithy",
+  "moonrockz/smithy-build" @build,
   "moonrockz/smithy-codegen" @codegen,
+  "moonbitlang/core/json",
 } for "test"
