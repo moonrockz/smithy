@@ -74,6 +74,30 @@ test "public AST retains source spans and expression reference arguments" {
 }
 
 ///|
+test "expression references use Smithy's prefix grammar and binding power" {
+  let expression = @jmespath.parse("&a == &b")
+  guard expression.root.kind is ExpressionRef(body) else {
+    fail("expected outer reference")
+  }
+  guard body.kind is Binary(Equal, left, right) else {
+    fail("expected comparison in reference body")
+  }
+  assert_eq(left.kind, @jmespath.Field("a"))
+  assert_eq(left.span, { start: 1, end: 2, })
+  guard right.kind is ExpressionRef(inner) else {
+    fail("expected right reference")
+  }
+  assert_eq(inner.kind, @jmespath.Field("b"))
+  assert_eq(right.span, { start: 6, end: 8, })
+  guard @jmespath.parse("(&a) == (&b)").root.kind is Binary(Equal, a, b) else {
+    fail("expected comparison of references")
+  }
+  assert_true(a.kind is ExpressionRef(_))
+  assert_true(b.kind is ExpressionRef(_))
+  assert_eq(error_of("&a", Json::null()).code, @jmespath.InvalidType)
+}
+
+///|
 test "parse errors and evaluation errors identify the failing construct" {
   let diagnostic = error_of("items[\n", Json::null())
   assert_eq(diagnostic.code, @jmespath.Syntax)

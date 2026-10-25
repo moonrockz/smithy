@@ -57,6 +57,14 @@ an integer that a double cannot hold, so give a decimal input its token in
 `repr` when its exact value matters. A number without its token is an integer
 when it is a whole number in the 64-bit range, and a double otherwise.
 
+For a string that contains `.`, `e` or `E`, `to_number` follows Java's
+`Double.parseDouble` syntax. It accepts surrounding U+0000 through U+0020,
+one `d`, `D`, `f` or `F` suffix, and hexadecimal floats such as `0x1.8p1`.
+It rejects underscores. Without `.`, `e` or `E`, the string must be a signed
+64-bit integer, so `0x1p3` and ` 12 ` return null. Overflow returns an infinite
+double, as in Smithy. Core `Json` can hold this value and comparisons can use it,
+but its text `Infinity` or `-Infinity` is outside the finite JSON number syntax.
+
 ```mbt check
 ///|
 test {

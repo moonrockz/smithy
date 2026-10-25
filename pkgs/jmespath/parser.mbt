@@ -225,6 +225,12 @@ fn Parser::prefix(self : Parser) -> Node raise JmespathError {
       }
     "literal" => node(Literal(token.value), start, token.span.end)
     "@" => identity
+    "&" => {
+      // Smithy accepts an expression reference in any prefix position. Its
+      // zero binding power includes the rest of the expression in the body.
+      let right = self.expression(0)
+      node(ExpressionRef(right), start, right.span.end)
+    }
     "!" => {
       let right = self.expression(45)
       node(Not(right), start, right.span.end)
@@ -312,14 +318,7 @@ fn Parser::infix(self : Parser, left : Node) -> Node raise JmespathError {
       let args = []
       if self.peek().tag != ")" {
         while true {
-          let arg = if self.peek().tag == "&" {
-            let amp = self.take()
-            let expr = self.expression(0)
-            node(ExpressionRef(expr), amp.span.start, expr.span.end)
-          } else {
-            self.expression(0)
-          }
-          args.push(arg)
+          args.push(self.expression(0))
           if self.peek().tag != "," {
             break
           }

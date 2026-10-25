@@ -169,6 +169,84 @@ test "a zero slice step has no static event, as in Smithy" {
 }
 
 ///|
+test "condition bug cases agree with Java 30bdab5" {
+  assert_eq(contract_keys(time_range("start < finish")), [
+    "ConditionsTrait.JmespathProblem.JmespathEventDanger.StartBeforeEnd|DANGER|example#TimeRange",
+  ])
+  assert_eq(contract_keys(time_range("start < end && end")), [])
+  for
+    text in [
+      time_range("start < end").replace(
+        old="documentation: \"The start time must be before the end time.\"",
+        new="",
+      ),
+      time_range("start < end").replace(
+        old="expression: \"start < end\"",
+        new="expression: 3",
+      ),
+    ] {
+    assert_eq(contract_keys(text), ["Model|ERROR|example#TimeRange"])
+  }
+  for expression in ["&start", "&start.foo", "&a == &b"] {
+    assert_eq(
+      contract_keys(time_range(expression)),
+      ["ConditionsTrait|DANGER|example#TimeRange"],
+      msg=expression,
+    )
+  }
+  for
+    expression in [
+      "(&start).foo", "(&start)[0]", "(&start)[]", "(&start)[:2]", "(&start)[*]",
+      "(&start).*", "(&start)[?@]",
+    ] {
+    assert_eq(
+      contract_keys(time_range(expression)),
+      [
+        "ConditionsTrait.JmespathProblem.JmespathEventDanger.StartBeforeEnd|DANGER|example#TimeRange",
+        "ConditionsTrait|DANGER|example#TimeRange",
+      ],
+      msg=expression,
+    )
+  }
+  for expression in ["(&a) == (&b)", "(&a) < (&b)"] {
+    assert_eq(
+      contract_keys(time_range(expression)),
+      [
+        "ConditionsTrait.JmespathProblem.JmespathEventWarning.StartBeforeEnd|WARNING|example#TimeRange",
+        "ConditionsTrait|DANGER|example#TimeRange",
+      ],
+      msg=expression,
+    )
+  }
+}
+
+///|
+test "the node validator errorfile already agrees on bare null fields" {
+  // Java stops before static conditions checks when model value validation fails.
+  let text =
+    #|$version: "2"
+    #|namespace smithy.example
+    #|use smithy.contracts#conditions
+    #|@conditions({MinNotGreaterThanMax: {
+    #|    documentation: "min must not be more than max"
+    #|    expression: "min == null || max == null || min <= max"
+    #|}})
+    #|@trait(selector: ":test(number, member > number)")
+    #|structure range2 {min: BigDecimal, max: BigDecimal}
+    #|@range2(min: 1)
+    #|integer Okay
+    #|@range2(max: 2)
+    #|integer Yup
+    #|@range2(min: 1, max: 2)
+    #|integer Alrighty
+    #|@range2(min: 2, max: 1)
+    #|integer Whoops
+  assert_eq(contract_keys(text), [
+    "TraitValue.MinNotGreaterThanMax|ERROR|smithy.example#Whoops",
+  ])
+}
+
+///|
 test "the selector check reports a contract trait on the wrong shape once" {
   // The loader diagnostic SM-MODEL-011 is the only TraitTarget source of the
   // loader. It carries no event: the selector check of the trait gives it.

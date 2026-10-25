@@ -268,6 +268,19 @@ fn translate_pattern(
       i += 1
       guard i < pattern.length() else { raise unsupported() }
       let escape = pattern.code_unit_at(i).to_int()
+      // Java rejects \B in a class. ECMA-262 without u reads it as 'B'.
+      // The portable profile cannot give both meanings, so reject it.
+      if class is Some(_) && escape == 66 {
+        raise unsupported()
+      }
+      // Java classes use code points; ECMA-262 without u uses UTF-16 units.
+      // Reject surrogate members, including \uXXXX spellings, on both sides.
+      if class is Some(_) &&
+        escape == 117 &&
+        !(i + 1 < pattern.length() && pattern.code_unit_at(i + 1) == 123) &&
+        class_atom_length(pattern, i - 1, pattern.length()) < 0 {
+        raise unsupported()
+      }
       let expansion = match escape {
         100 => Some("0-9")
         119 => Some("A-Za-z0-9_")
@@ -365,6 +378,9 @@ fn translate_pattern(
     } else if c == 46 && class is None {
       out.write_string("[^\\n\\r\\u2028\\u2029]")
     } else {
+      if class is Some(_) && c >= 0xd800 && c <= 0xdfff {
+        raise unsupported()
+      }
       if c == 40 &&
         class is None &&
         i + 1 < pattern.length() &&

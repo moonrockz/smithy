@@ -83,7 +83,8 @@ pub(all) struct Node {
 
 ///|
 /// Projections retain their input and per-element expression separately.
-/// ExpressionRef nodes represent function arguments such as sort_by(items, &name).
+/// ExpressionRef nodes represent late-bound expressions such as &name, including
+/// function arguments in sort_by(items, &name).
 pub(all) enum NodeKind {
   Identity
   Field(String)

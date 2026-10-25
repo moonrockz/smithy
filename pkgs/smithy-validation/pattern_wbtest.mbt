@@ -42,7 +42,6 @@ test "pattern size counts the copies the automaton builds" {
       ("^[\\d_]$", 4), // class escape counts its expanded members
       ("^[\\w]$", 6),
       ("^[\\s]$", 17),
-      ("^[😀]$", 6), // literal astral character: source length
       ("^[\\u00e9a-z]$", 4),
     ] {
     assert_eq(
@@ -51,6 +50,42 @@ test "pattern size counts the copies the automaton builds" {
       msg=pattern,
     )
   }
+  // The size reader also bounds expressions outside the portable profile.
+  assert_eq(pattern_size("^[😀]$", id), 6)
+}
+
+///|
+test "classes with surrogate members or a non-boundary escape are unsupported" {
+  let id = @smithy.ShapeId::parse("example#String").unwrap()
+  for
+    pattern in [
+      "^[😀]$", "^[a-😀]$", "^[😀-🙏]$", "^[^😀]$", "^[\\uD83D\\uDE00]$",
+      "^[\\uD800]$", "^[\\uDFFF-a]$", "^[\\B]$", "^[a\\B]$", "^[^\\B]$",
+    ] {
+    let mut rejected = false
+    ignore(compile_pattern(pattern, id)) catch {
+      UnsupportedConstraint(_, _) => rejected = true
+      _ => fail("Expected UnsupportedConstraint")
+    }
+    assert_true(rejected, msg=pattern)
+  }
+  for
+    unit in [
+      "😀".view(end_offset=1).to_owned(),
+      "😀".view(start_offset=1).to_owned(),
+    ] {
+    let mut rejected = false
+    ignore(compile_pattern("^[" + unit + "]$", id)) catch {
+      UnsupportedConstraint(_, _) => rejected = true
+      _ => fail("Expected UnsupportedConstraint")
+    }
+    assert_true(rejected)
+  }
+  // Outside a class, a non-boundary assertion and an astral literal still work.
+  assert_true(compile_pattern("a\\Bb", id).execute("ab"))
+  assert_true(compile_pattern("^😀$", id).execute("😀"))
+  assert_true(compile_pattern("^[\\bB]$", id).execute("B"))
+  assert_true(compile_pattern("^[\\bB]$", id).execute("\u{08}"))
 }
 
 ///|

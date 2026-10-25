@@ -148,6 +148,10 @@ The portable pattern profile supports literals, classes/ranges, groups, alternat
 whole-input anchors and common digit/word/whitespace escapes. Dot excludes line terminators.
 A '-' at the start or end of a class, or after a range, is a literal, as in ECMA-262. A '-' after a class escape is a literal, so `[\d-a]` matches a digit, '-' or 'a'. A '-' before a class escape, as in `[a-\d]`, fails preparation.
 A class range cannot end in `\d`, `\w` or `\s`. A `\u{...}` escape fails preparation; write `\uXXXX`.
+An astral character or a surrogate UTF-16 unit inside a class, including a `\uXXXX` spelling,
+fails preparation with `UnsupportedConstraint`. Java reads class members as code points, while
+ECMA-262 without the `u` flag reads UTF-16 units. `\B` inside a class also fails preparation:
+Java rejects it, while ECMA-262 without `u` reads it as the letter 'B'.
 Lookaround, backreferences, flags, Unicode properties, complement escapes inside classes and
 unsupported core regex constructs fail preparation. Matching searches unless anchored. This is
 not the full ECMA-262 language.
