@@ -319,7 +319,8 @@ of `"output"` and `"value"`: a lesson has at most one of them.
   `ERROR`; `SUPPRESSED` events are not shown, so a key cannot claim them. `"findings"` is an error.
 - `"events"` holds the model events of both models together (WARNING, DANGER and ERROR, as for any lesson).
   When a model has an ERROR or a DANGER, `smithy diff` does not compare: the case claims `"diff": []`.
-- `output_contains` is checked against the lines that `smithy diff` prints, joined with a line break.
+- `output_contains` is checked against the lines that `smithy diff` prints, joined with a line break. It cannot run when
+  a model has an ERROR or a DANGER (`smithy diff` does not compare then), so such a case cannot have it.
 - The text has no extension note: Smithy has a diff tool. The text says that our CLI prints the events of the
   Java `smithy-diff`.
 

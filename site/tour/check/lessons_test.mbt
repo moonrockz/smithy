@@ -166,6 +166,28 @@ fn data_keys(findings : Array[@core.DataFinding]) -> Array[String] {
 }
 
 ///|
+/// The compared events of a case must be those that its expect.json names.
+fn check_events(
+  where_ : String,
+  case : @model.Case,
+  actual : Array[@model.EventKey],
+) -> Unit raise {
+  let expected = case.expect.events.copy()
+  expected.sort_by(@model.compare_events)
+  let actual = actual.copy()
+  actual.sort_by(@model.compare_events)
+  if actual != expected {
+    fail(
+      where_ +
+      ": events differ.\n  expected: " +
+      show_events(expected) +
+      "\n  actual:   " +
+      show_events(actual),
+    )
+  }
+}
+
+///|
 /// Check one case of a diff lesson. The model events are those of the old and
 /// the new model together. The diff events are compared only when both models
 /// can be compared; a case with an ERROR or a DANGER in a model claims none.
@@ -186,18 +208,7 @@ fn check_diff_case(
     _ => fail(where_ + ": unexpected answer")
   }
   let actual = compared(old_findings + new_findings)
-  let expected = case.expect.events.copy()
-  expected.sort_by(@model.compare_events)
-  actual.sort_by(@model.compare_events)
-  if actual != expected {
-    fail(
-      where_ +
-      ": events differ.\n  expected: " +
-      show_events(expected) +
-      "\n  actual:   " +
-      show_events(actual),
-    )
-  }
+  check_events(where_, case, actual)
   let keys = match events {
     Some(events) => events.map(e => @model.diff_key(e.id, e.severity, e.shape))
     None => []
@@ -253,17 +264,9 @@ fn check_case(
     Blocked(reason~, ..) => fail(where_ + ": validation was blocked: " + reason)
     _ => fail(where_ + ": unexpected answer")
   }
+  check_events(where_, case, actual)
   let expected = case.expect.events.copy()
   expected.sort_by(@model.compare_events)
-  if actual != expected {
-    fail(
-      where_ +
-      ": events differ.\n  expected: " +
-      show_events(expected) +
-      "\n  actual:   " +
-      show_events(actual),
-    )
-  }
   let runs = match
     output_plan(
       lesson.output is Some(_) ||

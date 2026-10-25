@@ -442,6 +442,19 @@ test "a lesson with diff and value" {
 }
 
 ///|
+test "every file of a diff lesson is in old/ or in new/" {
+  let tour = match read("diff-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  for files in [lesson.files, ..lesson.cases.map(c => c.files)] {
+    let (old, new) = @model.sides(files)
+    assert_eq(old.length() + new.length(), files.length())
+  }
+}
+
+///|
 test "a transcript lesson reads its setup and the fields of a case" {
   let tour = match read("transcript-ok") {
     Ok(t) => t

@@ -174,7 +174,10 @@ pub let new_prefix : String = "new/"
 
 ///|
 /// The files of the old and of the new model of a diff lesson, by the prefix
-/// `old/` and `new/`. The names keep their prefix, in the same order.
+/// `old/` and `new/`. The names keep their prefix, in the same order. A file
+/// with another prefix is in neither list: the reader (`read_sides`) accepts
+/// only these two folders, and a test checks that every file of a diff lesson
+/// is in one of them.
 pub fn sides(
   files : Array[LessonFile],
 ) -> (Array[LessonFile], Array[LessonFile]) {
