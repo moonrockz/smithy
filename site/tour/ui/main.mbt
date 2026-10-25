@@ -77,9 +77,15 @@ fn reply_msg(text : String, newest : Int32) -> @lesson.Msg {
     Transformed(seq~, files~, ..) =>
       Answered(seq~, answer=Converted(@model.output_text(files)))
     Blocked(seq~, reason~, ..) => Answered(seq~, answer=NotConverted(reason))
-    // The page sends no transcript, value check, message check or diff
-    // request.
-    TranscriptProgress(..) | DataChecked(..) | Diffed(..) => mismatch
+    TranscriptProgress(seq~, entries~, findings~, checked~, done~, summary~) =>
+      Answered(
+        seq~,
+        answer=Progress(entries~, findings~, checked~, done~, summary~),
+      )
+    DataChecked(seq~, valid~, findings~) =>
+      Answered(seq~, answer=DataChecked(valid~, findings~))
+    Diffed(seq~, old~, new~, events~, ..) =>
+      Answered(seq~, answer=Diffed(old~, new~, events~))
   }
 }
 
@@ -138,18 +144,80 @@ fn Runtime::post(self : Runtime, seq : Int32, request : @core.Request) -> Unit {
 }
 
 ///|
-fn Runtime::run(self : Runtime, effect : @lesson.Effect) -> Unit {
+/// The request that an effect sends to the Worker, with its number; `None`
+/// for an effect that sends none.
+fn request_of(
+  page : @model.LessonPage,
+  effect : @lesson.Effect,
+) -> (Int32, @core.Request)? {
   match effect {
     SendValidate(seq~, files~) =>
-      self.post(
-        seq,
-        @core.lesson_validate(seq~, files~, output=self.page.output),
-      )
+      Some((seq, @core.lesson_validate(seq~, files~, output=page.output)))
     SendTransform(seq~, files~, output~, selector~) =>
-      self.post(seq, TransformFiles(seq~, files~, output~, selector~))
+      Some((seq, TransformFiles(seq~, files~, output~, selector~)))
+    SendCheckValue(seq~, files~, shape~, value~, options~) =>
+      Some((seq, CheckValue(seq~, files~, shape~, value~, options~)))
+    SendCheckMessage(
+      seq~,
+      files~,
+      service~,
+      version~,
+      message~,
+      kind~,
+      options~
+    ) =>
+      Some(
+        (
+          seq,
+          CheckMessage(
+            seq~,
+            files~,
+            service~,
+            version~,
+            message~,
+            kind~,
+            options~,
+          ),
+        ),
+      )
+    SendDiff(seq~, old~, new~) => Some((seq, DiffModels(seq~, old~, new~)))
+    SendTranscriptStart(seq~, files~, protocol~, text~) =>
+      Some(
+        (
+          seq,
+          TranscriptStartFiles(
+            seq~,
+            files~,
+            protocol~,
+            format=Json,
+            complete=false,
+            text~,
+          ),
+        ),
+      )
+    SendTranscriptStep(seq~, count~) =>
+      Some((seq, TranscriptStep(seq~, count~)))
+    _ => None
+  }
+}
+
+///|
+fn Runtime::run(self : Runtime, effect : @lesson.Effect) -> Unit {
+  match effect {
+    SendValidate(..)
+    | SendTransform(..)
+    | SendCheckValue(..)
+    | SendCheckMessage(..)
+    | SendDiff(..)
+    | SendTranscriptStart(..)
+    | SendTranscriptStep(..) =>
+      match request_of(self.page, effect) {
+        Some((seq, request)) => self.post(seq, request)
+        None => ()
+      }
     Wait(ms~, msg~) => set_timeout(ms, () => (self.dispatch)(msg))
-    LoadEditor(text~, file~, fresh~) => {
-      editor_load_file(@lesson.EDITOR_ID, text, file, fresh)
+    LoadEditor(text~, file~, fresh~, language~) => {
+      editor_load_file(@lesson.EDITOR_ID, text, file, fresh, language)
       // The marks belong to the text before: a `Mark` follows with the
       // findings of this text.
       editor_mark(@lesson.EDITOR_ID, "[]")
@@ -237,6 +305,13 @@ fn app(page : @model.LessonPage) -> @rabbita.Val[@rabbita.Html] {
 }
 
 ///|
+/// Whether the page gets the lesson component. A static lesson has no editor
+/// and no output, so the script starts no Worker for it.
+fn should_mount(page : @model.LessonPage) -> Bool {
+  !page.is_static()
+}
+
+///|
 /// The tour script. The page is pre-rendered with the lesson text and empty
 /// panes; this mounts the live lesson component in the element with id
 /// `APP_ID`.
@@ -246,6 +321,6 @@ fn main {
   let tour : @model.TourPage = @json.from_json(@json.parse(text)) catch {
     _ => return
   }
-  guard tour is Page(page) else { return }
+  guard tour is Page(page) && should_mount(page) else { return }
   @rabbita.new(() => app(page)).mount(@lesson.APP_ID)
 }

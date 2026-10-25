@@ -62,6 +62,17 @@ pub(all) enum Request {
     version~ : String?,
     text~ : String
   )
+  /// Load a transcript document and check its first entries, with a model of
+  /// several files, as (name, text). The document gives its own version, so a
+  /// JSONL log is blocked as `TranscriptStart` blocks it with no version.
+  TranscriptStartFiles(
+    seq~ : Int32,
+    files~ : Array[(String, String)],
+    protocol~ : String,
+    format~ : TranscriptFormat,
+    complete~ : Bool,
+    text~ : String
+  )
   /// Check the next `count` entries: 1 for Step, a large number for Run all.
   TranscriptStep(seq~ : Int32, count~ : Int32)
   TranscriptReset(seq~ : Int32)

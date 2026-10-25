@@ -105,6 +105,8 @@ changes, update the four files and the constants together.
 workbench, and it is the only page that loads `playground/ui.js`. A link into or out of the playground loads
 the new page, so that no other page runs the playground script.
 
+A tour lesson links to the playground with the path `site/playground/README.md`, which opens the playground page.
+
 | Part | Job |
 |---|---|
 | `playground/samples` | the example pickers: the models (`manifest`, with `chat-error.smithy`) and the transcripts (`transcript_manifest`, with `chat-findings.md`, the chat with the three findings of the mockup), and the typed transcript format and log preset |

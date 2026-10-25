@@ -1,0 +1,1 @@
+{"slug": "validating-messages", "title": "Validating JSON-RPC messages", "section": "Validating data", "spec": "pkgs/smithy-validation/rpc/README.mbt.md", "message": {"file": "call.json", "service": "example#Calculator", "version": "2.0", "kind": "request"}}

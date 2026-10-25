@@ -1,0 +1,1 @@
+{"events": [], "diff": ["AddedShape|NOTE|example.weather#GetForecastOutput$humidity", "RemovedShape|ERROR|example.weather#GetForecastInput$days"], "output_contains": ["[ERROR] example.weather#GetForecastInput$days: Removed member"]}

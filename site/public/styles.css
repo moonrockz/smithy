@@ -305,6 +305,9 @@ code, pre, kbd { font-family: var(--mono); }
 .tour-body { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); flex: 1; min-height: 0; }
 .tour-text { min-width: 0; overflow-y: auto; padding: 1.2rem var(--gutter) 2rem; border-right: 1px solid var(--border); }
 .tour-text .ms-md h1 { margin-top: 0; font-size: clamp(1.5rem, 1.2rem + 0.8vw, 2rem); }
+/* A static lesson has no panes: the text takes the width, up to the reading measure of the docs pages. */
+.tour-static { grid-template-columns: minmax(0, 1fr); }
+.tour-static .tour-text { width: 100%; max-width: calc(80ch + 2 * var(--gutter)); margin: 0 auto; border-right: 0; }
 .tour-spec { margin-top: 1.5rem; font-size: 0.875rem; }
 .tour-spec a { display: inline-flex; align-items: center; gap: 4px; }
 .tour-app { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--surface);
@@ -315,6 +318,12 @@ code, pre, kbd { font-family: var(--mono); }
 .tour-head { display: flex; flex: none; align-items: center; border-bottom: 1px solid var(--border); }
 .tour-tabs { display: flex; flex: none; align-items: center; gap: 2px; height: 40px; padding: 0 10px;
   border-bottom: 1px solid var(--border); overflow-x: auto; }
+/* The Old and New groups of a diff lesson: a label before the tabs of a side. */
+.tour-group { display: flex; align-self: stretch; align-items: center; gap: 2px; }
+.tour-group + .tour-group { margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--border); }
+.tour-group-tabs { display: flex; align-self: stretch; align-items: center; gap: 2px; }
+.tour-group-label { padding-right: 6px; color: var(--muted); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; }
 .tour-head .tour-tabs { flex: 1; min-width: 0; border-bottom: 0; }
 .tour-expand { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
   margin: 0 10px 0 4px; padding: 0; border: 1px solid var(--border); border-radius: 7px; background: var(--surface);
@@ -355,6 +364,26 @@ code, pre, kbd { font-family: var(--mono); }
 .tour-code { color: var(--accent); font-size: 0.8125rem; }
 .tour-finding .tour-place { color: var(--muted); font-family: var(--mono); font-size: 0.75rem; }
 .tour-message { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; }
+/* The Transcript tab of a transcript lesson. */
+.tour-steps { display: flex; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border); }
+.tour-btn:disabled { opacity: 0.5; cursor: default; }
+.tour-btn:disabled:hover { border-color: var(--border); }
+.tour-entries { margin: 0; padding: 0; list-style: none; }
+.tour-entry { padding: 8px 14px; border-bottom: 1px solid var(--border); }
+.tour-entry-pending { color: var(--muted); }
+.tour-entry-head { display: flex; align-items: baseline; gap: 10px; }
+.tour-entry-no { color: var(--accent); font-family: var(--mono); font-size: 0.75rem; font-weight: 800; }
+.tour-entry-route { font-size: 0.8125rem; }
+.tour-check { margin-left: auto; color: var(--ok); font-weight: 800; }
+.tour-entry-message { margin-top: 2px; color: var(--muted); font-family: var(--mono); font-size: 0.75rem;
+  overflow-wrap: anywhere; white-space: pre-wrap; }
+.tour-entry .tour-findings { margin-top: 6px; border-top: 0; }
+.tour-entry .tour-finding:last-child { border-bottom: 0; }
+.tour-cli { min-width: 0; color: var(--fg); font-size: 0.75rem; overflow-wrap: anywhere; }
+.tour-finding.tour-changed { background-color: var(--changed); box-shadow: inset 3px 0 0 var(--changed-edge); }
+.tour-verdict { padding: 10px 14px; }
+.tour-counts { color: var(--muted); font-size: 0.8125rem; }
+
 /* An output line that changed after the last edit. The editor is dark in both site themes. */
 .tour-output .cm-line.tour-changed { background-color: var(--changed); box-shadow: inset 3px 0 0 var(--changed-edge); }
 

@@ -106,10 +106,27 @@ async test "the view marks the selected tabs" {
 
 ///|
 test "each output has a tab name" {
-  assert_eq(output_label(JsonAst), "JSON AST")
-  assert_eq(output_label(JsonSchema), "JSON Schema")
-  assert_eq(output_label(Selector), "Selector")
-  assert_eq(output_label(Idl), "IDL (flattened)")
+  assert_eq(output_label(Model, Some(JsonAst)), Some("JSON AST"))
+  assert_eq(output_label(Model, Some(JsonSchema)), Some("JSON Schema"))
+  assert_eq(output_label(Model, Some(Selector)), Some("Selector"))
+  assert_eq(output_label(Model, Some(Idl)), Some("IDL (flattened)"))
+  assert_eq(output_label(Model, None), None)
+  assert_eq(output_label(Diff, None), Some("Diff"))
+  assert_eq(output_label(Static, None), None)
+  let setup : @model.ValueSetup = {
+    file: "order.json",
+    shape: "example#Order",
+    options: @samples.ValueOptions::default(),
+  }
+  assert_eq(output_label(Value(setup), None), Some("Value findings"))
+  let message : @model.MessageSetup = {
+    file: "call.json",
+    service: "example#Calculator",
+    version: V2_0,
+    role: Request,
+    options: @samples.ValueOptions::default(),
+  }
+  assert_eq(output_label(Message(message), None), Some("Message findings"))
 }
 
 ///|
@@ -176,4 +193,180 @@ async test "both panes and both editor elements stay in the DOM in every layout"
     assert_true(html.contains("id=\"\{EDITOR_ID}\""))
     assert_true(html.contains("id=\"\{OUTPUT_ID}\""))
   }
+}
+
+///|
+#cfg(not(target="js"))
+async test "a value lesson has the tabs Findings and Value findings and no Open in playground link" {
+  let (m, _) = Model::start(value_page(), None)
+  let html = render(m)
+  assert_true(html.contains(">Findings"))
+  assert_true(html.contains(">Value findings</button>"))
+  assert_true(
+    button_tag(html, "Value findings").contains("aria-selected=\"true\""),
+  )
+  assert_false(html.contains("Open in playground"))
+  // The expand buttons stay.
+  assert_true(expand_tag(html, "Expand the output") != "")
+  assert_true(expand_tag(html, "Expand the editor") != "")
+}
+
+///|
+#cfg(not(target="js"))
+async test "a message lesson has the tab Message findings and keeps the expand buttons" {
+  let (m, _) = Model::start(message_page(), None)
+  let html = render(m)
+  assert_true(html.contains(">Findings"))
+  assert_true(html.contains(">Message findings</button>"))
+  assert_true(
+    button_tag(html, "Message findings").contains("aria-selected=\"true\""),
+  )
+  assert_false(html.contains("Value findings"))
+  assert_false(html.contains("Open in playground"))
+  assert_true(expand_tag(html, "Expand the output") != "")
+  assert_true(expand_tag(html, "Expand the editor") != "")
+}
+
+///|
+#cfg(not(target="js"))
+async test "the file tabs are grouped under Old and New, and each tab shows the name without its prefix" {
+  let (m, _) = Model::start(diff_page(), None)
+  let html = render(m)
+  assert_true(html.contains(">Old</span>"))
+  assert_true(html.contains(">New</span>"))
+  assert_eq(html.split("class=\"tour-group\"").count() - 1, 2)
+  assert_true(
+    html.find(">Old</span>").unwrap() < html.find(">New</span>").unwrap(),
+  )
+  assert_eq(html.split(">model.smithy</button>").count() - 1, 2)
+  assert_false(html.contains(">old/model.smithy"))
+  assert_false(html.contains(">new/model.smithy"))
+  // The first tab of the old group is selected; the new one is not.
+  let first = html.find(">model.smithy</button>").unwrap()
+  assert_true(html[:first].rev_find("aria-selected=\"true\"") is Some(_))
+  let (m, _) = update(m, SelectFile(1))
+  let html = render(m)
+  let second = html.rev_find(">model.smithy</button>").unwrap()
+  assert_true(html[:second].rev_find("aria-selected=\"true\"") is Some(_))
+  // A model lesson has no groups.
+  let (m, _) = Model::start(two_file_page(), None)
+  assert_false(render(m).contains("tour-group"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "a diff lesson has the tabs Findings and Diff and keeps the expand buttons" {
+  let (m, _) = Model::start(diff_page(), None)
+  let html = render(m)
+  assert_true(html.contains(">Findings"))
+  assert_true(html.contains(">Diff</button>"))
+  assert_true(button_tag(html, "Diff").contains("aria-selected=\"true\""))
+  assert_false(html.contains("Open in playground"))
+  assert_true(expand_tag(html, "Expand the output") != "")
+  assert_true(expand_tag(html, "Expand the editor") != "")
+}
+
+///|
+#cfg(not(target="js"))
+async test "the Findings list of a diff lesson shows the file of each finding" {
+  let (m, _) = Model::start(diff_page(), None)
+  let (m, _) = update(
+    m,
+    Answered(
+      seq=1,
+      answer=Diffed(
+        old=[error_in("old/model.smithy", 3)],
+        new=[error_in("new/model.smithy", 5)],
+        events=None,
+      ),
+    ),
+  )
+  let html = render(m)
+  assert_true(html.contains("old/model.smithy:3:1"))
+  assert_true(html.contains("new/model.smithy:5:1"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "a transcript lesson has the tabs Findings and Transcript, Step and Run all, and no Open in playground link" {
+  let (m, _) = Model::start(transcript_page(), None)
+  let html = render(m)
+  assert_true(html.contains(">Findings"))
+  assert_true(html.contains(">Transcript</button>"))
+  // The Findings and Transcript tabs, and the two file tabs.
+  assert_eq(html.split("role=\"tab\"").count() - 1, 4)
+  assert_true(html.contains("id=\"tour-step\""))
+  assert_true(html.contains("id=\"tour-runall\""))
+  assert_true(html.contains(">Step</button>"))
+  assert_true(html.contains(">Run all</button>"))
+  assert_false(html.contains("Open in playground"))
+  // The editors keep their elements.
+  assert_true(html.contains("id=\"\{EDITOR_ID}\""))
+  assert_true(html.contains("id=\"\{OUTPUT_ID}\""))
+}
+
+///|
+#cfg(not(target="js"))
+async test "a checked entry without findings has a check mark; a pending entry has tour-entry-pending" {
+  let m = started()
+  let m = run(m, [StepClicked, Answered(seq=3, answer=progress(checked=1))]).0
+  let html = render(m)
+  assert_true(html.contains("1 of 3 entries checked"))
+  assert_eq(html.split("class=\"tour-check\"").count() - 1, 1)
+  assert_eq(html.split("tour-entry tour-entry-pending").count() - 1, 2)
+  assert_true(html.contains("client → server"))
+  assert_true(html.contains("server → client"))
+  // Step and Run all work while entries are left.
+  assert_false(html.contains("disabled"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "the Transcript tab shows the CLI lines, the findings with no entry and the verdict" {
+  let m = started()
+  let owned = finding_at(Some(0), "MissingResponse")
+  let loose = finding_at(None, "InvalidTranscript")
+  let m = run(m, [
+      RunAllClicked,
+      Answered(
+        seq=3,
+        answer=progress(
+          findings=[owned, loose],
+          checked=3,
+          done=true,
+          summary=Some({ ..summary_of(false, 2), outstanding: 1, }),
+        ),
+      ),
+    ]).0
+  let html = render(m)
+  assert_true(html.contains("3 of 3 entries checked"))
+  assert_true(
+    html.contains(
+      "exchange.json:5:35: entry 0 client: error MissingResponse: I expected a reply.",
+    ),
+  )
+  assert_true(html.contains("Findings with no entry"))
+  assert_true(html.contains("InvalidTranscript"))
+  assert_true(html.contains("not valid, complete"))
+  assert_true(
+    html.contains("3 entries checked, 2 error findings, 1 call without a reply"),
+  )
+  // Step and Run all are disabled at the end.
+  assert_true(html.contains("disabled"))
+}
+
+///|
+#cfg(not(target="js"))
+async test "a long message is cut with a mark and the model error text shows" {
+  let long = String::make(130, 'a')
+  assert_eq(short_message(long), String::make(120, 'a') + " …")
+  assert_eq(short_message("short"), "short")
+  let (m, _) = Model::start(transcript_page(), None)
+  let (m, _) = update(
+    m,
+    Answered(seq=1, answer=Checked([error_in("model.smithy", 2)])),
+  )
+  let (m, _) = update(m, SelectPane(TranscriptPane))
+  let html = render(m)
+  assert_true(html.contains(not_run_text))
 }

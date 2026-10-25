@@ -115,6 +115,10 @@ pub fn SiteData::manifest(self : SiteData) -> @content.Manifest {
 }
 
 ///|
+/// The repository path that a tour lesson links to open the playground.
+pub let playground_source : String = "site/playground/README.md"
+
+///|
 /// The link context for the page whose repository path is `source`.
 pub fn link_context(
   config : SiteConfig,
@@ -125,6 +129,9 @@ pub fn link_context(
   {
     source,
     resolve: path => {
+      if path == playground_source {
+        return Some(Playground)
+      }
       match manifest.find_source(path) {
         Some(page) => Some(page.route)
         None =>

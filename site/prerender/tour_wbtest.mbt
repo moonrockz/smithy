@@ -11,6 +11,8 @@ fn fixture_lesson(
     slug,
     title: "Lesson \{number}",
     section,
+    engine: Model,
+    extension: false,
     output: Some(@samples.Output::JsonAst),
     selector: None,
     spec: "https://smithy.io/2.0/spec/idl.html",
@@ -129,4 +131,74 @@ test "a lesson with an OpenAPI output has no playground link" {
     let page = lesson_page(fixture_config("next"), tour, lesson)
     assert_eq(page.playground, None)
   }
+}
+
+///|
+test "a static lesson page has no files and no playground link" {
+  let lesson = {
+    ..fixture_lesson(4, "Basics", []),
+    engine: Static,
+    output: None,
+  }
+  let tour : @model.Tour = { lessons: [lesson], }
+  let page = lesson_page(fixture_config("next"), tour, lesson)
+  assert_eq(page.files, [])
+  assert_eq(page.playground, None)
+  assert_eq(page.engine, Static)
+  assert_true(page.is_static())
+  let model = lesson_page(
+    fixture_config("next"),
+    fixture_tour(),
+    fixture_tour().lessons[0],
+  )
+  assert_eq(model.engine, Model)
+  assert_true(!model.is_static())
+}
+
+///|
+test "the query file of a Selector lesson does not count as a model file for the playground link" {
+  let tour = fixture_tour()
+  let files : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: "namespace a\n", },
+    { name: "query.selector", text: "structure\n", },
+  ]
+  let lesson = { ..fixture_lesson(4, "S", files), output: Some(Selector), }
+  let page = lesson_page(fixture_config("next"), tour, lesson)
+  assert_true(page.playground is Some(_))
+}
+
+///|
+test "a value lesson page has its engine and no playground link, also with one model file" {
+  let setup : @model.ValueSetup = {
+    file: "order.json",
+    shape: "example#Order",
+    options: @samples.ValueOptions::default(),
+  }
+  let files : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: "namespace a\n", },
+    { name: "order.json", text: "{}\n", },
+  ]
+  let lesson = {
+    ..fixture_lesson(5, "Values", files),
+    engine: Value(setup),
+    output: None,
+  }
+  let tour : @model.Tour = { lessons: [lesson], }
+  let page = lesson_page(fixture_config("next"), tour, lesson)
+  assert_eq(page.engine, Value(setup))
+  assert_eq(page.playground, None)
+}
+
+///|
+test "a transcript lesson page has no playground link" {
+  let files : Array[@model.LessonFile] = [
+    { name: "exchange.json", text: "{}", },
+  ]
+  let lesson = {
+    ..fixture_lesson(4, "Weather", files),
+    engine: Transcript({ file: "exchange.json", protocol: "example#P", }),
+  }
+  let tour : @model.Tour = { lessons: [lesson], }
+  let page = lesson_page(fixture_config("next"), tour, lesson)
+  assert_eq(page.playground, None)
 }

@@ -11,6 +11,8 @@ fn lesson_of(
     slug: "l\{number}",
     title: "L\{number}",
     section,
+    engine: Model,
+    extension: false,
     output: None,
     selector: None,
     spec: "https://smithy.io/2.0/",
@@ -50,7 +52,15 @@ test "case_files replaces a starting file and adds a new one, sorted by name" {
       { name: "model.smithy", text: "new", },
       { name: "a.smithy", text: "a", },
     ],
-    expect: { events: [], output_contains: [], blocked: None, },
+    expect: {
+      events: [],
+      output_contains: [],
+      blocked: None,
+      findings: [],
+      diff: [],
+      valid: None,
+      steps: [],
+    },
   }
   let names = lesson.case_files(c).map(f => f.name + "=" + f.text)
   assert_eq(names, ["a.smithy=a", "b.smithy=b", "model.smithy=new"])
@@ -173,7 +183,15 @@ test "case_files sorts names of different length by code unit" {
   let c : Case = {
     name: "c",
     files: [],
-    expect: { events: [], output_contains: [], blocked: None, },
+    expect: {
+      events: [],
+      output_contains: [],
+      blocked: None,
+      findings: [],
+      diff: [],
+      valid: None,
+      steps: [],
+    },
   }
   assert_eq(lesson.case_files(c).map(f => f.name), [
     "a-long-name.smithy", "zz.smithy",
@@ -209,6 +227,7 @@ test "the page types round-trip through JSON" {
     section: "Basics",
     number: 2,
     total: 3,
+    engine: Model,
     output: Some(@samples.Output::JsonSchema),
     selector: None,
     spec: "https://smithy.io/2.0/",
@@ -238,4 +257,271 @@ test "output_text gives one file as it is" {
 test "output_text joins two files with a line break" {
   assert_eq(output_text([("a.smithy", "A\n"), ("b.smithy", "B\n")]), "A\n\nB\n")
   assert_eq(output_text([]), "")
+}
+
+///|
+test "finding keys have one form each" {
+  assert_eq(found_key("Range", "error", "", "a#B"), "Range|error||a#B")
+  assert_eq(found_key("Range", "error", "/q", "a#B"), "Range|error|/q|a#B")
+  assert_eq(stopped_key("InvalidJson", None), "InvalidJson|stopped|-")
+  assert_eq(
+    stopped_key("InvalidTarget", Some("--shape")),
+    "InvalidTarget|stopped|--shape",
+  )
+  assert_true(is_finding_key("Range|error|/q|a#B"))
+  assert_true(is_finding_key("Range|advisory||a#B"))
+  assert_true(is_finding_key("InvalidJson|stopped|-"))
+  assert_true(!is_finding_key("Range|error|a#B"))
+  assert_true(!is_finding_key("Range|warning|/q|a#B"))
+  assert_true(!is_finding_key("InvalidJson|stopped|-|x"))
+  assert_true(!is_finding_key("Range"))
+}
+
+///|
+test "model_files leaves out the data files of the engine" {
+  let engine : Engine = Value({
+    file: "v.json",
+    shape: "a#B",
+    options: @samples.ValueOptions::default(),
+  })
+  let files : Array[LessonFile] = [
+    { name: "model.smithy", text: "m", },
+    { name: "v.json", text: "{}", },
+  ]
+  assert_eq(engine.data_files(), ["v.json"])
+  assert_eq(model_files(engine, files).map(f => f.name), ["model.smithy"])
+  assert_eq(model_files(Model, files).length(), 2)
+}
+
+///|
+test "a message lesson has its message and its request file as data files" {
+  let options = @samples.ValueOptions::default()
+  let request : MessageSetup = {
+    file: "call.json",
+    service: "a#S",
+    version: V2_0,
+    role: Request,
+    options,
+  }
+  let response : MessageSetup = {
+    ..request,
+    file: "reply.json",
+    role: Response(context=Some(RequestFile("call.json")), legacy_errors=Opaque),
+  }
+  assert_eq(Message(request).data_files(), ["call.json"])
+  assert_eq(Message(response).data_files(), ["reply.json", "call.json"])
+  let named : MessageSetup = {
+    ..response,
+    role: Response(context=Some(Method("m")), legacy_errors=Opaque),
+  }
+  assert_eq(Message(named).data_files(), ["reply.json"])
+  let files : Array[LessonFile] = [
+    { name: "model.smithy", text: "m", },
+    { name: "reply.json", text: "{}", },
+    { name: "call.json", text: "{\"id\":1}", },
+  ]
+  assert_eq(model_files(Message(response), files).map(f => f.name), [
+    "model.smithy",
+  ])
+  let lesson = { ..lesson_of(1, "M", [], []), engine: Message(response), }
+  assert_true(lesson.needs_extension_note())
+}
+
+///|
+test "a message engine survives the page data" {
+  let engine : Engine = Message({
+    file: "reply.json",
+    service: "a#S",
+    version: V1_0,
+    role: Response(
+      context=Some(RequestFile("call.json")),
+      legacy_errors=CodeMessageData,
+    ),
+    options: @samples.ValueOptions::default(),
+  })
+  let back : Engine = @json.from_json(engine.to_json())
+  assert_eq(back, engine)
+}
+
+///|
+test "the message kind of a setup carries the text of the request file" {
+  let options = @samples.ValueOptions::default()
+  let files : Array[LessonFile] = [{ name: "call.json", text: "{\"id\":1}", }]
+  let request : MessageSetup = {
+    file: "call.json",
+    service: "a#S",
+    version: V2_0,
+    role: Request,
+    options,
+  }
+  assert_eq(request.message_kind(files), RequestMessage)
+  let response : MessageSetup = {
+    ..request,
+    file: "reply.json",
+    role: Response(context=Some(RequestFile("call.json")), legacy_errors=Opaque),
+  }
+  // JSON-RPC 2.0 has no legacy errors: the option is absent.
+  assert_eq(
+    response.message_kind(files),
+    ResponseMessage(
+      context=Some(OriginalRequest("{\"id\":1}")),
+      legacy_errors=None,
+    ),
+  )
+  let legacy : MessageSetup = {
+    ..response,
+    version: V1_0,
+    role: Response(context=Some(EnvelopeOnly), legacy_errors=CodeMessageData),
+  }
+  assert_eq(
+    legacy.message_kind(files),
+    ResponseMessage(
+      context=Some(@samples.ResponseContext::EnvelopeOnly),
+      legacy_errors=Some(CodeMessageData),
+    ),
+  )
+}
+
+///|
+test "a static lesson has no data files and needs a note only when it is an extension" {
+  assert_eq(Static.data_files(), [])
+  let base = lesson_of(1, "S", [], [])
+  let static_ = { ..base, engine: Static, }
+  assert_true(static_.is_static())
+  assert_true(!base.is_static())
+  assert_true(!static_.needs_extension_note())
+  assert_true({ ..static_, extension: true, }.needs_extension_note())
+  assert_true(!base.needs_extension_note())
+}
+
+///|
+test "is_query_file" {
+  assert_true(is_query_file("query.selector"))
+  assert_false(is_query_file("model.smithy"))
+  assert_false(is_query_file("a.selector.smithy"))
+}
+
+///|
+test "model_files drops the query file and keeps the order" {
+  let files : Array[LessonFile] = [
+    { name: "b.smithy", text: "b", },
+    { name: "query.selector", text: "q", },
+    { name: "a.smithy", text: "a", },
+  ]
+  assert_eq(model_files(Model, files).map(f => f.name), ["b.smithy", "a.smithy"])
+}
+
+///|
+test "query_of prefers the query file" {
+  assert_eq(
+    query_of([{ name: "query.selector", text: "operation\n", }], fixed=None),
+    Some("operation\n"),
+  )
+  assert_eq(
+    query_of([{ name: "model.smithy", text: "", }], fixed=Some("structure")),
+    Some("structure"),
+  )
+  assert_eq(query_of([{ name: "model.smithy", text: "", }], fixed=None), None)
+}
+
+///|
+test "sides splits the files of a diff lesson by their prefix" {
+  let files : Array[LessonFile] = [
+    { name: "new/b.smithy", text: "n", },
+    { name: "old/a.smithy", text: "o", },
+    { name: "old/b.smithy", text: "o2", },
+  ]
+  let (old, new) = sides(files)
+  assert_eq(old.map(f => f.name), ["old/a.smithy", "old/b.smithy"])
+  assert_eq(new.map(f => f.name), ["new/b.smithy"])
+  assert_eq(Diff.data_files(), [])
+  assert_eq(model_files(Diff, files).length(), 3)
+  assert_true(!lesson_of(1, "D", [], []).needs_extension_note())
+  assert_true(
+    !{ ..lesson_of(1, "D", [], []), engine: Diff, }.needs_extension_note(),
+  )
+}
+
+///|
+test "is_diff_severity names the severities of a diff event that a lesson can claim" {
+  for s in ["NOTE", "WARNING", "DANGER", "ERROR"] {
+    assert_true(is_diff_severity(s))
+  }
+  assert_false(is_diff_severity("SUPPRESSED"))
+  assert_false(is_diff_severity("note"))
+  assert_false(is_diff_severity(""))
+}
+
+///|
+test "is_diff_key reads id|SEVERITY|shape" {
+  assert_true(is_diff_key("AddedShape|NOTE|example#B"))
+  assert_true(is_diff_key("ChangedMemberOrder|WARNING|-"))
+  assert_false(is_diff_key("AddedShape|SUPPRESSED|example#B"))
+  assert_false(is_diff_key("AddedShape|NOTE"))
+  assert_false(is_diff_key("|NOTE|a#B"))
+  assert_false(is_diff_key("AddedShape|NOTE|"))
+}
+
+///|
+test "diff_key writes id|SEVERITY|shape" {
+  assert_eq(diff_key("AddedShape", "NOTE", Some("a#B")), "AddedShape|NOTE|a#B")
+  assert_eq(diff_key("X", "ERROR", None), "X|ERROR|-")
+  assert_true(is_diff_key(diff_key("X", "ERROR", None)))
+}
+
+///|
+test "transcript_key joins code, severity, entry and sender" {
+  assert_eq(
+    transcript_key("MissingResponse", "error", Some(0), Some("client")),
+    "MissingResponse|error|0|client",
+  )
+  assert_eq(
+    transcript_key("InvalidTranscript", "error", None, None),
+    "InvalidTranscript|error|-|-",
+  )
+}
+
+///|
+test "is_transcript_key accepts the form code|severity|entry|sender" {
+  assert_true(is_transcript_key("MissingResponse|error|0|client"))
+  assert_true(is_transcript_key("OutstandingCall|advisory|12|server"))
+  assert_true(is_transcript_key("InvalidTranscript|error|-|-"))
+  assert_true(!is_transcript_key("MissingResponse|error|zero|client"))
+  assert_true(!is_transcript_key("MissingResponse|warning|0|client"))
+  assert_true(!is_transcript_key("MissingResponse|error|0"))
+  assert_true(!is_transcript_key("|error|0|client"))
+  assert_true(!is_transcript_key("A|error|0|client|x"))
+  assert_true(!is_transcript_key("A|error|-1|client"))
+}
+
+///|
+test "a transcript lesson has its file as data file and needs a note" {
+  let engine : Engine = Transcript({
+    file: "exchange.json",
+    protocol: "example#P",
+  })
+  assert_eq(engine.data_files(), ["exchange.json"])
+  let files : Array[LessonFile] = [
+    { name: "model.smithy", text: "m", },
+    { name: "exchange.json", text: "{}", },
+  ]
+  assert_eq(model_files(engine, files).map(f => f.name), ["model.smithy"])
+  let lesson = { ..lesson_of(1, "T", [], []), engine, }
+  assert_true(lesson.needs_extension_note())
+  assert_true(!lesson.is_static())
+}
+
+///|
+test "the message kind of an operation context names the operation" {
+  let setup : MessageSetup = {
+    file: "reply.json",
+    service: "a#S",
+    version: V2_0,
+    role: Response(context=Some(Operation("a#Ping")), legacy_errors=Opaque),
+    options: @samples.ValueOptions::default(),
+  }
+  assert_eq(
+    setup.message_kind([]),
+    ResponseMessage(context=Some(Operation("a#Ping")), legacy_errors=None),
+  )
 }

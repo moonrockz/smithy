@@ -18,21 +18,33 @@ site/tour/lessons/NN-<slug>/
 
 - Lesson numbers start at 01 and have no gap. The folder name is `NN-<slug>`, and `<slug>` is the `slug` of
   `lesson.json`. Two lessons cannot have the same number or the same slug.
-- `lesson.json` has the keys `slug`, `title`, `section`, `spec`, and optionally `output` and `selector`.
+- `lesson.json` has the keys `slug`, `title`, `section`, `spec`, and optionally `output` and `selector` (and `value`, `transcript`, `message`, `diff`, `static` and `extension`, see below).
   Another key is an error. `section` groups consecutive lessons on the contents page. `spec` is the link to what
   the lesson teaches: a URL that starts with `https://smithy.io/`, or the repository path of a docs page, such as
   `pkgs/smithy-openrpc/README.mbt.md`. The reader rejects any other value. A docs path links to the page on the
   site, with the text "Read the documentation of this feature". `output` is one of `JsonAst`, `Idl`, `Selector`,
-  `JsonSchema`, `OpenApi30`, `OpenApi31` or `OpenRpc`. `selector` is the selector for the `Selector` output, and
-  is an error with another output.
+  `JsonSchema`, `OpenApi30`, `OpenApi31` or `OpenRpc`. `selector` is the fixed selector for the `Selector` output,
+  and is an error with another output. The output `Selector` needs a selector: `selector` in `lesson.json`, or a
+  query file (see below).
 - `lesson.md` starts with the line `# <title>`, with the `title` of `lesson.json`.
 - A case runs the starting files with its own `files/` on top. A case file replaces a starting file of the same
   name, or adds a new file.
-- A lesson file is directly in `files/` or in `cases/<case>/files/`. A sub-folder there is an error. The name of
+- A lesson file is directly in `files/` or in `cases/<case>/files/`. A sub-folder there is an error (a diff lesson keeps its files in `old/` and `new/`, see below). The name of
   a lesson file must end in `.smithy`, because the playground core reads every file as IDL. (Java picks the
-  format by the extension. Remove this rule when the core does the same.)
+  format by the extension. Remove this rule when the core does the same.) The exceptions are the data file of a
+  value lesson, the transcript file, the message file and the request file of a message lesson, and the query file.
+- **The query file.** A lesson with the output `Selector` can keep its selector in a starting file whose name ends
+  in `.selector` (lesson 23: `query.selector`). The file is an editor tab as a model file is, in plain text. The
+  reader can change the query. A case can replace the file as any file; it cannot add another query file. A lesson
+  has at most one query file, and the query file needs the output `Selector`. The query file and `selector` in
+  `lesson.json` together are an error. The page does not send the query file as a model file: the Worker gets the
+  other files, and the text of the query file as the selector of the transform (`query_of` and `model_files` in
+  `tour/model`). An empty query shows the reason of the core, "I expected a selector. Write one, for example:
+  structure". The reference script keeps the query file in the digest, does not load it as a model, and writes the
+  selector of each case as `"selector"` in its input. The playground link counts the model files only and carries
+  the current query.
 - The loader skips every name that starts with `.`, such as `.DS_Store`.
-- `expect.json` has `events` and, optionally, `output_contains` or `blocked`. Another key is an error.
+- `expect.json` has `events` and, optionally, `output_contains` or `blocked` (and the engine keys below). Another key is an error.
   - `events` lists the expected findings, each as `id|SEVERITY|shape`. `SEVERITY` is `WARNING`, `DANGER` or
     `ERROR`. A finding with no shape has `-` in its place, for example `Model|ERROR|-`.
     The list is the complete list. An empty list says that the case has no finding of these severities.
@@ -74,12 +86,25 @@ commit that made them. For each case, the check:
 1. requires a fresh reference result. The digest in the file must match the case files. The result has a
    reference JSON Schema if and only if the lesson output is `JsonSchema` and the reference events have no
    `ERROR` and no `DANGER`. It has a reference OpenAPI entry if and only if the lesson output is `OpenApi30` or
-   `OpenApi31` and the reference events have no `ERROR` and no `DANGER`;
+   `OpenApi31` and the reference events have no `ERROR` and no `DANGER`. It has a reference selection if and only
+   if the lesson output is `Selector` and the reference events have no `ERROR` and no `DANGER`. It has a
+   reference JSON AST if and only if the lesson output is `JsonAst` and the reference events have no `ERROR` and
+   no `DANGER`. It has reference diff events if and only if the lesson is a diff lesson and the reference events
+   (of both models together) have no `ERROR` and no `DANGER`;
 2. requires the events of the playground core to be equal to the reference events (after the allow list);
 3. for a lesson with the output `JsonSchema`, requires the JSON Schema of the playground core to be equal to the
    reference JSON Schema (after the allow list);
 4. for a lesson with the output `OpenApi30` or `OpenApi31`, requires the OpenAPI document of the playground core
-   to be equal to the reference OpenAPI document (after the allow list).
+   to be equal to the reference OpenAPI document (after the allow list);
+5. for a lesson with the output `Selector`, requires the shape IDs of `selector.txt` to be equal to the shape IDs
+   that the Java `Selector` selects, both sorted by UTF-16 code unit (after the allow list);
+6. for a lesson with the output `JsonAst`, requires the JSON AST of the playground core (`model.json`) to be equal
+   to the Java `ModelSerializer` output, without the shapes of the namespaces `smithy.rpc` and
+   `smithy.contracts` (after the allow list);
+7. for a diff lesson, requires the diff events of the playground core (`id|SEVERITY|shape`, sorted by UTF-16 code
+   unit) to be equal to the events of the Java `ModelDiff` without `SUPPRESSED` (after the allow list). Both
+   sides must agree on whether a diff ran. The model events of item 2 are those of the old and the new model
+   together.
 
 The check also fails for a reference result of a case that does not exist.
 
@@ -108,13 +133,23 @@ from `site/tour/smithy-rpc-traits.smithy`. A test of `reference_test.mbt` requir
 case also covers the definitions, as the file `<smithy-rpc-traits>`, so a change of the definitions makes its
 reference result stale. The digest of another case covers the case files only.
 
+The contract traits (`smithy.contracts#conditions`) are standard Smithy. The harness compiles `smithy-model-jmespath`
+and `smithy-contract-traits` and sets the case member `smithy_contracts` when a file contains `smithy.contracts#`.
+It then loads `META-INF/smithy/contracts.smithy` from the compiled module. The digest does not cover these
+definitions: they come from the pinned checkout, and `reference_sha` already pins it. A case with the flag is
+checked at level 2 like any other case.
+
+The harness reads a diff lesson from `files/old/` and `files/new/` (and the same folders of a case). It
+assembles each side alone, with the name prefix `old/` or `new/` of the case files. It compares the two models
+with `ModelDiff` only when neither has an `ERROR` or a `DANGER`.
+
 ## The allow list
 
 `site/tour/reference-allow.json` lists the known differences between the playground core and the Java reference.
 It is a JSON array. Each entry has:
 
 - `case`: `<lesson folder>/<case>`
-- `kind`: `event`, `json_schema` or `openapi`
+- `kind`: `event`, `json_schema`, `openapi`, `json_ast`, `selector` or `diff_event`
 - `reason`: why the two differ
 - `issue`: a beads issue id, `smithy-` followed by lower-case letters, digits and dots (for example `smithy-2qe.4`)
 
@@ -129,6 +164,19 @@ an entry removes `/a/0`, the item that was at `/a/1` is at `/a/0`.
 
 A `kind` of `openapi` is the same for the OpenAPI documents: it has `pointer`, no `side`, and removes the value at
 the pointer from both documents.
+
+A `kind` of `json_ast` is the same for the JSON AST documents: it has `pointer`, no `side`, and removes the value
+at the pointer from both documents.
+
+A `kind` of `selector` has `shape` (a shape ID) and `side` (`ours` or `reference`). The entry removes one copy of
+the shape ID from the selected shapes of the named side before the comparison. Use it for the smithy.rpc shapes
+that our core loads into every model and that Java does not have (issue `smithy-2qe.41.24`).
+
+A `kind` of `diff_event` has `event` (`id|SEVERITY|shape`, with `-` for no shape) and `side` (`ours` or
+`reference`). The entry removes one copy of the diff event from the named side before the comparison.
+
+The reference selection is `null` when the Java selector does not parse. Our output must then be blocked. A result
+on one side and a failure on the other side fails the check.
 
 The reference OpenAPI entry is `null` when the model has no service with a protocol trait or the Java
 conversion fails. Our output must then be blocked. A document
@@ -159,6 +207,8 @@ Write `lesson.md` in ASD-STE100 Simplified Technical English:
 - Link to another lesson by the path of its `lesson.md`, for example `../04-shape-ids/lesson.md`. The site
   opens the page of that lesson, and the link also works on GitHub. A test of `site/tour/check`
   (`links_test.mbt`) fails on a link into `site/tour/lessons` that does not open a lesson page.
+- Link to the playground by the path of its README, `../../../playground/README.md`. The site opens the
+  playground page in the channel of the lesson, and the link also works on GitHub.
 - Every claim of the text is a case. When the text says that the Findings tab shows an error, add a case with
   that error in `events`. When the text says what the output contains, add a needle. A claim about the CLI or
   the API is an include block (see "CLI and API blocks"), which `mise run test:cli` or `moon test` runs.
@@ -172,6 +222,166 @@ Write `lesson.md` in ASD-STE100 Simplified Technical English:
 
 To add a lesson, number it with the next free number, add the files above, run `mise run reference:tour`, and
 then run `mise run tour:check`.
+
+## Value lessons
+
+A value lesson checks a JSON value against a shape of the lesson model, as
+`smithy validate value` does. `lesson.json` has `"value"` in place of `"output"`.
+A lesson has at most one of `output`, `value`, `transcript`, `message` and `diff`.
+
+```json
+"value": {"file": "order.json", "shape": "example.orders#Order",
+          "unknown_members": "reject", "member_names": "smithy"}
+```
+
+- `file` is a starting file in `files/` that ends in `.json`. It holds the
+  value. A case can replace it by name, as it replaces any file.
+- `shape` is the absolute ID of the target: a shape ID (`example#Order`) or
+  a member ID (`example#Order$quantity`). The CLI option `--shape` takes both.
+  A finding key holds the shape ID that the CLI prints. For a member target the
+  value is the member, so its pointer is empty (the root of the value).
+- `unknown_members` (`reject` or `ignore`) and `member_names` (`smithy` or
+  `json`) are optional. The defaults are the defaults of the CLI.
+- Other keys are an error.
+
+File rules, for every lesson: each file in `files/` and in a case must end in
+`.smithy`, except the data file of the engine (the value file, the transcript file, or the message file and the request file of a message lesson). A case cannot add another `.json` file.
+
+`expect.json` of a value lesson needs `"findings"` (a lesson of another kind
+cannot have it). Each item is a key of what the reader sees, without the message:
+
+- A finding in the value: `code|severity|pointer|shape`. The severity is
+  `error` or `advisory`. The pointer is a JSON pointer, empty for the root.
+  Example: `Range|error|/quantity|example.orders#Order$quantity`.
+- A problem that stopped the check: `code|stopped|source`. The source is
+  `--shape`, `--service`, a model file or `-` for the value file.
+  Example: `InvalidJson|stopped|-`.
+
+`output_contains` is checked against the lines that the CLI prints, joined with a
+line break. A case whose model has an ERROR or a DANGER cannot name findings or
+output strings, because the check does not run.
+
+The text of a value lesson must have a note that starts with
+`> **Our extension:**`. Standard Smithy has no command that checks a JSON
+value against a shape, and no Java reference exists for it. Level 1 checks the note. Level 2 compares only the
+model events.
+
+## Transcript lessons
+
+A transcript lesson steps through a JSON-RPC exchange against a protocol of the
+lesson model, as `smithy validate rpc transcript` does. `lesson.json` has
+`"transcript"` in place of `"output"`. A lesson has at most one of `output`,
+`value`, `transcript`, `message` and `diff`.
+
+```json
+"transcript": {"file": "exchange.json", "protocol": "example#WeatherProtocol"}
+```
+
+- `file` is a starting file in `files/`. It must end in `.json`: the editor
+  shows a JSON document. A Markdown transcript would need its own editor mode,
+  and a JSONL log needs a version and a preset, so the tour does not offer them.
+  A case can replace the file by name.
+- `protocol` is the absolute ID of the shape with the `jsonRpcProtocol` trait.
+- Other keys are an error. The file is a data file: it is not a model file.
+
+`expect.json` of a transcript lesson needs `"findings"`: the findings of a run
+to the end, as keys of the form `code|severity|entry|sender`. The severity is
+`error` or `advisory`. The entry is the entry number, or `-` for a finding with
+no entry. The sender is the peer name, or `-` for none. Examples:
+`MissingResponse|error|0|client` and `InvalidTranscript|error|-|-`. The check
+sorts the keys before it compares them. Two optional keys:
+
+- `"valid"` (`true` or `false`) is the verdict of the summary at the end.
+- `"steps"` is a list of `{"count": 1, "findings": []}`. Each item says which
+  findings a fresh check shows after Step is clicked `count` times from the
+  start. `count` is a whole number from 1. This is how a lesson claims that a
+  finding appears only when its entry is read.
+
+`valid` and `steps` in a lesson of another kind are an error.
+`output_contains` is checked against the lines that the CLI prints (the findings
+as `FindingView::cli_line`, then the expect lines), joined with a line break.
+A case whose model has an ERROR or a DANGER cannot name findings or output
+strings, because the check does not run.
+
+Level 1 runs each case on a fresh session: it starts the transcript with the
+model files and `format = Json`, steps to the end, and compares keys, `valid`,
+the steps and the output strings. A start that blocks fails the case with its
+reason. A transcript that is not valid JSON ends at the start with an
+`InvalidTranscript` finding.
+
+The text of a transcript lesson must have a note that starts with
+`> **Our extension:**`. Smithy defines no transcript check, and no Java
+reference exists for it. Level 1 checks the note. Level 2 compares only the
+model events of the model files.
+
+## Message lessons
+
+A message lesson checks one JSON-RPC message against a service of the lesson
+model, as `smithy validate rpc --message` or `--response` does. `lesson.json`
+has `"message"` in place of `"output"`, and the lesson has the file rules,
+the `findings` of `expect.json` and the extension note of a value lesson.
+
+```json
+"message": {"file": "reply.json", "service": "example#Calculator", "version": "1.0",
+            "kind": "response", "context": {"request": "call.json"},
+            "legacy_errors": "code-message-data",
+            "unknown_members": "reject", "member_names": "smithy"}
+```
+
+- `file` is a starting file in `files/` that ends in `.json`. It holds the
+  message. `service` is the absolute ID of the service (`--service`).
+- `version` is `"1.0"` or `"2.0"`. `kind` is `"request"` or `"response"`.
+- `context` is for a response only. It is `"envelope-only"`, or an object with
+  exactly one of `method` (the name of the method), `operation` (the absolute
+  ID of the operation) and `request`. `request` names a starting `.json` file
+  other than the message file. The check gets the text of that file as the
+  original request, so a case that edits the file changes the check. A JSON-RPC
+  id keeps all of its digits, because the check reads the text.
+- `legacy_errors` is for a response only: `"opaque"` (the default) or
+  `"code-message-data"`. The second value needs `"version": "1.0"`.
+- `unknown_members` and `member_names` are optional, as for a value lesson.
+- Other keys are an error.
+
+Every file ends in `.smithy`, except the message file and the request file.
+A finding key has the form of a value finding. The shape of a finding is the
+shape that the CLI prints: a member, an operation or the service. A message
+that is not JSON gives `InvalidJson|error||<service>`. Level 1 and level 2 are as
+for a value lesson: only the model events are compared with the Java reference.
+
+## Diff lessons
+
+A diff lesson compares two models, as `smithy diff --old --new` does. `lesson.json` has `"diff": true` in place
+of `"output"` and `"value"`: a lesson has at most one of them.
+
+- The starting files are in two folders, `files/old/` and `files/new/`. Each folder holds at least one file, and
+  the name of each file ends in `.smithy`. A file directly in `files/`, another folder, or a sub-folder in
+  `old/` or `new/` is an error.
+- The names of the files are `old/<name>` and `new/<name>`: they stay unique in one file list, so the digest,
+  the merge and the stored edits work as for any lesson. A case replaces or adds a file by this name, for
+  example `cases/<case>/files/new/model.smithy`. A case file outside `old/` and `new/` is an error that names
+  the case and the file.
+- `expect.json` of a diff lesson needs `"diff"` (a lesson of another kind cannot have it). Each item is
+  `id|SEVERITY|shape`, with `-` for an event without a shape. The severity is `NOTE`, `WARNING`, `DANGER` or
+  `ERROR`; `SUPPRESSED` events are not shown, so a key cannot claim them. `"findings"` is an error.
+- `"events"` holds the model events of both models together (WARNING, DANGER and ERROR, as for any lesson).
+  When a model has an ERROR or a DANGER, `smithy diff` does not compare: the case claims `"diff": []`.
+- `output_contains` is checked against the lines that `smithy diff` prints, joined with a line break. It cannot run when
+  a model has an ERROR or a DANGER (`smithy diff` does not compare then), so such a case cannot have it.
+- The text has no extension note: Smithy has a diff tool. The text says that our CLI prints the events of the
+  Java `smithy-diff`.
+
+## Static lessons
+
+A static lesson has no editor, no output and no cases. Its text shows blocks that come from tested sources through
+include blocks (see below), for example a CLI check that exits non-zero and an API block.
+
+- `lesson.json` has `"static": true`. It has none of `output`, `selector`, `value`, `message`, `diff` and
+  `transcript`.
+- The folder has `lesson.json` and `lesson.md` only. A `files/` or a `cases/` folder is an error.
+- `"extension": true` marks a feature that is ours, not Smithy's. It is only for a static lesson. The text of such a
+  lesson must have the note `> **Our extension:**`; level 1 checks it, as for a value lesson.
+- The page has no panes, no expand buttons and no Worker: the text takes the width, up to the reading measure of
+  the docs pages. The reference harness skips a static lesson.
 
 ## CLI and API blocks
 
@@ -194,7 +404,12 @@ A lesson must not hold a CLI or API block that no test runs. It includes a marke
 | --- | --- | --- |
 | `mbt check` with a test | a `.mbt.md` file with a `moon.pkg` next to it | `moon test` |
 | `console` | `apps/smithy/README.md` | `mise run test:cli` |
+| `console status=N` (N from 1 to 125) | `apps/smithy/README.md` | `mise run test:cli` |
 | `LANG file=NAME` | `apps/smithy/README.md` | `mise run test:cli` (writes the file) |
+
+A `console` fence runs each command and requires exit status 0 and an empty stderr. `console status=N` runs each
+command and requires exit status N; the text after a command is its stdout, then its stderr. Use it to show a
+failing check from a tested source.
 
 A `console` or `file=` fence must start at the start of a line, because the runner (`scripts/test-cli.mbtx`)
 reads only those. Do not remove a tour marker that a lesson uses.

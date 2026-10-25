@@ -76,38 +76,107 @@ as `\n`. See the [model diff library](../../pkgs/smithy-diff/README.mbt.md) for 
 comparison API, suppressions and preview-feature behavior. This command compares
 explicit old/new snapshots; Git and project modes are not implemented.
 
-### Convert a model to the JSON AST
+### Compare two models
 
-This command writes the JSON AST of the model to standard output.
+These commands compare an old weather model with two new models. The first new model adds an optional
+output member, a compatible change. The second new model also removes an input member, a breaking change, so
+the command exits 1.
 
-<!-- tour:start convert-json-cli -->
-```smithy file=greeting.smithy
+<!-- tour:start diff-cli -->
+```smithy file=old-weather.smithy
 $version: "2"
 
-namespace example
+namespace example.weather
 
-structure Greeting {
-    message: String
+service Weather {
+    version: "2026-10-01"
+    operations: [GetForecast]
+}
+
+operation GetForecast {
+    input := {
+        @required
+        city: String
+
+        days: Integer
+    }
+
+    output := {
+        @required
+        summary: String
+
+        celsius: Integer
+    }
+}
+```
+
+```smithy file=new-weather.smithy
+$version: "2"
+
+namespace example.weather
+
+service Weather {
+    version: "2026-10-01"
+    operations: [GetForecast]
+}
+
+operation GetForecast {
+    input := {
+        @required
+        city: String
+
+        days: Integer
+    }
+
+    output := {
+        @required
+        summary: String
+
+        celsius: Integer
+
+        humidity: Integer
+    }
+}
+```
+
+```smithy file=new-weather-removed.smithy
+$version: "2"
+
+namespace example.weather
+
+service Weather {
+    version: "2026-10-01"
+    operations: [GetForecast]
+}
+
+operation GetForecast {
+    input := {
+        @required
+        city: String
+    }
+
+    output := {
+        @required
+        summary: String
+
+        celsius: Integer
+
+        humidity: Integer
+    }
 }
 ```
 
 ```console
-$ smithy convert --to json greeting.smithy
-{
-    "smithy": "2.0",
-    "shapes": {
-        "example#Greeting": {
-            "type": "structure",
-            "members": {
-                "message": {
-                    "target": "smithy.api#String"
-                }
-            }
-        }
-    }
-}
+$ smithy diff --old old-weather.smithy --new new-weather.smithy
+[NOTE] example.weather#GetForecastOutput$humidity: Added member `example.weather#GetForecastOutput$humidity` | AddedShape
 ```
-<!-- tour:end convert-json-cli -->
+
+```console status=1
+$ smithy diff --old old-weather.smithy --new new-weather-removed.smithy
+[NOTE] example.weather#GetForecastOutput$humidity: Added member `example.weather#GetForecastOutput$humidity` | AddedShape
+[ERROR] example.weather#GetForecastInput$days: Removed member `example.weather#GetForecastInput$days` | RemovedShape
+```
+<!-- tour:end diff-cli -->
 
 ### JSONL diff output
 
@@ -296,6 +365,267 @@ native build for portable stdin pipelines.
 Run `mise run test:cli` to check the built CLI on every backend, or pass target
 names to select backends. The root [README](../../README.md) lists release assets.
 
+### Validate protocol test cases
+
+`--protocol-tests` loads the `smithy.test` traits, so `validate` checks the cases of
+`@httpRequestTests` and `@httpResponseTests`. These commands check the greeting model of the
+[protocol-tests example](../../examples/protocol-tests/README.md). In the second model the
+request case has the wrong type of value for `name` in `params`, so the command exits 1.
+
+<!-- tour:start protocol-tests-cli -->
+```smithy file=protocol-tests.smithy
+$version: "2"
+namespace example
+
+use smithy.test#httpRequestTests
+use smithy.test#httpResponseTests
+
+@trait
+@protocolDefinition
+structure fixtureProtocol {}
+
+@httpRequestTests([{
+    id: "GreetingRequest"
+    protocol: fixtureProtocol
+    method: "POST"
+    uri: "/greeting"
+    params: {name: "Ada"}
+    headers: {"Content-Type": "application/json"}
+    forbidHeaders: ["X-Secret"]
+    body: "{\"name\":\"Ada\"}"
+    bodyMediaType: "application/json"
+}])
+@httpResponseTests([{
+    id: "GreetingResponse"
+    protocol: fixtureProtocol
+    code: 200
+    params: {greeting: "Hello, Ada"}
+}])
+operation Greet { input: Input, output: Output }
+
+structure Input { @required name: String }
+structure Output { greeting: String }
+```
+
+```smithy file=protocol-tests-bad.smithy
+$version: "2"
+namespace example
+
+use smithy.test#httpRequestTests
+use smithy.test#httpResponseTests
+
+@trait
+@protocolDefinition
+structure fixtureProtocol {}
+
+@httpRequestTests([{
+    id: "GreetingRequest"
+    protocol: fixtureProtocol
+    method: "POST"
+    uri: "/greeting"
+    params: {name: 1}
+    headers: {"Content-Type": "application/json"}
+    forbidHeaders: ["X-Secret"]
+    body: "{\"name\":\"Ada\"}"
+    bodyMediaType: "application/json"
+}])
+@httpResponseTests([{
+    id: "GreetingResponse"
+    protocol: fixtureProtocol
+    code: 200
+    params: {greeting: "Hello, Ada"}
+}])
+operation Greet { input: Input, output: Output }
+
+structure Input { @required name: String }
+structure Output { greeting: String }
+```
+
+```console
+$ smithy validate --protocol-tests protocol-tests.smithy
+```
+
+```console status=1
+$ smithy validate --protocol-tests protocol-tests-bad.smithy
+[ERROR] example#Greet: smithy.test#httpRequestTests.0.params: Error validating value/name: Expected string value for `smithy.api#String`. | HttpRequestTestsInput
+```
+<!-- tour:end protocol-tests-cli -->
+
+### Convert a model to the JSON AST
+
+This command writes the JSON AST of the model to standard output.
+
+<!-- tour:start convert-json-cli -->
+```smithy file=greeting.smithy
+$version: "2"
+
+namespace example
+
+structure Greeting {
+    message: String
+}
+```
+
+```console
+$ smithy convert --to json greeting.smithy
+{
+    "smithy": "2.0",
+    "shapes": {
+        "example#Greeting": {
+            "type": "structure",
+            "members": {
+                "message": {
+                    "target": "smithy.api#String"
+                }
+            }
+        }
+    }
+}
+```
+<!-- tour:end convert-json-cli -->
+
+### Convert the JSON AST to IDL
+
+This command writes the IDL of a JSON AST model to standard output. The IDL output uses absolute shape IDs.
+
+<!-- tour:start convert-idl-cli -->
+```json file=greeting.json
+{
+    "smithy": "2.0",
+    "shapes": {
+        "example#Greeting": {
+            "type": "structure",
+            "members": {
+                "message": {
+                    "target": "smithy.api#String"
+                }
+            }
+        }
+    }
+}
+```
+
+```console
+$ smithy convert --to idl greeting.json
+$version: "2"
+
+namespace example
+
+structure Greeting {
+    message: smithy.api#String
+}
+```
+<!-- tour:end convert-idl-cli -->
+
+### Select shapes
+
+This command prints the ID of each shape that the selector matches, one on each line.
+
+<!-- tour:start select-cli -->
+```smithy file=weather.smithy
+$version: "2"
+
+namespace example
+
+service Weather {
+    version: "2024-01-01"
+    operations: [GetForecast, PutCity]
+}
+
+@readonly
+operation GetForecast {}
+
+@idempotent
+operation PutCity {}
+```
+
+```console
+$ smithy select --selector 'operation[trait|readonly]' weather.smithy
+example#GetForecast
+```
+<!-- tour:end select-cli -->
+
+### Build a projection
+
+A projection is a changed copy of the model. This build removes the shapes with the `@internal` trait from the projection `public`. The projection `source` is the model with no change.
+
+<!-- tour:start build-projection-cli -->
+```json file=smithy-build.json
+{
+    "version": "1.0",
+    "sources": ["forecast.smithy"],
+    "projections": {
+        "public": {
+            "transforms": [
+                {"name": "excludeShapesByTrait", "args": {"traits": ["internal"]}}
+            ]
+        }
+    }
+}
+```
+
+```smithy file=forecast.smithy
+$version: "2"
+
+namespace example
+
+service Weather {
+    version: "2024-01-01"
+    operations: [GetForecast, GetDebugInfo]
+}
+
+@readonly
+operation GetForecast {}
+
+@internal
+@readonly
+operation GetDebugInfo {}
+```
+
+```console
+$ smithy build --config smithy-build.json
+$ smithy select --selector operation build/smithy/source/model/model.json
+example#GetDebugInfo
+example#GetForecast
+$ smithy select --selector operation build/smithy/public/model/model.json
+example#GetForecast
+```
+<!-- tour:end build-projection-cli -->
+
+### Check contract traits
+
+The validate command prints nothing for a model with no findings. The selector finds the shapes that have conditions.
+
+<!-- tour:start contracts-cli -->
+```smithy file=time-range.smithy
+$version: "2"
+
+namespace example
+
+use smithy.contracts#conditions
+
+@conditions({
+    StartBeforeEnd: {
+        expression: "start < end"
+        documentation: "The start time must be before the end time."
+    }
+})
+structure TimeRange {
+    @required
+    start: Timestamp
+
+    @required
+    end: Timestamp
+}
+```
+
+```console
+$ smithy validate time-range.smithy
+$ smithy select --selector '[trait|smithy.contracts#conditions]' time-range.smithy
+example#TimeRange
+```
+<!-- tour:end contracts-cli -->
+
 ### Explicit directory, ZIP and tar/gzip resources
 
 Build `sources`, `imports` and projection `imports` accept resource selection
@@ -422,6 +752,53 @@ JSON output contains `valid`, `complete`, and findings with codes, typed path st
 shape/member IDs and messages. Invalid JSON and duplicate decoded names produce structured input
 findings too. Input files remain unchanged; defaults and coercions are not applied.
 
+These commands check two orders. The first order is valid, and the second order has a quantity out of range.
+
+<!-- tour:start value-cli -->
+```smithy file=order.smithy
+$version: "2"
+
+namespace example.orders
+
+/// An order in a shop.
+structure Order {
+    @required
+    id: String
+
+    @range(min: 1, max: 10)
+    quantity: Integer
+
+    @length(max: 20)
+    note: String
+}
+```
+
+```json file=order.json
+{
+    "id": "A-1001",
+    "quantity": 2,
+    "note": "Leave at the door"
+}
+```
+
+```json file=order-too-many.json
+{
+    "id": "A-1001",
+    "quantity": 11,
+    "note": "Leave at the door"
+}
+```
+
+```console
+$ smithy validate value --shape example.orders#Order --value order.json order.smithy
+```
+
+```console status=1
+$ smithy validate value --shape example.orders#Order --value order-too-many.json order.smithy
+order-too-many.json/quantity: error[Range] example.orders#Order$quantity: I expected the number to satisfy the modeled range.
+```
+<!-- tour:end value-cli -->
+
 Use `--value -` to read the value from stdin. Alternatively use `--from idl -` or `--from json -` for
 a model from stdin, with a value file. Stdin may be used only once across both inputs. Multiple model
 files assemble together. `--unknown-members ignore` permits unknown structure fields, and
@@ -442,6 +819,45 @@ same model, `{count: 2}` succeeds and `{count: 0}` fails with `Range`, native ki
 smithy validate value --shape example#Input --value request.ion --input-format ion-text model.smithy
 smithy validate value --shape example#Input --value request.10n --input-format ion-binary --diagnostics json model.smithy
 ```
+
+These commands check two Ion readings. The first reading has a native timestamp, and the second reading has a
+string in its place.
+
+<!-- tour:start ion-value-cli -->
+```smithy file=reading.smithy
+$version: "2"
+namespace example
+
+structure Reading {
+    @required
+    sensor: String
+
+    @required
+    @range(min: -50, max: 60)
+    celsius: Integer
+
+    @required
+    takenAt: Timestamp
+}
+```
+
+```ion file=reading.ion
+{sensor: "roof", celsius: 21, takenAt: 2026-10-24T09:30:00Z}
+```
+
+```ion file=reading-text-time.ion
+{sensor: "roof", celsius: 21, takenAt: "2026-10-24T09:30:00Z"}
+```
+
+```console
+$ smithy validate value --shape example#Reading --value reading.ion --input-format ion-text reading.smithy
+```
+
+```console status=1
+$ smithy validate value --shape example#Reading --value reading-text-time.ion --input-format ion-text reading.smithy
+reading-text-time.ion/takenAt: error[TypeMismatch] example#Reading$takenAt: I expected a timestamp value, but found string.
+```
+<!-- tour:end ion-value-cli -->
 
 Ion input uses the released `moonrockz/ion` text and binary codecs. By default the datagram must contain
 exactly one user value. Pass `--ion-index 1` to select its second user value explicitly; symbol-table
@@ -475,6 +891,68 @@ and parse offsets. Explicit JSON-RPC 2.0 batches use `--batch`; exchanges betwee
 `validate rpc transcript` (see below).
 See the [RPC library and runnable calculator examples](../../pkgs/smithy-validation/rpc/README.mbt.md)
 for trait definitions, version rules, parameter mapping, stdin and dependency isolation.
+
+These commands check two calls of `subtract`. The first call is valid, and the second call has a string as its
+second argument.
+
+<!-- tour:start message-cli -->
+```smithy file=calculator.smithy
+$version: "2"
+namespace example
+
+use smithy.rpc#jsonRpc
+use smithy.rpc#method
+
+@jsonRpc(versions: ["1.0", "2.0"])
+service Calculator {
+    version: "1"
+    operations: [Subtract, Ping]
+}
+
+@method(name: "subtract", params: "either",
+    positional: ["minuend", "subtrahend"], resultMember: "value")
+operation Subtract { input: SubtractInput, output: SubtractOutput }
+
+structure SubtractInput {
+    @required
+    minuend: Integer
+    @required
+    subtrahend: Integer
+}
+
+structure SubtractOutput { value: Integer }
+
+@method(name: "ping", params: "either", positional: [], nullResult: true)
+operation Ping {}
+```
+
+```json file=subtract.json
+{
+    "jsonrpc": "2.0",
+    "method": "subtract",
+    "params": [42, 23],
+    "id": 1
+}
+```
+
+```json file=subtract-string.json
+{
+    "jsonrpc": "2.0",
+    "method": "subtract",
+    "params": [42, "23"],
+    "id": 1
+}
+```
+
+```console
+$ smithy validate rpc --version 2.0 --service example#Calculator --message subtract.json calculator.smithy
+```
+
+```console status=1
+$ smithy validate rpc --version 2.0 --service example#Calculator --message subtract-string.json calculator.smithy
+subtract-string.json/params/1: error[TypeMismatch] example#SubtractInput$subtrahend: I expected a integer value, but found string.
+```
+<!-- tour:end message-cli -->
 
 Response mode uses `--response` in place of `--message`. Supply exactly one context option:
 `--method` for a wire method, `--operation` for a Smithy operation ID, `--request` for the original
@@ -531,6 +1009,96 @@ notifications and calls without a reply. A protocol with `@jsonRpcSession` also 
 methods (`StateViolation`), the advertised capabilities (`CapabilityNotAdvertised`) and cancellations
 of calls that are not active (`CancelInactiveCall`, advisory). An order trait that names an undeclared
 state or capability is an invalid protocol (exit 2). See `examples/json-rpc/lifecycle.smithy`.
+
+These commands check two weather exchanges. The first exchange is valid, and in the second exchange the call has no reply.
+
+<!-- tour:start transcript-cli -->
+```smithy file=weather-peers.smithy
+$version: "2"
+namespace example
+
+use smithy.rpc#jsonRpc
+use smithy.rpc#jsonRpcProtocol
+use smithy.rpc#method
+
+/// The two peers of the weather protocol.
+@jsonRpcProtocol(
+    versions: ["2.0"]
+    peers: [
+        { name: "client", accepts: WeatherClient }
+        { name: "server", accepts: WeatherApi }
+    ]
+)
+structure WeatherProtocol {}
+
+/// The server answers forecast calls.
+@jsonRpc(versions: ["2.0"])
+service WeatherApi {
+    version: "2024-01-01"
+    operations: [GetForecast]
+}
+
+/// The client receives alerts from the server.
+@jsonRpc(versions: ["2.0"])
+service WeatherClient {
+    version: "2024-01-01"
+    operations: [Alert]
+}
+
+@method(name: "weather/forecast", params: "named", resultMember: "chanceOfRain")
+operation GetForecast {
+    input := {
+        @required
+        cityId: String
+    }
+    output := {
+        @required
+        chanceOfRain: Float
+    }
+}
+
+@method(name: "weather/alert", params: "named", nullResult: true)
+operation Alert {
+    input := {
+        @required
+        text: String
+    }
+}
+```
+
+```json file=weather-exchange.json
+{
+  "version": "2.0",
+  "complete": true,
+  "entries": [
+    {"from": "client", "message": {"jsonrpc": "2.0", "id": 1, "method": "weather/forecast", "params": {"cityId": "oslo"}}},
+    {"from": "server", "message": {"jsonrpc": "2.0", "method": "weather/alert", "params": {"text": "Storm at 18:00"}}},
+    {"from": "server", "message": {"jsonrpc": "2.0", "id": 1, "result": 0.8}}
+  ]
+}
+```
+
+```json file=weather-no-reply.json
+{
+  "version": "2.0",
+  "complete": true,
+  "entries": [
+    {"from": "client", "message": {"jsonrpc": "2.0", "id": 1, "method": "weather/forecast", "params": {"cityId": "oslo"}}},
+    {"from": "server", "message": {"jsonrpc": "2.0", "method": "weather/alert", "params": {"text": "Storm at 18:00"}}}
+  ]
+}
+```
+
+```console
+$ smithy validate rpc transcript --protocol example#WeatherProtocol --diagnostics json weather-peers.smithy weather-exchange.json
+{"valid":true,"complete":true,"entries":3,"outstanding":0,"correlation":true,"findings":[]}
+```
+
+```console status=1
+$ smithy validate rpc transcript --protocol example#WeatherProtocol weather-peers.smithy weather-no-reply.json
+weather-no-reply.json:5:35: entry 0 client: error MissingResponse: I expected a reply from server to entry 0 from client with id 1; the complete transcript has none.
+```
+<!-- tour:end transcript-cli -->
 
 - `--protocol` names the protocol structure. It is required.
 - `--version 1.0|2.0` is required when the document gives no version. When both give it, they must agree.
@@ -691,6 +1259,45 @@ Repeat either command with `--offline`. Native Linux/macOS/Windows and Node.js
 hosts use curl. Wasm and Wasm GC retain portable archive/provider behavior with a
 custom library transport/cache store. Normal tests use controlled HTTP fixtures,
 not live registry availability.
+
+### Exact versions of remote inputs
+
+An npm input needs an exact version. A range such as `^1.2.0` fails when the CLI reads
+the configuration, before it acquires anything. The second configuration has a range, so
+the build exits 1 without network access.
+
+<!-- tour:start remote-inputs-cli -->
+```json file=weather-build.json
+{
+  "version": "1.0",
+  "sources": [
+    {
+      "npm": { "package": "@example/weather-models", "version": "1.2.3" },
+      "root": "package/models",
+      "globs": ["**/*.smithy"]
+    }
+  ]
+}
+```
+
+```json file=weather-build-range.json
+{
+  "version": "1.0",
+  "sources": [
+    {
+      "npm": { "package": "@example/weather-models", "version": "^1.2.0" },
+      "root": "package/models",
+      "globs": ["**/*.smithy"]
+    }
+  ]
+}
+```
+
+```console status=1
+$ smithy build --config weather-build-range.json
+smithy: npm requires a public registry base, package name and exact semantic version
+```
+<!-- tour:end remote-inputs-cli -->
 
 ## Repository credentials
 

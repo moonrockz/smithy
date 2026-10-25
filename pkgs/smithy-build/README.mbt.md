@@ -116,6 +116,61 @@ plugins return relative filenames; absolute paths and parent traversal are
 rejected.
 
 
+## Projections
+
+`BuildRunner::run` gives each artifact by its path. A projection model is a JSON AST that you can load again.
+
+<!-- tour:start build-projection-api -->
+```mbt check
+///|
+test {
+  let model = @smithy.Loader::new()
+  .add_idl(
+    "forecast.smithy",
+    (
+      #|$version: "2"
+      #|
+      #|namespace example
+      #|
+      #|service Weather {
+      #|    version: "2024-01-01"
+      #|    operations: [GetForecast, GetDebugInfo]
+      #|}
+      #|
+      #|@readonly
+      #|operation GetForecast {}
+      #|
+      #|@internal
+      #|@readonly
+      #|operation GetDebugInfo {}
+    ),
+  )
+  .assemble().model.unwrap()
+  let config = @build.BuildConfig::parse(
+    (
+      #|{
+      #|    "version": "1.0",
+      #|    "projections": {
+      #|        "public": {
+      #|            "transforms": [
+      #|                {"name": "excludeShapesByTrait", "args": {"traits": ["internal"]}}
+      #|            ]
+      #|        }
+      #|    }
+      #|}
+    ),
+  )
+  let artifacts = @build.BuildRunner::new(config).run(model)
+  let public = @smithy.Loader::new()
+  .add_json("public.json", artifacts["public/model/model.json"])
+  .assemble().model.unwrap()
+  assert_eq(@smithy.Selector::parse("operation").select_ids(public), [
+    "example#GetForecast",
+  ])
+}
+```
+<!-- tour:end build-projection-api -->
+
 ## Acquisition settings
 
 `BuildConfig::parse` accepts top-level `cacheDirectory`, a portable filesystem
@@ -222,6 +277,81 @@ See the [provider contracts](../artifact-resources/README.mbt.md#public-npm-pack
 [npm example](../../examples/npm-registry/README.md) and
 [Maven example](../../examples/maven-repository/README.md). All remote inputs share
 `cacheDirectory`, `offline` and the CLI cache flags.
+
+This test reads one npm, one Maven and one GitHub input. Parsing performs no I/O,
+so it needs no network. Each input knows its kind and its location. A version
+range fails:
+
+<!-- tour:start remote-inputs-api -->
+```mbt check
+///|
+test "read npm, Maven and GitHub inputs" {
+  let config = @build.BuildConfig::parse(
+    (
+      #|{
+      #|  "version": "1.0",
+      #|  "sources": [
+      #|    {
+      #|      "npm": { "package": "@example/weather-models", "version": "1.2.3" },
+      #|      "root": "package/models",
+      #|      "globs": ["**/*.smithy"]
+      #|    },
+      #|    {
+      #|      "maven": {
+      #|        "group": "software.amazon.smithy",
+      #|        "artifact": "smithy-aws-traits",
+      #|        "version": "1.72.0"
+      #|      }
+      #|    },
+      #|    {
+      #|      "github": {
+      #|        "repository": "example/weather-models",
+      #|        "tag": "v1.2.3",
+      #|        "asset": "models.tar.gz"
+      #|      },
+      #|      "format": "tgz",
+      #|      "root": "package/models",
+      #|      "globs": ["**/*.smithy"]
+      #|    }
+      #|  ]
+      #|}
+    ),
+  )
+  let kinds = config.sources.map(input => {
+    match input {
+      Npm(_) => "npm"
+      Maven(_) => "maven"
+      GitHub(_) => "github"
+      _ => "other"
+    }
+  })
+  assert_eq(kinds, ["npm", "maven", "github"])
+  let locations = config.sources.map(input => input.location().to_string())
+  assert_eq(locations[0], "https://registry.npmjs.org")
+  assert_eq(locations[1], "https://repo.maven.apache.org/maven2")
+  assert_eq(locations[2], "example/weather-models")
+  let range =
+    #|{
+    #|  "version": "1.0",
+    #|  "sources": [
+    #|    {
+    #|      "npm": { "package": "@example/weather-models", "version": "^1.2.0" },
+    #|      "root": "package/models",
+    #|      "globs": ["**/*.smithy"]
+    #|    }
+    #|  ]
+    #|}
+  try @build.BuildConfig::parse(range) catch {
+    @build.InvalidBuildConfig(message) => {
+      let expected = "npm requires a public registry base, package name and exact semantic version"
+      assert_eq(message, expected)
+    }
+  } noraise {
+    _ => fail("I expected the version range to fail")
+  }
+}
+```
+<!-- tour:end remote-inputs-api -->
 
 ## Credential bindings
 

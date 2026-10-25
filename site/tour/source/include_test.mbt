@@ -70,6 +70,27 @@ test "tested_snippet accepts only tested fences" {
     @source.tested_snippet("apps/smithy/README.md", console, has_moon_pkg=false),
     Ok({ lang: "console", file: None, code: "$ x", }),
   )
+  let failing : @markdown.Fence = {
+    lang: "console",
+    rest: "status=1",
+    code: "$ x",
+  }
+  assert_eq(
+    @source.tested_snippet("apps/smithy/README.md", failing, has_moon_pkg=false),
+    Ok({ lang: "console", file: None, code: "$ x", }),
+  )
+  for
+    rest in [
+      "status=x", "status=0", "status=126", "status=", "status=+1", "status=01",
+      "status=1 status=2",
+    ] {
+    snippet_err(
+      "apps/smithy/README.md",
+      { lang: "console", rest, code: "$ x", },
+      has_moon_pkg=false,
+      "a tested block",
+    )
+  }
   let fixture : @markdown.Fence = {
     lang: "smithy",
     rest: "file=greeting.smithy",
@@ -157,35 +178,59 @@ test "check_hand_written" {
 /// it starts a line. The mbtx cannot be imported here, so the runner side is its own tests.
 test "every console and file fence of an included region is read by the CLI runner" {
   for file in @source.cli_doc_files {
-    let text = @fs.read_file_to_string("../\{file}")
-    let mut count = 0
-    for line in text.split("\n") {
-      let t = line.trim().to_owned()
-      let prefix = "<!-- tour:start "
-      if t.has_prefix(prefix) && t.has_suffix(" -->") {
-        let name = t[prefix.length():t.length() - 4].to_owned()
-        let snippets = match
-          @source.resolve_include("..", { label: "L", path: file, name, }) {
-          Ok(s) => s
-          Err(e) => fail("\{file}#\{name}: \{e}")
+    assert_runner_reads("..", file, "../\{file}")
+  }
+}
+
+///|
+/// Checks every marked region of `repo/file`. `path` is the file to read.
+fn assert_runner_reads(
+  repo : String,
+  file : String,
+  path : String,
+) -> Unit raise {
+  let text = @fs.read_file_to_string(path)
+  let mut count = 0
+  for line in text.split("\n") {
+    let t = line.trim().to_owned()
+    let prefix = "<!-- tour:start "
+    if t.has_prefix(prefix) && t.has_suffix(" -->") {
+      let name = t[prefix.length():t.length() - 4].to_owned()
+      let snippets = match
+        @source.resolve_include(repo, { label: "L", path: file, name, }) {
+        Ok(s) => s
+        Err(e) => fail("\{file}#\{name}: \{e}")
+      }
+      count += snippets.length()
+      // The full info string of each fence, as the runner reads it (`console status=1` too).
+      let fences = match @markdown.region(text, name) {
+        Ok(f) => f
+        Err(e) => fail("\{file}#\{name}: \{e}")
+      }
+      assert_eq(fences.length(), snippets.length())
+      for fence in fences {
+        let info = if fence.rest == "" {
+          fence.lang
+        } else {
+          "\{fence.lang} \{fence.rest}"
         }
-        count += snippets.length()
-        for s in snippets {
-          let info = match s.file {
-            Some(f) => "\{s.lang} file=\{f}"
-            None => s.lang
-          }
-          assert_true(
-            text
-            .split("\n")
-            .any(l => l.trim_end(chars="\r").to_owned() == "```\{info}"),
-            msg="\{file}#\{name}: no fence line starts with ```\{info}",
-          )
-        }
+        assert_true(
+          text
+          .split("\n")
+          .any(l => l.trim_end(chars="\r").to_owned() == "```\{info}"),
+          msg="\{file}#\{name}: no fence line starts with ```\{info}",
+        )
       }
     }
-    assert_true(count > 0, msg="\{file} has no included region")
   }
+  assert_true(count > 0, msg="\{file} has no included region")
+}
+
+///|
+test "the runner reads a console fence with a status of an included region" {
+  assert_runner_reads(
+    "tour/source/testdata/status-readme", "apps/smithy/README.md", "tour/source/testdata/status-readme/apps/smithy/README.md",
+  )
 }
 
 ///|
@@ -439,4 +484,33 @@ test "the message for an untested fence names each CLI README" {
       "`LANG file=NAME` in \{file}",
     )
   }
+}
+
+///|
+test "a console status fence of a region is read, and a bad status is rejected" {
+  let inc : @markdown.Include = {
+    label: "L",
+    path: "apps/smithy/README.md",
+    name: "x",
+  }
+  let dir = "tour/source/testdata/status-readme"
+  assert_eq(
+    @source.resolve_include(dir, inc).map(snippets => {
+      snippets.map(s => (s.lang, s.code))
+    }),
+    Ok([("console", "$ smithy validate bad.smithy\n[ERROR] x | Y")]),
+  )
+  assert_eq(
+    @source.check_hand_written(
+      "# T\n\n```include\nL: apps/smithy/README.md#x\n```\n",
+    ),
+    Ok(()),
+  )
+  contains_all(
+    @source.resolve_include("tour/source/testdata/status-bad-readme", {
+      ..inc,
+      name: "y",
+    }).map(_ => ()),
+    "a tested block",
+  )
 }

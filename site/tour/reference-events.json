@@ -8,7 +8,20 @@
         },
         "01-hello-smithy/start": {
             "digest": "9e02d76db2e3c58b3b4d8e8308ea1589a2ba9adc03f3fe514a7f6e95cbe6a23c",
-            "events": []
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#Greeting": {
+                        "members": {
+                            "message": {
+                                "target": "smithy.api#String"
+                            }
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
         },
         "02-simple-shapes/count-as-string": {
             "digest": "4b24fb4de1877a456dc4c74cb4c1e379382635d6bebe79e0957b4205d38d13c9",
@@ -80,19 +93,86 @@
             "digest": "bd05fc404b924298ae72602faa3bb5713fbf39a09d3e3e4bde86c4650f1272c3",
             "events": [
                 "Model.BadDocumentationComment|WARNING|-"
-            ]
+            ],
+            "json_ast": {
+                "shapes": {
+                    "example#Greeting": {
+                        "members": {
+                            "message": {
+                                "target": "smithy.api#String"
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#deprecated": {}
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
         },
         "03-documentation/member-documentation": {
             "digest": "648b3bc6e0570f3a2e2511b74ec242e4097820434b71dd47cff4b0cb97a67172",
-            "events": []
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#Greeting": {
+                        "members": {
+                            "message": {
+                                "target": "smithy.api#String",
+                                "traits": {
+                                    "smithy.api#documentation": "The text of the greeting."
+                                }
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A greeting for one person."
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
         },
         "03-documentation/start": {
             "digest": "5e9cc1e2677bcfb09714b95afe5001240f5b34c14fdb5423d24084dd276f4077",
-            "events": []
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#Greeting": {
+                        "members": {
+                            "message": {
+                                "target": "smithy.api#String"
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A greeting for one person."
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
         },
         "03-documentation/two-lines": {
             "digest": "99f7f97b70e35a42d0a558de5120a4cc1a8922dab79893503e05a5c9888efb21",
-            "events": []
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#Greeting": {
+                        "members": {
+                            "message": {
+                                "target": "smithy.api#String"
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A greeting for one person.\nIt has one message."
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
         },
         "04-shape-ids/absolute-id": {
             "digest": "eeb681fbb9c45f11646d7cecbe597d1f955c7c2133947732f99a9d23a8b631ba",
@@ -624,7 +704,43 @@
         },
         "13-applying-traits/start": {
             "digest": "c55941dec951d7ddf083bfc725103f09ff1e370342dc5cddc9a1ba67f9ea121f",
-            "events": []
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#City": {
+                        "members": {
+                            "latitude": {
+                                "target": "smithy.api#Float",
+                                "traits": {
+                                    "smithy.api#documentation": "Degrees north of the equator.",
+                                    "smithy.api#range": {
+                                        "max": 90,
+                                        "min": -90
+                                    }
+                                }
+                            },
+                            "name": {
+                                "target": "smithy.api#String",
+                                "traits": {
+                                    "smithy.api#length": {
+                                        "max": 64,
+                                        "min": 1
+                                    },
+                                    "smithy.api#required": {}
+                                }
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A city on the map.",
+                            "smithy.api#tags": [
+                                "geo"
+                            ]
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
         },
         "13-applying-traits/unknown-trait": {
             "digest": "8d3ce24c316faab910e8742472be633d4cd6a81446c070eaa3ef07c3b7f35eae",
@@ -2069,6 +2185,322 @@
         },
         "22-json-rpc/wrong-result-member": {
             "digest": "e0e957aae5000852cf774cf73d576db6d37aa240bf65f2d91f5faf51d62632de",
+            "events": []
+        },
+        "23-selectors/all-operations": {
+            "digest": "3399ad57b04433d699f16f68e75df0076f5f0311bc3e9cf2d0ec1a5eb986b788",
+            "events": [],
+            "selector": [
+                "example#CreateCity",
+                "example#GetCity",
+                "example#GetForecast",
+                "example#ListCities"
+            ]
+        },
+        "23-selectors/input-members": {
+            "digest": "5149f8e9b0d59cecac59944b5acb23aadcbaddbd0002667e0370b75cd36f9922",
+            "events": [],
+            "selector": [
+                "example#CreateCityInput$name",
+                "example#GetCityInput$cityId",
+                "example#GetForecastInput$cityId"
+            ]
+        },
+        "23-selectors/invalid": {
+            "digest": "510f6f2401855da8d00b9d34551e3b1e370b195f6c0da2507d587edc0079c107",
+            "events": [],
+            "selector": null
+        },
+        "23-selectors/own-shapes": {
+            "digest": "6e82f07270fb54e37359a6e362c4196810a5fa86b7a7dcc0c0e111a9023f3bfc",
+            "events": [],
+            "selector": [
+                "example#CityId"
+            ]
+        },
+        "23-selectors/prelude": {
+            "digest": "df37a05b542ca44d506538d4c962cf9b3e083983598e3257b3081d65fe2f8a4f",
+            "events": [],
+            "selector": [
+                "example#CityId",
+                "smithy.api#AuthTraitReference",
+                "smithy.api#ClosureId",
+                "smithy.api#CommonMark",
+                "smithy.api#EnumConstantBodyName",
+                "smithy.api#HttpApiKeyLocations",
+                "smithy.api#Identifier",
+                "smithy.api#LocalMixinTrait",
+                "smithy.api#NonEmptyString",
+                "smithy.api#Severity",
+                "smithy.api#String",
+                "smithy.api#StructurallyExclusive",
+                "smithy.api#TraitChangeType",
+                "smithy.api#TraitShapeId",
+                "smithy.api#UnstableReason",
+                "smithy.api#documentation",
+                "smithy.api#error",
+                "smithy.api#httpHeader",
+                "smithy.api#httpPrefixHeaders",
+                "smithy.api#httpQuery",
+                "smithy.api#jsonName",
+                "smithy.api#mediaType",
+                "smithy.api#pattern",
+                "smithy.api#resourceIdentifier",
+                "smithy.api#since",
+                "smithy.api#timestampFormat",
+                "smithy.api#title",
+                "smithy.api#xmlName"
+            ]
+        },
+        "23-selectors/read-operation": {
+            "digest": "130d4d25b6f5fe1ed63e4679b64c41bafe2ca1846b3d9d847d9500d8040c0090",
+            "events": [],
+            "selector": [
+                "example#GetCity"
+            ]
+        },
+        "23-selectors/start": {
+            "digest": "87d9bec741b36daa61dd3183f516616c251241038cc97e170de5f79c2ff764e6",
+            "events": [],
+            "selector": [
+                "example#GetCity",
+                "example#GetForecast",
+                "example#ListCities"
+            ]
+        },
+        "24-converting-models/add-member": {
+            "digest": "7a4711e633e1d4dc887e86dff068483762be68f3c1ff195d2589a91d1579ec79",
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#City": {
+                        "members": {
+                            "country": {
+                                "target": "example#CountryCode"
+                            },
+                            "name": {
+                                "target": "smithy.api#String",
+                                "traits": {
+                                    "smithy.api#required": {}
+                                }
+                            },
+                            "population": {
+                                "target": "smithy.api#Integer"
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A city on the map."
+                        },
+                        "type": "structure"
+                    },
+                    "example#CountryCode": {
+                        "traits": {
+                            "smithy.api#length": {
+                                "max": 2,
+                                "min": 2
+                            }
+                        },
+                        "type": "string"
+                    }
+                },
+                "smithy": "2.0"
+            }
+        },
+        "24-converting-models/apply": {
+            "digest": "887eb83d8613d57ba851e36162ed8995a633f90578e8db7a53a8de09304be9af",
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#City": {
+                        "members": {
+                            "name": {
+                                "target": "smithy.api#String",
+                                "traits": {
+                                    "smithy.api#length": {
+                                        "max": 64,
+                                        "min": 1
+                                    },
+                                    "smithy.api#required": {}
+                                }
+                            },
+                            "population": {
+                                "target": "smithy.api#Integer"
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A city on the map."
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
+        },
+        "24-converting-models/start": {
+            "digest": "ae0b7dd83d07832a886d9f2117b6de0f5e087f032001dcd1cc6cf8a099538870",
+            "events": [],
+            "json_ast": {
+                "shapes": {
+                    "example#City": {
+                        "members": {
+                            "name": {
+                                "target": "smithy.api#String",
+                                "traits": {
+                                    "smithy.api#required": {}
+                                }
+                            },
+                            "population": {
+                                "target": "smithy.api#Integer"
+                            }
+                        },
+                        "traits": {
+                            "smithy.api#documentation": "A city on the map."
+                        },
+                        "type": "structure"
+                    }
+                },
+                "smithy": "2.0"
+            }
+        },
+        "25-contracts/bad-default": {
+            "digest": "f015d322af9270a9dd98e0cc02fb18e8557176a9caa5b738adf88d7279324cc0",
+            "events": [
+                "DefaultTrait.NoSpaces|ERROR|example#Search$cityId"
+            ]
+        },
+        "25-contracts/bad-function": {
+            "digest": "f39a7ce731bb8874dbd58862574fe6b2e4c240b92c189f603fed681d426b6789",
+            "events": [
+                "ConditionsTrait|ERROR|example#TimeRange"
+            ]
+        },
+        "25-contracts/bad-name": {
+            "digest": "1119f216709903537e71b671b5c001a5ec2e14546612f1c9a35b1d6deeb0d7e0",
+            "events": [
+                "TraitValue|ERROR|example#TimeRange"
+            ]
+        },
+        "25-contracts/not-boolean": {
+            "digest": "9472d3e25186b48287935281bfb215b2b70d4e6e6c98b3f189cf6be5b1f3169a",
+            "events": [
+                "ConditionsTrait|DANGER|example#TimeRange"
+            ]
+        },
+        "25-contracts/start": {
+            "digest": "e8f15665d70697c98240b867ababf0505986120b115a9522acb5bd9c6d0221cf",
+            "events": []
+        },
+        "25-contracts/syntax": {
+            "digest": "00e3f2c412ac8caffc293e8fa3b3d4a43ca05b3ba90bfd5e06711e6721e88e94",
+            "events": [
+                "Model|ERROR|example#TimeRange"
+            ]
+        },
+        "26-validating-values/long-note": {
+            "digest": "a660916cf2196c6ccdef28a06f00adfefc862e62244b690cda0f78847f002013",
+            "events": []
+        },
+        "26-validating-values/missing-id": {
+            "digest": "d6784e361cd5998d700ee80a09e85932b16d38d406082a5ee690b5bd0d038743",
+            "events": []
+        },
+        "26-validating-values/not-json": {
+            "digest": "b1a51fa584c46c5b446a72fa0efa1024a5b24f3aeb7a37e4b6afdc8c32188f10",
+            "events": []
+        },
+        "26-validating-values/out-of-range": {
+            "digest": "3568f388379f6f23082ef02109867e4cab04972ca1142bc1e4c665175c84280d",
+            "events": []
+        },
+        "26-validating-values/start": {
+            "digest": "65ffb7c8f9cd4ef6128e8c03d3c436c9db4b62b9da7bfda92268d03caff7f100",
+            "events": []
+        },
+        "26-validating-values/string-quantity": {
+            "digest": "4e37f88a98c8fcc13d12d4b44c8206ad0f9202e06d2d6929443ac863e73c98b6",
+            "events": []
+        },
+        "26-validating-values/unknown-member": {
+            "digest": "4cd59a4c9fe7121b3ef4e6c9fafdf2462c27c6d1e02f1c8198c2c409609ada9d",
+            "events": []
+        },
+        "27-validating-messages/extra-param": {
+            "digest": "6e30190c6fcd9ce7cca6bfe5f461b5fa2279c5ebe1bca0d3d271df0db7e3fdbd",
+            "events": []
+        },
+        "27-validating-messages/named": {
+            "digest": "671fc0642435a356d669a22f441de6440ab71cb704d6cb0b5f97913ba2a5cd72",
+            "events": []
+        },
+        "27-validating-messages/notification": {
+            "digest": "be2a10aff4a56ecc3c593f585c6866bdb5808be59c0d2df11641db6c77d32e2d",
+            "events": []
+        },
+        "27-validating-messages/start": {
+            "digest": "cca841c8ab545ce595b608edbacfd64c886600527837f794aa98ef383c4f3989",
+            "events": []
+        },
+        "27-validating-messages/unknown-method": {
+            "digest": "6dbf25c4dde4aa277ba93d57f2f6707ef731b0d097901465cec58e3040b556bc",
+            "events": []
+        },
+        "27-validating-messages/wrong-type": {
+            "digest": "4216787f98e3dbae7db52ba8bebf1e9062d7bd8d627059857b8f1cc565a7ba29",
+            "events": []
+        },
+        "28-transcripts/no-reply": {
+            "digest": "33c324b1c62b447c3720f60f7fd469fcf3a3e443872fe853ce49fa763675f93b",
+            "events": []
+        },
+        "28-transcripts/partial": {
+            "digest": "18a89cae573c766b3e1b8029c1aff5eaf260bb9d37af064734ee4ed2585be3fc",
+            "events": []
+        },
+        "28-transcripts/start": {
+            "digest": "23eac4b987f4d7ffbbf2a510a2903acf841238c5e68706b5c3572cddea134e99",
+            "events": []
+        },
+        "28-transcripts/wrong-id": {
+            "digest": "813d7585af565652b402c27c87cba07ffb8b95ae38b29c2946421d3fe69becb7",
+            "events": []
+        },
+        "28-transcripts/wrong-sender": {
+            "digest": "b2aecd767f4dc4df33bf5c2daa2ed1813072eb62f1260c0a676305682e131cff",
+            "events": []
+        },
+        "30-comparing-models/broken-new": {
+            "digest": "19e75e192f0d98d428058e64bab3d310b860ec06221b1c138d74d9b14b400b51",
+            "events": [
+                "Target.UnresolvedShape|ERROR|example.weather#GetForecastOutput$celsius"
+            ]
+        },
+        "30-comparing-models/removed-member": {
+            "diff": [
+                "AddedShape|NOTE|example.weather#GetForecastOutput$humidity",
+                "RemovedShape|ERROR|example.weather#GetForecastInput$days"
+            ],
+            "digest": "bc3a8aff146a1f89f67d7a8614c1eaac0faba2ea2f2c1fe3ca6547836912163c",
+            "events": []
+        },
+        "30-comparing-models/required-added": {
+            "diff": [
+                "AddedRequiredMember|ERROR|example.weather#GetForecastInput$country",
+                "AddedShape|NOTE|example.weather#GetForecastInput$country",
+                "AddedShape|NOTE|example.weather#GetForecastOutput$humidity"
+            ],
+            "digest": "6df9557cbf6f771787995d90b83e6660da7e50cf0a961289e22ff7e6512b70e6",
+            "events": []
+        },
+        "30-comparing-models/same": {
+            "diff": [],
+            "digest": "727201e823caff2ef43e58845439ef83c3a4907eb2142b51992b133c9a6e7d34",
+            "events": []
+        },
+        "30-comparing-models/start": {
+            "diff": [
+                "AddedShape|NOTE|example.weather#GetForecastOutput$humidity"
+            ],
+            "digest": "2f18b366b7f2291bf48fcd2f5117a17a5e76798bbc4fdb3945c55c8ad82776d6",
             "events": []
         }
     },

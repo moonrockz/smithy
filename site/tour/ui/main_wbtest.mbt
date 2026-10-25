@@ -44,6 +44,20 @@ test "a transform answers with the text of its files" {
 }
 
 ///|
+test "a value check answers with its findings" {
+  let finding : @core.DataFinding = Stopped(
+    code="InvalidJson",
+    message="m",
+    source=None,
+    offset=None,
+  )
+  assert_eq(
+    reply_msg(reply(DataChecked(seq=5, valid=false, findings=[finding])), 9),
+    Answered(seq=5, answer=DataChecked(valid=false, findings=[finding])),
+  )
+}
+
+///|
 test "a blocked request answers with its reason" {
   assert_eq(
     reply_msg(reply(Blocked(seq=3, reason="no", kind=ModelErrors)), 3),
@@ -60,6 +74,77 @@ test "a reply of another build answers the newest request with the mismatch text
   )
   assert_eq(reply_msg("{\"Unknown\":1}", 7), mismatch)
   assert_eq(reply_msg("not json", 7), mismatch)
+}
+
+///|
+test "a transcript progress answers with its state" {
+  let entry : @core.EntryView = {
+    index: 0,
+    sender: "client",
+    receiver: Some("server"),
+    message: "{}",
+    line: Some(3),
+    column: Some(5),
+  }
+  assert_eq(
+    reply_msg(
+      reply(
+        TranscriptProgress(
+          seq=6,
+          entries=[entry],
+          findings=[],
+          checked=1,
+          done=false,
+          summary=None,
+        ),
+      ),
+      9,
+    ),
+    Answered(
+      seq=6,
+      answer=Progress(
+        entries=[entry],
+        findings=[],
+        checked=1,
+        done=false,
+        summary=None,
+      ),
+    ),
+  )
+}
+
+///|
+test "the transcript effects send the model files in the JSON format, and the step count" {
+  let page = test_runtime([]).page
+  assert_eq(
+    request_of(
+      page,
+      SendTranscriptStart(
+        seq=3,
+        files=[("model.smithy", "m")],
+        protocol="example#P",
+        text="{}",
+      ),
+    ),
+    Some(
+      (
+        3,
+        TranscriptStartFiles(
+          seq=3,
+          files=[("model.smithy", "m")],
+          protocol="example#P",
+          format=Json,
+          complete=false,
+          text="{}",
+        ),
+      ),
+    ),
+  )
+  assert_eq(
+    request_of(page, SendTranscriptStep(seq=4, count=2)),
+    Some((4, TranscriptStep(seq=4, count=2))),
+  )
+  assert_eq(request_of(page, Remeasure), None)
 }
 
 ///|
@@ -98,6 +183,7 @@ fn test_runtime(sent : Array[@lesson.Msg]) -> Runtime {
     section: "S",
     number: 1,
     total: 1,
+    engine: Model,
     output: None,
     selector: None,
     spec: "",
@@ -130,4 +216,14 @@ test "a reply of an older Worker changes nothing" {
   assert_eq(sent, [])
   runtime.worker_replied(2, "not json")
   assert_eq(sent, [Answered(seq=5, answer=NotConverted(mismatch_text))])
+}
+
+///|
+test "the script mounts the lesson component for a lesson with an editor only" {
+  let sent : Array[@lesson.Msg] = []
+  let page = test_runtime(sent).page
+  // A model lesson mounts, even before it has a starting file.
+  assert_eq(page.engine, Model)
+  assert_true(should_mount(page))
+  assert_true(!should_mount({ ..page, engine: Static, }))
 }

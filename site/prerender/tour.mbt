@@ -40,6 +40,7 @@ fn lesson_page(
     section: lesson.section,
     number: lesson.number,
     total: tour.lessons.length(),
+    engine: lesson.engine,
     output: lesson.output,
     selector: lesson.selector,
     spec: spec_href(config, lesson.spec),
@@ -49,9 +50,12 @@ fn lesson_page(
     next: next.map(link_of),
     worker: worker_url(config),
     storage_key: "smithy-tour:" + config.channel.name() + ":" + lesson.slug,
-    // The playground holds one model. It validates without the protocol
-    // definitions, so it marks an OpenAPI model with an error (smithy-2qe.41.22).
-    playground: if lesson.files.length() == 1 &&
+    // The playground holds one model, and the query of a Selector lesson. It
+    // validates without the protocol definitions, so it marks an OpenAPI model
+    // with an error (smithy-2qe.41.22). A value, diff, transcript or static
+    // lesson has no link: the playground does not run its engine.
+    playground: if lesson.engine is Model &&
+      @model.model_files(lesson.engine, lesson.files).length() == 1 &&
       !(lesson.output is Some(OpenApi30 | OpenApi31)) {
       Some(@route.href(config.base, Playground))
     } else {

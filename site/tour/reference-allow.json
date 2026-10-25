@@ -1,1 +1,50 @@
-[]
+[
+  {
+    "case": "23-selectors/prelude",
+    "kind": "selector",
+    "shape": "smithy.rpc#MethodName",
+    "side": "ours",
+    "reason": "The core loads the smithy.rpc trait definitions into every model; Java does not.",
+    "issue": "smithy-2qe.41.24"
+  },
+  {
+    "case": "23-selectors/prelude",
+    "kind": "selector",
+    "shape": "smithy.rpc#ParameterMode",
+    "side": "ours",
+    "reason": "The core loads the smithy.rpc trait definitions into every model; Java does not.",
+    "issue": "smithy-2qe.41.24"
+  },
+  {
+    "case": "23-selectors/prelude",
+    "kind": "selector",
+    "shape": "smithy.rpc#PeerName",
+    "side": "ours",
+    "reason": "The core loads the smithy.rpc trait definitions into every model; Java does not.",
+    "issue": "smithy-2qe.41.24"
+  },
+  {
+    "case": "23-selectors/prelude",
+    "kind": "selector",
+    "shape": "smithy.rpc#ServiceRef",
+    "side": "ours",
+    "reason": "The core loads the smithy.rpc trait definitions into every model; Java does not.",
+    "issue": "smithy-2qe.41.24"
+  },
+  {
+    "case": "23-selectors/prelude",
+    "kind": "selector",
+    "shape": "smithy.rpc#StateName",
+    "side": "ours",
+    "reason": "The core loads the smithy.rpc trait definitions into every model; Java does not.",
+    "issue": "smithy-2qe.41.24"
+  },
+  {
+    "case": "23-selectors/prelude",
+    "kind": "selector",
+    "shape": "smithy.rpc#Version",
+    "side": "ours",
+    "reason": "The core loads the smithy.rpc trait definitions into every model; Java does not.",
+    "issue": "smithy-2qe.41.24"
+  }
+]

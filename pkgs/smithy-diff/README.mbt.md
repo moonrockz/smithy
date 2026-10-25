@@ -30,6 +30,92 @@ Events use the shared `smithy.ValidationEvent` type. `events` includes suppresse
 events and has deterministic order by event ID, shape ID, severity and message.
 `is_breaking()` is true when an event has ERROR or DANGER severity.
 
+This test compares an old weather model with a new model. The new model adds
+an optional output member and removes an input member. The removed member is a
+breaking change:
+
+<!-- tour:start diff-api -->
+```mbt check
+///|
+test "compare an old and a new weather model" {
+  let old_model = @smithy.Loader::new()
+  .add_idl(
+    "old-weather.smithy",
+    (
+      #|$version: "2"
+      #|
+      #|namespace example.weather
+      #|
+      #|service Weather {
+      #|    version: "2026-10-01"
+      #|    operations: [GetForecast]
+      #|}
+      #|
+      #|operation GetForecast {
+      #|    input := {
+      #|        @required
+      #|        city: String
+      #|
+      #|        days: Integer
+      #|    }
+      #|
+      #|    output := {
+      #|        @required
+      #|        summary: String
+      #|
+      #|        celsius: Integer
+      #|    }
+      #|}
+    ),
+  )
+  .assemble().model.unwrap()
+  let new_model = @smithy.Loader::new()
+  .add_idl(
+    "new-weather.smithy",
+    (
+      #|$version: "2"
+      #|
+      #|namespace example.weather
+      #|
+      #|service Weather {
+      #|    version: "2026-10-01"
+      #|    operations: [GetForecast]
+      #|}
+      #|
+      #|operation GetForecast {
+      #|    input := {
+      #|        @required
+      #|        city: String
+      #|    }
+      #|
+      #|    output := {
+      #|        @required
+      #|        summary: String
+      #|
+      #|        celsius: Integer
+      #|
+      #|        humidity: Integer
+      #|    }
+      #|}
+    ),
+  )
+  .assemble().model.unwrap()
+  let result = @diff.compare(old_model, new_model)
+  let keys = result.events.map(event => {
+    let shape = event.shape.map(id => id.to_string()).unwrap_or("-")
+    event.id + "|" + event.severity + "|" + shape
+  })
+  assert_eq(keys.length(), 2)
+  assert_eq(
+    keys[0],
+    "AddedShape|NOTE|example.weather#GetForecastOutput$humidity",
+  )
+  assert_eq(keys[1], "RemovedShape|ERROR|example.weather#GetForecastInput$days")
+  assert_true(result.is_breaking())
+}
+```
+<!-- tour:end diff-api -->
+
 The constraint evaluators preserve two quirks of the pinned reference. They
 compare `@length` and `@range` bounds only when the trait exists in both models;
 adding either trait uses the generic NOTE event. Both evaluators substitute zero

@@ -26,6 +26,381 @@ pub(all) struct Expectation {
   /// A text that the reason of a blocked output must contain. The output must
   /// be blocked for a reason other than model errors (`BlockKind::Other`).
   blocked : String?
+  /// The finding keys of a value or message lesson: `found_key` and
+  /// `stopped_key`. Empty for other lessons.
+  findings : Array[String]
+  /// The diff event keys of a diff lesson. Empty for other lessons.
+  diff : Array[String]
+  /// The verdict of the summary of a transcript lesson; `None` leaves it
+  /// unchecked. `None` for other lessons.
+  valid : Bool?
+  /// The findings of a transcript lesson after Step is clicked `count` times
+  /// from the start. Empty for other lessons.
+  steps : Array[StepExpectation]
+}
+
+///|
+/// The transcript finding keys (`transcript_key`) that a check shows after
+/// `count` entries from the start, in any order.
+pub(all) struct StepExpectation {
+  count : Int32
+  findings : Array[String]
+} derive(Eq, Debug)
+
+///|
+pub extend StepExpectation with Eq::{equal, not_equal}
+
+///|
+pub extend StepExpectation with @debug.Debug::{to_repr}
+
+///|
+/// What a lesson runs on its files. A lesson has one engine.
+pub(all) enum Engine {
+  /// Validate the model files; `Lesson.output` names the transform, if any.
+  Model
+  /// Check a JSON value against a shape of the model.
+  Value(ValueSetup)
+  /// Check a JSON-RPC message against a service of the model.
+  Message(MessageSetup)
+  /// Compare the models in `old/` and `new/`, as `smithy diff` does.
+  Diff
+  /// Step through a JSON-RPC transcript against a protocol of the model.
+  Transcript(TranscriptSetup)
+  /// No editor, no files and no cases: the blocks of the text come from
+  /// include blocks.
+  Static
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend Engine with Eq::{equal, not_equal}
+
+///|
+pub extend Engine with @debug.Debug::{to_repr}
+
+///|
+pub extend Engine with ToJson::{to_json}
+
+///|
+pub extend Engine with FromJson::{from_json}
+
+///|
+/// The setup of a value lesson: the starting file with the value, the absolute
+/// ID of the target shape and the options of `smithy validate value`.
+pub(all) struct ValueSetup {
+  file : String
+  shape : String
+  options : @samples.ValueOptions
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend ValueSetup with Eq::{equal, not_equal}
+
+///|
+pub extend ValueSetup with @debug.Debug::{to_repr}
+
+///|
+pub extend ValueSetup with ToJson::{to_json}
+
+///|
+pub extend ValueSetup with FromJson::{from_json}
+
+///|
+/// The setup of a message lesson: the starting file with the message, the
+/// absolute ID of the service, the JSON-RPC version, what the message is and
+/// the options of `smithy validate rpc`.
+pub(all) struct MessageSetup {
+  file : String
+  service : String
+  version : @samples.RpcVersion
+  role : MessageRole
+  options : @samples.ValueOptions
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend MessageSetup with Eq::{equal, not_equal}
+
+///|
+pub extend MessageSetup with @debug.Debug::{to_repr}
+
+///|
+pub extend MessageSetup with ToJson::{to_json}
+
+///|
+pub extend MessageSetup with FromJson::{from_json}
+
+///|
+/// What the message of a message lesson is: a request, or a response with the
+/// options `--method`, `--operation`, `--request`, `--envelope-only` and
+/// `--legacy-errors`.
+pub(all) enum MessageRole {
+  Request
+  Response(context~ : LessonContext?, legacy_errors~ : @samples.LegacyErrors)
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend MessageRole with Eq::{equal, not_equal}
+
+///|
+pub extend MessageRole with @debug.Debug::{to_repr}
+
+///|
+pub extend MessageRole with ToJson::{to_json}
+
+///|
+pub extend MessageRole with FromJson::{from_json}
+
+///|
+/// What a response lesson knows of the call: `RequestFile` names a starting
+/// file that holds the request. The check gets the text of that file.
+pub(all) enum LessonContext {
+  Method(String)
+  Operation(String)
+  RequestFile(String)
+  EnvelopeOnly
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend LessonContext with Eq::{equal, not_equal}
+
+///|
+pub extend LessonContext with @debug.Debug::{to_repr}
+
+///|
+pub extend LessonContext with ToJson::{to_json}
+
+///|
+pub extend LessonContext with FromJson::{from_json}
+
+///|
+/// The kind of the message check for `files` (the files of the lesson or of a
+/// case): a `RequestFile` becomes the text of that file. The reader makes sure
+/// that the lesson has the file; a case that deletes it has an empty request.
+/// JSON-RPC 2.0 has no legacy errors, and the CLI rejects the option there, so
+/// the check gets no value for it.
+pub fn MessageSetup::message_kind(
+  self : MessageSetup,
+  files : Array[LessonFile],
+) -> @samples.MessageKind {
+  match self.role {
+    Request => RequestMessage
+    Response(context~, legacy_errors~) => {
+      let context : @samples.ResponseContext? = match context {
+        None => None
+        Some(Method(name)) => Some(Method(name))
+        Some(Operation(id)) => Some(Operation(id))
+        Some(EnvelopeOnly) => Some(@samples.ResponseContext::EnvelopeOnly)
+        Some(RequestFile(name)) =>
+          Some(
+            OriginalRequest(
+              match files.search_by(f => f.name == name) {
+                Some(i) => files[i].text
+                None => ""
+              },
+            ),
+          )
+      }
+      let legacy_errors = match self.version {
+        V1_0 => Some(legacy_errors)
+        V2_0 => None
+      }
+      ResponseMessage(context~, legacy_errors~)
+    }
+  }
+}
+
+///|
+/// The setup of a transcript lesson: the starting file with the transcript
+/// (a `.json` document) and the absolute ID of the protocol shape.
+pub(all) struct TranscriptSetup {
+  file : String
+  protocol : String
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend TranscriptSetup with Eq::{equal, not_equal}
+
+///|
+pub extend TranscriptSetup with @debug.Debug::{to_repr}
+
+///|
+pub extend TranscriptSetup with ToJson::{to_json}
+
+///|
+pub extend TranscriptSetup with FromJson::{from_json}
+
+///|
+/// The names of the files that hold data in place of a model.
+pub fn Engine::data_files(self : Engine) -> Array[String] {
+  match self {
+    Model => []
+    Value(setup) => [setup.file]
+    Transcript(setup) => [setup.file]
+    Message(setup) =>
+      match setup.role {
+        Response(context=Some(RequestFile(name)), ..) => [setup.file, name]
+        _ => [setup.file]
+      }
+    Diff | Static => []
+  }
+}
+
+///|
+/// True for the query file of a Selector lesson: a name that ends with
+/// ".selector".
+pub fn is_query_file(name : String) -> Bool {
+  name.has_suffix(".selector")
+}
+
+///|
+/// The files of the model: the files without the data files of the engine and
+/// without the query file of a Selector lesson, in the same order.
+pub fn model_files(
+  engine : Engine,
+  files : Array[LessonFile],
+) -> Array[LessonFile] {
+  let data = engine.data_files()
+  files.filter(f => !data.contains(f.name) && !is_query_file(f.name))
+}
+
+///|
+/// The selector for `files`: the text of the query file, else `fixed` (the
+/// "selector" of `lesson.json`).
+pub fn query_of(files : Array[LessonFile], fixed~ : String?) -> String? {
+  for file in files {
+    if is_query_file(file.name) {
+      return Some(file.text)
+    }
+  }
+  fixed
+}
+
+///|
+/// The folder of the old model in the files of a diff lesson, and the prefix of
+/// the names of its files.
+pub let old_prefix : String = "old/"
+
+///|
+/// The folder of the new model, as `old_prefix`.
+pub let new_prefix : String = "new/"
+
+///|
+/// The files of the old and of the new model of a diff lesson, by the prefix
+/// `old/` and `new/`. The names keep their prefix, in the same order. A file
+/// with another prefix is in neither list: the reader (`read_sides`) accepts
+/// only these two folders, and a test checks that every file of a diff lesson
+/// is in one of them.
+pub fn sides(
+  files : Array[LessonFile],
+) -> (Array[LessonFile], Array[LessonFile]) {
+  (
+    files.filter(f => f.name.has_prefix(old_prefix)),
+    files.filter(f => f.name.has_prefix(new_prefix)),
+  )
+}
+
+///|
+/// Whether the text is the severity of a diff event that a lesson can claim.
+/// SUPPRESSED events are not shown, so no lesson claims them.
+pub fn is_diff_severity(s : String) -> Bool {
+  s == "NOTE" || s == "WARNING" || s == "DANGER" || s == "ERROR"
+}
+
+///|
+/// Whether the text has the form `id|SEVERITY|shape` of a diff key, with `-`
+/// for no shape.
+pub fn is_diff_key(key : String) -> Bool {
+  guard key.split("|").map(p => p.to_owned()).to_array()
+    is [id, severity, shape] else {
+    return false
+  }
+  id != "" && shape != "" && is_diff_severity(severity)
+}
+
+///|
+/// The key of a diff event: `id|SEVERITY|shape`, with `-` for no shape.
+pub fn diff_key(id : String, severity : String, shape : String?) -> String {
+  "\{id}|\{severity}|\{shape.unwrap_or("-")}"
+}
+
+///|
+/// The key of a `Found` finding: `code|severity|path|shape`. The path is the
+/// JSON pointer, empty for the root.
+pub fn found_key(
+  code : String,
+  severity : String,
+  path : String,
+  shape : String,
+) -> String {
+  "\{code}|\{severity}|\{path}|\{shape}"
+}
+
+///|
+/// The key of a `Stopped` finding: `code|stopped|source`, with `-` for the
+/// input file.
+pub fn stopped_key(code : String, source : String?) -> String {
+  "\{code}|stopped|\{source.unwrap_or("-")}"
+}
+
+///|
+/// Whether the text has the form of a finding key: a `Found` key has 4 or more
+/// parts (a pointer can hold `|`) with `error` or `advisory` as part 2; a
+/// `Stopped` key has 3 parts with `stopped` as part 2.
+pub fn is_finding_key(key : String) -> Bool {
+  let parts = key.split("|").map(p => p.to_owned()).to_array()
+  if parts.length() < 3 || parts[0] == "" {
+    return false
+  }
+  if parts[1] == "stopped" {
+    return parts.length() == 3 && parts[2] != ""
+  }
+  parts.length() >= 4 &&
+  (parts[1] == "error" || parts[1] == "advisory") &&
+  parts[parts.length() - 1] != ""
+}
+
+///|
+/// The key of a transcript finding: `code|severity|entry|sender`, with `-` for
+/// no entry or no sender.
+pub fn transcript_key(
+  code : String,
+  severity : String,
+  entry : Int32?,
+  sender : String?,
+) -> String {
+  "\{code}|\{severity}|\{entry.map(n => n.to_string()).unwrap_or("-")}|\{sender.unwrap_or("-")}"
+}
+
+///|
+/// Whether the text has the form of `transcript_key`: the severity is `error`
+/// or `advisory`, and the entry is a number or `-`.
+pub fn is_transcript_key(key : String) -> Bool {
+  guard key.split("|").map(p => p.to_owned()).to_array()
+    is [code, severity, entry, sender] &&
+    code != "" &&
+    sender != "" &&
+    (severity == "error" || severity == "advisory") else {
+    return false
+  }
+  entry == "-" ||
+  (entry != "" && entry.to_array().iter().all(c => c.is_ascii_digit()))
+}
+
+///|
+/// The note that a value, message or transcript lesson, or a static lesson
+/// with an extension, must have in its text: standard Smithy has no such
+/// feature.
+pub let extension_note : String = "> **Our extension:**"
+
+///|
+/// Whether the text of the lesson must hold `extension_note`.
+pub fn Lesson::needs_extension_note(self : Lesson) -> Bool {
+  match self.engine {
+    Model => false
+    Value(_) | Message(_) | Transcript(_) => true
+    // Smithy has a diff tool: the lesson shows its events.
+    Diff => false
+    Static => self.extension
+  }
 }
 
 ///|
@@ -43,12 +418,23 @@ pub(all) struct Lesson {
   slug : String
   title : String
   section : String
+  engine : Engine
+  /// Whether the text must say that the lesson shows a feature of this
+  /// project, not of standard Smithy. Set in `lesson.json` of a static lesson; a value
+  /// lesson always says it.
+  extension : Bool
   output : @samples.Output?
   selector : String?
   spec : String
   text : String
   files : Array[LessonFile]
   cases : Array[Case]
+}
+
+///|
+/// Whether the lesson has an editor and an output. A static lesson has none.
+pub fn Lesson::is_static(self : Lesson) -> Bool {
+  self.engine is Static
 }
 
 ///|
@@ -357,6 +743,8 @@ pub(all) struct LessonPage {
   /// The place of the lesson in the tour, from 1, and the number of lessons.
   number : Int32
   total : Int32
+  /// What the lesson runs. A static lesson has no editor and no output.
+  engine : Engine
   output : @samples.Output?
   selector : String?
   /// The smithy.io section that the lesson teaches.
@@ -376,6 +764,12 @@ pub(all) struct LessonPage {
   /// one file, because the playground holds one model.
   playground : String?
 } derive(Eq, Debug, ToJson, FromJson)
+
+///|
+/// Whether the page is a static lesson: it has no editor and no output.
+pub fn LessonPage::is_static(self : LessonPage) -> Bool {
+  self.engine is Static
+}
 
 ///|
 pub extend LessonPage with Eq::{equal, not_equal}

@@ -1,0 +1,1 @@
+{"slug": "order", "title": "Order", "section": "Data", "spec": "https://smithy.io/2.0/", "value": {"file": "order.json", "shape": "example#Order"}}

@@ -62,6 +62,70 @@ smithy validate --protocol-tests examples/protocol-tests/greeting.smithy
 Events go to stderr; invalid cases exit 1. Execution is a library API whose host
 supplies the protocol adapter.
 
+This test loads the greeting model and lists its cases. A `params` value of the
+wrong type gives an `HttpRequestTestsInput` error on the operation:
+
+<!-- tour:start protocol-tests-api -->
+```mbt check
+///|
+test "list the protocol test cases of a model" {
+  let source =
+    #|$version: "2"
+    #|namespace example
+    #|
+    #|use smithy.test#httpRequestTests
+    #|use smithy.test#httpResponseTests
+    #|
+    #|@trait
+    #|@protocolDefinition
+    #|structure fixtureProtocol {}
+    #|
+    #|@httpRequestTests([{
+    #|    id: "GreetingRequest"
+    #|    protocol: fixtureProtocol
+    #|    method: "POST"
+    #|    uri: "/greeting"
+    #|    params: {name: "Ada"}
+    #|    headers: {"Content-Type": "application/json"}
+    #|    forbidHeaders: ["X-Secret"]
+    #|    body: "{\"name\":\"Ada\"}"
+    #|    bodyMediaType: "application/json"
+    #|}])
+    #|@httpResponseTests([{
+    #|    id: "GreetingResponse"
+    #|    protocol: fixtureProtocol
+    #|    code: 200
+    #|    params: {greeting: "Hello, Ada"}
+    #|}])
+    #|operation Greet { input: Input, output: Output }
+    #|
+    #|structure Input { @required name: String }
+    #|structure Output { greeting: String }
+  let loaded = @protocoltests.loader()
+    .add_idl("greeting.smithy", source)
+    .assemble()
+  assert_eq(loaded.validation_events(), [])
+  let suite = @protocoltests.Suite::from_model(loaded.model.unwrap())
+  assert_eq(suite.cases().map(c => c.id().to_string()), [
+    "GreetingRequest", "GreetingResponse",
+  ])
+  let bad = @protocoltests.loader()
+    .add_idl(
+      "greeting.smithy",
+      source.replace(old="params: {name: \"Ada\"}", new="params: {name: 1}"),
+    )
+    .assemble()
+  let keys = bad
+    .validation_events()
+    .map(e => {
+      let shape = e.shape.map(id => id.to_string()).unwrap_or("-")
+      e.id + "|" + e.severity + "|" + shape
+    })
+  assert_eq(keys, ["HttpRequestTestsInput|ERROR|example#Greet"])
+}
+```
+<!-- tour:end protocol-tests-api -->
+
 The exact pinned upstream schema includes later malformed-request and event-stream
 definitions. This runner handles request and response cases only; it does not
 claim malformed-request, event-stream, smoke-test or live-transport coverage.

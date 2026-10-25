@@ -217,3 +217,391 @@ test "an include block that the reader cannot expand" {
     "01-hello/lesson.md", "I found an include block that I cannot expand",
   ])
 }
+
+///|
+test "a value lesson reads its setup and the findings of a case" {
+  let tour = match read("value-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(
+    lesson.engine,
+    Value({
+      file: "order.json",
+      shape: "example#Order",
+      options: { unknown_members: Ignore, member_names: Smithy, },
+    }),
+  )
+  assert_eq(lesson.output, None)
+  assert_eq(lesson.files.map(f => f.name), ["model.smithy", "order.json"])
+  assert_eq(lesson.cases[0].expect.findings, [])
+  assert_eq(lesson.cases[1].expect.findings, [
+    "Range|error|/quantity|example#Order", "InvalidJson|stopped|-", "Hint|advisory||example#Order",
+    "InvalidTarget|stopped|--shape",
+  ])
+  assert_eq(lesson.cases[1].expect.output_contains, ["Range"])
+  let merged = lesson.case_files(lesson.cases[1])
+  assert_eq(merged.map(f => f.text), [
+    "namespace example\nstructure Order { quantity: Integer }\n", "{\"quantity\": 0}\n",
+  ])
+}
+
+///|
+test "a message lesson reads its setup and the findings of a case" {
+  let tour = match read("message-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(
+    lesson.engine,
+    Message({
+      file: "reply.json",
+      service: "example#Calculator",
+      version: V1_0,
+      role: Response(
+        context=Some(RequestFile("call.json")),
+        legacy_errors=CodeMessageData,
+      ),
+      options: { unknown_members: Ignore, member_names: Smithy, },
+    }),
+  )
+  assert_eq(lesson.output, None)
+  assert_eq(lesson.engine.data_files(), ["reply.json", "call.json"])
+  assert_eq(lesson.cases[1].expect.findings, [
+    "TypeMismatch|error|/id|example#Order",
+  ])
+  assert_eq(lesson.case_files(lesson.cases[1]).map(f => f.text), [
+    "{}\n", "namespace example\nstructure Order { quantity: Integer }\n", "{\"jsonrpc\":\"2.0\",\"result\":19,\"id\":1}\n",
+  ])
+}
+
+///|
+test "a message lesson reads the envelope-only context" {
+  let tour = match read("message-envelope-only") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  assert_eq(
+    tour.lessons[0].engine,
+    Message({
+      file: "call.json",
+      service: "example#Calculator",
+      version: V2_0,
+      role: Response(context=Some(EnvelopeOnly), legacy_errors=Opaque),
+      options: @samples.ValueOptions::default(),
+    }),
+  )
+}
+
+///|
+test "a request has no context" {
+  expect_err("message-request-with-context", ["01-a", "\"context\"", "response"])
+}
+
+///|
+test "legacy_errors needs JSON-RPC 1.0" {
+  expect_err("message-legacy-on-2", ["01-a", "legacy_errors", "1.0"])
+}
+
+///|
+test "the request file is not the message file" {
+  expect_err("message-request-file-is-message", ["01-a", "call.json", "request"])
+}
+
+///|
+test "a message lesson that names a missing request file" {
+  expect_err("message-missing-request", ["01-a", "gone.json"])
+}
+
+///|
+test "a message context names one thing" {
+  expect_err("message-bad-context", ["01-a", "context", "one of"])
+}
+
+///|
+test "a message setup with an unknown key" {
+  expect_err("message-unknown-key", ["01-a", "colour"])
+}
+
+///|
+test "a message setup with an unknown version" {
+  expect_err("message-bad-version", ["01-a", "version", "3.0"])
+}
+
+///|
+test "a lesson with a message and a value" {
+  expect_err("message-and-value", ["01-a", "at most one of"])
+}
+
+///|
+test "a message lesson case needs findings" {
+  expect_err("message-no-findings", ["01-a/cases/start", "findings"])
+}
+
+///|
+test "a value lesson that names a missing file" {
+  expect_err("value-bad-file", ["01-a", "missing.json"])
+}
+
+///|
+test "a lesson with an output and a value" {
+  expect_err("value-and-output", ["01-a", "at most one of output, value"])
+}
+
+///|
+test "a value setup with an unknown key" {
+  expect_err("value-unknown-key", ["01-a", "colour"])
+}
+
+///|
+test "a value setup with an unknown option" {
+  expect_err("value-bad-option", ["01-a", "member_names", "camel"])
+}
+
+///|
+test "a value file must end with .json" {
+  expect_err("value-file-not-json", ["01-a", "order.smithy", ".json"])
+}
+
+///|
+test "a value lesson case needs findings" {
+  expect_err("value-no-findings", ["01-a/cases/start", "findings"])
+}
+
+///|
+test "a finding key has the form of a found or a stopped finding" {
+  expect_err("bad-finding-key", ["01-a/cases/start", "Range|error|a#B"])
+}
+
+///|
+test "findings are for a value or message lesson" {
+  expect_err("findings-in-model-lesson", [
+    "01-a/cases/start", "\"findings\" is for a value, message or transcript lesson",
+  ])
+}
+
+///|
+test "diff is for a diff lesson" {
+  expect_err("diff-in-model-lesson", [
+    "01-a/cases/start", "\"diff\" is for a diff lesson",
+  ])
+}
+
+///|
+test "a model file must end with .smithy" {
+  expect_err("json-model-file", ["01-a/files/extra.json", ".smithy"])
+}
+
+///|
+test "a case cannot add a json file that no setup names" {
+  expect_err("value-case-adds-json", [
+    "01-a/cases/start/files/other.json", ".smithy",
+  ])
+}
+
+///|
+test "a static lesson has no files and no cases" {
+  let tour = match read("static-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(lesson.engine, Static)
+  assert_eq(lesson.extension, true)
+  assert_eq(lesson.files, [])
+  assert_eq(lesson.cases.length(), 0)
+  assert_eq(lesson.output, None)
+}
+
+///|
+test "a static lesson with files or cases" {
+  expect_err("static-with-files", [
+    "01-a", "a static lesson has no files/ and no cases/", "its blocks come from include blocks",
+  ])
+  expect_err("static-with-cases", [
+    "01-a", "a static lesson has no files/ and no cases/",
+  ])
+}
+
+///|
+test "a static lesson with an output" {
+  expect_err("static-with-output", ["01-a", "static", "output"])
+}
+
+///|
+test "extension is for a static lesson" {
+  expect_err("extension-not-static", ["01-a", "\"extension\"", "static"])
+}
+
+///|
+test "a Selector lesson keeps its query in a file" {
+  let tour = match read("query-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(lesson.files.map(f => f.name), ["model.smithy", "query.selector"])
+  let merged = lesson.case_files(lesson.cases[1])
+  assert_eq(@model.query_of(merged, fixed=lesson.selector), Some("operation\n"))
+}
+
+///|
+test "a query file needs the output Selector" {
+  expect_err("query-no-output", ["01-a", "needs the output Selector"])
+}
+
+///|
+test "a query file and a selector together are an error" {
+  expect_err("query-and-selector", ["01-a", "both"])
+}
+
+///|
+test "the output Selector needs a query" {
+  expect_err("query-missing", ["01-a", "needs a selector"])
+}
+
+///|
+test "a lesson has at most one query file" {
+  expect_err("query-two", ["01-a", "more than one"])
+}
+
+///|
+test "a case cannot add a query file" {
+  expect_err("query-case-adds", ["01-a/cases/more", "other.selector"])
+}
+
+///|
+test "a diff lesson reads the old and the new files and a case override" {
+  let tour = match read("diff-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(lesson.engine, Diff)
+  assert_eq(lesson.files.map(f => f.name), [
+    "new/model.smithy", "old/model.smithy",
+  ])
+  assert_eq(lesson.cases[0].expect.diff, ["AddedShape|NOTE|example#B"])
+  assert_eq(lesson.cases[1].files.map(f => f.name), ["new/model.smithy"])
+  let merged = lesson.case_files(lesson.cases[1])
+  assert_eq(merged.map(f => f.name), ["new/model.smithy", "old/model.smithy"])
+  assert_eq(merged[0].text, merged[1].text)
+  let (old, new) = @model.sides(merged)
+  assert_eq(old.length(), 1)
+  assert_eq(new.length(), 1)
+}
+
+///|
+test "a diff lesson needs a files/new folder" {
+  expect_err("diff-no-new", ["01-a", "files/new"])
+}
+
+///|
+test "a file directly in files/ of a diff lesson is an error" {
+  expect_err("diff-top-level-file", ["01-a/files/stray.smithy", "old/", "new/"])
+}
+
+///|
+test "a case file outside old/ and new/ names the case and the file" {
+  expect_err("diff-case-outside-sides", [
+    "01-a/cases/start/files/model.smithy", "old/", "new/",
+  ])
+}
+
+///|
+test "a diff key with the severity SUPPRESSED is an error" {
+  expect_err("diff-suppressed-key", [
+    "01-a/cases/start", "AddedShape|SUPPRESSED|example#B", "NOTE, WARNING, DANGER or ERROR",
+  ])
+}
+
+///|
+test "findings are not for a diff lesson" {
+  expect_err("findings-in-diff-lesson", [
+    "01-a/cases/start", "\"findings\" is for a value, message or transcript lesson",
+  ])
+}
+
+///|
+test "a diff lesson case needs diff" {
+  expect_err("diff-no-diff-key", ["01-a/cases/start", "\"diff\""])
+}
+
+///|
+test "a lesson with diff and value" {
+  expect_err("diff-and-value", ["01-a", "at most one of"])
+}
+
+///|
+test "every file of a diff lesson is in old/ or in new/" {
+  let tour = match read("diff-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  for files in [lesson.files, ..lesson.cases.map(c => c.files)] {
+    let (old, new) = @model.sides(files)
+    assert_eq(old.length() + new.length(), files.length())
+  }
+}
+
+///|
+test "a transcript lesson reads its setup and the fields of a case" {
+  let tour = match read("transcript-ok") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  let lesson = tour.lessons[0]
+  assert_eq(
+    lesson.engine,
+    Transcript({ file: "exchange.json", protocol: "example#WeatherProtocol", }),
+  )
+  assert_eq(lesson.files.map(f => f.name), ["exchange.json", "model.smithy"])
+  assert_eq(lesson.cases.map(c => c.name), [
+    "start", "no-reply", "not-json", "partial",
+  ])
+  let start = lesson.cases[0].expect
+  assert_eq(start.findings, [])
+  assert_eq(start.valid, Some(true))
+  assert_eq(start.steps, [{ count: 1, findings: [], }])
+  let no_reply = lesson.cases[1].expect
+  assert_eq(no_reply.findings, ["MissingResponse|error|0|client"])
+  assert_eq(no_reply.valid, Some(false))
+  assert_eq(no_reply.steps, [
+    { count: 1, findings: [], },
+    { count: 2, findings: ["MissingResponse|error|0|client"], },
+  ])
+  assert_eq(no_reply.output_contains, ["entry 0 client: error MissingResponse"])
+  assert_eq(lesson.cases[3].expect.valid, Some(true))
+}
+
+///|
+test "a transcript lesson needs a .json transcript" {
+  expect_err("transcript-jsonl", [
+    "01-weather", "a transcript lesson needs a .json transcript", "log.jsonl",
+  ])
+}
+
+///|
+test "steps are for a transcript lesson" {
+  expect_err("transcript-steps-in-value", [
+    "01-weather/cases/start", "\"steps\" is for a transcript lesson",
+  ])
+}
+
+///|
+test "a transcript finding key has the form code|severity|entry|sender" {
+  expect_err("transcript-bad-key", [
+    "01-weather/cases/start", "MissingResponse|error|zero|client", "code|severity|entry|sender",
+    "error or advisory", "a number or -",
+  ])
+}
+
+///|
+test "valid in a transcript case must be true or false" {
+  expect_err("transcript-bad-valid", [
+    "01-weather/cases/start", "\"valid\" must be true or false",
+  ])
+}

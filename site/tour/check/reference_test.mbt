@@ -8,7 +8,11 @@ let reference_path : String = "tour/reference-events.json"
 /// and `side` (`ours` or `reference`), and removes one copy of the event from
 /// that side. Kind `json_schema` has `pointer` and no `side`, and removes the
 /// value at the pointer from both JSON Schema documents. Kind `openapi` is the
-/// same for the OpenAPI documents.
+/// same for the OpenAPI documents. Kind `json_ast` is the same for the JSON AST
+/// documents. Kind `selector` has `shape` and `side`, and
+/// removes one copy of the shape id from the selected shapes of that side. Kind
+/// `diff_event` has `event` (`id|SEVERITY|shape`) and `side`, and removes one
+/// copy of the diff event from that side.
 let allow_path : String = "tour/reference-allow.json"
 
 ///|
@@ -59,6 +63,12 @@ struct ReferenceCase {
   json_schema : Json?
   /// None: no entry. Some(null): the reference conversion failed.
   openapi : Json?
+  /// None: no entry. Some(null): the reference selector did not parse.
+  selector : Json?
+  json_ast : Json?
+  /// None: no entry. Some: the sorted keys `id|SEVERITY|shape` of the diff
+  /// events of a diff lesson.
+  diff : Array[String]?
 }
 
 ///|
@@ -76,6 +86,12 @@ enum Difference {
   JsonSchema(pointer~ : String)
   /// The value at the JSON pointer is removed from both OpenAPI documents.
   OpenApi(pointer~ : String)
+  /// The value at the JSON pointer is removed from both JSON AST documents.
+  JsonAst(pointer~ : String)
+  /// The shape id is removed from the selected shapes of the named side only.
+  Selected(shape~ : String, side~ : Side)
+  /// The diff event key is removed from the named side only.
+  DiffEvent(event~ : String, side~ : Side)
 }
 
 ///|
@@ -172,9 +188,51 @@ fn parse_reference(text : String) -> Map[@model.CaseId, ReferenceCase] raise {
         { "openapi": document, .. } => Some(document)
         _ => None
       },
+      selector: match entry {
+        { "selector": selected, .. } => Some(selected)
+        _ => None
+      },
+      json_ast: match entry {
+        { "json_ast": document, .. } => Some(document)
+        _ => None
+      },
+      diff: match entry {
+        { "diff": Array(keys), .. } =>
+          Some(
+            keys.map(key => {
+              guard key is String(s) && @model.is_diff_key(s) else {
+                fail(
+                  reference_path +
+                  ": " +
+                  id +
+                  ": a diff event must be a string id|SEVERITY|shape",
+                )
+              }
+              s
+            }),
+          )
+        { "diff": _, .. } =>
+          fail(reference_path + ": " + id + ": \"diff\" must be an array")
+        _ => None
+      },
     }
   }
   result
+}
+
+///|
+fn side_member(entry : Json, where_ : String) -> Side raise {
+  match string_member(entry, "side", where_) {
+    "ours" => Ours
+    "reference" => Reference
+    other =>
+      fail(
+        where_ +
+        ": \"side\" must be \"ours\" or \"reference\", not \"" +
+        other +
+        "\"",
+      )
+  }
 }
 
 ///|
@@ -189,17 +247,24 @@ fn parse_allow(text : String) -> Array[Allowed] raise {
       "event" =>
         Event(
           event=event_member(entry, "event", where_),
-          side=match string_member(entry, "side", where_) {
-            "ours" => Ours
-            "reference" => Reference
-            other =>
-              fail(
-                where_ +
-                ": \"side\" must be \"ours\" or \"reference\", not \"" +
-                other +
-                "\"",
-              )
-          },
+          side=side_member(entry, where_),
+        )
+      "diff_event" => {
+        let event = string_member(entry, "event", where_)
+        if !@model.is_diff_key(event) {
+          fail(
+            where_ +
+            ": \"event\" must have the form id|SEVERITY|shape, not \"" +
+            event +
+            "\"",
+          )
+        }
+        DiffEvent(event~, side=side_member(entry, where_))
+      }
+      "selector" =>
+        Selected(
+          shape=string_member(entry, "shape", where_),
+          side=side_member(entry, where_),
         )
       "json_schema" => {
         if entry is { "side": _, .. } {
@@ -219,10 +284,19 @@ fn parse_allow(text : String) -> Array[Allowed] raise {
         }
         OpenApi(pointer=string_member(entry, "pointer", where_))
       }
+      "json_ast" => {
+        if entry is { "side": _, .. } {
+          fail(
+            where_ +
+            ": \"side\" is for kind \"event\" only; a json_ast entry removes the pointer from both sides",
+          )
+        }
+        JsonAst(pointer=string_member(entry, "pointer", where_))
+      }
       other =>
         fail(
           where_ +
-          ": \"kind\" must be \"event\", \"json_schema\" or \"openapi\", not \"" +
+          ": \"kind\" must be \"event\", \"json_schema\", \"openapi\", \"json_ast\", \"selector\" or \"diff_event\", not \"" +
           other +
           "\"",
         )
@@ -392,6 +466,7 @@ fn our_json_schema(
   where_ : String,
   lesson : @model.Lesson,
   files : Array[(String, String)],
+  selector : String?,
 ) -> Json raise {
   guard lesson.output is Some(output) else {
     fail(
@@ -399,14 +474,37 @@ fn our_json_schema(
     )
   }
   match
-    @core.handle(
-      session,
-      TransformFiles(seq=2, files~, output~, selector=lesson.selector),
-    ) {
+    @core.handle(session, TransformFiles(seq=2, files~, output~, selector~)) {
     Transformed(files=out, ..) =>
       match out.search_by(f => f.0 == "schema.json") {
         Some(i) => parse_json(where_ + " schema.json", out[i].1)
         None => fail(where_ + ": the output has no schema.json")
+      }
+    Blocked(reason~, ..) => fail(where_ + ": the output was blocked: " + reason)
+    _ => fail(where_ + ": unexpected answer")
+  }
+}
+
+///|
+/// Our JSON AST: the `model.json` file of the transform.
+fn our_json_ast(
+  session : @core.Session,
+  where_ : String,
+  lesson : @model.Lesson,
+  files : Array[(String, String)],
+  selector : String?,
+) -> Json raise {
+  guard lesson.output is Some(output) else {
+    fail(
+      where_ + ": the reference has a JSON AST, but the lesson has no output",
+    )
+  }
+  match
+    @core.handle(session, TransformFiles(seq=2, files~, output~, selector~)) {
+    Transformed(files=out, ..) =>
+      match out.search_by(f => f.0 == "model.json") {
+        Some(i) => parse_json(where_ + " model.json", out[i].1)
+        None => fail(where_ + ": the output has no model.json")
       }
     Blocked(reason~, ..) => fail(where_ + ": the output was blocked: " + reason)
     _ => fail(where_ + ": unexpected answer")
@@ -421,6 +519,7 @@ fn our_openapi(
   where_ : String,
   lesson : @model.Lesson,
   files : Array[(String, String)],
+  selector : String?,
 ) -> Json? raise {
   guard lesson.output is Some(output) else {
     fail(
@@ -429,10 +528,7 @@ fn our_openapi(
     )
   }
   match
-    @core.handle(
-      session,
-      TransformFiles(seq=2, files~, output~, selector=lesson.selector),
-    ) {
+    @core.handle(session, TransformFiles(seq=2, files~, output~, selector~)) {
     Transformed(files=out, ..) =>
       match out.search_by(f => f.0.has_suffix(".openapi.json")) {
         Some(i) => Some(parse_json(where_ + " OpenAPI", out[i].1))
@@ -469,6 +565,82 @@ fn document_pair(
 }
 
 ///|
+/// The shape ids that our selector selects, one per line of `selector.txt`, or
+/// None when the transform is blocked (the selector does not parse).
+fn our_selection(
+  session : @core.Session,
+  where_ : String,
+  lesson : @model.Lesson,
+  files : Array[(String, String)],
+  selector : String?,
+) -> Array[String]? raise {
+  guard lesson.output is Some(output) else {
+    fail(
+      where_ + ": the reference has a selection, but the lesson has no output",
+    )
+  }
+  match
+    @core.handle(session, TransformFiles(seq=2, files~, output~, selector~)) {
+    Transformed(files=out, ..) =>
+      match out.search_by(f => f.0 == "selector.txt") {
+        Some(i) =>
+          Some(
+            out[i].1
+            .split("\n")
+            .filter(l => l != "")
+            .map(l => l.to_owned())
+            .collect(),
+          )
+        None => fail(where_ + ": the output has no selector.txt")
+      }
+    Blocked(kind=Other, ..) => None
+    Blocked(reason~, ..) => fail(where_ + ": the output was blocked: " + reason)
+    _ => fail(where_ + ": unexpected answer")
+  }
+}
+
+///|
+/// The two selections to compare. Both sides must agree on failure: a blocked
+/// output of ours goes with a reference selector that did not parse (null).
+fn selection_pair(
+  where_ : String,
+  ours : Array[String]?,
+  reference : Json,
+) -> (Array[String], Array[String])? raise {
+  match (ours, reference) {
+    (None, Null) => None
+    (Some(_), Null) =>
+      fail(where_ + ": the reference selector failed, but ours gave a result")
+    (None, _) =>
+      fail(where_ + ": our selector failed, but the reference gave a result")
+    (Some(a), Array(items)) =>
+      Some(
+        (
+          a,
+          items.map(item => {
+            guard item is String(id) else {
+              fail(
+                reference_path +
+                ": " +
+                where_ +
+                ": a selected shape must be a string",
+              )
+            }
+            id
+          }),
+        ),
+      )
+    (Some(_), _) =>
+      fail(
+        reference_path +
+        ": " +
+        where_ +
+        ": the selector must be an array or null",
+      )
+  }
+}
+
+///|
 /// The tour, the reference results and the allow list.
 fn inputs() -> (@model.Tour, Map[@model.CaseId, ReferenceCase], Array[Allowed]) raise {
   let tour = match @source.read_tour(lessons_root, repo="..") {
@@ -499,6 +671,16 @@ fn needs_json_schema(
 }
 
 ///|
+/// Whether the reference must have a JSON AST: the lesson output is JsonAst,
+/// and the reference events have no ERROR or DANGER.
+fn needs_json_ast(
+  output : @core.Output?,
+  events : Array[@model.EventKey],
+) -> Bool {
+  output is Some(JsonAst) && !events.any(e => e.severity.blocks_output())
+}
+
+///|
 /// Whether the reference must have an OpenAPI entry: the lesson output is
 /// OpenApi30 or OpenApi31, and the reference events have no ERROR or DANGER.
 fn needs_openapi(
@@ -510,17 +692,38 @@ fn needs_openapi(
 }
 
 ///|
-/// Fail when the reference result is not the result of these case files and
-/// this lesson output.
+/// Whether the reference must have a selector entry: the lesson output is
+/// Selector, and the reference events have no ERROR or DANGER.
+fn needs_selector(
+  output : @core.Output?,
+  events : Array[@model.EventKey],
+) -> Bool {
+  output is Some(Selector) && !events.any(e => e.severity.blocks_output())
+}
+
+///|
+/// Whether the reference must have diff events: the lesson is a diff lesson,
+/// and the reference events (of both models) have no ERROR or DANGER.
+fn needs_diff(engine : @model.Engine, events : Array[@model.EventKey]) -> Bool {
+  engine is Diff && !events.any(e => e.severity.blocks_output())
+}
+
+///|
+/// Fail when the reference result is not the result of these case files, this
+/// lesson output and this engine.
 fn check_fresh(
   where_ : String,
   entry : ReferenceCase,
   digest : String,
   output : @core.Output?,
+  engine : @model.Engine,
 ) -> Unit raise {
   if entry.digest != digest ||
     (entry.json_schema is Some(_)) != needs_json_schema(output, entry.events) ||
-    (entry.openapi is Some(_)) != needs_openapi(output, entry.events) {
+    (entry.openapi is Some(_)) != needs_openapi(output, entry.events) ||
+    (entry.selector is Some(_)) != needs_selector(output, entry.events) ||
+    (entry.json_ast is Some(_)) != needs_json_ast(output, entry.events) ||
+    (entry.diff is Some(_)) != needs_diff(engine, entry.events) {
     fail(stale(where_))
   }
 }
@@ -571,6 +774,181 @@ fn compare_openapi(
 }
 
 ///|
+/// Compare our JSON AST with the reference one for a case. An allow entry of
+/// the case with kind `json_ast` removes its pointer from both documents, and
+/// is marked used when that removes a difference. Fail on a difference that
+/// remains when `json_ast` is true.
+fn compare_json_ast(
+  case_id : @model.CaseId,
+  mine : Json,
+  theirs : Json,
+  allow : Array[Allowed],
+  used : Array[Bool],
+  json_ast~ : Bool,
+) -> Unit raise {
+  let where_ = case_id.to_string()
+  for i, entry in allow {
+    guard entry.case_id == case_id && entry.difference is JsonAst(pointer~) else {
+      continue
+    }
+    if removes_difference(mine, theirs, pointer) {
+      used[i] = true
+    }
+  }
+  if json_ast && mine != theirs {
+    fail(
+      where_ +
+      ": our JSON AST differs from the reference at " +
+      show(json_differences(mine, theirs, "")),
+    )
+  }
+}
+
+///|
+/// Compare our selected shapes with the reference ones for a case. An allow
+/// entry of the case with kind `selector` removes one copy of its shape from the
+/// side that it names, and is marked used when it removes one. Fail on a
+/// difference that remains when `selector` is true.
+fn compare_selector(
+  case_id : @model.CaseId,
+  ours : Array[String]?,
+  reference : Json,
+  allow : Array[Allowed],
+  used : Array[Bool],
+  selector~ : Bool,
+) -> Unit raise {
+  let where_ = case_id.to_string()
+  guard selection_pair(where_, ours, reference) is Some((mine, theirs)) else {
+    return
+  }
+  for i, entry in allow {
+    guard entry.case_id == case_id &&
+      entry.difference is Selected(shape~, side~) else {
+      continue
+    }
+    let selected = match side {
+      Ours => mine
+      Reference => theirs
+    }
+    if selected.search(shape) is Some(j) {
+      selected.remove(j) |> ignore
+      used[i] = true
+    }
+  }
+  mine.sort_by(@model.compare_code_units)
+  theirs.sort_by(@model.compare_code_units)
+  if selector && mine != theirs {
+    fail(
+      where_ +
+      ": our selected shapes differ from the reference.\n  ours:      " +
+      mine.join(" ") +
+      "\n  reference: " +
+      theirs.join(" "),
+    )
+  }
+}
+
+///|
+/// Our answer for a diff lesson case: the compared findings of both models
+/// together, and the diff event keys, sorted. The keys are None when a model
+/// has an ERROR or a DANGER, and the library does not compare then.
+fn our_diffed(
+  session : @core.Session,
+  where_ : String,
+  case_files : Array[@model.LessonFile],
+) -> (Array[@model.EventKey], Array[String]?) raise {
+  let (old, new) = @model.sides(case_files)
+  match
+    @core.handle(
+      session,
+      DiffModels(seq=1, old=files_of(old), new=files_of(new)),
+    ) {
+    Diffed(old~, new~, events~, ..) => {
+      let keys = events.map(events => {
+        let keys = events.map(e => @model.diff_key(e.id, e.severity, e.shape))
+        keys.sort_by(@model.compare_code_units)
+        keys
+      })
+      (compared(old + new), keys)
+    }
+    Blocked(reason~, ..) => fail(where_ + ": the diff was blocked: " + reason)
+    _ => fail(where_ + ": unexpected answer")
+  }
+}
+
+///|
+/// Compare our diff events with the reference ones for a case. Both sides must
+/// agree on whether a diff ran: a model with an ERROR or a DANGER gives none
+/// on both sides. An allow entry of the case with kind `diff_event` removes one
+/// copy of its event from the side that it names, and is marked used when it
+/// removes one. Fail on a difference that remains when `diff` is true.
+fn compare_diff(
+  case_id : @model.CaseId,
+  ours : Array[String]?,
+  reference : Array[String]?,
+  allow : Array[Allowed],
+  used : Array[Bool],
+  diff~ : Bool,
+) -> Unit raise {
+  let where_ = case_id.to_string()
+  let (mine, theirs) = match (ours, reference) {
+    (None, None) => return
+    (Some(_), None) =>
+      fail(where_ + ": the reference gave no diff events, but ours gave some")
+    (None, Some(_)) =>
+      fail(
+        where_ + ": our diff did not run, but the reference gave diff events",
+      )
+    (Some(a), Some(b)) => (a.copy(), b.copy())
+  }
+  for i, entry in allow {
+    guard entry.case_id == case_id &&
+      entry.difference is DiffEvent(event~, side~) else {
+      continue
+    }
+    let events = match side {
+      Ours => mine
+      Reference => theirs
+    }
+    if events.search(event) is Some(j) {
+      events.remove(j) |> ignore
+      used[i] = true
+    }
+  }
+  mine.sort_by(@model.compare_code_units)
+  theirs.sort_by(@model.compare_code_units)
+  if diff && mine != theirs {
+    fail(
+      where_ +
+      ": our diff events differ from the reference.\n  ours:      " +
+      show(mine) +
+      "\n  reference: " +
+      show(theirs),
+    )
+  }
+}
+
+///|
+/// Our events of a case, from the files that the page sends: the model files
+/// (not the data file of a value, message or transcript lesson), or both sides
+/// of a diff lesson with their diff events.
+fn our_case_events(
+  session : @core.Session,
+  where_ : String,
+  lesson : @model.Lesson,
+  case : @model.Case,
+) -> (Array[@model.EventKey], Array[String]?) raise {
+  if lesson.engine is Diff {
+    our_diffed(session, where_, lesson.case_files(case))
+  } else {
+    let files = files_of(
+      @model.model_files(lesson.engine, lesson.case_files(case)),
+    )
+    (our_events(session, where_, files, lesson.output), None)
+  }
+}
+
+///|
 /// Compare our events and JSON Schema with the reference for every case, and
 /// mark the allow list entries that remove a difference.
 fn compare_all(
@@ -580,6 +958,9 @@ fn compare_all(
   events~ : Bool,
   json_schema~ : Bool,
   openapi~ : Bool,
+  selector~ : Bool,
+  json_ast~ : Bool,
+  diff~ : Bool,
 ) -> Array[Bool] raise {
   let used = allow.map(_ => false)
   let session = @core.Session::new()
@@ -587,9 +968,15 @@ fn compare_all(
     for case in lesson.cases {
       let case_id = lesson.case_id(case)
       let where_ = case_id.to_string()
-      let files = files_of(lesson.case_files(case))
+      let files = files_of(
+        @model.model_files(lesson.engine, lesson.case_files(case)),
+      )
+      let query = @model.query_of(
+        lesson.case_files(case),
+        fixed=lesson.selector,
+      )
       let expected = reference_of(reference, case_id)
-      let ours = our_events(session, where_, files, lesson.output)
+      let (ours, diffed) = our_case_events(session, where_, lesson, case)
       let theirs = expected.events.copy()
       remove_allowed_events(case_id, ours, theirs, allow, used)
       ours.sort_by(@model.compare_events)
@@ -603,8 +990,11 @@ fn compare_all(
           show_events(theirs),
         )
       }
+      if lesson.engine is Diff {
+        compare_diff(case_id, diffed, expected.diff, allow, used, diff~)
+      }
       if expected.json_schema is Some(schema) {
-        let mine = our_json_schema(session, where_, lesson, files)
+        let mine = our_json_schema(session, where_, lesson, files, query)
         let theirs = parse_json(reference_path, schema.stringify())
         for i, entry in allow {
           guard entry.case_id == case_id &&
@@ -625,8 +1015,17 @@ fn compare_all(
       }
       if expected.openapi is Some(document) {
         let theirs = parse_json(reference_path, document.stringify())
-        let mine = our_openapi(session, where_, lesson, files)
+        let mine = our_openapi(session, where_, lesson, files, query)
         compare_openapi(case_id, mine, theirs, allow, used, openapi~)
+      }
+      if expected.json_ast is Some(document) {
+        let theirs = parse_json(reference_path, document.stringify())
+        let mine = our_json_ast(session, where_, lesson, files, query)
+        compare_json_ast(case_id, mine, theirs, allow, used, json_ast~)
+      }
+      if expected.selector is Some(selected) {
+        let mine = our_selection(session, where_, lesson, files, query)
+        compare_selector(case_id, mine, selected, allow, used, selector~)
       }
     }
   }
@@ -648,6 +1047,7 @@ test "every lesson case has a fresh reference result" {
         entry,
         reference_digest(lesson.case_files(case), definitions),
         lesson.output,
+        lesson.engine,
       )
     }
   }
@@ -672,6 +1072,9 @@ test "our events agree with the reference events" {
       events=true,
       json_schema=false,
       openapi=false,
+      selector=false,
+      json_ast=false,
+      diff=false,
     ),
   )
 }
@@ -687,6 +1090,9 @@ test "our JSON Schema agrees with the reference JSON Schema" {
       events=false,
       json_schema=true,
       openapi=false,
+      selector=false,
+      json_ast=false,
+      diff=false,
     ),
   )
 }
@@ -701,6 +1107,9 @@ test "every allow list entry is used, has an issue, and its lesson says so" {
     events=false,
     json_schema=false,
     openapi=false,
+    selector=false,
+    json_ast=false,
+    diff=false,
   )
   for i, entry in allow {
     let where_ = allow_path +
@@ -871,14 +1280,16 @@ test "a JSON Schema lesson needs a reference schema unless the case has an error
       events: events.map(e => @model.EventKey::parse(e).unwrap()),
       json_schema,
       openapi: None,
+      selector: None,
+      json_ast: None,
+      diff: None,
     }
   }
-  check_fresh("a", entry([], schema), "d", Some(JsonSchema))
-  check_fresh("a", entry(["W|WARNING|-"], schema), "d", Some(JsonSchema))
-  check_fresh("a", entry(["E|ERROR|-"], None), "d", Some(JsonSchema))
-  check_fresh("a", entry(["E|DANGER|-"], None), "d", Some(JsonSchema))
-  check_fresh("a", entry([], None), "d", Some(JsonAst))
-  check_fresh("a", entry([], None), "d", None)
+  check_fresh("a", entry([], schema), "d", Some(JsonSchema), Model)
+  check_fresh("a", entry(["W|WARNING|-"], schema), "d", Some(JsonSchema), Model)
+  check_fresh("a", entry(["E|ERROR|-"], None), "d", Some(JsonSchema), Model)
+  check_fresh("a", entry(["E|DANGER|-"], None), "d", Some(JsonSchema), Model)
+  check_fresh("a", entry([], None), "d", None, Model)
   let stale_message = "a: the reference result is missing or stale; run `mise run reference:tour`"
   for
     bad in [
@@ -888,7 +1299,7 @@ test "a JSON Schema lesson needs a reference schema unless the case has an error
       (entry(["E|ERROR|-"], schema), "d", Some(@core.Output::JsonSchema)),
       (entry([], None), "other", None),
     ] {
-    try check_fresh("a", bad.0, bad.1, bad.2) catch {
+    try check_fresh("a", bad.0, bad.1, bad.2, Model) catch {
       Failure(message) => assert_true(message.has_suffix(stale_message))
       e => fail("unexpected error: " + e.to_string())
     } noraise {
@@ -930,11 +1341,14 @@ test "an OpenAPI lesson needs a reference document unless the case has an error"
       events: events.map(e => @model.EventKey::parse(e).unwrap()),
       json_schema: None,
       openapi,
+      selector: None,
+      json_ast: None,
+      diff: None,
     }
   }
-  check_fresh("a", entry([], doc), "d", Some(OpenApi30))
-  check_fresh("a", entry([], Some(Json::null())), "d", Some(OpenApi31))
-  check_fresh("a", entry(["E|ERROR|-"], None), "d", Some(OpenApi30))
+  check_fresh("a", entry([], doc), "d", Some(OpenApi30), Model)
+  check_fresh("a", entry([], Some(Json::null())), "d", Some(OpenApi31), Model)
+  check_fresh("a", entry(["E|ERROR|-"], None), "d", Some(OpenApi30), Model)
   let stale_message = "a: the reference result is missing or stale; run `mise run reference:tour`"
   for
     bad in [
@@ -942,7 +1356,7 @@ test "an OpenAPI lesson needs a reference document unless the case has an error"
       (entry([], doc), "d", Some(@core.Output::JsonAst)),
       (entry(["E|DANGER|-"], doc), "d", Some(@core.Output::OpenApi31)),
     ] {
-    try check_fresh("a", bad.0, bad.1, bad.2) catch {
+    try check_fresh("a", bad.0, bad.1, bad.2, Model) catch {
       Failure(message) => assert_true(message.has_suffix(stale_message))
       e => fail("unexpected error: " + e.to_string())
     } noraise {
@@ -1004,6 +1418,9 @@ test "our OpenAPI agrees with the reference OpenAPI" {
       events=false,
       json_schema=false,
       openapi=true,
+      selector=false,
+      json_ast=false,
+      diff=false,
     ),
   )
 }
@@ -1087,6 +1504,8 @@ test "our OpenAPI document is the .openapi.json file of the transform" {
     slug: "x",
     title: "x",
     section: "x",
+    engine: Model,
+    extension: false,
     output: Some(OpenApi30),
     selector: None,
     spec: "",
@@ -1094,12 +1513,493 @@ test "our OpenAPI document is the .openapi.json file of the transform" {
     files: [],
     cases: [],
   }
-  let document = our_openapi(@core.Session::new(), "a", lesson, [
-    ("model.smithy", model),
-  ])
+  let document = our_openapi(
+    @core.Session::new(),
+    "a",
+    lesson,
+    [("model.smithy", model)],
+    None,
+  )
   guard document
     is Some({ "openapi": String("3.0.2"), "paths": Object(paths), .. }) else {
     fail("the OpenAPI document is missing or has no version 3.0.2 and paths")
   }
   assert_true(paths.contains("/city"))
+}
+
+///|
+test "a Selector lesson needs a reference selection unless the case has an error" {
+  let list = Some(Json::array([Json::string("a#B")]))
+  let entry = fn(events : Array[String], selector : Json?) -> ReferenceCase {
+    {
+      digest: "d",
+      events: events.map(e => @model.EventKey::parse(e).unwrap()),
+      json_schema: None,
+      openapi: None,
+      selector,
+      json_ast: None,
+      diff: None,
+    }
+  }
+  check_fresh("a", entry([], list), "d", Some(Selector), Model)
+  check_fresh("a", entry([], Some(Json::null())), "d", Some(Selector), Model)
+  check_fresh("a", entry(["E|ERROR|-"], None), "d", Some(Selector), Model)
+  let stale_message = "a: the reference result is missing or stale; run `mise run reference:tour`"
+  for
+    bad in [
+      (entry([], None), "d", Some(@core.Output::Selector)),
+      (entry([], list), "d", Some(@core.Output::JsonAst)),
+      (
+        entry(["E|DANGER|-"], Some(Json::array([]))),
+        "d",
+        Some(@core.Output::Selector),
+      ),
+    ] {
+    try check_fresh("a", bad.0, bad.1, bad.2, Model) catch {
+      Failure(message) => assert_true(message.has_suffix(stale_message))
+      e => fail("unexpected error: " + e.to_string())
+    } noraise {
+      _ => fail("a stale result passed")
+    }
+  }
+}
+
+///|
+test "a failed reference selector agrees only with a blocked output" {
+  let list = Json::array([Json::string("a#B")])
+  assert_true(selection_pair("a", None, Json::null()) is None)
+  assert_eq(selection_pair("a", Some(["a#B"]), list), Some((["a#B"], ["a#B"])))
+  try selection_pair("a", Some([]), Json::null()) catch {
+    Failure(message) =>
+      assert_true(
+        message.has_suffix(
+          "a: the reference selector failed, but ours gave a result",
+        ),
+      )
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a result against a failed selector passed")
+  }
+  try selection_pair("a", None, list) catch {
+    Failure(message) =>
+      assert_true(
+        message.has_suffix(
+          "a: our selector failed, but the reference gave a result",
+        ),
+      )
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a blocked output against a result passed")
+  }
+}
+
+///|
+test "an allowed shape is removed once, from the side that the entry names" {
+  let start : @model.CaseId = { dir: "01-a", name: "start", }
+  let allowed = (side : Side) => {
+    case_id: start,
+    difference: Selected(shape="smithy.rpc#X", side~),
+    reason: "r",
+    issue: "smithy-1",
+  }
+  let reference = Json::array([Json::string("a#A")])
+  let used = [false]
+  compare_selector(
+    start,
+    Some(["a#A", "smithy.rpc#X"]),
+    reference,
+    [allowed(Ours)],
+    used,
+    selector=true,
+  )
+  assert_eq(used, [true])
+  // the same entry on the other side removes nothing: stale, and the difference fails
+  let used = [false]
+  try
+    compare_selector(
+      start,
+      Some(["a#A", "smithy.rpc#X"]),
+      reference,
+      [allowed(Reference)],
+      used,
+      selector=true,
+    )
+  catch {
+    Failure(message) =>
+      assert_true(message.contains("our selected shapes differ"))
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a difference passed with a wrong side")
+  }
+  assert_eq(used, [false])
+  // the order of the lines does not matter: both sides sort by code unit
+  compare_selector(
+    start,
+    Some(["a#B", "a#A"]),
+    Json::array([Json::string("a#A"), Json::string("a#B")]),
+    [],
+    [],
+    selector=true,
+  )
+}
+
+///|
+test "a selector allow entry names a shape and a side" {
+  let text = "[{\"case\": \"01-a/start\", \"kind\": \"selector\", \"shape\": \"smithy.rpc#X\", \"side\": \"ours\", \"reason\": \"r\", \"issue\": \"smithy-1\"}]"
+  let allow = parse_allow(text)
+  assert_eq(allow.length(), 1)
+  assert_true(allow[0].difference is Selected(shape="smithy.rpc#X", side=Ours))
+}
+
+///|
+test "our selector results agree with the reference" {
+  let (tour, reference, allow) = inputs()
+  ignore(
+    compare_all(
+      tour,
+      reference,
+      allow,
+      events=false,
+      json_schema=false,
+      openapi=false,
+      selector=true,
+      json_ast=false,
+      diff=false,
+    ),
+  )
+}
+
+///|
+test "a JsonAst lesson needs a reference document unless the case has an error" {
+  let doc = Some(Json::object({}))
+  let entry = fn(events : Array[String], json_ast : Json?) -> ReferenceCase {
+    {
+      digest: "d",
+      events: events.map(e => @model.EventKey::parse(e).unwrap()),
+      json_schema: None,
+      openapi: None,
+      selector: None,
+      json_ast,
+      diff: None,
+    }
+  }
+  check_fresh("a", entry([], doc), "d", Some(JsonAst), Model)
+  check_fresh("a", entry(["W|WARNING|-"], doc), "d", Some(JsonAst), Model)
+  check_fresh("a", entry(["E|ERROR|-"], None), "d", Some(JsonAst), Model)
+  let stale_message = "a: the reference result is missing or stale; run `mise run reference:tour`"
+  for
+    bad in [
+      (entry([], None), "d", Some(@core.Output::JsonAst)),
+      (entry([], doc), "d", Some(@core.Output::JsonSchema)),
+      (entry([], doc), "d", None),
+      (entry(["E|DANGER|-"], doc), "d", Some(@core.Output::JsonAst)),
+    ] {
+    try check_fresh("a", bad.0, bad.1, bad.2, Model) catch {
+      Failure(message) => assert_true(message.has_suffix(stale_message))
+      e => fail("unexpected error: " + e.to_string())
+    } noraise {
+      _ => fail("a stale result passed")
+    }
+  }
+}
+
+///|
+test "a json_ast allow entry must not name a side" {
+  let text = "[{\"case\": \"01-a/start\", \"kind\": \"json_ast\", \"pointer\": \"/a\", \"side\": \"ours\", \"reason\": \"r\", \"issue\": \"smithy-1\"}]"
+  try parse_allow(text) catch {
+    Failure(message) =>
+      assert_true(message.contains("\"side\" is for kind \"event\" only"))
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a json_ast entry with a side was accepted")
+  }
+  let ok = "[{\"case\": \"01-a/start\", \"kind\": \"json_ast\", \"pointer\": \"/a\", \"reason\": \"r\", \"issue\": \"smithy-1\"}]"
+  assert_true(parse_allow(ok)[0].difference is JsonAst(pointer="/a"))
+}
+
+///|
+test "the JSON AST comparison fails on a difference and honors the allow list" {
+  let json = (text : String) => parse_json("test", text)
+  let start : @model.CaseId = { dir: "01-a", name: "start", }
+  let other : @model.CaseId = { dir: "01-a", name: "other", }
+  let allowed = (case_id : @model.CaseId, pointer : String) => {
+    case_id,
+    difference: JsonAst(pointer~),
+    reason: "r",
+    issue: "smithy-1",
+  }
+  compare_json_ast(
+    start,
+    json("{\"a\": 1}"),
+    json("{\"a\": 1}"),
+    [],
+    [],
+    json_ast=true,
+  )
+  try
+    compare_json_ast(
+      start,
+      json("{\"a\": 1, \"b\": 2}"),
+      json("{\"a\": 1, \"b\": 3}"),
+      [],
+      [],
+      json_ast=true,
+    )
+  catch {
+    Failure(message) =>
+      assert_true(
+        message.contains(
+          "01-a/start: our JSON AST differs from the reference at [/b",
+        ),
+      )
+    e => fail("unexpected error: " + e.to_string())
+  } noraise {
+    _ => fail("a different document passed")
+  }
+  let used = [false]
+  compare_json_ast(
+    start,
+    json("{\"a\": 1, \"b\": 2}"),
+    json("{\"a\": 1, \"b\": 3}"),
+    [allowed(start, "/b")],
+    used,
+    json_ast=true,
+  )
+  assert_eq(used, [true])
+  for wrong in [allowed(other, "/b"), allowed(start, "/c")] {
+    let used = [false]
+    try
+      compare_json_ast(
+        start,
+        json("{\"a\": 2}"),
+        json("{\"a\": 3}"),
+        [wrong],
+        used,
+        json_ast=true,
+      )
+    catch {
+      Failure(message) => assert_true(message.contains("our JSON AST differs"))
+      e => fail("unexpected error: " + e.to_string())
+    } noraise {
+      _ => fail("a difference passed with a wrong allow entry")
+    }
+    assert_eq(used, [false])
+  }
+}
+
+///|
+test "our JSON AST is the model.json file of the transform" {
+  let lesson : @model.Lesson = {
+    dir: "99-x",
+    number: 99,
+    slug: "x",
+    title: "x",
+    section: "x",
+    engine: Model,
+    extension: false,
+    output: Some(JsonAst),
+    selector: None,
+    spec: "",
+    text: "",
+    files: [],
+    cases: [],
+  }
+  let document = our_json_ast(
+    @core.Session::new(),
+    "a",
+    lesson,
+    [("model.smithy", "$version: \"2\"\nnamespace example\nstring Name\n")],
+    None,
+  )
+  guard document is { "smithy": String("2.0"), "shapes": Object(shapes), .. } else {
+    fail("the JSON AST is missing the version 2.0 and shapes")
+  }
+  assert_true(shapes.contains("example#Name"))
+}
+
+///|
+test "our JSON AST agrees with the reference JSON AST" {
+  let (tour, reference, allow) = inputs()
+  ignore(
+    compare_all(
+      tour,
+      reference,
+      allow,
+      events=false,
+      json_schema=false,
+      openapi=false,
+      selector=false,
+      json_ast=true,
+      diff=false,
+    ),
+  )
+}
+
+///|
+test "a diff lesson needs reference diff events unless a model has an error" {
+  let list = Some(["AddedShape|NOTE|a#B"])
+  let entry = fn(
+    events : Array[String],
+    diff : Array[String]?,
+  ) -> ReferenceCase {
+    {
+      digest: "d",
+      events: events.map(e => @model.EventKey::parse(e).unwrap()),
+      json_schema: None,
+      openapi: None,
+      selector: None,
+      json_ast: None,
+      diff,
+    }
+  }
+  check_fresh("a", entry([], list), "d", None, Diff)
+  check_fresh("a", entry([], Some([])), "d", None, Diff)
+  check_fresh("a", entry(["W|WARNING|-"], list), "d", None, Diff)
+  check_fresh("a", entry(["E|ERROR|-"], None), "d", None, Diff)
+  check_fresh("a", entry(["E|DANGER|-"], None), "d", None, Diff)
+  check_fresh("a", entry([], None), "d", None, Model)
+  let stale_message = "a: the reference result is missing or stale; run `mise run reference:tour`"
+  for
+    bad in [
+      (entry([], None), "d", @model.Engine::Diff),
+      (entry([], list), "d", @model.Engine::Model),
+      (entry(["E|ERROR|-"], list), "d", @model.Engine::Diff),
+      (entry(["E|DANGER|-"], list), "d", @model.Engine::Diff),
+      (entry([], list), "other", @model.Engine::Diff),
+    ] {
+    try check_fresh("a", bad.0, bad.1, None, bad.2) catch {
+      Failure(message) => assert_true(message.has_suffix(stale_message))
+      e => fail("unexpected error: " + e.to_string())
+    } noraise {
+      _ => fail("a stale result passed")
+    }
+  }
+  assert_true(needs_diff(Diff, []))
+  assert_false(needs_diff(Model, []))
+  assert_false(needs_diff(Diff, [@model.EventKey::parse("E|ERROR|-").unwrap()]))
+}
+
+///|
+test "a diff_event allow entry names an event key and a side" {
+  let text = "[{\"case\": \"01-a/start\", \"kind\": \"diff_event\", \"event\": \"AddedShape|NOTE|a#B\", \"side\": \"reference\", \"reason\": \"r\", \"issue\": \"smithy-1\"}]"
+  let allow = parse_allow(text)
+  assert_eq(allow.length(), 1)
+  assert_true(
+    allow[0].difference
+    is DiffEvent(event="AddedShape|NOTE|a#B", side=Reference),
+  )
+  let no_side = text.replace_all(old=", \"side\": \"reference\"", new="")
+  try parse_allow(no_side) catch {
+    _ => ()
+  } noraise {
+    _ => fail("no_side passed")
+  }
+  let bad_key = text.replace_all(old="AddedShape|NOTE|a#B", new="AddedShape")
+  try parse_allow(bad_key) catch {
+    _ => ()
+  } noraise {
+    _ => fail("bad_key passed")
+  }
+}
+
+///|
+test "the diff comparison fails on a difference and honors the allow list" {
+  let start : @model.CaseId = { dir: "01-a", name: "start", }
+  let other : @model.CaseId = { dir: "01-a", name: "other", }
+  let a = "AddedShape|NOTE|a#B"
+  let b = "RemovedShape|ERROR|a#C"
+  let allowed = fn(
+    case_id : @model.CaseId,
+    event : String,
+    side : Side,
+  ) -> Allowed {
+    {
+      case_id,
+      difference: DiffEvent(event~, side~),
+      reason: "r",
+      issue: "smithy-1",
+    }
+  }
+  compare_diff(start, Some([a, b]), Some([b, a]), [], [], diff=true)
+  compare_diff(start, None, None, [], [], diff=true)
+  let expect_failure = fn(
+    ours : Array[String]?,
+    reference : Array[String]?,
+    allow : Array[Allowed],
+    text : String,
+  ) -> Unit raise {
+    let used = allow.map(_ => false)
+    try compare_diff(start, ours, reference, allow, used, diff=true) catch {
+      Failure(message) => assert_true(message.contains(text))
+      e => fail("unexpected error: " + e.to_string())
+    } noraise {
+      _ => fail("a difference passed")
+    }
+  }
+  expect_failure(
+    Some([a]),
+    Some([a, b]),
+    [],
+    "01-a/start: our diff events differ",
+  )
+  expect_failure(Some([a]), None, [], "the reference gave no diff events")
+  expect_failure(None, Some([a]), [], "our diff did not run")
+  let used = [false, false, false]
+  compare_diff(
+    start,
+    Some([a]),
+    Some([a, b]),
+    [
+      allowed(start, b, Reference),
+      allowed(other, b, Reference),
+      allowed(start, "Gone|NOTE|a#Z", Ours),
+    ],
+    used,
+    diff=true,
+  )
+  assert_eq(used, [true, false, false])
+  // An entry on the wrong side removes nothing, so the difference stays.
+  expect_failure(Some([a]), Some([a, b]), [allowed(start, b, Ours)], "differ")
+}
+
+///|
+test "our diff events agree with the reference diff events" {
+  let (tour, reference, allow) = inputs()
+  ignore(
+    compare_all(
+      tour,
+      reference,
+      allow,
+      events=true,
+      json_schema=false,
+      openapi=false,
+      selector=false,
+      json_ast=false,
+      diff=true,
+    ),
+  )
+}
+
+///|
+test "the events of a value case come from the model files only" {
+  let tour = match
+    @source.read_tour("tour/source/testdata/value-level1", repo="..") {
+    Ok(tour) => tour
+    Err(e) => fail("I cannot read the fixture: " + e)
+  }
+  let lesson = tour.lessons[0]
+  let case = lesson.cases[0]
+  let session = @core.Session::new()
+  let (events, diffed) = our_case_events(session, "value", lesson, case)
+  assert_eq(events, [])
+  assert_eq(diffed, None)
+  // The same files with the value file loaded as a model file give a parse
+  // error, so the empty list above proves that the value file is left out.
+  let all = our_events(
+    session,
+    "value",
+    files_of(lesson.case_files(case)),
+    lesson.output,
+  )
+  assert_true(all.any(e => e.severity == Error))
 }

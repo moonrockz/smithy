@@ -272,6 +272,81 @@ test("Undo after a file tab switch never moves the text of one file into another
   expect(page.errors).toEqual([]);
 });
 
+test("a Selector lesson edits its query in the tab query.selector, and Undo stays inside that file", async ({
+  page,
+}) => {
+  await page.goto(siteUrl("tour/selectors/"));
+  await expect(page.locator("#tour-editor .cm-content")).toBeVisible();
+  await settled(page);
+  const editor = page.locator("#tour-editor .cm-content");
+  const output = page.locator("#tour-output .cm-content");
+  const modelTab = page.getByRole("tab", { name: "model.smithy" });
+  const queryTab = page.getByRole("tab", { name: "query.selector" });
+
+  await modelTab.click();
+  await expect(editor).toContainText("resource City");
+  const modelStart = await editorText(page);
+  await queryTab.click();
+  await expect(editor).toContainText("operation[trait|readonly]");
+  const queryStart = await editorText(page);
+  expect(queryStart).not.toContain("namespace example");
+
+  // The output tab lists the operations with @readonly.
+  await page.getByRole("tab", { name: /Selector/ }).click();
+  await expect(output).toContainText("example#GetCity");
+  expect(await outputText(page)).not.toContain("example#CreateCity");
+
+  // An edit of the query changes the output: without the attribute, every operation matches.
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+Home");
+  await page.keyboard.press("End");
+  for (const _ of "[trait|readonly]") await page.keyboard.press("Backspace");
+  await settled(page);
+  expect((await editorText(page)).trim()).toEqual("operation");
+  await expect(output).toContainText("example#CreateCity");
+
+  // A query that does not parse shows the reason, and the model has no findings.
+  await page.keyboard.type("[trait|readonly");
+  await settled(page);
+  await expect(page.locator(".tour-note.tour-err")).toContainText("I expected an attribute comparator");
+  await page.getByRole("tab", { name: /Findings/ }).click();
+  await expect(page.getByText("The model has no findings.")).toBeVisible();
+  await page.getByRole("tab", { name: /Selector/ }).click();
+
+  // The model file is unchanged.
+  await modelTab.click();
+  await expect(editor).toContainText("resource City");
+  expect(await editorText(page)).toEqual(modelStart);
+
+  // Undo until nothing changes: the query goes back to its own start text, never to the model text.
+  await queryTab.click();
+  await expect(editor).toContainText("operation[trait|readonly");
+  await editor.click();
+  let before = "";
+  for (let i = 0; i < 60; i++) {
+    const text = await editorText(page);
+    if (text === before) break;
+    before = text;
+    await page.keyboard.press("ControlOrMeta+z");
+    await settled(page);
+  }
+  const queryUndone = await editorText(page);
+  expect(queryUndone).toEqual(queryStart);
+  expect(queryUndone).not.toContain("namespace example");
+  await expect(output).toContainText("example#GetCity");
+  expect(await outputText(page)).not.toContain("example#CreateCity");
+
+  // Undo in model.smithy has nothing to undo. The editor shows only the lines in view, so the click is on
+  // the first line and the view stays at the top.
+  await modelTab.click();
+  await expect(editor).toContainText("resource City");
+  await editor.locator(".cm-line").first().click();
+  await page.keyboard.press("ControlOrMeta+z");
+  await settled(page);
+  expect(await editorText(page)).toEqual(modelStart);
+  expect(page.errors).toEqual([]);
+});
+
 // The two tabs of the first include block of the lesson: the CLI and the MoonBit block.
 function includeTabs(page) {
   const group = page.locator(".ms-md-tabs").first();
@@ -341,3 +416,311 @@ test("the include tabs switch with JavaScript off", async ({ browser }) => {
   await expectApiShown(tabs);
   await context.close();
 });
+
+test("a transcript lesson steps through the exchange", async ({ page }) => {
+  await page.goto(siteUrl("tour/transcripts/"));
+  await expect(page.locator("#tour-editor .cm-content")).toBeVisible();
+  await settled(page);
+  const rows = page.locator(".tour-entry");
+
+  // The Transcript tab is the first one; no entry is checked.
+  await expect(page.getByRole("tab", { name: "Transcript" })).toBeVisible();
+  await expect(rows).toHaveCount(3);
+  await expect(page.getByText("0 of 3 entries checked")).toBeVisible();
+  await expect(rows.locator(".tour-check")).toHaveCount(0);
+  await expect(page.locator(".tour-entry-pending")).toHaveCount(3);
+
+  await page.locator("#tour-step").click();
+  await expect(page.getByText("1 of 3 entries checked")).toBeVisible();
+  await expect(rows.nth(0).locator(".tour-check")).toHaveCount(1);
+  await expect(page.locator(".tour-entry-pending")).toHaveCount(2);
+
+  await page.locator("#tour-runall").click();
+  await expect(page.getByText("3 of 3 entries checked")).toBeVisible();
+  await expect(page.locator(".tour-verdict")).toContainText("valid, complete");
+  await expect(page.locator(".tour-verdict")).not.toContainText("not valid");
+  await expect(page.locator("#tour-step")).toBeDisabled();
+  await expect(page.locator("#tour-runall")).toBeDisabled();
+
+  // Delete the last entry and the comma before it. The call of the first entry has no reply.
+  await page.getByRole("tab", { name: "exchange.json" }).click();
+  await page.locator("#tour-editor .cm-content").click();
+  await page.keyboard.press("ControlOrMeta+Home");
+  for (let line = 1; line < 6; line++) {
+    await page.keyboard.press("ArrowDown");
+  }
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+ArrowDown");
+  await page.keyboard.press("Shift+End");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await settled(page);
+  await expect(rows).toHaveCount(2);
+  const changed = page.locator(".tour-finding.tour-changed");
+  await expect(changed).toHaveCount(1);
+  await expect(changed).toContainText("error MissingResponse");
+  await expect(page.locator(".tour-verdict")).toContainText("not valid");
+  expect(page.errors).toEqual([]);
+});
+
+// The color of the editor for a property name (editor.js): only the JSON mode tags the keys of a JSON object
+// with it.
+const propertyNameColor = "rgb(126, 231, 135)";
+
+// Undo in the editor until the text stops changing, and give the text.
+async function undoAll(page, times = 30) {
+  const editor = page.locator("#tour-editor .cm-content");
+  await editor.click();
+  let before = "";
+  for (let i = 0; i < times; i++) {
+    const text = await editorText(page);
+    if (text === before) break;
+    before = text;
+    await page.keyboard.press("ControlOrMeta+z");
+    await settled(page);
+  }
+  return editorText(page);
+}
+
+test("a value lesson opens the value in JSON mode, shows its findings, keeps Undo in each file and reports a broken value", async ({
+  page,
+}) => {
+  await page.goto(siteUrl("tour/validating-values/"));
+  await expect(page.locator("#tour-editor .cm-content")).toBeVisible();
+  await expect(page.locator("#tour-output .cm-content")).toBeAttached();
+  await settled(page);
+  const output = page.locator("#tour-output .cm-content");
+  const editor = page.locator("#tour-editor .cm-content");
+  const modelTab = page.getByRole("tab", { name: "model.smithy" });
+  const valueTab = page.getByRole("tab", { name: "order.json" });
+  await expect(page.getByRole("tab", { name: "Value findings" })).toHaveAttribute("aria-selected", "true");
+  await expect(output).toContainText("No findings. The value is valid.");
+  await expect(page.getByRole("button", { name: "Open in playground" })).toHaveCount(0);
+
+  await modelTab.click();
+  await expect(editor).toContainText("structure Order");
+  const modelStart = await editorText(page);
+
+  // The value file opens in JSON mode: its keys have the property name color.
+  await valueTab.click();
+  await expect(editor).toContainText('"quantity": 2,');
+  const valueStart = await editorText(page);
+  const key = editor.locator("span", { hasText: /^"id"$/ });
+  await expect(key).toHaveCount(1);
+  await expect(key).toHaveCSS("color", propertyNameColor);
+
+  // Set the quantity out of range.
+  await editor.locator(".cm-line", { hasText: '"quantity"' }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("11");
+  await settled(page);
+  await expect(output).toContainText("order.json/quantity: error[Range] example.orders#Order$quantity");
+  await expect(output.locator(".cm-line")).toHaveCount(1);
+  await expect(page.locator("#tour-output .cm-line.tour-changed")).toHaveCount(1);
+
+  // Switch to the model and back. Undo then gives the start value back, never the text of the model.
+  await modelTab.click();
+  await expect(editor).toContainText("structure Order");
+  expect(await editorText(page)).toEqual(modelStart);
+  await valueTab.click();
+  await expect(editor).toContainText('"quantity": 11,');
+  const valueUndone = await undoAll(page);
+  expect(valueUndone).toEqual(valueStart);
+  expect(valueUndone).not.toContain("structure Order");
+  await expect(output).toContainText("No findings. The value is valid.");
+
+  // The model is unchanged, and Undo there has nothing to undo.
+  await modelTab.click();
+  await expect(editor).toContainText("structure Order");
+  await editor.locator(".cm-line").first().click();
+  await page.keyboard.press("ControlOrMeta+z");
+  await settled(page);
+  expect(await editorText(page)).toEqual(modelStart);
+
+  // Delete the last brace: the InvalidJson line comes.
+  await valueTab.click();
+  await expect(editor).toContainText('"quantity": 2,');
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await settled(page);
+  await expect(output).toContainText("order.json: error[InvalidJson]");
+  await expect(output).not.toContainText("error[Range]");
+
+  // The expand button of the output pane works with the value pane.
+  await page.getByRole("button", { name: "Expand the output" }).click();
+  await expect(page.getByRole("button", { name: "Expand the output" })).toHaveAttribute("aria-pressed", "true");
+  expect(page.errors).toEqual([]);
+});
+
+test("a message lesson shows the message findings, marks the changed line and reports a broken message", async ({ page }) => {
+  await page.goto(siteUrl("tour/validating-messages/"));
+  await expect(page.locator("#tour-editor .cm-content")).toBeVisible();
+  await expect(page.locator("#tour-output .cm-content")).toBeAttached();
+  await settled(page);
+  const output = page.locator("#tour-output .cm-content");
+  await expect(page.getByRole("tab", { name: "Message findings" })).toHaveAttribute("aria-selected", "true");
+  await expect(output).toContainText("No findings. The message is valid.");
+  await expect(page.getByRole("button", { name: "Open in playground" })).toHaveCount(0);
+
+  // Change 23 to "23": the pane shows the TypeMismatch line at /params/1.
+  await page.getByRole("tab", { name: "call.json" }).click();
+  const editor = page.locator("#tour-editor .cm-content");
+  await expect(editor).toContainText('"params": [42, 23],');
+  await editor.getByText("23", { exact: true }).dblclick();
+  await page.keyboard.type('"23"');
+  await settled(page);
+  await expect(output).toContainText("call.json/params/1: error[TypeMismatch] example#SubtractInput$subtrahend");
+  await expect(output.locator(".cm-line")).toHaveCount(1);
+  await expect(page.locator("#tour-output .cm-line.tour-changed")).toHaveCount(1);
+
+  // Delete the last brace: the old line goes, the InvalidJson line comes.
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await settled(page);
+  await expect(output).toContainText("error[InvalidJson]");
+  await expect(output).not.toContainText("error[TypeMismatch]");
+
+  // The expand button of the output pane works with the message pane.
+  await page.getByRole("button", { name: "Expand the output" }).click();
+  await expect(page.getByRole("button", { name: "Expand the output" })).toHaveAttribute("aria-pressed", "true");
+  expect(page.errors).toEqual([]);
+});
+
+test("a diff lesson groups the files under Old and New, shows the diff, marks a new event and keeps Undo in each side", async ({
+  page,
+}) => {
+  await page.goto(siteUrl("tour/comparing-models/"));
+  await expect(page.locator("#tour-editor .cm-content")).toBeVisible();
+  await expect(page.locator("#tour-output .cm-content")).toBeAttached();
+  await settled(page);
+  const output = page.locator("#tour-output .cm-content");
+  const editor = page.locator("#tour-editor .cm-content");
+  await expect(page.getByRole("tab", { name: "Diff" })).toHaveAttribute("aria-selected", "true");
+  await expect(output).toContainText("[NOTE] example.weather#GetForecastOutput$humidity");
+  await expect(output).toContainText("| AddedShape");
+  await expect(page.getByRole("button", { name: "Open in playground" })).toHaveCount(0);
+
+  // The tabs are under Old and New, without the folder in the name.
+  const oldGroup = page.getByRole("tablist", { name: "Old model" });
+  const newGroup = page.getByRole("tablist", { name: "New model" });
+  const oldTab = oldGroup.getByRole("tab", { name: "model.smithy" });
+  const newTab = newGroup.getByRole("tab", { name: "model.smithy" });
+  await expect(page.locator(".tour-group-label", { hasText: "Old" })).toBeVisible();
+  await expect(page.locator(".tour-group-label", { hasText: "New" })).toBeVisible();
+  await expect(newTab).toBeVisible();
+
+  await oldTab.click();
+  await expect(editor).not.toContainText("humidity");
+  const oldStart = await editorText(page);
+  await newTab.click();
+  await expect(editor).toContainText("humidity: Integer");
+  const newStart = await editorText(page);
+
+  // Delete the member days in the new model: an ERROR line comes and is marked as changed.
+  await editor.locator(".cm-line", { hasText: "days: Integer" }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+Home");
+  await page.keyboard.press("Backspace");
+  await settled(page);
+  await expect(output).toContainText("[ERROR] example.weather#GetForecastInput$days: Removed member");
+  await expect(page.locator("#tour-output .cm-line.tour-changed")).toContainText("[ERROR]");
+
+  // The Old file keeps its own text. Add a comment there.
+  await oldTab.click();
+  await expect(editor).toContainText("days: Integer");
+  expect(await editorText(page)).toEqual(oldStart);
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.type("\n// An old comment.");
+  await settled(page);
+  await expect(editor).toContainText("// An old comment.");
+
+  // Undo in each side gives back the start text of that side, never the text of the other side.
+  await newTab.click();
+  await expect(editor).toContainText("humidity: Integer");
+  const newUndone = await undoAll(page);
+  expect(newUndone).toEqual(newStart);
+  expect(newUndone).not.toContain("// An old comment.");
+  await expect(output).not.toContainText("[ERROR]");
+  await oldTab.click();
+  await expect(editor).toContainText("// An old comment.");
+  const oldUndone = await undoAll(page);
+  expect(oldUndone).toEqual(oldStart);
+  expect(oldUndone).not.toContain("humidity");
+
+  // The expand buttons keep working in a diff lesson.
+  await page.getByRole("button", { name: "Expand the output" }).click();
+  await expect(page.getByRole("button", { name: "Expand the output" })).toHaveAttribute("aria-pressed", "true");
+  expect(page.errors).toEqual([]);
+});
+
+// A static lesson: the text with its include blocks, and no panes, no expand buttons and no Worker.
+async function openStaticLesson(page) {
+  const workers = [];
+  page.on("worker", (worker) => workers.push(worker.url()));
+  await page.goto(siteUrl("tour/ion-values/"));
+  await expect(page.locator(".tour-text h1")).toContainText("Ion values");
+  await page.waitForLoadState("networkidle");
+  return workers;
+}
+
+for (const colorScheme of ["light", "dark"]) {
+  test(`a static lesson has only its text, up to the reading measure, in ${colorScheme} mode`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    await page.setViewportSize({ width: 1600, height: 900 });
+    const workers = await openStaticLesson(page);
+    await expect(page.locator(".tour-static")).toHaveCount(1);
+    await expect(page.locator("#tour-app")).toHaveCount(0);
+    await expect(page.locator(".tour-expand")).toHaveCount(0);
+    expect(workers).toEqual([]);
+    await expect(includeTabs(page).cli).toContainText(
+      "$ smithy validate value --shape example#Reading --value reading.ion --input-format ion-text reading.smithy",
+    );
+
+    // On a wide screen the text takes the reading measure of the docs pages, not the whole width.
+    const [width, measure] = await page.locator(".tour-text").evaluate((el) => [
+      el.getBoundingClientRect().width,
+      parseFloat(getComputedStyle(el).maxWidth),
+    ]);
+    expect(measure).toBeGreaterThan(0);
+    expect(width).toBeLessThanOrEqual(measure + 0.5);
+    expect(width).toBeGreaterThan(measure - 1);
+    expect(width).toBeLessThan(1600 - 100);
+
+    // The text shows against its background.
+    const [color, background] = await page.evaluate(() => {
+      const text = getComputedStyle(document.querySelector(".tour-text p"));
+      return [text.color, getComputedStyle(document.body).backgroundColor];
+    });
+    expect(color).not.toEqual(background);
+
+    // On a phone the text fits the width: no page scrolls sideways.
+    await page.setViewportSize({ width: 375, height: 800 });
+    await expect(page.locator(".tour-text h1")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect(page.errors).toEqual([]);
+  });
+}
+
+// Each static lesson of the section "Evolving and sharing models" has its text only: no lesson app, no expand
+// buttons and no Worker.
+for (const slug of ["protocol-tests", "loading-models", "where-next"]) {
+  test(`the static lesson ${slug} has no lesson app, no expand buttons and no Worker`, async ({ page }) => {
+    const workers = [];
+    page.on("worker", (worker) => workers.push(worker.url()));
+    await page.goto(siteUrl(`tour/${slug}/`));
+    await expect(page.locator(".tour-text h1")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator(".tour-static")).toHaveCount(1);
+    await expect(page.locator("#tour-app")).toHaveCount(0);
+    await expect(page.locator(".tour-expand")).toHaveCount(0);
+    expect(workers).toEqual([]);
+    expect(page.errors).toEqual([]);
+  });
+}

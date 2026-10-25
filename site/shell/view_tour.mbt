@@ -79,27 +79,44 @@ fn lesson_view(m : Model, page : @model.LessonPage) -> Html {
         lesson_link(base, page.next, "Next →"),
       ]),
     ]),
-    @html.div(class="tour-body", [
-      @html.article(class="tour-text", [
-        text,
-        @html.p(class="tour-spec", [
-          if page.spec.has_prefix(@model.spec_url_prefix) {
-            @html.a(href=page.spec, [
-              @html.text("Read this subject in the Smithy specification"),
-              icon_external(),
-            ])
-          } else {
-            @html.a(href=page.spec, [
-              @html.text("Read the documentation of this feature"),
-            ])
-          },
+    @html.div(
+      class=if page.is_static() { "tour-body tour-static" } else { "tour-body" },
+      [
+        @html.article(class="tour-text", [
+          text,
+          @html.p(class="tour-spec", [
+            if page.spec.has_prefix(@model.spec_url_prefix) {
+              @html.a(href=page.spec, [
+                @html.text("Read this subject in the Smithy specification"),
+                icon_external(),
+              ])
+            } else {
+              @html.a(href=page.spec, [
+                @html.text("Read the documentation of this feature"),
+              ])
+            },
+          ]),
         ]),
-      ]),
-      @html.div(id="tour-app", class="tour-app", [
-        @html.div(id="tour-editor", class="tour-editor", ([] : Array[Html])),
-        @html.div(id="tour-output", class="tour-output", ([] : Array[Html])),
-      ]),
-    ]),
+        ..if page.is_static() {
+          []
+        } else {
+          [
+            @html.div(id="tour-app", class="tour-app", [
+              @html.div(
+                id="tour-editor",
+                class="tour-editor",
+                ([] : Array[Html]),
+              ),
+              @html.div(
+                id="tour-output",
+                class="tour-output",
+                ([] : Array[Html]),
+              ),
+            ]),
+          ]
+        },
+      ],
+    ),
   ])
 }
 

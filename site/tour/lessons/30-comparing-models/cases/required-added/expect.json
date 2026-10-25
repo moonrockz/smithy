@@ -1,0 +1,1 @@
+{"events": [], "diff": ["AddedRequiredMember|ERROR|example.weather#GetForecastInput$country", "AddedShape|NOTE|example.weather#GetForecastInput$country", "AddedShape|NOTE|example.weather#GetForecastOutput$humidity"], "output_contains": ["but not the `default` trait or the `clientOptional` trait is backwards-incompatible"]}

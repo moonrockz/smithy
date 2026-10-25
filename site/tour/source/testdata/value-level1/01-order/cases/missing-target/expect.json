@@ -1,0 +1,1 @@
+{"events": [], "findings": ["InvalidTarget|stopped|--shape"], "output_contains": ["--shape: error[InvalidTarget]"]}

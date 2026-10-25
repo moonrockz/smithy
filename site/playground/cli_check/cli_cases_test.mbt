@@ -32,7 +32,10 @@ let expected_ids : Array[String] = [
   "value-json-limit", "rpc-call", "rpc-invalid", "rpc-reply", "rpc-error", "rpc-reply-no-context",
   "rpc-not-json", "rpc-missing-service", "rpc-legacy-call", "rpc-legacy-error", "rpc-legacy-opaque",
   "rpc-legacy-version-2", "rpc-envelope-only", "rpc-unknown-reject", "rpc-unknown-ignore",
-  "diff-constraints-added", "diff-removed-shape",
+  "diff-constraints-added", "diff-removed-shape", "transcript-weather-valid", "transcript-weather-no-reply",
+  "transcript-weather-partial", "transcript-weather-wrong-id", "transcript-weather-wrong-sender",
+  "transcript-weather-not-json", "transcript-weather-expect-missing", "transcript-weather-expect-empty",
+  "transcript-editor-negative", "transcript-chat-markdown",
 ]
 
 ///|
@@ -117,6 +120,8 @@ fn request_of(
 ) -> (@core.Request, String) raise {
   match args {
     ["validate", "value", .. rest] => value_request_of(rest, files)
+    ["validate", "rpc", "transcript", .. rest] =>
+      transcript_request_of(rest, files)
     ["validate", "rpc", .. rest] => rpc_request_of(rest, files)
     ["diff", "--old", old, "--new", new] =>
       (
@@ -291,9 +296,131 @@ fn rpc_request_of(
 }
 
 ///|
+/// `validate rpc transcript` with `--protocol` and `--complete`. The last
+/// argument is the transcript file and the others are model files; the
+/// extension of the transcript gives its format. The request is the start; the
+/// test sends one step to the end after it.
+fn transcript_request_of(
+  rest : ArrayView[String],
+  files : Map[String, String],
+) -> (@core.Request, String) raise {
+  let positional : Array[String] = []
+  let mut protocol : String? = None
+  let mut complete = false
+  let mut i = 0
+  while i < rest.length() {
+    match rest[i] {
+      "--complete" => {
+        complete = true
+        i += 1
+      }
+      "--protocol" => {
+        guard i + 1 < rest.length() else {
+          fail("the option --protocol needs a value")
+        }
+        protocol = Some(rest[i + 1])
+        i += 2
+      }
+      option if option.has_prefix("--") =>
+        fail("the differential test does not know the option \{option}")
+      file => {
+        positional.push(file)
+        i += 1
+      }
+    }
+  }
+  guard protocol is Some(protocol) && positional.length() >= 2 else {
+    fail("a transcript case needs --protocol, a model file and a transcript")
+  }
+  let transcript = positional[positional.length() - 1]
+  let format : @core.TranscriptFormat = if transcript.has_suffix(".json") {
+    Json
+  } else if transcript.has_suffix(".md") {
+    Markdown
+  } else {
+    fail("the differential test does not know the format of \{transcript}")
+  }
+  let models = positional[:positional.length() - 1].map(model => {
+    (model, file_of(files, model))
+  })
+  (
+    TranscriptStartFiles(
+      seq=1,
+      files=models,
+      protocol~,
+      format~,
+      complete~,
+      text=file_of(files, transcript),
+    ),
+    transcript,
+  )
+}
+
+///|
+/// The lines and the validity that the core gives for a transcript: the
+/// findings of the start and of one step to the end, then the lines of the
+/// expectations. A usage error is not a transcript run.
+fn transcript_outcome(
+  request : @core.Request,
+  file : String,
+) -> (Array[String], Bool) raise {
+  let session = @core.Session::new()
+  let lines : Array[String] = []
+  let mut unreadable = false
+  match @core.handle(session, request) {
+    TranscriptProgress(findings~, ..) => {
+      unreadable = findings.any(f => f.code == "InvalidTranscript")
+      lines.append(findings.map(f => f.cli_line(file~)))
+    }
+    other =>
+      fail(
+        "I expected TranscriptProgress for the start, but found \{@json.to_json(other).stringify()}",
+      )
+  }
+  match @core.handle(session, TranscriptStep(seq=2, count=1000000)) {
+    // A transcript that is not readable has no entries to check: the CLI
+    // prints its finding and exits 1.
+    Blocked(kind=Other, reason~, ..) if unreadable => {
+      assert_eq(reason, "I have no transcript to check. Start one first.")
+      (lines, false)
+    }
+    TranscriptProgress(findings~, summary~, ..) => {
+      lines.append(findings.map(f => f.cli_line(file~)))
+      guard summary is Some(summary) else {
+        fail("the step to the end gave no summary")
+      }
+      match summary.expectations {
+        Some(expectations) => lines.append(expectations.cli_lines(file~))
+        None => ()
+      }
+      let valid = summary.expectations
+        .map(e => e.matched)
+        .unwrap_or(summary.valid)
+      (lines, valid)
+    }
+    other =>
+      fail(
+        "I expected TranscriptProgress for the step, but found \{@json.to_json(other).stringify()}",
+      )
+  }
+}
+
+///|
 test "every CLI case gives the CLI lines and the CLI status in the core" {
   for c in load_cases() {
     let (request, file) = request_of(c.args, c.files)
+    if request is TranscriptStartFiles(..) {
+      let (lines, valid) = transcript_outcome(request, file)
+      if lines != c.lines {
+        fail(
+          "\{c.id}: the core gave \{Json(lines).stringify()} but the CLI printed \{Json(c.lines).stringify()}",
+        )
+      }
+      if valid != (c.status == 0) {
+        fail("\{c.id}: valid is \{valid} but the CLI status is \{c.status}")
+      }
+      continue
+    }
     match @core.handle(@core.Session::new(), request) {
       DataChecked(valid~, findings~, ..) => {
         let lines = findings.map(f => f.cli_line(file~))
