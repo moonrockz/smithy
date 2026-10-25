@@ -16,6 +16,20 @@ fn valid_condition_name(name : String) -> Bool {
 }
 
 ///|
+/// ConditionsTrait.fromNode and Condition.fromNode require these fields before
+/// schema validation. A failure is a Model event, not a TraitValue event.
+fn invalid_conditions_factory(value : NodeValue) -> Bool {
+  guard value is Object(conditions) else { return true }
+  conditions
+  .values()
+  .any(condition => {
+    guard condition is Object(fields) else { return true }
+    !(fields.get("expression") is Some(String(_))) ||
+    !(fields.get("documentation") is Some(String(_)))
+  })
+}
+
+///|
 /// Check the contract-specific rules that are not covered by schema validation.
 fn Assembly::validate_conditions(
   self : Assembly,

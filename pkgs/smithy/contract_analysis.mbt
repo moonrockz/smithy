@@ -105,6 +105,7 @@ priv enum ContractTask {
   Project(@jmespath.Node)
   ProjectionResult(Bool)
   CallbackResult(@jmespath.Node, String, ContractType)
+  ReferenceResult(@jmespath.Node)
 }
 
 ///|
@@ -269,7 +270,10 @@ fn ContractAnalysis::analyze(
                           node.span,
                           "I could not resolve member \{Json::string(name).stringify()} in the JMESPath object.",
                         )
-                        Null
+                        // A missing field is a known null value, not only an
+                        // inferred null result type. Keep that fact when the
+                        // field is either operand of a comparison.
+                        Constant(Json::null())
                       }
                     }
                 }
@@ -285,7 +289,11 @@ fn ContractAnalysis::analyze(
             }
             values.push(type_)
           }
-          ExpressionRef(expression) => values.push(Reference(expression))
+          ExpressionRef(expression) => {
+            // Java checks a late-bound body with ANY outside a function.
+            tasks.push(ReferenceResult(expression))
+            tasks.push(Analyze(expression, Unknown))
+          }
           Subexpression(left, right) | Binary(Pipe, left, right) => {
             tasks.push(Then(right))
             tasks.push(Analyze(left, input))
@@ -321,6 +329,10 @@ fn ContractAnalysis::analyze(
       Then(right) => {
         let input = values.pop().unwrap()
         tasks.push(Analyze(right, input))
+      }
+      ReferenceResult(body) => {
+        values.pop() |> ignore
+        values.push(Reference(body))
       }
       Project(node) => {
         let left = values.pop().unwrap()
@@ -390,27 +402,63 @@ fn ContractAnalysis::analyze(
                 }
               None => contract_join(args, self.model)
             }
-          Binary(op, _, _) =>
-            if op is (Equal | NotEqual) {
+          Binary(op, _, _) => {
+            let left = args[0].name(self.model)
+            let right = args[1].name(self.model)
+            let null_number = match (args[0], args[1]) {
+              (Constant(Null), other) | (other, Constant(Null)) =>
+                other.resolve(self.model) is Number
+              _ => false
+            }
+            // RuntimeType.compare returns BOOLEAN for a known NULL versus a
+            // number on either side. Two references return NULL for every
+            // comparator, even equality, and produce a warning.
+            if left == "expression reference" && right == left {
+              self.problem(
+                event=Warning,
+                node.span,
+                "I could not compare two JMESPath expression references; the static result is null.",
+              )
+              Null
+            } else if op is (Equal | NotEqual) {
+              Boolean
+            } else if null_number ||
+              (
+                left != right &&
+                (
+                  left == "expression reference" ||
+                  right == "expression reference"
+                )
+              ) {
+              Constant(Json::boolean(false))
+            } else if left == "number" && right == "number" {
+              // Java's type checker compares sample values, and preserves the
+              // boolean value for && and ||. In particular, two timestamp
+              // samples are 0, so start < end && end has a boolean result.
+              let difference = args[0].number_sample(self.model) -
+                args[1].number_sample(self.model)
+              Constant(
+                Json::boolean(
+                  match op {
+                    Less => difference < 0.0
+                    LessEqual => difference <= 0.0
+                    Greater => difference > 0.0
+                    _ => difference >= 0.0
+                  },
+                ),
+              )
+            } else if (left == "unknown" || left == "number") &&
+              (right == "unknown" || right == "number") {
               Boolean
             } else {
-              let invalid = args
-                .iter()
-                .any(t => {
-                  let kind = t.name(self.model)
-                  kind != "unknown" && kind != "number"
-                })
-              if invalid {
-                self.problem(
-                  event=Warning,
-                  node.span,
-                  "I expected numbers for an ordering comparison, but found \{args[0].name(self.model)} and \{args[1].name(self.model)}; the JMESPath result is null.",
-                )
-                Null
-              } else {
-                Boolean
-              }
+              self.problem(
+                event=Warning,
+                node.span,
+                "I expected numbers for an ordering comparison, but found \{args[0].name(self.model)} and \{args[1].name(self.model)}; the JMESPath result is null.",
+              )
+              Null
             }
+          }
           Index(_, index) => {
             let elements = self.elements(args[0], node)
             match args[0].resolve(self.model) {

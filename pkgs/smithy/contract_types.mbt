@@ -85,6 +85,47 @@ fn ContractType::name(self : ContractType, model : Model) -> String {
 }
 
 ///|
+/// Numeric samples from Java's ModelRuntimeTypeGenerator. Member constraints
+/// do not change the target sample. Function NUMBER sentinels and timestamps
+/// use zero; other numeric shapes use eight clamped to their range.
+fn ContractType::number_sample(self : ContractType, model : Model) -> Double {
+  let mut current = self
+  let seen : Set[ShapeId] = Set([])
+  while true {
+    match current {
+      Constant(Number(n, ..)) => return n
+      Modeled(id) => {
+        if seen.contains(id) {
+          return 0.0
+        }
+        seen.add(id)
+        guard model.shapes.get(id) is Some(shape) else { return 0.0 }
+        if shape.body is Member(target~) {
+          current = Modeled(target)
+          continue
+        }
+        if shape.body is Simple(Timestamp) {
+          return 0.0
+        }
+        let mut value = 8.0
+        if shape.trait_value("smithy.api#range") is Some(Object(fields)) {
+          if fields.get("min") is Some(Number(n)) {
+            value = value.max(n.approximate)
+          }
+          if fields.get("max") is Some(Number(n)) {
+            value = value.min(n.approximate)
+          }
+        }
+        return value
+      }
+      _ => return 0.0
+    }
+  } nobreak {
+    0.0
+  }
+}
+
+///|
 /// Preserve identical modeled types and common scalar types. Mixed values stay
 /// unknown, rather than selecting one fabricated value and rejecting valid data.
 fn contract_join(types : Array[ContractType], model : Model) -> ContractType {

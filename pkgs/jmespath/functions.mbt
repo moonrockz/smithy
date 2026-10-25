@@ -392,9 +392,11 @@ fn apply_keys(
 /// `e` or `E` is a double, and any other string is a 64-bit integer or null.
 fn to_number_of_string(s : String) -> Json {
   if is_decimal_token(s) {
-    let n = @string.parse_double(s) catch { _ => return Json::null() }
-    if n.is_nan() || n.is_inf() {
-      return Json::null()
+    guard java_double(s) is Some(n) else { return Json::null() }
+    // Core Json can hold non-finite doubles, as can arithmetic results here.
+    // Keep overflow as a Double, without a decimal token, to match Smithy.
+    if n.is_inf() {
+      return Json::number(n)
     }
     // A decimal token that a double holds makes the number a double.
     let text = n.to_string()

@@ -2,8 +2,8 @@
 /// Pieces of the portable pattern profile, as a Smithy model writes them.
 let portable_atoms : Array[String] = [
   "a", "b", "-", ".", "\\d", "\\w", "\\s", "\\D", "\\W", "\\S", "[ab]", "[^a]", "[a-]",
-  "[\\d-a]", "[a-z0-9]", "[^\\s]", "(a|b)", "(?:ab|a)", "(a-)", "😀", "[😀a]",
-  "\\u00e9", "\\.", "[^😀]", "(|a)", "((a*b)+)", "(((a|b)?)*)",
+  "[\\d-a]", "[a-z0-9]", "[^\\s]", "(a|b)", "(?:ab|a)", "(a-)", "😀", "[éa]",
+  "\\u00e9", "\\.", "[^é]", "(|a)", "((a*b)+)", "(((a|b)?)*)",
 ]
 
 ///|

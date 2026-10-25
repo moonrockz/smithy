@@ -272,6 +272,8 @@ fn Assembly::validate(
         )
       } else {
         let factory_error = match (trait_id.to_string(), value) {
+          ("smithy.contracts#conditions", value) =>
+            invalid_conditions_factory(value)
           ("smithy.api#error", String("client" | "server")) => false
           ("smithy.api#error", _) => true
           ("smithy.api#deprecated", Object(_)) => false
