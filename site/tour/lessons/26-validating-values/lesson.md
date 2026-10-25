@@ -8,7 +8,7 @@ The Value findings tab shows one line for each finding. A line starts with the f
 
 Make these changes in `order.json` one at a time. Change the value back after each change.
 
-- Change the quantity to `11`. The trait `@range` permits 1 to 10, so the tab shows `order.json/quantity: error[Range]` on the member `example.orders#Order$quantity`.
+- Change the quantity to `11`. The trait [`@range`](../11-constraints/lesson.md) permits 1 to 10, so the tab shows `order.json/quantity: error[Range]` on the member `example.orders#Order$quantity`.
 - Change `2` to `"2"`. The check does not change a string into a number, so the tab shows `TypeMismatch` at `/quantity`.
 - Delete the line of `id`. The member is required, so the tab shows `RequiredMember` at `/id`.
 - Change the note to `Leave the parcel at the back door`. The trait `@length` permits at most 20 characters, so the tab shows `Length` at `/note`.

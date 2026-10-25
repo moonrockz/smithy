@@ -1,6 +1,6 @@
 # Transcripts
 
-> **Our extension:** Smithy defines no JSON-RPC transcripts. The check is part of [moonrockz/smithy-validation](../../../../pkgs/smithy-validation/rpc/README.mbt.md). No Java reference exists for it.
+> **Our extension:** Standard Smithy has no command that runs a JSON-RPC transcript. The check is part of [moonrockz/smithy-validation](../../../../pkgs/smithy-validation/rpc/README.mbt.md). No Java reference exists for it.
 
 A transcript is a conversation between the two peers of a `@jsonRpcProtocol` structure ([lesson 22](../22-json-rpc/lesson.md)). Here the protocol is `example#WeatherProtocol`. The client calls `weather/forecast` on the server, and the server sends the alert `weather/alert` to the client.
 

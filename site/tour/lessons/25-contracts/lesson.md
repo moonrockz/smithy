@@ -1,6 +1,6 @@
 # Contracts
 
-A [contract trait](https://smithy.io/2.0/additional-specs/contract-traits.html) adds a rule that valid values must obey. The trait [`smithy.contracts#conditions`](https://smithy.io/2.0/additional-specs/contract-traits.html#smithy-contracts-conditions-trait) is one. It is not in the prelude, so the model imports it with `use`.
+A [contract trait](https://smithy.io/2.0/additional-specs/contract-traits.html) adds a rule that valid values must obey. The trait [`smithy.contracts#conditions`](https://smithy.io/2.0/additional-specs/contract-traits.html#smithy-contracts-conditions-trait) is one. It is not in the prelude, so the model imports it with [`use`](../04-shape-ids/lesson.md).
 
 The trait is a map from condition names to conditions. Each condition has an `expression` and `documentation`. The expression is a JMESPath expression that must give `true`. In the expression, a member name is an [identifier](https://jmespath.org/specification.html#identifiers) that selects the value of that member. The [current node](https://jmespath.org/specification.html#current-node) `@` is the value itself. A timestamp is a number in the [JMESPath data model](https://smithy.io/2.0/additional-specs/waiters.html#jmespath-data-model), so `start < end` compares two times.
 

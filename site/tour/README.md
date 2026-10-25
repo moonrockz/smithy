@@ -32,7 +32,7 @@ site/tour/lessons/NN-<slug>/
 - A lesson file is directly in `files/` or in `cases/<case>/files/`. A sub-folder there is an error (a diff lesson keeps its files in `old/` and `new/`, see below). The name of
   a lesson file must end in `.smithy`, because the playground core reads every file as IDL. (Java picks the
   format by the extension. Remove this rule when the core does the same.) The exceptions are the data file of a
-  value lesson and the query file.
+  value lesson, the transcript file, the message file and the request file of a message lesson, and the query file.
 - **The query file.** A lesson with the output `Selector` can keep its selector in a starting file whose name ends
   in `.selector` (lesson 23: `query.selector`). The file is an editor tab as a model file is, in plain text. The
   reader can change the query. A case can replace the file as any file; it cannot add another query file. A lesson
@@ -44,7 +44,7 @@ site/tour/lessons/NN-<slug>/
   selector of each case as `"selector"` in its input. The playground link counts the model files only and carries
   the current query.
 - The loader skips every name that starts with `.`, such as `.DS_Store`.
-- `expect.json` has `events` and, optionally, `output_contains` or `blocked`. Another key is an error.
+- `expect.json` has `events` and, optionally, `output_contains` or `blocked` (and the engine keys below). Another key is an error.
   - `events` lists the expected findings, each as `id|SEVERITY|shape`. `SEVERITY` is `WARNING`, `DANGER` or
     `ERROR`. A finding with no shape has `-` in its place, for example `Model|ERROR|-`.
     The list is the complete list. An empty list says that the case has no finding of these severities.
@@ -262,8 +262,8 @@ line break. A case whose model has an ERROR or a DANGER cannot name findings or
 output strings, because the check does not run.
 
 The text of a value lesson must have a note that starts with
-`> **Our extension:**`. Smithy defines no value validation, and no Java
-reference exists for it. Level 1 checks the note. Level 2 compares only the
+`> **Our extension:**`. Standard Smithy has no command that checks a JSON
+value against a shape, and no Java reference exists for it. Level 1 checks the note. Level 2 compares only the
 model events.
 
 ## Transcript lessons

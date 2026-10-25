@@ -19,7 +19,9 @@ CLI: apps/smithy/README.md#convert-json-cli
 MoonBit: pkgs/smithy/README.mbt.md#convert-json-api
 ```
 
-These tabs convert the JSON AST back to the IDL. This tool writes absolute shape IDs in the IDL, such as `smithy.api#String`.
+These tabs convert the JSON AST back to the IDL.
+
+> **Reference difference:** This tool writes a prelude shape in the IDL as an absolute shape ID, such as `smithy.api#String`. The Java serializer of Smithy does not write it in this form. Issue smithy-2qe.41.35 tracks the difference.
 
 ```include
 CLI: apps/smithy/README.md#convert-idl-cli

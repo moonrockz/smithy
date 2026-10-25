@@ -1,6 +1,6 @@
 # Validating JSON-RPC messages
 
-> **Our extension:** Smithy defines no check of JSON-RPC messages. This check is part of [moonrockz/smithy-validation](../../../../pkgs/smithy-validation/rpc/README.mbt.md). No Java reference exists for it.
+> **Our extension:** Standard Smithy has no command that checks a JSON-RPC message. This check is part of [moonrockz/smithy-validation](../../../../pkgs/smithy-validation/rpc/README.mbt.md). No Java reference exists for it.
 
 This check compares one JSON-RPC message with a service of the model, as the command `smithy validate rpc --message` does. Here the service is `example#Calculator`, the version is 2.0, and the message is the request in `call.json`.
 

@@ -178,6 +178,193 @@ $ smithy diff --old old-weather.smithy --new new-weather-removed.smithy
 ```
 <!-- tour:end diff-cli -->
 
+### JSONL diff output
+
+Use `--format jsonl` for automation. `--format=jsonl` also works. Text remains
+the default, and `--format text` selects it explicitly. There is no separate
+streaming flag.
+
+```shell
+smithy diff --old previous/ --new current/ --format jsonl
+smithy diff --old previous/ --new current/ --format=jsonl --output changes.jsonl
+```
+
+Each unsuppressed event is one compact, newline-terminated UTF-8 JSON object,
+in the same deterministic order as text output. The output has no array wrapper,
+header, summary, progress text or blank records. For example:
+
+```json
+{"id":"ChangedMemberTarget","severity":"ERROR","shape":"example#Value$name","message":"The event message","source":{"file":"current/model.smithy","path":"","span":{"start":42,"length":12}}}
+```
+
+| Field | Value |
+|-------|-------|
+| `id` | Event identifier string |
+| `severity` | `NOTE`, `WARNING`, `DANGER` or `ERROR` |
+| `shape` | Absolute shape ID string, or `null` for a model-level event |
+| `message` | Complete message string; JSON decoding restores newlines and other escaped characters |
+| `source` | `null`, or an object containing `file`, `path` and `span` |
+| `source.file` | Physical source identifier, including archive entry paths when present |
+| `source.path` | JSON Pointer for JSON AST input, otherwise usually an empty string |
+| `source.span` | `null`, or nonnegative integer `start` and `length` in zero-based UTF-16 code units |
+
+Source locations retain the comparison engine's precision, usually a shape's
+location. They do not promise exact trait locations or line/column coordinates.
+Consumers should tolerate additional object fields.
+
+Both models are assembled and compared before output begins. The CLI then
+serializes one event at a time and flushes each complete stdout record through
+its application buffers. It honors sink backpressure without collecting the
+serialized output. Assembly and comparison still keep their models and results
+in memory. A downstream tool may have its own buffers.
+
+`--output FILE` uses the same records with ordinary file buffering, finishes
+the write and close before returning, and leaves stdout empty. Wasm and Wasm GC
+hosts must supply WASI `fd_write`, `path_open` and `fd_close`, including a working
+directory preopen at descriptor 3. The pinned `moonrun` host provides these;
+its WASI file paths must remain within that directory, including symlink targets.
+Native and Node.js output paths use the host filesystem directly.
+
+An unchanged comparison produces no records and creates an empty file when
+`--output` is used. Invalid models produce no diff records and preserve an
+existing output file. Diagnostics stay on stderr. Write, flush and close errors,
+including a closed downstream pipe, stop delivery and return 1. A failed output
+may contain only a prefix, including an incomplete final record; output is not
+atomic and does not request filesystem durability for every record.
+
+Exit statuses are the same in text and JSONL:
+
+- `0`: compatible or unchanged models, with no processing error.
+- `1`: an ERROR/DANGER difference, invalid models, or a processing/output failure.
+- `2`: invalid command usage, including an unknown or missing format value.
+
+A breaking diff writes all its events before returning 1 unless output fails.
+Use stderr to distinguish processing failures from compatibility findings.
+In Bash, enable `pipefail` so a successful `jq` does not hide Smithy's status:
+
+```bash
+set -o pipefail
+smithy diff --old previous/ --new current/ --format jsonl |
+  jq --unbuffered -c 'select(.severity == "ERROR" or .severity == "DANGER")'
+```
+
+With a successful `jq`, this pipeline returns Smithy's status. `--unbuffered`
+asks `jq` to flush each result too.
+
+`build` reads the configured local sources and imports, runs each concrete
+projection, and writes model, sources and build-info artifacts under its output
+directory. A `jsonSchema` plugin setting writes `schema.json` for each
+projection. The `openapi` plugin writes `<ServiceName>.openapi.json` in OpenAPI
+3.0.2 or 3.1.0; its `service` setting is required. See the
+[OpenAPI library and plugin guide](../../pkgs/smithy-openapi/README.mbt.md) for
+protocol selection, configuration and conversion boundaries. `clean` removes
+that configured output directory.
+
+The `openrpc` plugin writes `openrpc.json` for a JSON-RPC 2.0 service. Its
+required `service` setting selects the Smithy service ID; the CLI supplies the
+opt-in `smithy.rpc` traits. OpenRPC document version 1.3.2, JSON Schema draft-07,
+the service's API version and JSON-RPC wire version 2.0 are separate values.
+Run the [example](../../examples/openrpc/smithy-build.json) from a source checkout:
+
+```sh
+moon run apps/smithy -- build --config examples/openrpc/smithy-build.json
+```
+
+See the [library and plugin guide](../../pkgs/smithy-openrpc/README.mbt.md)
+for typed configuration, errors, examples and extension policies.
+
+Build sources and imports also accept local JAR files with a
+`META-INF/smithy/manifest`. Configuration strings and keys expand `${NAME}`
+from environment variables; `\${NAME}` escapes a placeholder.
+Directories, individual model files and JARs use the independent
+[artifact resource library](../../pkgs/artifact-resources/README.mbt.md).
+The same inputs work in `sources`, global `imports` and projection `imports`.
+JARs load only manifest entries; repeated manifest lines are ignored and
+unlisted models stay excluded. Nested JAR source artifacts retain paths such
+as `nested/models.jar/models/a.smithy`. Loading errors include the physical
+origin and resource diagnostic code; unsafe paths, duplicate ZIP entries,
+corrupt content and resource limit failures stop the build.
+
+For a working directory example with both import scopes, run from the root:
+
+```shell
+mise exec -- moon run apps/smithy --target js -- build --config examples/local-resources/smithy-build.json
+```
+
+The output is under `.dev/out/local-resources`. For the vendored real-JAR
+example, set `sources` to `tests/tck/build/plugins/sources/jar-import.jar`
+in a root-level build configuration. Local builds require no network.
+The default resource limits are 64 MiB per archive, 10,000 entries,
+16 MiB per entry and 256 MiB total expanded ZIP bytes. The library API
+allows callers to configure these limits. Node.js, native hosts and MoonBit
+Wasm filesystem hosts support local acquisition. Credentials and remote
+repository acquisition are not part of local loading.
+
+`${SMITHY_ROOT_DIR}` always expands to the CLI's working directory.
+
+Use a dedicated output directory. Builds replace their previous artifacts,
+including artifacts from projections that become abstract. An ownership file
+ties the output to its configuration; an existing nonempty directory must
+have that configuration's ownership marker. All files in an owned output
+directory are replaced. Keep the output directory separate from source and
+import directories; neither may contain the other.
+
+The `smithy.contracts#conditions` trait is included. Validation checks its
+targets, condition names and required string fields, then analyzes JMESPath
+syntax, modeled member references, function arguments and boolean result types.
+Diagnostics identify the condition and its expression-relative location.
+The events use the IDs of the Smithy reference: `Model` for a syntax error, `ConditionsTrait` for a function error
+or a result that is not boolean (DANGER), `ConditionsTrait.JmespathProblem.JmespathEventDanger.<Name>`,
+`ConditionsTrait.JmespathProblem.JmespathEventWarning.<Name>`, `TraitValue` and `TraitTarget`.
+Validation also evaluates the conditions on trait values, default values, examples, typed metadata and
+protocol test parameters. A value that fails a condition gives `TraitValue.<Name>`, `DefaultTrait.<Name>`,
+`ExamplesTrait.<Name>`, `TypedMetadata.<key>.<Name>` or the protocol test event ID plus the name, as in the
+Smithy reference. The event is an ERROR, or a WARNING for an example with `allowConstraintErrors`. A failed
+trait value prevents assembly, as every other `TraitValue` error does; for the other values the model still
+assembles. A result that is not boolean, or an evaluation error, also fails the condition, and the message
+says why; the Smithy reference stops the validation in these two cases. Protocol test parameters need
+`smithy validate --protocol-tests`, which loads the `smithy.test` traits; without it the protocol test traits
+do not resolve, and that is an error.
+Conversion preserves expressions and documentation without evaluating contracts.
+`smithy validate value` does not evaluate conditions; it reports `UnsupportedConstraint`.
+
+IDL output uses Smithy 2, absolute references and flattened inherited contents.
+It preserves model semantics and exact numbers. Comments, import choices,
+source layout, resource bindings and inline-operation syntax are not retained
+by conversion. An IDL file has one namespace, so a model with multiple
+namespaces requires `--output-dir`. The output names are `<namespace>.smithy`.
+Metadata is emitted exactly once, in the first namespace. Empty models and
+metadata-only models use `model.smithy`.
+
+`format` checks syntax and normalizes indentation and spacing. IDL formatting
+retains comments, existing line breaks, commas, literal spellings and the
+contents of text blocks. JSON formatting uses the typed JSON AST codec. By
+default, formatting prints one file to stdout. `--write` formats files in place;
+all inputs must parse before any file changes. `--check` writes nothing and
+returns status 1 when any file differs.
+
+Input formats follow `.smithy` and `.json` extensions. Override with
+`--from idl` or `--from json`. Use `-` once for stdin, with an explicit format:
+
+```shell
+cat model.smithy | smithy convert --from idl --to json -
+```
+
+Output goes to stdout unless `-o FILE` or `--output-dir DIR` is supplied. Existing
+output files are replaced. Use `--` before input paths beginning with `-`.
+
+Exit statuses are 0 for success, 1 for invalid models, I/O failures or formatting
+differences, and 2 for command-line usage errors. Native, Wasm and Node.js
+builds write diagnostics to stderr. Node.js builds use the Node 24 toolchain pinned by mise.
+On Wasm GC, diff diagnostics and top-level errors use WASI stderr. Other
+commands' legacy print-based diagnostics may still share stdout through
+`spectest.print_char`. JSONL diff records use WASI stdout and stay separate
+from diagnostics. Wasm GC reads stdin through `/dev/stdin`; use the Wasm or
+native build for portable stdin pipelines.
+
+Run `mise run test:cli` to check the built CLI on every backend, or pass target
+names to select backends. The root [README](../../README.md) lists release assets.
+
 ### Validate protocol test cases
 
 `--protocol-tests` loads the `smithy.test` traits, so `validate` checks the cases of
@@ -438,193 +625,6 @@ $ smithy select --selector '[trait|smithy.contracts#conditions]' time-range.smit
 example#TimeRange
 ```
 <!-- tour:end contracts-cli -->
-
-### JSONL diff output
-
-Use `--format jsonl` for automation. `--format=jsonl` also works. Text remains
-the default, and `--format text` selects it explicitly. There is no separate
-streaming flag.
-
-```shell
-smithy diff --old previous/ --new current/ --format jsonl
-smithy diff --old previous/ --new current/ --format=jsonl --output changes.jsonl
-```
-
-Each unsuppressed event is one compact, newline-terminated UTF-8 JSON object,
-in the same deterministic order as text output. The output has no array wrapper,
-header, summary, progress text or blank records. For example:
-
-```json
-{"id":"ChangedMemberTarget","severity":"ERROR","shape":"example#Value$name","message":"The event message","source":{"file":"current/model.smithy","path":"","span":{"start":42,"length":12}}}
-```
-
-| Field | Value |
-|-------|-------|
-| `id` | Event identifier string |
-| `severity` | `NOTE`, `WARNING`, `DANGER` or `ERROR` |
-| `shape` | Absolute shape ID string, or `null` for a model-level event |
-| `message` | Complete message string; JSON decoding restores newlines and other escaped characters |
-| `source` | `null`, or an object containing `file`, `path` and `span` |
-| `source.file` | Physical source identifier, including archive entry paths when present |
-| `source.path` | JSON Pointer for JSON AST input, otherwise usually an empty string |
-| `source.span` | `null`, or nonnegative integer `start` and `length` in zero-based UTF-16 code units |
-
-Source locations retain the comparison engine's precision, usually a shape's
-location. They do not promise exact trait locations or line/column coordinates.
-Consumers should tolerate additional object fields.
-
-Both models are assembled and compared before output begins. The CLI then
-serializes one event at a time and flushes each complete stdout record through
-its application buffers. It honors sink backpressure without collecting the
-serialized output. Assembly and comparison still keep their models and results
-in memory. A downstream tool may have its own buffers.
-
-`--output FILE` uses the same records with ordinary file buffering, finishes
-the write and close before returning, and leaves stdout empty. Wasm and Wasm GC
-hosts must supply WASI `fd_write`, `path_open` and `fd_close`, including a working
-directory preopen at descriptor 3. The pinned `moonrun` host provides these;
-its WASI file paths must remain within that directory, including symlink targets.
-Native and Node.js output paths use the host filesystem directly.
-
-An unchanged comparison produces no records and creates an empty file when
-`--output` is used. Invalid models produce no diff records and preserve an
-existing output file. Diagnostics stay on stderr. Write, flush and close errors,
-including a closed downstream pipe, stop delivery and return 1. A failed output
-may contain only a prefix, including an incomplete final record; output is not
-atomic and does not request filesystem durability for every record.
-
-Exit statuses are the same in text and JSONL:
-
-- `0`: compatible or unchanged models, with no processing error.
-- `1`: an ERROR/DANGER difference, invalid models, or a processing/output failure.
-- `2`: invalid command usage, including an unknown or missing format value.
-
-A breaking diff writes all its events before returning 1 unless output fails.
-Use stderr to distinguish processing failures from compatibility findings.
-In Bash, enable `pipefail` so a successful `jq` does not hide Smithy's status:
-
-```bash
-set -o pipefail
-smithy diff --old previous/ --new current/ --format jsonl |
-  jq --unbuffered -c 'select(.severity == "ERROR" or .severity == "DANGER")'
-```
-
-With a successful `jq`, this pipeline returns Smithy's status. `--unbuffered`
-asks `jq` to flush each result too.
-
-`build` reads the configured local sources and imports, runs each concrete
-projection, and writes model, sources and build-info artifacts under its output
-directory. A `jsonSchema` plugin setting writes `schema.json` for each
-projection. The `openapi` plugin writes `<ServiceName>.openapi.json` in OpenAPI
-3.0.2 or 3.1.0; its `service` setting is required. See the
-[OpenAPI library and plugin guide](../../pkgs/smithy-openapi/README.mbt.md) for
-protocol selection, configuration and conversion boundaries. `clean` removes
-that configured output directory.
-
-The `openrpc` plugin writes `openrpc.json` for a JSON-RPC 2.0 service. Its
-required `service` setting selects the Smithy service ID; the CLI supplies the
-opt-in `smithy.rpc` traits. OpenRPC document version 1.3.2, JSON Schema draft-07,
-the service's API version and JSON-RPC wire version 2.0 are separate values.
-Run the [example](../../examples/openrpc/smithy-build.json) from a source checkout:
-
-```sh
-moon run apps/smithy -- build --config examples/openrpc/smithy-build.json
-```
-
-See the [library and plugin guide](../../pkgs/smithy-openrpc/README.mbt.md)
-for typed configuration, errors, examples and extension policies.
-
-Build sources and imports also accept local JAR files with a
-`META-INF/smithy/manifest`. Configuration strings and keys expand `${NAME}`
-from environment variables; `\${NAME}` escapes a placeholder.
-Directories, individual model files and JARs use the independent
-[artifact resource library](../../pkgs/artifact-resources/README.mbt.md).
-The same inputs work in `sources`, global `imports` and projection `imports`.
-JARs load only manifest entries; repeated manifest lines are ignored and
-unlisted models stay excluded. Nested JAR source artifacts retain paths such
-as `nested/models.jar/models/a.smithy`. Loading errors include the physical
-origin and resource diagnostic code; unsafe paths, duplicate ZIP entries,
-corrupt content and resource limit failures stop the build.
-
-For a working directory example with both import scopes, run from the root:
-
-```shell
-mise exec -- moon run apps/smithy --target js -- build --config examples/local-resources/smithy-build.json
-```
-
-The output is under `.dev/out/local-resources`. For the vendored real-JAR
-example, set `sources` to `tests/tck/build/plugins/sources/jar-import.jar`
-in a root-level build configuration. Local builds require no network.
-The default resource limits are 64 MiB per archive, 10,000 entries,
-16 MiB per entry and 256 MiB total expanded ZIP bytes. The library API
-allows callers to configure these limits. Node.js, native hosts and MoonBit
-Wasm filesystem hosts support local acquisition. Credentials and remote
-repository acquisition are not part of local loading.
-
-`${SMITHY_ROOT_DIR}` always expands to the CLI's working directory.
-
-Use a dedicated output directory. Builds replace their previous artifacts,
-including artifacts from projections that become abstract. An ownership file
-ties the output to its configuration; an existing nonempty directory must
-have that configuration's ownership marker. All files in an owned output
-directory are replaced. Keep the output directory separate from source and
-import directories; neither may contain the other.
-
-The `smithy.contracts#conditions` trait is included. Validation checks its
-targets, condition names and required string fields, then analyzes JMESPath
-syntax, modeled member references, function arguments and boolean result types.
-Diagnostics identify the condition and its expression-relative location.
-The events use the IDs of the Smithy reference: `Model` for a syntax error, `ConditionsTrait` for a function error
-or a result that is not boolean (DANGER), `ConditionsTrait.JmespathProblem.JmespathEventDanger.<Name>`,
-`ConditionsTrait.JmespathProblem.JmespathEventWarning.<Name>`, `TraitValue` and `TraitTarget`.
-Validation also evaluates the conditions on trait values, default values, examples, typed metadata and
-protocol test parameters. A value that fails a condition gives `TraitValue.<Name>`, `DefaultTrait.<Name>`,
-`ExamplesTrait.<Name>`, `TypedMetadata.<key>.<Name>` or the protocol test event ID plus the name, as in the
-Smithy reference. The event is an ERROR, or a WARNING for an example with `allowConstraintErrors`. A failed
-trait value prevents assembly, as every other `TraitValue` error does; for the other values the model still
-assembles. A result that is not boolean, or an evaluation error, also fails the condition, and the message
-says why; the Smithy reference stops the validation in these two cases. Protocol test parameters need
-`smithy validate --protocol-tests`, which loads the `smithy.test` traits; without it the protocol test traits
-do not resolve, and that is an error.
-Conversion preserves expressions and documentation without evaluating contracts.
-`smithy validate value` does not evaluate conditions; it reports `UnsupportedConstraint`.
-
-IDL output uses Smithy 2, absolute references and flattened inherited contents.
-It preserves model semantics and exact numbers. Comments, import choices,
-source layout, resource bindings and inline-operation syntax are not retained
-by conversion. An IDL file has one namespace, so a model with multiple
-namespaces requires `--output-dir`. The output names are `<namespace>.smithy`.
-Metadata is emitted exactly once, in the first namespace. Empty models and
-metadata-only models use `model.smithy`.
-
-`format` checks syntax and normalizes indentation and spacing. IDL formatting
-retains comments, existing line breaks, commas, literal spellings and the
-contents of text blocks. JSON formatting uses the typed JSON AST codec. By
-default, formatting prints one file to stdout. `--write` formats files in place;
-all inputs must parse before any file changes. `--check` writes nothing and
-returns status 1 when any file differs.
-
-Input formats follow `.smithy` and `.json` extensions. Override with
-`--from idl` or `--from json`. Use `-` once for stdin, with an explicit format:
-
-```shell
-cat model.smithy | smithy convert --from idl --to json -
-```
-
-Output goes to stdout unless `-o FILE` or `--output-dir DIR` is supplied. Existing
-output files are replaced. Use `--` before input paths beginning with `-`.
-
-Exit statuses are 0 for success, 1 for invalid models, I/O failures or formatting
-differences, and 2 for command-line usage errors. Native, Wasm and Node.js
-builds write diagnostics to stderr. Node.js builds use the Node 24 toolchain pinned by mise.
-On Wasm GC, diff diagnostics and top-level errors use WASI stderr. Other
-commands' legacy print-based diagnostics may still share stdout through
-`spectest.print_char`. JSONL diff records use WASI stdout and stay separate
-from diagnostics. Wasm GC reads stdin through `/dev/stdin`; use the Wasm or
-native build for portable stdin pipelines.
-
-Run `mise run test:cli` to check the built CLI on every backend, or pass target
-names to select backends. The root [README](../../README.md) lists release assets.
 
 ### Explicit directory, ZIP and tar/gzip resources
 

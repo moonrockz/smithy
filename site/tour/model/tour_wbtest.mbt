@@ -510,3 +510,18 @@ test "a transcript lesson has its file as data file and needs a note" {
   assert_true(lesson.needs_extension_note())
   assert_true(!lesson.is_static())
 }
+
+///|
+test "the message kind of an operation context names the operation" {
+  let setup : MessageSetup = {
+    file: "reply.json",
+    service: "a#S",
+    version: V2_0,
+    role: Response(context=Some(Operation("a#Ping")), legacy_errors=Opaque),
+    options: @samples.ValueOptions::default(),
+  }
+  assert_eq(
+    setup.message_kind([]),
+    ResponseMessage(context=Some(Operation("a#Ping")), legacy_errors=None),
+  )
+}

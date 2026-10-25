@@ -378,7 +378,7 @@ test "a finding key has the form of a found or a stopped finding" {
 ///|
 test "findings are for a value or message lesson" {
   expect_err("findings-in-model-lesson", [
-    "01-a/cases/start", "\"findings\" is for a value or message lesson",
+    "01-a/cases/start", "\"findings\" is for a value, message or transcript lesson",
   ])
 }
 
@@ -520,7 +520,7 @@ test "a diff key with the severity SUPPRESSED is an error" {
 ///|
 test "findings are not for a diff lesson" {
   expect_err("findings-in-diff-lesson", [
-    "01-a/cases/start", "\"findings\" is for a value or message lesson",
+    "01-a/cases/start", "\"findings\" is for a value, message or transcript lesson",
   ])
 }
 

@@ -664,8 +664,8 @@ async test "lesson_cases loads only the model files of a transcript lesson, and 
 
 ///|
 async test "lesson_cases reads the old and new folders of a diff lesson" {
-  let root = "diff-lessons-scratch"
-  if @fs.exists(root) { @fs.rmdir(root, recursive=true) }
+  let root = @fs.tmpdir(prefix="diff-lessons")
+  defer @fs.rmdir(root, recursive=true)
   @fs.mkdir(root + "/01-d/files/old", recursive=true, allow_exist=true)
   @fs.mkdir(root + "/01-d/files/new", recursive=true, allow_exist=true)
   @fs.mkdir(root + "/01-d/cases/start", recursive=true, allow_exist=true)
@@ -685,7 +685,6 @@ async test "lesson_cases reads the old and new folders of a diff lesson" {
   } catch {
     _ => true
   }
-  @fs.rmdir(root, recursive=true)
   let summary = cases.map(c => match c {
     { "id": String(id), "diff": True, "files": Array(files), .. } =>
       id + ": " + files.map(f => match f {
@@ -703,14 +702,13 @@ async test "lesson_cases reads the old and new folders of a diff lesson" {
 
 ///|
 async test "lesson_cases marks a model lesson as no diff case" {
-  let root = "model-lessons-scratch"
-  if @fs.exists(root) { @fs.rmdir(root, recursive=true) }
+  let root = @fs.tmpdir(prefix="model-lessons")
+  defer @fs.rmdir(root, recursive=true)
   @fs.mkdir(root + "/01-m/files", recursive=true, allow_exist=true)
   @fs.mkdir(root + "/01-m/cases/start", recursive=true, allow_exist=true)
   @fs.write_file(root + "/01-m/lesson.json", "{\"slug\": \"m\"}")
   @fs.write_file(root + "/01-m/files/model.smithy", "namespace example\n")
   let cases = lesson_cases(root)
-  @fs.rmdir(root, recursive=true)
   assert_true(cases[0] is { "diff": False, .. })
 }
 
@@ -739,15 +737,14 @@ test "data_files of a model lesson is empty" {
 
 ///|
 async test "lesson_cases loads only the model files of a value lesson, and keeps all files for the digest" {
-  let root = "value-lessons-scratch"
-  if @fs.exists(root) { @fs.rmdir(root, recursive=true) }
+  let root = @fs.tmpdir(prefix="value-lessons")
+  defer @fs.rmdir(root, recursive=true)
   @fs.mkdir(root + "/01-v/files", recursive=true, allow_exist=true)
   @fs.mkdir(root + "/01-v/cases/start", recursive=true, allow_exist=true)
   @fs.write_file(root + "/01-v/lesson.json", "{\"slug\": \"v\", \"value\": {\"file\": \"order.json\", \"shape\": \"a#B\"}}")
   @fs.write_file(root + "/01-v/files/model.smithy", "namespace a\n")
   @fs.write_file(root + "/01-v/files/order.json", "{}\n")
   let cases = lesson_cases(root)
-  @fs.rmdir(root, recursive=true)
   match cases[0] {
     { "load": Array(load), "files": Array(files), .. } => {
       assert_eq(load.map(l => match l { String(s) => s; _ => "?" }), ["model.smithy"])

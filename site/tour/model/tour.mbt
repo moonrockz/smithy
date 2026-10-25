@@ -386,8 +386,9 @@ pub fn is_transcript_key(key : String) -> Bool {
 }
 
 ///|
-/// The note that a value or message lesson must have in its text: Smithy
-/// defines no such check.
+/// The note that a value, message or transcript lesson, or a static lesson
+/// with an extension, must have in its text: standard Smithy has no such
+/// feature.
 pub let extension_note : String = "> **Our extension:**"
 
 ///|
@@ -418,8 +419,8 @@ pub(all) struct Lesson {
   title : String
   section : String
   engine : Engine
-  /// Whether the text must say that the lesson shows a feature of Smithy in
-  /// MoonBit, not of Smithy. Set in `lesson.json` of a static lesson; a value
+  /// Whether the text must say that the lesson shows a feature of this
+  /// project, not of standard Smithy. Set in `lesson.json` of a static lesson; a value
   /// lesson always says it.
   extension : Bool
   output : @samples.Output?

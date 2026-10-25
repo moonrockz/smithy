@@ -23,7 +23,7 @@ pub const TIMEOUT_MS : Int32 = 10000
 ///|
 /// The text of the Findings and the output tabs after a request that did not
 /// end in time, two times.
-pub let timeout_text : String = "The check took more than \{TIMEOUT_MS / 1000} s, two times, so I stopped it. Edit the model to try again."
+pub let timeout_text : String = "The check took more than \{TIMEOUT_MS / 1000} s, two times, so I stopped it. Edit a file to try again."
 
 ///|
 /// The text next to Open in playground when the files do not fit in a link.

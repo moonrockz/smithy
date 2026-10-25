@@ -264,7 +264,7 @@ fn read_extension(
 
 ///|
 /// The engine of a lesson: at most one of `output`, `value`, `message`, `diff`,
-/// or `static`. A lesson with none of them validates its model.
+/// `transcript` or `static`. A lesson with none of them validates its model.
 fn read_engine(
   meta : Json,
   dir : String,
@@ -643,7 +643,9 @@ fn read_case(
     Static => fail("\{where_}: a static lesson has no cases")
     Model | Diff =>
       if !findings.is_empty() || has_key(json, "findings") {
-        fail("\{where_}: \"findings\" is for a value or message lesson")
+        fail(
+          "\{where_}: \"findings\" is for a value, message or transcript lesson",
+        )
       }
   }
   let is_transcript = engine is Transcript(_)
@@ -793,8 +795,6 @@ fn read_steps(
     { count, findings, }
   })
 }
-
-///|
 
 ///|
 /// Fail on a key that is not in `keys`. A misspelt key would otherwise drop
