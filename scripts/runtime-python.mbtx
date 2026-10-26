@@ -97,6 +97,91 @@ async fn check_golden(dir : String) -> Unit {
 }
 
 ///|
+/// The mise config that pins uv. A Windows job installs uv without mise, so
+/// each subcommand first checks that `uv --version` gives this pin.
+let mise_config : String = ".config/mise/config.toml"
+
+///|
+/// The uv version of the `uv = "X"` line of the mise config text.
+fn uv_pin(config : String) -> String raise {
+  for line in config.split("\n") {
+    let line = line.trim().to_owned()
+    if line.has_prefix("uv ") || line.has_prefix("uv=") {
+      let value = line[2:].trim_start().to_owned()
+      if value.has_prefix("=") {
+        let quoted = value[1:].trim().to_owned()
+        if quoted.length() > 2 &&
+          quoted.has_prefix("\"") &&
+          quoted.has_suffix("\"") {
+          return quoted[1:quoted.length() - 1].to_owned()
+        }
+      }
+    }
+  }
+  fail("I expected a uv = \"X\" line in \{mise_config}; I found none.")
+}
+
+///|
+/// Whether the output of `uv --version` names exactly `pin`.
+fn uv_version_matches(output : String, pin : String) -> Bool {
+  let words = output.trim().split(" ").to_array()
+  words.length() >= 2 && words[0] == "uv" && words[1] == pin
+}
+
+///|
+/// Stop when the uv on the PATH is not the version that mise pins.
+async fn check_uv_pin() -> Unit {
+  let pin = uv_pin(@fs.read_file(mise_config).text()) catch {
+    error => {
+      println("❌ ERROR: \{error}")
+      @sys.exit(1)
+      return
+    }
+  }
+  let (code, out, _) = @process.collect_output("uv", ["--version"]) catch {
+    error => {
+      println("❌ ERROR: I could not start uv to read its version: \{error}")
+      @sys.exit(1)
+      return
+    }
+  }
+  let found = out.text().trim().to_owned()
+  if code != 0 || !uv_version_matches(found, pin) {
+    println(
+      "❌ ERROR: I expected uv \{pin} (the pin in \{mise_config}); I found `\{found}`.",
+    )
+    @sys.exit(1)
+  }
+  println("✓ \{found}")
+}
+
+///|
+test "the uv pin comes from the uv line of the mise config" {
+  let config = "[tools]\n# uv installs Python.\nuv = \"0.13.5\"\nuvx = \"9.9.9\"\n"
+  assert_eq(uv_pin(config), "0.13.5")
+  let missing = try {
+    ignore(uv_pin("[tools]\nzig = \"0.17.0\"\n"))
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(missing)
+}
+
+///|
+test "only the pinned uv version matches" {
+  assert_true(
+    uv_version_matches(
+      "uv 0.13.5 (46776a95d 2026-10-21 x86_64-pc-windows-msvc)\r\n", "0.13.5",
+    ),
+  )
+  assert_true(uv_version_matches("uv 0.13.5\n", "0.13.5"))
+  assert_false(uv_version_matches("uv 0.13.50 (x)\n", "0.13.5"))
+  assert_false(uv_version_matches("uv 0.13.4 (x)\n", "0.13.5"))
+  assert_false(uv_version_matches("", "0.13.5"))
+}
+
+///|
 /// The text of a JSON string.
 fn json_text(text : String) -> String {
   Json::string(text).stringify()
@@ -172,6 +257,9 @@ async fn sample_build() -> Unit {
 async fn main {
   let args = @env.args()
   let command = if args.length() > 1 { args[1] } else { "" }
+  if ["test", "generated", "sample-build"].contains(command) {
+    check_uv_pin()
+  }
   match command {
     "test" => {
       check_project(runtime_dir)
