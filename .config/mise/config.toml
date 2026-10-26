@@ -93,7 +93,7 @@ run = "moonx scripts/lint-yaml.mbtx"
 
 [tasks.validate]
 description = "Run all validation checks"
-depends = ["validate:packages", "validate:versions", "regex:vendor:check"]
+depends = ["validate:packages", "validate:versions", "regex:vendor:check", "runtime:embed:check"]
 
 [tasks."validate:packages"]
 description = "Verify the workspace package structure against moon.work"
@@ -366,4 +366,5 @@ run = "moonx scripts/codegen-payment-terminal.mbtx"
 
 [tasks."test:payment-terminal"]
 description = "Run the MoonBit POS against the Python terminal over stdio and check each transcript"
+depends = ["sample:build:moonbit", "sample:build:python"]
 run = "moonx scripts/payment-terminal.mbtx"

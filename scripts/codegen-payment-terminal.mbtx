@@ -1,0 +1,155 @@
+///|
+/// Regenerate the golden generated peers of `examples/payment-terminal`, or
+/// check that they are current.
+///
+/// The script runs `smithy build` with `examples/payment-terminal/smithy-build.json`
+/// and copies each generated peer into `examples/payment-terminal/generated/`.
+/// A reviewer reads the diff: the golden files change only on purpose.
+///
+/// Usage: `mise run codegen:payment-terminal` writes the golden files.
+/// `mise run codegen:payment-terminal -- --check` exits with 1 when a golden
+/// file is missing, extra or different. `--smithy PATH` uses a built CLI
+/// instead of `moon run apps/smithy`.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let build_config : String = "examples/payment-terminal/smithy-build.json"
+
+///|
+let build_output : String = ".dev/out/payment-terminal/source"
+
+///|
+/// Each generated peer: the artifact name of the build and the golden directory.
+let peers : Array[(String, String)] = [
+  ("moonbit-pos", "examples/payment-terminal/generated/moonbit/pos"),
+  ("moonbit-terminal", "examples/payment-terminal/generated/moonbit/terminal"),
+  ("python-pos", "examples/payment-terminal/generated/python/pos"),
+  ("python-terminal", "examples/payment-terminal/generated/python/terminal"),
+]
+
+///|
+/// Directories that tools make inside a golden directory. I do not compare them.
+let ignored : Array[String] = [
+  "_build", ".mooncakes", "__pycache__", ".venv", ".pytest_cache", ".ruff_cache",
+  "target",
+]
+
+///|
+/// The relative paths of the files below `root`, in lexical order. The walk
+/// keeps its own stack.
+async fn files_below(root : String) -> Array[String] {
+  let found = []
+  guard @fs.exists(root) else { return found }
+  let stack = [""]
+  while stack.pop() is Some(relative) {
+    let dir = if relative.is_empty() { root } else { "\{root}/\{relative}" }
+    for entry in @fs.readdir(dir) {
+      guard !ignored.contains(entry) else { continue }
+      let path = if relative.is_empty() { entry } else { "\{relative}/\{entry}" }
+      match @fs.kind("\{root}/\{path}") {
+        Directory => stack.push(path)
+        _ => found.push(path)
+      }
+    }
+  }
+  found.sort_by((a, b) => a.lexical_compare(b))
+  found
+}
+
+///|
+async fn ensure_parent(path : String) -> Unit {
+  guard path.rev_find("/") is Some(at) else { return }
+  let dir = path[:at].to_owned()
+  if !@fs.exists(dir) {
+    @fs.mkdir(dir, recursive=true)
+  }
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let mut check = false
+  let mut smithy : String? = None
+  let mut index = 1
+  while index < args.length() {
+    match args[index] {
+      "--check" => check = true
+      "--smithy" if index + 1 < args.length() => {
+        index += 1
+        smithy = Some(args[index])
+      }
+      other => {
+        println("I expected --check or --smithy PATH, found `\{other}`.")
+        @sys.exit(2)
+      }
+    }
+    index += 1
+  }
+  let command = match smithy {
+    Some(path) => [path, "build", "--config", build_config]
+    None =>
+      [
+        "moon", "run", "apps/smithy", "--target", "native", "--", "build", "--config",
+        build_config,
+      ]
+  }
+  let status = @process.run(command[0], command[1:].to_array())
+  if status != 0 {
+    println("❌ smithy build failed with exit status \{status}.")
+    @sys.exit(1)
+  }
+  let mut problems = 0
+  for peer in peers {
+    let (artifact, golden) = peer
+    let source = "\{build_output}/\{artifact}"
+    guard @fs.exists(source) else {
+      println("I skipped `\{artifact}`: the build did not write it.")
+      continue
+    }
+    let generated = files_below(source)
+    let existing = files_below(golden)
+    for path in existing {
+      if !generated.contains(path) {
+        if check {
+          println("❌ \{golden}/\{path} is not generated any more.")
+          problems += 1
+        } else {
+          @fs.remove("\{golden}/\{path}")
+        }
+      }
+    }
+    for path in generated {
+      let text = @fs.read_file("\{source}/\{path}").text()
+      let target = "\{golden}/\{path}"
+      let current = if @fs.exists(target) {
+        Some(@fs.read_file(target).text())
+      } else {
+        None
+      }
+      if current == Some(text) {
+        continue
+      }
+      if check {
+        let what = if current is None { "is missing" } else { "differs" }
+        println("❌ \{target} \{what}.")
+        problems += 1
+      } else {
+        ensure_parent(target)
+        @fs.write_file(target, text)
+      }
+    }
+    println("✓ \{golden} (\{generated.length()} files)")
+  }
+  if problems > 0 {
+    println(
+      "❌ \{problems} golden file(s) are not current. Run `mise run codegen:payment-terminal` and review the diff.",
+    )
+    @sys.exit(1)
+  }
+}

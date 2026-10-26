@@ -4,6 +4,18 @@
   "sources": ["model.smithy"],
   "plugins": {
     "openrpc::terminal": {"service": "example.payments#PaymentTerminal"},
-    "openrpc::pos": {"service": "example.payments#PointOfSale"}
+    "openrpc::pos": {"service": "example.payments#PointOfSale"},
+    "moonbit-jsonrpc-codegen::moonbit-terminal": {
+      "service": "example.payments#PaymentTerminal",
+      "protocol": "example.payments#TerminalProtocol",
+      "peer": "terminal",
+      "module": "example/terminal"
+    },
+    "moonbit-jsonrpc-codegen::moonbit-pos": {
+      "service": "example.payments#PaymentTerminal",
+      "protocol": "example.payments#TerminalProtocol",
+      "peer": "pos",
+      "module": "example/pos"
+    }
   }
 }

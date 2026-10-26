@@ -14,6 +14,7 @@ import {
   "moonrockz/smithy-validation/rpc",
   "moonrockz/smithy-build" @build,
   "moonrockz/smithy-codegen/fixture" @codegen_fixture,
+  "moonrockz/smithy-codegen-moonbit" @codegen_moonbit,
   "moonrockz/smithy-diff" @diff,
   "moonrockz/smithy-jsonschema" @jsonschema,
   "moonrockz/smithy-openapi" @openapi,

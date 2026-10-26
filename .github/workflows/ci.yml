@@ -208,6 +208,42 @@ jobs:
       - name: Check the tour lessons
         run: mise run tour:check
 
+  # The JSON-RPC generators of the payment terminal sample. The golden files, the runtimes, the
+  # generated peers and the MoonBit POS against the Python terminal over stdio, with a check of each
+  # recorded transcript. uv installs the pinned Python and the locked packages. The manual workflow
+  # runs the full matrix of languages and transports.
+  jsonrpc:
+    name: JSON-RPC peers (MoonBit POS to Python terminal)
+    runs-on: ubuntu-latest
+    needs: [lint]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check that the golden generated peers are current
+        run: mise run codegen:payment-terminal -- --check
+
+      - name: Test the MoonBit runtime
+        run: mise run test:runtime:moonbit
+
+      - name: Test the Python runtime
+        run: mise run test:runtime:python
+
+      - name: Check and test the generated MoonBit peers
+        run: mise run test:generated:moonbit
+
+      - name: Check and test the generated Python peers
+        run: mise run test:generated:python
+
+      - name: Run the MoonBit POS against the Python terminal over stdio
+        run: mise run test:payment-terminal
+
   # Smoke after a merge: run the release binaries of cross-build on a runner of each OS. It runs
   # only on a push to main and a manual run, and only when no trusted run has smoked the same inputs
   # (scripts/smoke.mbtx). A change outside the inputs, such as docs or tests, carries the evidence
@@ -280,7 +316,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [lint, build, build-windows, test, cross-build, test-native-zig, test-scripts, tour, smoke-plan, smoke]
+    needs:
+      [lint, build, build-windows, test, cross-build, test-native-zig, test-scripts, tour, jsonrpc, smoke-plan, smoke]
     steps:
       - name: Check that every job passed or was skipped
         env:

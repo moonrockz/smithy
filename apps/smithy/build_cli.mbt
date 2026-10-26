@@ -770,6 +770,7 @@ fn run_build(
     .register_plugin("openapi", openapi_plugin)
     .register_plugin("openrpc", openrpc_plugin)
     .register_plugin("codegenFixture", @codegen_fixture.plugin)
+    .register_plugin("moonbit-jsonrpc-codegen", @codegen_moonbit.plugin)
   for input in config.sources {
     build_add_input(
       loader,

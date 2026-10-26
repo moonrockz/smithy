@@ -8,6 +8,7 @@ members = [
   "./pkgs/smithy-build",
   "./pkgs/smithy-codegen",
   "./pkgs/smithy-codegen-jsonrpc",
+  "./pkgs/smithy-codegen-moonbit",
   "./pkgs/smithy-diff",
   "./pkgs/smithy-jsonschema",
   "./pkgs/smithy-openapi",
