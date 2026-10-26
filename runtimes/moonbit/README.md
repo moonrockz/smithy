@@ -9,6 +9,22 @@ The files in `rpc/` do not name this module, because the generator copies them i
 
 The runtime is for the native target only.
 
+## Windows
+
+HTTP and WebSocket passed their runtime transport tests and all four payment
+terminal scenarios on native Windows in the
+[manual matrix run](https://github.com/moonrockz/smithy/actions/runs/40368678704).
+
+**Stdio is not supported on Windows.** The pinned `moonbitlang/async` 0.22.5
+can lose the process handle before `wait_pid` opens it after a child exits.
+The runtime test `Peer::run returns after close while it reads from a child`
+fails with `OSError("@process.wait_pid(): The handle is invalid.")`.
+Beads bug `smithy-2qe.47` records the evidence and the dependency source paths.
+All four stdio sample scenarios passed, but the failed runtime test prevents
+a support claim. The full Windows runtime gate keeps this test enabled and
+fails when this race occurs. Support requires an upstream fix and a passing
+native runtime gate.
+
 ## Test
 
 ```shell

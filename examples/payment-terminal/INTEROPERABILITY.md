@@ -43,8 +43,13 @@ The job summary has one row per language and transport combination. The
 and the pass/fail table. The Windows artifact is `jsonrpc-matrix-windows-<commit>`.
 GitHub retains both artifacts for 14 days. A maintainer
 must inspect a failed cell and its logs before using the result as evidence.
-Both jobs must pass on the selected source before the result can support a
-Windows compatibility claim. The manual workflow keeps these checks outside
+Both jobs must pass on the selected source before the result can support an
+unqualified Windows compatibility claim. If a pinned upstream dependency fails,
+retain the failing check, file a beads bug with its evidence, and mark the
+affected transport unsupported in the runtime README. A passing scenario alone
+does not qualify that transport. This recorded limit can complete a Windows
+verification follow-up; it does not turn the failed gate into a pass.
+The manual workflow keeps these checks outside
 normal PR CI. A failed runtime gate remains a job failure even when the generated
 peer and scenario steps can still run to collect more evidence.
 
