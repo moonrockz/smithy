@@ -17,6 +17,8 @@ output, and the same model gives the same bytes. Text sorts are lexical.
 | Symbol provider | `SymbolProvider`, `ReservedWords` | Map a shape to a `Symbol` and a member to a name. Decorators and a cache add behavior. |
 | Shape order | `service_closure`, `topological_order` | List the shapes of a service and order them by their dependencies. |
 | Code writer | `CodeWriter`, `TemplateValue`, `Section`, `Interceptor` | Write text with templates, indentation, imports and sections. |
+| Import policies | `ImportPolicy`, `ImportEntry`, `PackageImport` | Select how `$T` writes a foreign symbol: by name, or qualified by its package. |
+| Contextual names | `ServiceNames` | Apply the service `rename` map to shape names. |
 | Writer delegator | `WriterDelegator` | Keep one writer for each output file and collect the files. |
 | Integrations | `Integration[C]`, `sort_integrations` | Add behavior to a generator: ordered hooks for the model, the provider and the writers. |
 | Director | `DirectedCodegen[C]`, `CreateContext`, `run_codegen` | Walk the shapes of a service and call one function for each kind of shape. |
@@ -86,6 +88,76 @@ More rules:
   `reserve_name` reserves. `use_shape_writer` reserves the name of its shape.
 - Use `push_state` and `pop_state` to save and restore the indentation, the
   newline prefix, the context and the formatters.
+- A foreign import that a file makes first wins over a later local symbol with
+  the same name that the file did not reserve. Reserve the names of the file's
+  own symbols with `reserve_name` before you write.
+
+## Import policies
+
+`CodeWriter::new(imports=...)` selects how `$T` writes a foreign symbol and
+what it records. All writers of one file share the policy.
+
+| Policy | Text of a foreign symbol | Record | Language |
+|--------|--------------------------|--------|----------|
+| `ImportPolicy::by_name()`, the default | The name, or the local name of its reference | `imports()`: one `ImportEntry` for each name | Python |
+| `ImportPolicy::by_package(qualify~, qualifier~, locals_block_qualifiers~)` | `qualify(qualifier, symbol)`, such as `rpc.Decimal` or `@rpc.Decimal` | `package_imports()`: one `PackageImport` for each package | Go, MoonBit |
+
+With a package policy, the namespace of a symbol is its package, such as the
+import path `example/payments/rpc`. A symbol of the writer namespace or of the
+root namespace has its bare name. `qualifier` gives the default qualifier of a
+package, and the local name of a reference is an explicit qualifier. The first
+use of a package fixes its qualifier. When another package of the file has the
+qualifier, I add the first free number from 2, in the order of use: `rpc2`,
+`rpc3`. With `locals_block_qualifiers=true`, the file's own names also block a
+qualifier. Go needs this, because a package name and a local name share one
+scope. MoonBit does not, because `@rpc` cannot be a local name.
+
+```mbt check
+///|
+test {
+  let last_segment = (ns : @codegen.Namespace) => {
+    let parts = ns.text.split("/").map(part => part.to_owned()).collect()
+    @codegen.SymbolName::parse(parts[parts.length() - 1]).unwrap()
+  }
+  let writer = @codegen.CodeWriter::new(
+    ns=@codegen.Namespace::parse("example/pos", separator="/").unwrap(),
+    imports=@codegen.ImportPolicy::by_package(
+      qualify=(qualifier, symbol) => {
+        "@\{qualifier.to_string()}.\{symbol.name.to_string()}"
+      },
+      qualifier=last_segment,
+      locals_block_qualifiers=false,
+    ),
+  )
+  let decimal = @codegen.Symbol::new(
+    @codegen.SymbolName::parse("Decimal").unwrap(),
+    ns=@codegen.Namespace::parse("example/pos/rpc", separator="/").unwrap(),
+  )
+  writer.write("let amount : $T = $T::zero()", args=[
+    @codegen.Sym(decimal),
+    @codegen.Sym(decimal),
+  ])
+  assert_eq(
+    writer.to_string(),
+    "let amount : @rpc.Decimal = @rpc.Decimal::zero()\n",
+  )
+  assert_eq(
+    writer.package_imports().map(entry => entry.qualifier.to_string()),
+    ["rpc"],
+  )
+}
+```
+
+## Contextual names
+
+A service `rename` map gives a shape another name in the context of the
+service. `ServiceNames::new(model, service)` reads the map of one service, and
+`ServiceNames::for_services(model, services)` merges the maps of several
+services, such as the two services of a protocol. `shape_name(id)` gives the
+rename, else the name of the shape ID. A member keeps its member name. A
+generator applies its own case rules to the result. `for_services` raises
+`InvalidSettings` when the services give one shape two names, or when two shapes
+outside the prelude get the same name without regard to case.
 
 ## Sections and interceptors
 

@@ -80,10 +80,13 @@ fn format_literal(value : TemplateValue) -> Result[String, String] {
 }
 
 ///|
+/// A writer for the namespace `ns`. `imports` selects how `$T` writes a foreign
+/// symbol; the default imports by name.
 pub fn CodeWriter::new(
   ns~ : Namespace = Namespace::root(),
   indent_text~ : String = "    ",
   string_literal~ : (String) -> String = json_string_literal,
+  imports~ : ImportPolicy = ImportPolicy::by_name(),
 ) -> CodeWriter {
   let formatters : Map[Char, Formatter] = Map([])
   formatters['L'] = Builtin(format_literal)
@@ -98,7 +101,7 @@ pub fn CodeWriter::new(
   {
     ns,
     indent_text,
-    tracker: ImportTracker::new(),
+    tracker: ImportTracker::new(imports),
     buffers: [OutputBuffer::new()],
     interceptors: [],
     open_sections: [],
