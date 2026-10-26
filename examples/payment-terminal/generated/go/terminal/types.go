@@ -7,6 +7,7 @@ import (
 	json "encoding/json"
 	rpc "example/payments/terminal/rpc"
 	fmt "fmt"
+	sort "sort"
 )
 
 func decodeValue[T any](data []byte) (T, error) {
@@ -369,7 +370,11 @@ func (value *Labels) UnmarshalJSON(data []byte) error {
 	raw, err := decodeObject(data, "example.payments#Labels")
 	if err != nil { return err }
 	decoded := make(Labels, len(raw))
-	for key, data := range raw {
+	keys := make([]string, 0, len(raw))
+	for key := range raw { keys = append(keys, key) }
+	sort.Strings(keys)
+	for _, key := range keys {
+		data := raw[key]
 		item, err := decodeValue[string](data)
 		if err != nil { return err }
 		decoded[string(key)] = item

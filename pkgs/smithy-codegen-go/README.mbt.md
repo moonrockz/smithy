@@ -61,14 +61,22 @@ Modeled error structures implement `error` and `RPCError() *rpc.Error`. Return
 them from a handler to send the prepared code and data. Typed calls convert a
 mapped error back to its modeled type. Use `errors.As` to inspect the result.
 An unmapped error stays an `*rpc.Error`.
+An absent optional selected error member omits the error data. A required
+document member keeps JSON null as present data.
 
 Custom simple types are aliases. `bigDecimal` uses `rpc.Number`; `bigInteger`
 uses `rpc.Integer`. These types preserve exact JSON number text. No float carries
 a big number. Documents use `json.RawMessage`. The default timestamp type is
 `rpc.Number`, for epoch seconds. A prepared `DateTime` default uses `string`.
+Core `timestampFormat` on a member has priority over its target's format. The
+target format has priority over the prepared default. This rule also applies
+to list and map members, union members, selected results, and error data.
 Blobs use `[]byte` and JSON base64 encoding. Decoders reject null for an optional
 primitive or enum member. A document member can hold null. Enums reject unknown
 values on input and output.
+Maps with enum keys check each key against its enum target on input and result
+validation. Maps with string keys keep ordinary string keys.
+All maps check entries in lexical key order to keep their first diagnostic stable.
 
 The runtime applies the prepared lifecycle, capability, cancellation, and active
 call rules. `rpc.RequestID(ctx)` reads a handler's exact request ID.

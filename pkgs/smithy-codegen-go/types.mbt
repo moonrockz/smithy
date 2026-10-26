@@ -38,8 +38,9 @@ fn decode_expression(
   id : @smithy.ShapeId,
   raw : String,
 ) -> Unit raise @codegen.CodegenError {
-  if ctx.shape(id).body is Union(_) {
-    w.write_inline("decode$L($L)", args=[Text(ctx.name(id)), Text(raw)])
+  let shape = ctx.value_shape(id)
+  if shape.body is Union(_) {
+    w.write_inline("decode$L($L)", args=[Text(ctx.name(shape.id)), Text(raw)])
   } else {
     w.write_inline("decodeValue[$C]($L)", args=[ctx.type_symbol(id), Text(raw)])
   }
@@ -62,7 +63,7 @@ fn generate_structure(
     w.write("\t$L $L$C `json:$L`", args=[
       Text(ctx.field(id)),
       Text(pointer),
-      ctx.type_symbol(ctx.target(id)),
+      ctx.type_symbol(id),
       Text(quote(ctx.wire_name(id) + omit)),
     ])
   }
@@ -82,7 +83,7 @@ fn generate_structure(
     let required = member_required(ctx, id)
     w.write("\tif data, ok := raw[$S]; ok {", args=[Text(ctx.wire_name(id))])
     w.write_inline("\t\tmember, err := ")
-    decode_expression(ctx, w, ctx.target(id), "data")
+    decode_expression(ctx, w, id, "data")
     w.write("\n\t\tif err != nil { return $T($S, err) }", args=[
       ctx.foreign("Errorf", "fmt"),
       Text("I could not read member `" + id.to_string() + "`: %w"),
@@ -158,7 +159,7 @@ fn generate_union(
     let variant = name + ctx.field(id)
     w.write("type $L struct { Value $C }\nfunc ($L) is$L() {}", args=[
       Text(variant),
-      ctx.type_symbol(ctx.target(id)),
+      ctx.type_symbol(id),
       Text(variant),
       Text(name),
     ])
@@ -186,7 +187,7 @@ fn generate_union(
   for id in members {
     w.write("\t\tcase $S:", args=[Text(union_wire(ctx, id))])
     w.write_inline("\t\t\tvalue, err := ")
-    decode_expression(ctx, w, ctx.target(id), "data")
+    decode_expression(ctx, w, id, "data")
     w.write(
       "\n\t\t\tif err != nil { return nil, err }\n\t\t\treturn $L{Value: value}, nil",
       args=[Text(name + ctx.field(id))],
@@ -216,11 +217,10 @@ fn generate_collection(
   let pointer = if sparse { "*" } else { "" }
   match shape.body {
     List(member_) => {
-      let target = ctx.target(member_)
       w.write("type $T []$L$C\n", args=[
         Sym(name),
         Text(pointer),
-        ctx.type_symbol(target),
+        ctx.type_symbol(member_),
       ])
       w.write(
         "func (value *$T) UnmarshalJSON(data []byte) error {\n\tvar raw []$T\n\tif err := $T(data, &raw); err != nil { return err }\n\tif raw == nil { return $T($S) }\n\tdecoded := make($T, len(raw))\n\tfor index, data := range raw {",
@@ -237,7 +237,7 @@ fn generate_collection(
         write_sparse_null(ctx, w)
       }
       w.write_inline("\t\titem, err := ")
-      decode_expression(ctx, w, target, "data")
+      decode_expression(ctx, w, member_, "data")
       w.write(
         "\n\t\tif err != nil { return err }\n\t\tdecoded[index] = $Litem\n\t}\n\t*value = decoded\n\treturn nil\n}\n",
         args=[Text(if sparse { "&" } else { "" })],
@@ -245,26 +245,48 @@ fn generate_collection(
     }
     Map(key~, value~) => {
       let key_target = ctx.target(key)
-      let target = ctx.target(value)
+      let enum_key = ctx.shape(key_target).body is Enum(_)
+      let key_expression : @codegen.TemplateValue = Call(writer => {
+        if enum_key {
+          writer.write_inline("decodedKey")
+        } else {
+          writer.write_inline("$C(key)", args=[ctx.type_symbol(key_target)])
+        }
+      })
       w.write("type $T map[$C]$L$C\n", args=[
         Sym(name),
         ctx.type_symbol(key_target),
         Text(pointer),
-        ctx.type_symbol(target),
+        ctx.type_symbol(value),
       ])
       w.write(
-        "func (value *$T) UnmarshalJSON(data []byte) error {\n\traw, err := decodeObject(data, $S)\n\tif err != nil { return err }\n\tdecoded := make($T, len(raw))\n\tfor key, data := range raw {",
+        "func (value *$T) UnmarshalJSON(data []byte) error {\n\traw, err := decodeObject(data, $S)\n\tif err != nil { return err }\n\tdecoded := make($T, len(raw))",
         args=[Sym(name), Text(shape.id.to_string()), Sym(name)],
       )
+      w.write(
+        "\tkeys := make([]string, 0, len(raw))\n\tfor key := range raw { keys = append(keys, key) }\n\t$T(keys)\n\tfor _, key := range keys {\n\t\tdata := raw[key]",
+        args=[ctx.foreign("Strings", "sort")],
+      )
+      if enum_key {
+        w.write("\t\tkeyData, _ := $T(key)", args=[
+          ctx.foreign("Marshal", "encoding/json"),
+        ])
+        w.write_inline("\t\tdecodedKey, err := ")
+        decode_expression(ctx, w, key_target, "keyData")
+        w.write("\n\t\tif err != nil { return $T($S, key, err) }", args=[
+          ctx.foreign("Errorf", "fmt"),
+          Text("I could not read map key `" + key.to_string() + "` at `%s`: %w"),
+        ])
+      }
       if sparse {
-        w.write("\t\tdecoded[$C(key)] = nil", args=[ctx.type_symbol(key_target)])
+        w.write("\t\tdecoded[$C] = nil", args=[key_expression])
         write_sparse_null(ctx, w)
       }
       w.write_inline("\t\titem, err := ")
-      decode_expression(ctx, w, target, "data")
+      decode_expression(ctx, w, value, "data")
       w.write(
-        "\n\t\tif err != nil { return err }\n\t\tdecoded[$C(key)] = $Litem\n\t}\n\t*value = decoded\n\treturn nil\n}\n",
-        args=[ctx.type_symbol(key_target), Text(if sparse { "&" } else { "" })],
+        "\n\t\tif err != nil { return err }\n\t\tdecoded[$C] = $Litem\n\t}\n\t*value = decoded\n\treturn nil\n}\n",
+        args=[key_expression, Text(if sparse { "&" } else { "" })],
       )
     }
     _ => ()
@@ -385,7 +407,7 @@ fn generate_types(ctx : GoContext) -> String raise @codegen.CodegenError {
             primitive_symbol(
               kind,
               ctx.module_name,
-              timestamp_format=ctx.timestamp_format,
+              timestamp_format=ctx.timestamp_format_for(shape.id),
             ),
           ),
         ])

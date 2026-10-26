@@ -34,14 +34,11 @@ fn write_reference(
 }
 
 ///|
-fn result_target(
-  ctx : GoContext,
-  method_ : @rpc.MethodContract,
-) -> @smithy.ShapeId? raise @codegen.CodegenError {
+fn result_shape(method_ : @rpc.MethodContract) -> @smithy.ShapeId? {
   match method_.result {
     NullResult => None
     OutputStructure(id) => Some(id)
-    OutputMember(id) => Some(ctx.target(id))
+    OutputMember(id) => Some(id)
   }
 }
 
@@ -105,7 +102,7 @@ fn generate_contract(ctx : GoContext) -> String raise @codegen.CodegenError {
         w.write_inline("\t\t\t\t\tValidateParams: ")
         write_validator(ctx, w, method_.input)
         w.write(",")
-        if result_target(ctx, method_) is Some(id) {
+        if result_shape(method_) is Some(id) {
           w.write_inline("\t\t\t\t\tValidateResult: ")
           write_validator(ctx, w, id)
           w.write(",")
@@ -121,13 +118,8 @@ fn generate_contract(ctx : GoContext) -> String raise @codegen.CodegenError {
             ],
           )
           if error.data is Some(data) {
-            let target = if ctx.shape(data).body is Member(target~) {
-              target
-            } else {
-              data
-            }
             w.write_inline(", ValidateData: ")
-            write_validator(ctx, w, target)
+            write_validator(ctx, w, data)
           }
           w.write("},")
         }

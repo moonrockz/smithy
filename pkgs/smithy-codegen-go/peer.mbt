@@ -18,7 +18,7 @@ fn signature(
   w.write_inline(") ")
   if !notification &&
     method_.kind != @rpc.NotificationOnly &&
-    result_target(ctx, method_) is Some(id) {
+    result_shape(method_) is Some(id) {
     w.write_inline("($C, error)", args=[ctx.type_symbol(id)])
   } else {
     w.write_inline("error")
@@ -79,7 +79,7 @@ fn generate_call(
   } else {
     name
   }
-  let output = if notification { None } else { result_target(ctx, method_) }
+  let output = if notification { None } else { result_shape(method_) }
   w.write_inline("func (peer *Peer) $L(", args=[Text(name)])
   signature(ctx, w, method_, true, notification~)
   w.write(" {")
@@ -138,10 +138,9 @@ fn generate_error_decoder(
       None => ()
       Some(data) => {
         let is_member = data.member_name() != None
-        let target = if is_member { ctx.target(data) } else { data }
         w.write("\t\tif len(wire.Data) != 0 {")
         w.write_inline("\t\t\tdecoded, decodeErr := ")
-        decode_expression(ctx, w, target, "wire.Data")
+        decode_expression(ctx, w, data, "wire.Data")
         w.write("\n\t\t\tif decodeErr != nil { return err }")
         if is_member {
           w.write("\t\t\tvalue.$L = $Ldecoded", args=[
@@ -269,15 +268,23 @@ fn generate_errors(ctx : GoContext) -> String raise @codegen.CodegenError {
       ctx.type_symbol(id),
       Text("I received modeled error `" + id.to_string() + "`."),
     ])
-    w.write_inline(
-      "func (value $C) RPCError() *$T {\n\treturn $T($L, value.Error(), ",
-      args=[
-        ctx.type_symbol(id),
-        ctx.runtime("Error"),
+    w.write("func (value $C) RPCError() *$T {", args=[
+      ctx.type_symbol(id),
+      ctx.runtime("Error"),
+    ])
+    if error.data is Some(data) &&
+      data.member_name() != None &&
+      !error.data_required {
+      w.write("\tif value.$L == nil { return $T($L, value.Error(), nil) }", args=[
+        Text(ctx.field(data)),
         ctx.runtime("NewError"),
         Text(code_text(error.code, error.shape.to_string())),
-      ],
-    )
+      ])
+    }
+    w.write_inline("\treturn $T($L, value.Error(), ", args=[
+      ctx.runtime("NewError"),
+      Text(code_text(error.code, error.shape.to_string())),
+    ])
     match error.data {
       None => w.write_inline("nil")
       Some(data) if data.member_name() != None =>

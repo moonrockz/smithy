@@ -78,8 +78,20 @@ fn GoContext::type_symbol(
   self : GoContext,
   id : @smithy.ShapeId,
 ) -> @codegen.TemplateValue raise @codegen.CodegenError {
-  let shape = self.shape(id)
-  if id.namespace() == "smithy.api" {
+  let shape = self.value_shape(id)
+  if shape.body is Simple(Timestamp) {
+    let format = self.timestamp_format_for(id)
+    if shape.id.namespace() == "smithy.api" ||
+      format != self.timestamp_format_for(shape.id) {
+      let type_ = primitive_symbol(
+        Timestamp,
+        self.module_name,
+        timestamp_format=format,
+      )
+      return Call(w => w.write_inline("$T", args=[Sym(type_)]))
+    }
+  }
+  if shape.id.namespace() == "smithy.api" {
     match shape.body {
       Simple(Blob) =>
         return Call(w => w.write_inline("[]$T", args=[Sym(symbol("byte"))]))
@@ -89,6 +101,42 @@ fn GoContext::type_symbol(
   }
   let type_ = self.provider.to_symbol(shape)
   Call(w => w.write_inline("$T", args=[Sym(type_)]))
+}
+
+///|
+/// Resolve one member boundary. Semantic member targets are value shapes.
+fn GoContext::value_shape(
+  self : GoContext,
+  id : @smithy.ShapeId,
+) -> @smithy.Shape raise @codegen.CodegenError {
+  let shape = self.shape(id)
+  match shape.body {
+    Member(target~) => self.shape(target)
+    _ => shape
+  }
+}
+
+///|
+/// Core value directives use member, target, then prepared default precedence.
+fn GoContext::timestamp_format_for(
+  self : GoContext,
+  id : @smithy.ShapeId,
+) -> @validation.TimestampFormat raise @codegen.CodegenError {
+  let source = self.shape(id)
+  let target = self.value_shape(id)
+  let trait_ = match source.trait_value("smithy.api#timestampFormat") {
+    Some(value) => Some(value)
+    None => target.trait_value("smithy.api#timestampFormat")
+  }
+  match trait_ {
+    None => self.timestamp_format
+    Some(String("date-time")) => @validation.DateTime
+    Some(String("epoch-seconds")) => @validation.EpochSeconds
+    _ =>
+      raise @codegen.InvalidSettings(
+        "I cannot map the JSON timestamp format of construct `\{id}` to a Go type.",
+      )
+  }
 }
 
 ///|
