@@ -15,7 +15,9 @@ The runtime is for the native target only.
 mise run test:runtime:moonbit
 ```
 
-The task runs `moon check --deny-warn` and `moon test --target native` in `runtimes/moonbit`.
+The task builds the native stdio child-process fixture, then runs `moon check --deny-warn` and
+`moon test --target native` in `runtimes/moonbit`. The fixture uses MoonBit stdio, so the tests
+need no system shell or external executable.
 
 ## Parts
 
@@ -73,6 +75,15 @@ The task runs `moon check --deny-warn` and `moon test --target native` in `runti
   error. The client sends the next POST only after the response headers of the last POST, so the order
   of the messages stays the same.
 - WebSocket: `GET /ws` on the same port, one message in each text frame.
+- `Connection::shutdown` closes gracefully in the caller's async task. For WebSocket it sends a
+  normal close frame with code 1000, then closes the socket and inbox. Sending the frame has a
+  one-second timeout. If the WebSocket protocol is already closed, shutdown just cleans up.
+  Other errors, timeout and cancellation still close the resources and propagate to the caller.
+  Shutdown is safe to repeat, including after the peer's reader task group ends.
+  It does not wait for a close reply. The default implementation calls `close`, preserving the
+  behavior of memory, stdio and HTTP connections. Use synchronous `close` for forced cleanup,
+  including in a `defer` around graceful shutdown. The server shuts down a WebSocket when its
+  `on_peer` callback returns normally.
 - `serve(port~, on_peer)` serves `/rpc` and `/ws` on 127.0.0.1, and writes `listening N` to stderr.
   Port 0 picks a free port. `on_peer` runs once for each HTTP session and for each WebSocket.
 - `TranscriptLog` writes `{"dir":"send"|"recv","message":<wire JSON>}` lines, which

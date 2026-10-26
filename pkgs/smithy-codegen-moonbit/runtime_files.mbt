@@ -14,7 +14,9 @@ let runtime_files : Array[(String, String)] = [
       #|///   the message belongs to, when there is one: its response, or a
       #|///   notification or request that its handler sends. A transport that has
       #|///   one stream per call (HTTP) uses it; other transports ignore it.
-      #|/// - `close` closes the connection.
+      #|/// - `close` forces synchronous resource cleanup.
+      #|/// - `shutdown` closes gracefully in the caller's async task. The default
+      #|///   calls `close`. WebSocket sends a normal close frame before cleanup.
       #|/// - `start` gives the transport the task group of `Peer::run`, for the
       #|///   tasks that read its streams. The default does nothing.
       #|/// - `watch` gives the transport a function that fails a pending call of the
@@ -24,8 +26,14 @@ let runtime_files : Array[(String, String)] = [
       #|  async fn receive(Self) -> String?
       #|  async fn send(Self, String, related~ : RequestId?) -> Unit
       #|  fn close(Self) -> Unit
+      #|  async fn shutdown(Self) -> Unit = _
       #|  fn start(Self, @async.TaskGroup[Unit]) -> Unit = _
       #|  fn watch(Self, (RequestId) -> Unit) -> Unit = _
+      #|}
+      #|
+      #|///|
+      #|impl Connection with fn shutdown(self) {
+      #|  self.close()
       #|}
       #|
       #|///|
@@ -2341,6 +2349,7 @@ let runtime_files : Array[(String, String)] = [
       #|          let connection = WsConnection::wrap(ws)
       #|          defer Connection::close(connection)
       #|          on_peer(connection)
+      #|          Connection::shutdown(connection)
       #|        }
       #|        _ => {
       #|          conn.skip_request_body()
@@ -3673,10 +3682,19 @@ let runtime_files : Array[(String, String)] = [
       #|
       #|///|
       #|pub impl Connection for WsConnection with fn close(self) {
-      #|  if !self.closed {
-      #|    self.closed = true
-      #|    self.inbox.close()
-      #|    self.conn.close()
+      #|  self.closed = true
+      #|  self.inbox.close()
+      #|  self.conn.close()
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for WsConnection with fn shutdown(self) {
+      #|  guard !self.closed else { return }
+      #|  self.closed = true
+      #|  defer Connection::close(self)
+      #|  @async.with_timeout(1000, () => self.conn.send_close(code=Normal)) catch {
+      #|    @websocket.ConnectionClosed(_, _) => ()
+      #|    err => raise err
       #|  }
       #|}
       #|

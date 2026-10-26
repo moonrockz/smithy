@@ -68,14 +68,25 @@ async test "frame errors name the header and what was found" {
 }
 
 ///|
+async fn stdio_fixture(mode : String) -> Array[String] {
+  let path = "./_build/native/debug/build/fixtures/stdio/stdio.exe"
+  guard @fs.exists(path) else {
+    fail(
+      "I expected the native stdio fixture at \{path}; run moon build --target native in runtimes/moonbit first.",
+    )
+  }
+  [path, mode]
+}
+
+///|
 async test "spawn_stdio talks to a child process" {
-  let conn = @rpc.spawn_stdio(["/bin/cat"])
+  let conn = @rpc.spawn_stdio(stdio_fixture("echo"))
   conn.send("{\"jsonrpc\":\"2.0\",\"method\":\"terminal.ping\"}", related=None)
   inspect(
     conn.receive().unwrap(),
     content="{\"jsonrpc\":\"2.0\",\"method\":\"terminal.ping\"}",
   )
-  conn.close()
+  conn.shutdown()
   inspect(conn.wait(), content="0")
 }
 
@@ -94,9 +105,28 @@ async test "spawn_stdio needs a command" {
 }
 
 ///|
+async test "default shutdown preserves memory and stdio closure" {
+  let (a, b) = @rpc.memory_pair()
+  a.shutdown()
+  a.shutdown()
+  assert_true(a.receive() is None)
+  assert_true(b.receive() is None)
+  let stdio = @rpc.stdio_connection()
+  stdio.shutdown()
+  assert_true(stdio.receive() is None)
+  let rejected = try stdio.send("{}", related=None) catch {
+    @rpc.TransportError(_) => true
+    err => raise err
+  } noraise {
+    _ => false
+  }
+  assert_true(rejected)
+}
+
+///|
 async test "Peer::run returns when the child process exits" {
   // The child reads one frame header line and exits.
-  let conn = @rpc.spawn_stdio(["/bin/sh", "-c", "head -n 1 >/dev/null; exit 0"])
+  let conn = @rpc.spawn_stdio(stdio_fixture("exit-after-header"))
   let pos = new_pos(@rpc.TranscriptLog::memory())
   @async.with_timeout(5000, () => {
     @async.with_task_group(group => {
@@ -109,7 +139,7 @@ async test "Peer::run returns when the child process exits" {
 
 ///|
 async test "Peer::run returns after close while it reads from a child" {
-  let conn = @rpc.spawn_stdio(["/bin/cat"])
+  let conn = @rpc.spawn_stdio(stdio_fixture("echo"))
   let pos = new_pos(@rpc.TranscriptLog::memory())
   @async.with_timeout(5000, () => {
     @async.with_task_group(group => {

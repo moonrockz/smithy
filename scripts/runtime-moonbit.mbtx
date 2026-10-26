@@ -136,6 +136,8 @@ async fn main {
   let command = if args.length() > 1 { args[1] } else { "" }
   match command {
     "test" => {
+      // Build the native child-process fixture used by the stdio tests.
+      moon(runtime_dir, ["build", "--target", "native"])
       check_module(runtime_dir)
       println("✅ The MoonBit JSON-RPC runtime passed its checks.")
     }

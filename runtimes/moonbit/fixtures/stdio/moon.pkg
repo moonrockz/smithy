@@ -1,0 +1,7 @@
+pkgtype(kind: "executable")
+
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/stdio" @sys_stdio,
+  "moonbitlang/core/env",
+}

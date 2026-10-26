@@ -99,9 +99,18 @@ pub impl Connection for WsConnection with fn send(self, text, related~) {
 
 ///|
 pub impl Connection for WsConnection with fn close(self) {
-  if !self.closed {
-    self.closed = true
-    self.inbox.close()
-    self.conn.close()
+  self.closed = true
+  self.inbox.close()
+  self.conn.close()
+}
+
+///|
+pub impl Connection for WsConnection with fn shutdown(self) {
+  guard !self.closed else { return }
+  self.closed = true
+  defer Connection::close(self)
+  @async.with_timeout(1000, () => self.conn.send_close(code=Normal)) catch {
+    @websocket.ConnectionClosed(_, _) => ()
+    err => raise err
   }
 }
