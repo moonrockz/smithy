@@ -27,12 +27,19 @@ gh workflow run jsonrpc-matrix.yml --ref main
 
 The workflow checks embedding and golden files, runs the language quality
 gates, and builds each sample once. A Linux runner then executes all 27 combinations.
-An independent Windows runner checks the MoonBit runtime and generated peers,
-builds the MoonBit sample natively, and runs all four scenarios over stdio, HTTP
-and WebSocket. These three Windows combinations add 12 checked logs. A Windows
+An independent Windows runner checks the MoonBit and Python runtimes and the
+generated MoonBit and Python peers. It builds the MoonBit and Python samples
+natively, once each. Then it runs all four scenarios over stdio, HTTP and
+WebSocket for each MoonBit and Python caller and receiver: MoonBit to MoonBit,
+MoonBit to Python, Python to MoonBit and Python to Python. These 12 Windows
+combinations add 48 checked logs. When the Python sample fails, the job fails,
+and it still runs the 3 MoonBit to MoonBit combinations for evidence. A Windows
 binary must be built on Windows because a cross-built binary reads its arguments
-wrongly. Windows uses the same pinned setup as the release build and calls the
-MoonBit task scripts directly, without installing the other language toolchains.
+wrongly. Windows uses the same pinned MoonBit setup as the release build and
+calls the task scripts directly. It installs uv with `astral-sh/setup-uv` at the
+uv version that `.config/mise/config.toml` pins; `runtime-python.mbtx` stops
+when `uv --version` gives another version. uv installs the Python of
+`.python-version` and the locked dependencies. Go is not installed on Windows.
 The job fails if a scenario, receiver process, or transcript check fails.
 Each checked log must meet the minimum message count for its fixed scenario.
 Skipped and non-JSON log rows fail the run.
@@ -68,10 +75,12 @@ mise run sample:build:go
 mise run test:jsonrpc:matrix
 ```
 
-To run a subset, select a caller, receiver, or transport:
+To run a subset, select a caller, receiver, or transport. Each option takes a
+comma-separated list, once. An unknown or empty value stops the run:
 
 ```shell
 mise run test:jsonrpc:matrix -- --caller go --receiver python --transport http
+mise run test:jsonrpc:matrix -- --caller moonbit,python --receiver moonbit,python
 ```
 
 Build commands write absolute command arrays to
