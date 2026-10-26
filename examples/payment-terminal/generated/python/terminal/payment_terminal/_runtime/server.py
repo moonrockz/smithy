@@ -31,6 +31,7 @@ import sys
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
+from typing import BinaryIO
 
 import uvicorn
 from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
@@ -281,6 +282,23 @@ async def serve(port: int, peer_factory: PeerFactory, *, host: str = "127.0.0.1"
     When the server is ready, I write `listening N` to stderr.
     """
     running = await start_server(port, peer_factory, host=host)
-    sys.stderr.write(f"listening {running.port}\n")
-    sys.stderr.flush()
+    _write_ready_line(running.port)
     await running.wait()
+
+
+def _write_ready_line(port: int) -> None:
+    """Write the bytes `listening N\\n` to stderr, with no newline translation.
+
+    Text-mode stderr writes `\\r\\n` on Windows. Other runtimes and test
+    harnesses read this line, so it has the same bytes on every platform.
+    """
+    line = f"listening {port}\n"
+    stream = sys.stderr
+    buffer: BinaryIO | None = getattr(stream, "buffer", None)
+    stream.flush()
+    if buffer is None:
+        stream.write(line)
+        stream.flush()
+        return
+    buffer.write(line.encode("ascii"))
+    buffer.flush()

@@ -39,6 +39,9 @@ are not copied.
   that it does not know.
 - `spawn_stdio(argv)`: starts a child process and connects to its stdin and stdout.
 - `memory_pair()`: two connected in-memory ends, for tests.
+- `serve(port, peer_factory)`: serves HTTP (`/rpc`) and WebSocket (`/ws`) until the process stops.
+  When it is ready, it writes the bytes `listening N\n` to stderr, where N is the port. It writes
+  them with no newline translation, so the line is the same on Windows and in the other runtimes.
 
 ## Checks
 

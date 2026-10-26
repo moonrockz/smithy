@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import io
+import re
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from decimal import Decimal
@@ -23,7 +26,7 @@ from smithy_jsonrpc_runtime.http_client import (
     http_connect,
     read_events,
 )
-from smithy_jsonrpc_runtime.server import RunningServer, start_server
+from smithy_jsonrpc_runtime.server import RunningServer, serve, start_server
 from smithy_jsonrpc_runtime.ws_client import ws_connect
 
 from .payment import Pos, Terminal, session_rules, usd
@@ -352,3 +355,25 @@ async def test_an_oversized_json_body_is_refused() -> None:
     ):
         await conn.send('{"jsonrpc":"2.0","id":1,"method":"terminal.ping"}')
     await conn.close()
+
+
+async def test_serve_writes_the_ready_line_with_lf_on_every_platform(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Text-mode stderr on Windows writes each "\n" as "\r\n". This stream does
+    # the same on every platform. The ready line is a cross-language signal, so
+    # its bytes must be "listening N\n", as the MoonBit and Go runtimes write.
+    raw = io.BytesIO()
+    windows_stderr = io.TextIOWrapper(raw, encoding="utf-8", newline="\r\n", write_through=True)
+    monkeypatch.setattr("sys.stderr", windows_stderr)
+    task = asyncio.create_task(serve(0, terminal_peer))
+    try:
+        for _ in range(500):
+            if raw.getvalue() or task.done():
+                break
+            await asyncio.sleep(0.01)
+        assert re.fullmatch(rb"listening [0-9]+\n", raw.getvalue()), raw.getvalue()
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
