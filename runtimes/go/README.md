@@ -131,7 +131,9 @@ peer and session state. WebSocket does not use the HTTP session header.
 
 Every transport uses the same dispatcher. The runtime never sends batches.
 A received batch gets one `-32600` response with a null ID. Messages are limited
-to 1 MiB. Active calls are limited to 1024 per direction by default. Set
+to 1 MiB. This limit also applies to the full SSE data payload, including
+newline bytes between data lines. The client rejects an oversized event before
+its delimiter or EOF. Active calls are limited to 1024 per direction by default. Set
 `Options.MaxActiveCalls` to change the call limit.
 
 ## Exact values and logs

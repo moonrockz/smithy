@@ -522,15 +522,18 @@ func (t *HTTPTransport) readResponse(response *http.Response, expected ID) error
 		return errors.New("I received an unsupported response type")
 	}
 	scanner := bufio.NewScanner(response.Body)
-	scanner.Buffer(make([]byte, 4096), maxMessageBytes)
-	var data []string
+	// The line limit includes the data field prefix and CRLF framing.
+	scanner.Buffer(make([]byte, 4096), maxMessageBytes+len("data: ")+len("\r\n"))
+	var data []byte
+	hasData := false
 	final := false
 	flush := func() error {
-		if len(data) == 0 {
+		if !hasData {
 			return nil
 		}
-		raw := []byte(strings.Join(data, "\n"))
+		raw := data
 		data = nil
+		hasData = false
 		final = finalHTTPReply(raw, expected)
 		fields, problem := envelope(raw)
 		if problem == nil {
@@ -554,7 +557,18 @@ func (t *HTTPTransport) readResponse(response *http.Response, expected ID) error
 		if strings.HasPrefix(line, "data:") {
 			value := strings.TrimPrefix(line, "data:")
 			value = strings.TrimPrefix(value, " ")
-			data = append(data, value)
+			additional := len(value)
+			if hasData {
+				additional++
+			}
+			if additional > maxMessageBytes-len(data) {
+				return errors.New("I received an oversized SSE message")
+			}
+			if hasData {
+				data = append(data, '\n')
+			}
+			data = append(data, value...)
+			hasData = true
 		}
 	}
 	if err := scanner.Err(); err != nil {
