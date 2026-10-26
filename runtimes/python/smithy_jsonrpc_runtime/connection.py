@@ -11,11 +11,25 @@ SESSION_HEADER = "Smithy-Session-Id"
 """The HTTP header that ties the posts of one session together."""
 
 
+class CallLost(ConnectionError):
+    """A transport lost the way to the reply of one call, such as an HTTP event
+    stream that ended before its response. `Connection.receive` raises it after
+    the messages that came before; the peer fails that call and reads on."""
+
+    def __init__(self, request_id: RequestId, detail: str) -> None:
+        super().__init__(f"I lost the reply to request {request_id}: {detail}.")
+        self.request_id = request_id
+        self.detail = detail
+
+
 class Connection(Protocol):
     """A transport that carries one JSON-RPC message per `send` and `receive`."""
 
     async def receive(self) -> str | None:
-        """Give the text of the next message, or None when the remote peer closed."""
+        """Give the text of the next message, or None when the remote peer closed.
+
+        A transport that loses the reply to one call raises `CallLost`.
+        """
         ...
 
     async def send(self, text: str, *, related: RequestId | None = None) -> None:

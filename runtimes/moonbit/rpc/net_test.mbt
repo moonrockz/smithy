@@ -397,3 +397,86 @@ async test "http: a stream that ends before its response fails that call" {
     })
   })
 }
+
+///|
+async test "http: frames of a stream are dispatched before its call fails" {
+  let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"), reuse_addr=true)
+  defer server.close()
+  let posted : @aqueue.Queue[String] = @aqueue.Queue(kind=Unbounded)
+  let count = Ref(0)
+  let log = @rpc.TranscriptLog::memory()
+  let pos = @rpc.Peer::new(
+    self_name="pos",
+    remote_name="terminal",
+    rules=@rpc.SessionRules::none(),
+    log=Some(log),
+  )
+  pos.on_request("pos.confirmTip", RequestOnly, (_, _) => Json::boolean(true))
+  let outcome = Ref("")
+  let seen_at_failure = Ref("")
+  @async.with_timeout(5000, () => {
+    @async.with_task_group(group => {
+      group.spawn_bg(no_wait=true, () => {
+        server.run_forever(allow_failure=true, (_, body, conn) => {
+          let text = body.read_all().text()
+          count.val += 1
+          if count.val == 1 {
+            // The stream of the call: a server request, then a batch frame,
+            // then the end, with no response to the call.
+            conn.send_response(200, "OK", extra_headers={
+              "Content-Type": "text/event-stream",
+              "Smithy-Session-Id": "s-1",
+            })
+            conn.write(
+              "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":\"cb-1\",\"method\":\"pos.confirmTip\",\"params\":{}}\n\n",
+            )
+            conn.write("event: message\ndata: [1,2]\n\n")
+            conn.end_response()
+          } else {
+            posted.put(text)
+            conn
+            ..send_response(202, "Accepted", extra_headers={
+              "Smithy-Session-Id": "s-1",
+            })
+            .end_response()
+          }
+        })
+      })
+      let conn = @rpc.http_connect("http://127.0.0.1:\{server.addr.port()}/rpc")
+      group.spawn_bg(() => pos.run(conn))
+      outcome.val = try pos.request("terminal.ping", None) |> ignore catch {
+        @rpc.TransportError(message) => message
+        err => "other: \{err}"
+      } noraise {
+        _ => "no error"
+      }
+      // The frames of the stream went through the dispatcher before the call
+      // failed.
+      seen_at_failure.val = log
+        .lines()
+        .filter(line => line.has_prefix("{\"dir\":\"recv\""))
+        .join("\n")
+      let replies = [posted.get(), posted.get()]
+      replies.sort_by((a, b) => a.lexical_compare(b))
+      inspect(
+        replies.join("\n"),
+        content=(
+          #|{"jsonrpc":"2.0","id":"cb-1","result":true}
+          #|{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"I do not accept a batch; I received a JSON array."}}
+        ),
+      )
+      conn.close()
+    })
+  })
+  inspect(
+    outcome.val,
+    content="I lost the event stream of the call to terminal.ping before its reply.",
+  )
+  inspect(
+    seen_at_failure.val,
+    content=(
+      #|{"dir":"recv","message":{"jsonrpc":"2.0","id":"cb-1","method":"pos.confirmTip","params":{}}}
+      #|{"dir":"recv","message":[1,2]}
+    ),
+  )
+}

@@ -219,4 +219,52 @@ async def test_a_dropped_event_stream_fails_the_pending_request() -> None:
     task = asyncio.create_task(peer.run(conn))
     with pytest.raises(ConnectionError, match=r"terminal\.ping"):
         await asyncio.wait_for(peer.request("terminal.ping", None), 5)
+    await conn.close()
+    await asyncio.wait_for(task, 5)
+
+
+async def test_frames_of_a_dropped_stream_go_through_the_dispatcher_first() -> None:
+    posted: list[str] = []
+    answered = asyncio.Event()
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        body = request.content.decode()
+        posted.append(body)
+        if '"method":"terminal.ping"' in body:
+            # (a) a server request, (b) a batch frame, then the stream ends.
+            stream = (
+                ": open\n\n"
+                "event: message\n"
+                'data: {"jsonrpc":"2.0","id":"s1","method":"test.echo","params":[1]}\n\n'
+                'event: message\ndata: [{"jsonrpc":"2.0","id":7,"method":"test.echo"}]\n\n'
+            )
+            return httpx.Response(
+                200,
+                headers={"Smithy-Session-Id": "s1", "content-type": "text/event-stream"},
+                content=stream.encode(),
+            )
+        if len(posted) == 3:
+            answered.set()
+        return httpx.Response(202, headers={"Smithy-Session-Id": "s1"})
+
+    conn = HttpClientConnection(
+        "http://test/rpc", httpx.AsyncClient(transport=httpx.MockTransport(respond))
+    )
+    peer = Peer(self_name="pos", remote_name="terminal", rules=session_rules())
+
+    async def echo(params: JsonValue | None, ctx: CallContext) -> JsonValue:
+        await asyncio.sleep(0.05)
+        return params
+
+    peer.on_request("test.echo", MethodKind.REQUEST_ONLY, echo)
+    task = asyncio.create_task(peer.run(conn))
+    with pytest.raises(ConnectionError, match=r"terminal\.ping"):
+        await asyncio.wait_for(peer.request("terminal.ping", None), 5)
+    await asyncio.wait_for(answered.wait(), 5)
+    assert posted[1:] == [
+        '{"jsonrpc":"2.0","id":null,"error":{"code":-32600,'
+        '"message":"I do not accept a batch; I received a JSON array."}}',
+        '{"jsonrpc":"2.0","id":"s1","result":[1]}',
+    ]
+    await conn.close()
     await asyncio.wait_for(task, 5)

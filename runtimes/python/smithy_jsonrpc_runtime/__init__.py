@@ -5,7 +5,7 @@ Every import in it is relative, so the copy works under any package name.
 """
 
 from . import json_codec
-from .connection import Connection, MemoryConnection, memory_pair
+from .connection import CallLost, Connection, MemoryConnection, memory_pair
 from .errors import (
     INTERNAL_ERROR,
     INVALID_PARAMS,
@@ -72,6 +72,7 @@ __all__ = [
     "Blob",
     "Byte",
     "CallContext",
+    "CallLost",
     "CancelRule",
     "CapabilitySource",
     "Connection",

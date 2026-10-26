@@ -19,7 +19,7 @@ import logging
 
 import httpx
 
-from .connection import SESSION_HEADER
+from .connection import SESSION_HEADER, CallLost
 from .errors import DecodeError
 from .ids import RequestId
 from .json_codec import loads
@@ -41,17 +41,19 @@ class HttpClientConnection:
                 limits=httpx.Limits(max_keepalive_connections=0),
             )
         )
-        self._inbox: asyncio.Queue[str | None] = asyncio.Queue()
+        self._inbox: asyncio.Queue[str | CallLost | None] = asyncio.Queue()
         self._order = asyncio.Lock()
         self._readers: set[asyncio.Task[None]] = set()
-        # Closed for sending: after close() or after a lost stream.
         self._closed = False
         self._shut = False
 
     async def receive(self) -> str | None:
         if self._closed and self._inbox.empty():
             return None
-        return await self._inbox.get()
+        item = await self._inbox.get()
+        if isinstance(item, CallLost):
+            raise item
+        return item
 
     async def send(self, text: str, *, related: RequestId | None = None) -> None:
         async with self._order:
@@ -103,8 +105,9 @@ class HttpClientConnection:
     async def _read_events(self, response: httpx.Response, request_id: RequestId | None) -> None:
         """Read the events of the stream of a request.
 
-        When the stream ends before the response to the request, the session
-        cannot continue: I close the connection, so the calls that wait fail.
+        When the stream ends before the response to the request, the peer
+        first dispatches the messages that the stream delivered. Then it gets
+        `CallLost` and fails that call. The connection stays open.
         """
         data: list[str] = []
         answered = request_id is None
@@ -136,29 +139,23 @@ class HttpClientConnection:
             problem = f"the stream failed: {error}"
         finally:
             await response.aclose()
-        if not answered and not self._closed:
+        if not answered and request_id is not None and not self._closed:
             _LOG.warning(
-                "I lost the event stream of request %s from %s: %s. I close the connection.",
-                request_id,
-                self.url,
-                problem,
+                "I lost the event stream of request %s from %s: %s.", request_id, self.url, problem
             )
-            self._closed = True
-            self._inbox.put_nowait(None)
+            self._inbox.put_nowait(CallLost(request_id, problem))
 
     async def close(self) -> None:
         if self._shut:
             return
         self._shut = True
-        lost = self._closed
         self._closed = True
         for task in list(self._readers):
             task.cancel()
         for task in list(self._readers):
             with contextlib.suppress(asyncio.CancelledError):
                 await task
-        if not lost:
-            self._inbox.put_nowait(None)
+        self._inbox.put_nowait(None)
         await self._client.aclose()
 
 

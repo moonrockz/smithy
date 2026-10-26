@@ -49,7 +49,8 @@ struct HttpClientConnection {
   base : String
   path : String
   mut session : String?
-  inbox : @aqueue.Queue[String]
+  /// The received frames, and the markers of lost streams, in order.
+  inbox : @aqueue.Queue[Inbound]
   mut group : @async.TaskGroup[Unit]?
   /// Fails a pending call of the peer; see `Connection::watch`.
   mut lost : ((RequestId) -> Unit)?
@@ -138,11 +139,19 @@ pub impl Connection for HttpClientConnection with fn start(self, group) {
 
 ///|
 pub impl Connection for HttpClientConnection with fn receive(self) {
-  let text = self.inbox.get() catch {
-    @aqueue.QueueAlreadyClosed => return None
-    err => raise err
+  while true {
+    let item = self.inbox.get() catch {
+      @aqueue.QueueAlreadyClosed => return None
+      err => raise err
+    }
+    match item {
+      Frame(text) => return Some(text)
+      // The peer handled each earlier frame of the stream before it asks
+      // for this item, so the call fails only after them.
+      Lost(id) => if self.lost is Some(lost) { lost(id) }
+    }
   }
-  Some(text)
+  None
 }
 
 ///|
@@ -196,7 +205,7 @@ pub impl Connection for HttpClientConnection with fn send(self, text, related~) 
           if call is Some(id) && is_response_to(data, id) {
             answered.val = true
           }
-          self.inbox.put(data)
+          self.inbox.put(Frame(data))
         }
         read_events(client, deliver) catch {
           err => {
@@ -208,17 +217,17 @@ pub impl Connection for HttpClientConnection with fn send(self, text, related~) 
         }
         // A stream that ends before its response fails that call only.
         if !answered.val {
-          self.lose(call)
+          self.mark_lost(call)
         }
       })
     200 => {
       let reply = client.read_all().text()
       client.close()
       if reply.trim().to_owned() != "" {
-        self.inbox.put(reply)
+        self.inbox.put(Frame(reply))
       }
       if !(call is Some(id) && is_response_to(reply, id)) {
-        self.lose(call)
+        self.mark_lost(call)
       }
     }
     404 => {
@@ -242,13 +251,25 @@ pub impl Connection for HttpClientConnection with fn watch(self, lost) {
 }
 
 ///|
-/// Fails the call `call` of the peer, when there is one.
-fn HttpClientConnection::lose(
+/// An item of the inbox of the HTTP client.
+priv enum Inbound {
+  /// A received message.
+  Frame(String)
+  /// The stream of this call ended before its response.
+  Lost(RequestId)
+}
+
+///|
+/// Puts the marker of the lost stream of `call` after the frames that the
+/// stream delivered. `receive` fails the call when it reaches the marker.
+async fn HttpClientConnection::mark_lost(
   self : HttpClientConnection,
   call : RequestId?,
 ) -> Unit {
-  if call is Some(id) && self.lost is Some(lost) {
-    lost(id)
+  guard call is Some(id) else { return }
+  // A closed inbox ends the session, and that fails the call too.
+  self.inbox.put(Lost(id)) catch {
+    _ => ()
   }
 }
 

@@ -12,7 +12,7 @@ let runtime_files : Array[(String, String)] = [
       #|"""
       #|
       #|from . import json_codec
-      #|from .connection import Connection, MemoryConnection, memory_pair
+      #|from .connection import CallLost, Connection, MemoryConnection, memory_pair
       #|from .errors import (
       #|    INTERNAL_ERROR,
       #|    INVALID_PARAMS,
@@ -79,6 +79,7 @@ let runtime_files : Array[(String, String)] = [
       #|    "Blob",
       #|    "Byte",
       #|    "CallContext",
+      #|    "CallLost",
       #|    "CancelRule",
       #|    "CapabilitySource",
       #|    "Connection",
@@ -151,11 +152,25 @@ let runtime_files : Array[(String, String)] = [
       #|"""The HTTP header that ties the posts of one session together."""
       #|
       #|
+      #|class CallLost(ConnectionError):
+      #|    """A transport lost the way to the reply of one call, such as an HTTP event
+      #|    stream that ended before its response. `Connection.receive` raises it after
+      #|    the messages that came before; the peer fails that call and reads on."""
+      #|
+      #|    def __init__(self, request_id: RequestId, detail: str) -> None:
+      #|        super().__init__(f"I lost the reply to request {request_id}: {detail}.")
+      #|        self.request_id = request_id
+      #|        self.detail = detail
+      #|
+      #|
       #|class Connection(Protocol):
       #|    """A transport that carries one JSON-RPC message per `send` and `receive`."""
       #|
       #|    async def receive(self) -> str | None:
-      #|        """Give the text of the next message, or None when the remote peer closed."""
+      #|        """Give the text of the next message, or None when the remote peer closed.
+      #|
+      #|        A transport that loses the reply to one call raises `CallLost`.
+      #|        """
       #|        ...
       #|
       #|    async def send(self, text: str, *, related: RequestId | None = None) -> None:
@@ -321,7 +336,7 @@ let runtime_files : Array[(String, String)] = [
       #|
       #|import httpx
       #|
-      #|from .connection import SESSION_HEADER
+      #|from .connection import SESSION_HEADER, CallLost
       #|from .errors import DecodeError
       #|from .ids import RequestId
       #|from .json_codec import loads
@@ -343,17 +358,19 @@ let runtime_files : Array[(String, String)] = [
       #|                limits=httpx.Limits(max_keepalive_connections=0),
       #|            )
       #|        )
-      #|        self._inbox: asyncio.Queue[str | None] = asyncio.Queue()
+      #|        self._inbox: asyncio.Queue[str | CallLost | None] = asyncio.Queue()
       #|        self._order = asyncio.Lock()
       #|        self._readers: set[asyncio.Task[None]] = set()
-      #|        # Closed for sending: after close() or after a lost stream.
       #|        self._closed = False
       #|        self._shut = False
       #|
       #|    async def receive(self) -> str | None:
       #|        if self._closed and self._inbox.empty():
       #|            return None
-      #|        return await self._inbox.get()
+      #|        item = await self._inbox.get()
+      #|        if isinstance(item, CallLost):
+      #|            raise item
+      #|        return item
       #|
       #|    async def send(self, text: str, *, related: RequestId | None = None) -> None:
       #|        async with self._order:
@@ -405,8 +422,9 @@ let runtime_files : Array[(String, String)] = [
       #|    async def _read_events(self, response: httpx.Response, request_id: RequestId | None) -> None:
       #|        """Read the events of the stream of a request.
       #|
-      #|        When the stream ends before the response to the request, the session
-      #|        cannot continue: I close the connection, so the calls that wait fail.
+      #|        When the stream ends before the response to the request, the peer
+      #|        first dispatches the messages that the stream delivered. Then it gets
+      #|        `CallLost` and fails that call. The connection stays open.
       #|        """
       #|        data: list[str] = []
       #|        answered = request_id is None
@@ -438,29 +456,23 @@ let runtime_files : Array[(String, String)] = [
       #|            problem = f"the stream failed: {error}"
       #|        finally:
       #|            await response.aclose()
-      #|        if not answered and not self._closed:
+      #|        if not answered and request_id is not None and not self._closed:
       #|            _LOG.warning(
-      #|                "I lost the event stream of request %s from %s: %s. I close the connection.",
-      #|                request_id,
-      #|                self.url,
-      #|                problem,
+      #|                "I lost the event stream of request %s from %s: %s.", request_id, self.url, problem
       #|            )
-      #|            self._closed = True
-      #|            self._inbox.put_nowait(None)
+      #|            self._inbox.put_nowait(CallLost(request_id, problem))
       #|
       #|    async def close(self) -> None:
       #|        if self._shut:
       #|            return
       #|        self._shut = True
-      #|        lost = self._closed
       #|        self._closed = True
       #|        for task in list(self._readers):
       #|            task.cancel()
       #|        for task in list(self._readers):
       #|            with contextlib.suppress(asyncio.CancelledError):
       #|                await task
-      #|        if not lost:
-      #|            self._inbox.put_nowait(None)
+      #|        self._inbox.put_nowait(None)
       #|        await self._client.aclose()
       #|
       #|
@@ -883,7 +895,7 @@ let runtime_files : Array[(String, String)] = [
       #|
       #|from pydantic import ValidationError
       #|
-      #|from .connection import Connection
+      #|from .connection import CallLost, Connection
       #|from .errors import (
       #|    INTERNAL_ERROR,
       #|    INVALID_PARAMS,
@@ -1134,7 +1146,11 @@ let runtime_files : Array[(String, String)] = [
       #|        self._connected.set()
       #|        try:
       #|            while True:
-      #|                text = await conn.receive()
+      #|                try:
+      #|                    text = await conn.receive()
+      #|                except CallLost as lost:
+      #|                    self._lose(lost)
+      #|                    continue
       #|                if text is None:
       #|                    break
       #|                if self.log is not None:
@@ -1154,6 +1170,20 @@ let runtime_files : Array[(String, String)] = [
       #|                        )
       #|                    )
       #|            self._outgoing.clear()
+      #|
+      #|    def _lose(self, lost: CallLost) -> None:
+      #|        """Fail a call whose reply the transport lost. The session does not change."""
+      #|        outgoing = self._outgoing.pop(lost.request_id, None)
+      #|        if outgoing is None:
+      #|            _LOG.warning("%s It matches no call.", lost)
+      #|            return
+      #|        if not outgoing.future.done():
+      #|            outgoing.future.set_exception(
+      #|                ConnectionError(
+      #|                    f"I lost the reply to {outgoing.method} (request {lost.request_id}): "
+      #|                    f"{lost.detail}."
+      #|                )
+      #|            )
       #|
       #|    async def _dispatch(self, text: str) -> None:
       #|        try:

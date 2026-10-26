@@ -18,7 +18,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from .connection import Connection
+from .connection import CallLost, Connection
 from .errors import (
     INTERNAL_ERROR,
     INVALID_PARAMS,
@@ -269,7 +269,11 @@ class Peer:
         self._connected.set()
         try:
             while True:
-                text = await conn.receive()
+                try:
+                    text = await conn.receive()
+                except CallLost as lost:
+                    self._lose(lost)
+                    continue
                 if text is None:
                     break
                 if self.log is not None:
@@ -289,6 +293,20 @@ class Peer:
                         )
                     )
             self._outgoing.clear()
+
+    def _lose(self, lost: CallLost) -> None:
+        """Fail a call whose reply the transport lost. The session does not change."""
+        outgoing = self._outgoing.pop(lost.request_id, None)
+        if outgoing is None:
+            _LOG.warning("%s It matches no call.", lost)
+            return
+        if not outgoing.future.done():
+            outgoing.future.set_exception(
+                ConnectionError(
+                    f"I lost the reply to {outgoing.method} (request {lost.request_id}): "
+                    f"{lost.detail}."
+                )
+            )
 
     async def _dispatch(self, text: str) -> None:
         try:
