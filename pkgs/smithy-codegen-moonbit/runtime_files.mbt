@@ -15,10 +15,19 @@ let runtime_files : Array[(String, String)] = [
       #|///   notification or request that its handler sends. A transport that has
       #|///   one stream per call (HTTP) uses it; other transports ignore it.
       #|/// - `close` closes the connection.
+      #|/// - `start` gives the transport the task group of `Peer::run`, for the
+      #|///   tasks that read its streams. The default does nothing.
       #|pub(open) trait Connection {
       #|  async fn receive(Self) -> String?
       #|  async fn send(Self, String, related~ : RequestId?) -> Unit
       #|  fn close(Self) -> Unit
+      #|  fn start(Self, @async.TaskGroup[Unit]) -> Unit = _
+      #|}
+      #|
+      #|///|
+      #|impl Connection with fn start(self, group) {
+      #|  ignore(self)
+      #|  ignore(group)
       #|}
       #|
       #|///|
@@ -155,6 +164,390 @@ let runtime_files : Array[(String, String)] = [
       #|        _ => None
       #|      }
       #|    _ => None
+      #|  }
+      #|}
+      #|
+    ),
+  ),
+  (
+    "http.mbt",
+    (
+      #|// The HTTP transport, in the style of MCP Streamable HTTP:
+      #|//
+      #|// - The client POSTs each message to one endpoint (`/rpc`), with
+      #|//   `Accept: application/json, text/event-stream`.
+      #|// - The server gives a session ID in `Smithy-Session-Id` on the response to
+      #|//   the first POST, and on each later response. The client sends it on each
+      #|//   later POST. An unknown session ID gives 404.
+      #|// - A POSTed request gets 200 `text/event-stream`. Each event is
+      #|//   `event: message` and `data: <one JSON message>`. The notifications and
+      #|//   requests that the handler of that request sends come first, and its
+      #|//   response comes last; then the stream ends. The server first writes the
+      #|//   SSE comment `: open`, so that the headers go out at once.
+      #|// - A POSTed notification or response gets 202 with an empty body.
+      #|// - Text that is not one JSON object (invalid JSON, a batch) gets 200
+      #|//   `application/json` with one error, and the session does not see it.
+      #|//
+      #|// The client sends the next POST only after it has the response headers of
+      #|// the last POST. So the server receives the messages in the order of the
+      #|// client, and the client knows the session ID before its second POST.
+      #|
+      #|///|
+      #|/// The name of the session header.
+      #|pub let session_header : String = "Smithy-Session-Id"
+      #|
+      #|///|
+      #|/// Splits `http://host:port/path` into the base URL and the path.
+      #|fn split_url(
+      #|  url : String,
+      #|  scheme : String,
+      #|) -> (String, String) raise TransportError {
+      #|  guard url.has_prefix(scheme + "://") else {
+      #|    raise TransportError(
+      #|      "I expected a URL that starts with \{scheme}://, found '\{url}'.",
+      #|    )
+      #|  }
+      #|  let rest = url[scheme.length() + 3:].to_owned()
+      #|  match rest.find("/") {
+      #|    Some(i) if i > 0 =>
+      #|      (scheme + "://" + rest[:i].to_owned(), rest[i:].to_owned())
+      #|    None if rest != "" => (scheme + "://" + rest, "/")
+      #|    _ => raise TransportError("I expected a host in the URL, found '\{url}'.")
+      #|  }
+      #|}
+      #|
+      #|///|
+      #|/// A connection to a JSON-RPC server over HTTP.
+      #|struct HttpClientConnection {
+      #|  url : String
+      #|  base : String
+      #|  path : String
+      #|  mut session : String?
+      #|  inbox : @aqueue.Queue[String]
+      #|  mut group : @async.TaskGroup[Unit]?
+      #|  mut closed : Bool
+      #|}
+      #|
+      #|///|
+      #|/// Connects to the JSON-RPC endpoint at `url`, such as
+      #|/// `http://127.0.0.1:8080/rpc`. It checks that the server accepts a TCP
+      #|/// connection. The first POST starts the session.
+      #|pub async fn http_connect(url : String) -> HttpClientConnection {
+      #|  let (base, path) = split_url(url, "http")
+      #|  let probe = @http.Client(base) catch {
+      #|    err => raise TransportError("I could not connect to \{url}: \{err}")
+      #|  }
+      #|  probe.close()
+      #|  {
+      #|    url,
+      #|    base,
+      #|    path,
+      #|    session: None,
+      #|    inbox: @aqueue.Queue(kind=Unbounded),
+      #|    group: None,
+      #|    closed: false,
+      #|  }
+      #|}
+      #|
+      #|///|
+      #|/// The session ID that the server gave, when it gave one.
+      #|pub fn HttpClientConnection::session_id(self : HttpClientConnection) -> String? {
+      #|  self.session
+      #|}
+      #|
+      #|///|
+      #|/// Reads the events of an SSE stream, and gives the data of each event to
+      #|/// `deliver`.
+      #|async fn[R : @io.Reader] read_events(
+      #|  reader : R,
+      #|  deliver : async (String) -> Unit,
+      #|) -> Unit {
+      #|  let data : Array[String] = []
+      #|  while reader.read_until("\n") is Some(raw) {
+      #|    let line = if raw.has_suffix("\r") {
+      #|      raw[:raw.length() - 1].to_owned()
+      #|    } else {
+      #|      raw
+      #|    }
+      #|    if line == "" {
+      #|      if !data.is_empty() {
+      #|        deliver(data.join("\n"))
+      #|        data.clear()
+      #|      }
+      #|      continue
+      #|    }
+      #|    if line.has_prefix(":") {
+      #|      continue
+      #|    }
+      #|    let (field, value) = match line.find(":") {
+      #|      Some(i) => {
+      #|        let value = line[i + 1:].to_owned()
+      #|        (
+      #|          line[:i].to_owned(),
+      #|          if value.has_prefix(" ") {
+      #|            value[1:].to_owned()
+      #|          } else {
+      #|            value
+      #|          },
+      #|        )
+      #|      }
+      #|      None => (line, "")
+      #|    }
+      #|    if field == "data" {
+      #|      data.push(value)
+      #|    }
+      #|  }
+      #|  if !data.is_empty() {
+      #|    deliver(data.join("\n"))
+      #|  }
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for HttpClientConnection with fn start(self, group) {
+      #|  self.group = Some(group)
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for HttpClientConnection with fn receive(self) {
+      #|  let text = self.inbox.get() catch {
+      #|    @aqueue.QueueAlreadyClosed => return None
+      #|    err => raise err
+      #|  }
+      #|  Some(text)
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for HttpClientConnection with fn send(self, text, related~) {
+      #|  ignore(related)
+      #|  if self.closed {
+      #|    raise TransportError(
+      #|      "I could not send the message: the HTTP connection is closed.",
+      #|    )
+      #|  }
+      #|  guard self.group is Some(group) else {
+      #|    raise TransportError(
+      #|      "I need Peer::run on the HTTP connection to read the replies, found no running peer.",
+      #|    )
+      #|  }
+      #|  let body = @utf8.encode(text)
+      #|  let headers : @http.Headers = {
+      #|    "Content-Type": "application/json",
+      #|    "Accept": "application/json, text/event-stream",
+      #|    "Content-Length": body.length().to_string(),
+      #|  }
+      #|  if self.session is Some(id) {
+      #|    headers[@http.CaseInsensitiveString(session_header)] = id
+      #|  }
+      #|  let client = @http.Client(self.base) catch {
+      #|    err => raise TransportError("I could not connect to \{self.url}: \{err}")
+      #|  }
+      #|  errdefer client.close()
+      #|  let response = client.post(self.path, body, extra_headers=headers)
+      #|  if self.session is None {
+      #|    self.session = response.headers.get(
+      #|      @http.CaseInsensitiveString(session_header),
+      #|    )
+      #|  }
+      #|  let content_type = response.headers
+      #|    .get(@http.CaseInsensitiveString("Content-Type"))
+      #|    .unwrap_or("")
+      #|  match response.code {
+      #|    202 => {
+      #|      client.skip_response_body()
+      #|      client.close()
+      #|    }
+      #|    200 if content_type.has_prefix("text/event-stream") =>
+      #|      group.spawn_bg(allow_failure=true, () => {
+      #|        defer client.close()
+      #|        read_events(client, data => self.inbox.put(data)) catch {
+      #|          err =>
+      #|            if !@async.is_being_cancelled() {
+      #|              diagnose("I lost the event stream from \{self.url}: \{err}")
+      #|              Connection::close(self)
+      #|            }
+      #|        }
+      #|      })
+      #|    200 => {
+      #|      let reply = client.read_all().text()
+      #|      client.close()
+      #|      if reply.trim().to_owned() != "" {
+      #|        self.inbox.put(reply)
+      #|      }
+      #|    }
+      #|    404 => {
+      #|      client.close()
+      #|      raise TransportError(
+      #|        "I expected the server at \{self.url} to know the session \{self.session.unwrap_or("")}, found HTTP status 404.",
+      #|      )
+      #|    }
+      #|    code => {
+      #|      client.close()
+      #|      raise TransportError(
+      #|        "I expected HTTP status 200 or 202 for the POST to \{self.url}, found \{code}.",
+      #|      )
+      #|    }
+      #|  }
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for HttpClientConnection with fn close(self) {
+      #|  self.closed = true
+      #|  self.inbox.close()
+      #|}
+      #|
+      #|///|
+      #|/// One HTTP session on the server: the connection of its Peer.
+      #|struct HttpSession {
+      #|  id : String
+      #|  inbox : @aqueue.Queue[String]
+      #|  /// The open event streams, by the ID of the POSTed request.
+      #|  streams : Map[RequestId, @aqueue.Queue[String?]]
+      #|  /// The messages that came when no stream was open.
+      #|  backlog : Array[String]
+      #|  mut closed : Bool
+      #|}
+      #|
+      #|///|
+      #|fn HttpSession::new(id : String) -> HttpSession {
+      #|  {
+      #|    id,
+      #|    inbox: @aqueue.Queue(kind=Unbounded),
+      #|    streams: Map([]),
+      #|    backlog: [],
+      #|    closed: false,
+      #|  }
+      #|}
+      #|
+      #|///|
+      #|/// Opens the event stream of a POSTed request. The messages of the backlog
+      #|/// go on it first.
+      #|fn HttpSession::open_stream(
+      #|  self : HttpSession,
+      #|  id : RequestId,
+      #|) -> @aqueue.Queue[String?] {
+      #|  let events : @aqueue.Queue[String?] = @aqueue.Queue(kind=Unbounded)
+      #|  for text in self.backlog {
+      #|    let _ = events.try_put(Some(text)) catch { _ => false }
+      #|  }
+      #|  self.backlog.clear()
+      #|  self.streams[id] = events
+      #|  events
+      #|}
+      #|
+      #|///|
+      #|fn HttpSession::latest_stream(self : HttpSession) -> RequestId? {
+      #|  let mut last = None
+      #|  for id, _ in self.streams {
+      #|    last = Some(id)
+      #|  }
+      #|  last
+      #|}
+      #|
+      #|///|
+      #|/// Whether `text` is the response to the call `id`.
+      #|fn is_response_to(text : String, id : RequestId) -> Bool {
+      #|  let value = parse_json(text) catch { _ => return false }
+      #|  guard value is Object(fields) else { return false }
+      #|  fields.get("method") is None &&
+      #|  fields.get("id").bind(RequestId::from_json) == Some(id)
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for HttpSession with fn receive(self) {
+      #|  let text = self.inbox.get() catch {
+      #|    @aqueue.QueueAlreadyClosed => return None
+      #|    err => raise err
+      #|  }
+      #|  Some(text)
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for HttpSession with fn send(self, text, related~) {
+      #|  if self.closed {
+      #|    raise TransportError(
+      #|      "I could not send the message: the HTTP session \{self.id} is closed.",
+      #|    )
+      #|  }
+      #|  let target = match related {
+      #|    Some(id) if self.streams.contains(id) => Some(id)
+      #|    _ => self.latest_stream()
+      #|  }
+      #|  match target {
+      #|    Some(id) => {
+      #|      let events = self.streams[id]
+      #|      events.put(Some(text))
+      #|      if is_response_to(text, id) {
+      #|        events.put(None)
+      #|        self.streams.remove(id)
+      #|      }
+      #|    }
+      #|    None => self.backlog.push(text)
+      #|  }
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for HttpSession with fn close(self) {
+      #|  self.closed = true
+      #|  self.inbox.close()
+      #|  for _, events in self.streams {
+      #|    let _ = events.try_put(None) catch { _ => false }
+      #|  }
+      #|  self.streams.clear()
+      #|}
+      #|
+      #|///|
+      #|/// The kind of a POSTed body.
+      #|priv enum PostKind {
+      #|  /// A request: it gets an event stream.
+      #|  Call(RequestId)
+      #|  /// A notification or a response: it gets 202.
+      #|  Accepted
+      #|  /// Not one message: the HTTP layer answers with this error.
+      #|  Answer(Json)
+      #|}
+      #|
+      #|///|
+      #|fn classify_post(text : String) -> PostKind {
+      #|  let value = parse_json(text) catch {
+      #|    DecodeError(message~, ..) =>
+      #|      return Answer(
+      #|        error_message(
+      #|          None,
+      #|          parse_error_code,
+      #|          "I could not parse the message as JSON: \{message}",
+      #|          None,
+      #|        ),
+      #|      )
+      #|  }
+      #|  guard value is Object(fields) else {
+      #|    let message = if value is Array(_) {
+      #|      "I do not accept a batch; I received a JSON array."
+      #|    } else {
+      #|      "I expected a valid JSON-RPC 2.0 request; I found \{json_kind(value)}."
+      #|    }
+      #|    return Answer(error_message(None, invalid_request_code, message, None))
+      #|  }
+      #|  let id = fields.get("id").bind(RequestId::from_json)
+      #|  if fields.get("method") is Some(_) {
+      #|    match id {
+      #|      Some(id) => Call(id)
+      #|      None => Accepted
+      #|    }
+      #|  } else if fields.get("result") is Some(_) || fields.get("error") is Some(_) {
+      #|    Accepted
+      #|  } else {
+      #|    match id {
+      #|      Some(id) => Call(id)
+      #|      None =>
+      #|        Answer(
+      #|          error_message(
+      #|            None,
+      #|            invalid_request_code,
+      #|            "I expected a valid JSON-RPC 2.0 request; I found an object without a method.",
+      #|            None,
+      #|          ),
+      #|        )
+      #|    }
       #|  }
       #|}
       #|
@@ -843,6 +1236,9 @@ let runtime_files : Array[(String, String)] = [
       #|  "moonbitlang/async/aqueue",
       #|  "moonbitlang/async/cond_var",
       #|  "moonbitlang/async/fs",
+      #|  "moonbitlang/async/http",
+      #|  "moonbitlang/async/socket",
+      #|  "moonbitlang/async/websocket",
       #|  "moonbitlang/async/io",
       #|  "moonbitlang/async/process",
       #|  "moonbitlang/async/stdio",
@@ -916,6 +1312,7 @@ let runtime_files : Array[(String, String)] = [
       #|  handlers : Map[String, Handler]
       #|  references : Map[String, CallReference]
       #|  mut conn : &Connection?
+      #|  mut started : Bool
       #|  mut finished : Bool
       #|  attached : @cond_var.Cond
       #|  lock : @async.Mutex
@@ -987,6 +1384,7 @@ let runtime_files : Array[(String, String)] = [
       #|    handlers: Map([]),
       #|    references: Map([]),
       #|    conn: None,
+      #|    started: false,
       #|    finished: false,
       #|    attached: @cond_var.Cond(),
       #|    lock: @async.Mutex(),
@@ -1270,15 +1668,18 @@ let runtime_files : Array[(String, String)] = [
       #|/// TransportError.
       #|pub async fn Peer::run(self : Peer, conn : &Connection) -> Unit {
       #|  let core = self.core
-      #|  if core.conn is Some(_) || core.finished {
+      #|  if core.started || core.finished {
       #|    raise TransportError(
       #|      "I expected one connection for the peer \{core.self_name}; run was called again.",
       #|    )
       #|  }
-      #|  core.conn = Some(conn)
-      #|  core.attached.broadcast()
+      #|  core.started = true
       #|  defer core.finish()
       #|  @async.with_task_group(group => {
+      #|    // The transport gets the group before any message is sent on it.
+      #|    conn.start(group)
+      #|    core.conn = Some(conn)
+      #|    core.attached.broadcast()
       #|    while conn.receive() is Some(text) {
       #|      core.locked(() => core.receive_locked(group, conn, text))
       #|    }
@@ -1696,6 +2097,182 @@ let runtime_files : Array[(String, String)] = [
     ),
   ),
   (
+    "server.mbt",
+    (
+      #|// The server of the HTTP and the WebSocket transports. One port serves
+      #|// `POST /rpc` (one Peer for each HTTP session) and `GET /ws` (one Peer for
+      #|// each WebSocket).
+      #|
+      #|///|
+      #|/// A server that listens on a port of 127.0.0.1.
+      #|struct RpcServer {
+      #|  server : @http.Server
+      #|  sessions : Map[String, HttpSession]
+      #|  mut next_session : Int32
+      #|}
+      #|
+      #|///|
+      #|/// Starts to listen on `port` of 127.0.0.1. Port 0 picks a free port; see
+      #|/// `RpcServer::port`.
+      #|pub async fn RpcServer::listen(port~ : Int32) -> RpcServer {
+      #|  let addr = @socket.Addr::parse("127.0.0.1:\{port}") catch {
+      #|    _ =>
+      #|      raise TransportError("I expected a port from 0 to 65535, found \{port}.")
+      #|  }
+      #|  let server = @http.Server(addr, reuse_addr=true)
+      #|  { server, sessions: Map([]), next_session: 1, }
+      #|}
+      #|
+      #|///|
+      #|/// The port that the server listens on.
+      #|pub fn RpcServer::port(self : RpcServer) -> Int32 {
+      #|  self.server.addr.port()
+      #|}
+      #|
+      #|///|
+      #|/// Stops the server.
+      #|pub fn RpcServer::close(self : RpcServer) -> Unit {
+      #|  for _, session in self.sessions {
+      #|    Connection::close(session)
+      #|  }
+      #|  self.sessions.clear()
+      #|  self.server.close()
+      #|}
+      #|
+      #|///|
+      #|/// The path of a request target, without the query.
+      #|fn target_path(path : String) -> String {
+      #|  match path.find("?") {
+      #|    Some(i) => path[:i].to_owned()
+      #|    None => path
+      #|  }
+      #|}
+      #|
+      #|///|
+      #|/// Serves the connections until the server is closed. `on_peer` runs once
+      #|/// for each HTTP session and for each WebSocket, with its connection; it
+      #|/// usually runs a Peer on it.
+      #|pub async fn RpcServer::run(
+      #|  self : RpcServer,
+      #|  on_peer : async (&Connection) -> Unit,
+      #|) -> Unit {
+      #|  @async.with_task_group(group => {
+      #|    let start_peer = (conn : &Connection) => {
+      #|      group.spawn_bg(allow_failure=true, () => {
+      #|        on_peer(conn) catch {
+      #|          err =>
+      #|            if !@async.is_being_cancelled() {
+      #|              diagnose("I stopped a peer of the server: \{err}")
+      #|            }
+      #|        }
+      #|      })
+      #|    }
+      #|    self.server.run_forever(allow_failure=true, (request, body, conn) => {
+      #|      match (request.meth, target_path(request.path)) {
+      #|        (Post, "/rpc") => self.handle_post(request, body, conn, start_peer)
+      #|        (Get, "/ws") => {
+      #|          let ws = @websocket.Conn::from_http_server(request, conn)
+      #|          let connection = WsConnection::wrap(ws)
+      #|          defer Connection::close(connection)
+      #|          on_peer(connection)
+      #|        }
+      #|        _ => {
+      #|          conn.skip_request_body()
+      #|          conn
+      #|          ..send_response(404, "Not Found")
+      #|          ..write("I serve POST /rpc and GET /ws, not \{request.path}.")
+      #|          .end_response()
+      #|        }
+      #|      }
+      #|    })
+      #|  })
+      #|}
+      #|
+      #|///|
+      #|/// Answers one POST to `/rpc`.
+      #|async fn RpcServer::handle_post(
+      #|  self : RpcServer,
+      #|  request : @http.Request,
+      #|  body : &@io.Reader,
+      #|  conn : @http.ServerConnection,
+      #|  start_peer : (&Connection) -> Unit,
+      #|) -> Unit {
+      #|  let text = body.read_all().text()
+      #|  let session = match
+      #|    request.headers.get(@http.CaseInsensitiveString(session_header)) {
+      #|    Some(id) =>
+      #|      match self.sessions.get(id) {
+      #|        Some(session) => session
+      #|        None => {
+      #|          conn
+      #|          ..send_response(404, "Not Found")
+      #|          ..write("I do not know the session \{id}.")
+      #|          .end_response()
+      #|          return
+      #|        }
+      #|      }
+      #|    None => {
+      #|      let id = "session-\{@async.now()}-\{self.next_session}"
+      #|      self.next_session += 1
+      #|      let session = HttpSession::new(id)
+      #|      self.sessions[id] = session
+      #|      start_peer(session)
+      #|      session
+      #|    }
+      #|  }
+      #|  let headers : @http.Headers = Map([])
+      #|  headers[@http.CaseInsensitiveString(session_header)] = session.id
+      #|  match classify_post(text) {
+      #|    Answer(reply) => {
+      #|      headers[@http.CaseInsensitiveString("Content-Type")] = "application/json"
+      #|      conn
+      #|      ..send_response(200, "OK", extra_headers=headers)
+      #|      ..write(write_json(reply))
+      #|      .end_response()
+      #|    }
+      #|    Accepted => {
+      #|      session.inbox.put(text)
+      #|      conn..send_response(202, "Accepted", extra_headers=headers).end_response()
+      #|    }
+      #|    Call(id) => {
+      #|      let events = session.open_stream(id)
+      #|      defer (if session.streams.get(id) is Some(open) &&
+      #|        physical_equal(open, events) {
+      #|        session.streams.remove(id)
+      #|      })
+      #|      session.inbox.put(text)
+      #|      headers[@http.CaseInsensitiveString("Content-Type")] = "text/event-stream"
+      #|      headers[@http.CaseInsensitiveString("Cache-Control")] = "no-cache"
+      #|      conn.send_response(200, "OK", extra_headers=headers)
+      #|      conn.write(": open\n\n")
+      #|      conn.flush()
+      #|      while events.get() is Some(message) {
+      #|        conn.write("event: message\ndata: \{message}\n\n")
+      #|        conn.flush()
+      #|      }
+      #|      conn.end_response()
+      #|    }
+      #|  }
+      #|}
+      #|
+      #|///|
+      #|/// Serves `POST /rpc` and `GET /ws` on `port` of 127.0.0.1, and writes
+      #|/// `listening N` to stderr when it is ready, where N is the port. Port 0
+      #|/// picks a free port. `on_peer` runs once for each HTTP session and for each
+      #|/// WebSocket.
+      #|pub async fn serve(
+      #|  port~ : Int32,
+      #|  on_peer : async (&Connection) -> Unit,
+      #|) -> Unit {
+      #|  let server = RpcServer::listen(port~)
+      #|  defer server.close()
+      #|  diagnose("listening \{server.port()}")
+      #|  server.run(on_peer)
+      #|}
+      #|
+    ),
+  ),
+  (
     "session.mbt",
     (
       #|// The session engine. The generator renders the rules from the prepared
@@ -2087,11 +2664,15 @@ let runtime_files : Array[(String, String)] = [
       #|  pid : Int32
       #|  reader : @process.ReadFromProcess
       #|  writer : @process.WriteToProcess
+      #|  /// True after `close`: the stdin of the child is closed.
       #|  mut closed : Bool
+      #|  /// True after the end of the stdout of the child.
+      #|  mut ended : Bool
       #|}
       #|
       #|///|
-      #|/// Starts `argv` as a child process and connects to its stdio.
+      #|/// Starts `argv` as a child process and connects to its stdio. A command
+      #|/// without a `/` is searched in PATH; an absolute path is the safe choice.
       #|pub async fn spawn_stdio(argv : Array[String]) -> ProcessConnection {
       #|  guard argv.length() > 0 else {
       #|    raise TransportError(
@@ -2106,7 +2687,7 @@ let runtime_files : Array[(String, String)] = [
       #|    stdin=child_in,
       #|    stdout=child_out,
       #|  )
-      #|  { pid, reader, writer, closed: false, }
+      #|  { pid, reader, writer, closed: false, ended: false, }
       #|}
       #|
       #|///|
@@ -2123,10 +2704,17 @@ let runtime_files : Array[(String, String)] = [
       #|
       #|///|
       #|pub impl Connection for ProcessConnection with fn receive(self) {
-      #|  if self.closed {
+      #|  if self.ended {
       #|    return None
       #|  }
-      #|  read_frame(self.reader)
+      #|  // After `close`, the frames that the child still writes are read until
+      #|  // the end of its stdout.
+      #|  let frame = read_frame(self.reader)
+      #|  if frame is None {
+      #|    self.ended = true
+      #|    self.reader.close()
+      #|  }
+      #|  frame
       #|}
       #|
       #|///|
@@ -2141,13 +2729,14 @@ let runtime_files : Array[(String, String)] = [
       #|}
       #|
       #|///|
-      #|/// Closes the stdin of the child, so that it reads the end of its input,
-      #|/// and stops the reading of its stdout.
+      #|/// Closes the stdin of the child, so that it reads the end of its input.
+      #|/// `receive` then gives the rest of the stdout of the child, and None when
+      #|/// the child closes its stdout (usually when it exits). The read end is not
+      #|/// closed here: a read that waits on a closed handle would never end.
       #|pub impl Connection for ProcessConnection with fn close(self) {
       #|  if !self.closed {
       #|    self.closed = true
       #|    self.writer.close()
-      #|    self.reader.close()
       #|  }
       #|}
       #|
@@ -2809,6 +3398,119 @@ let runtime_files : Array[(String, String)] = [
       #|    out.push(fields.get(names[index]).unwrap_or(Json::null()))
       #|  }
       #|  Json::array(out)
+      #|}
+      #|
+    ),
+  ),
+  (
+    "websocket.mbt",
+    (
+      #|// The WebSocket transport: one JSON-RPC message in each text frame, in both
+      #|// directions.
+      #|
+      #|///|
+      #|/// A WebSocket as a connection.
+      #|///
+      #|/// With `Peer::run`, a reader task of the peer reads the frames into an
+      #|/// inbox, so that `close` can end `receive` at once: a read that waits on a
+      #|/// closed socket would never end.
+      #|struct WsConnection {
+      #|  conn : @websocket.Conn
+      #|  inbox : @aqueue.Queue[String]
+      #|  mut reading : Bool
+      #|  mut closed : Bool
+      #|}
+      #|
+      #|///|
+      #|fn WsConnection::wrap(conn : @websocket.Conn) -> WsConnection {
+      #|  { conn, inbox: @aqueue.Queue(kind=Unbounded), reading: false, closed: false, }
+      #|}
+      #|
+      #|///|
+      #|/// Connects to the WebSocket endpoint at `url`, such as
+      #|/// `ws://127.0.0.1:8080/ws`.
+      #|pub async fn ws_connect(url : String) -> WsConnection {
+      #|  guard url.has_prefix("ws://") else {
+      #|    raise TransportError(
+      #|      "I expected a URL that starts with ws://, found '\{url}'.",
+      #|    )
+      #|  }
+      #|  let conn = @websocket.connect(url) catch {
+      #|    err => raise TransportError("I could not connect to \{url}: \{err}")
+      #|  }
+      #|  WsConnection::wrap(conn)
+      #|}
+      #|
+      #|///|
+      #|/// Reads the next text frame, or None when the socket is closed.
+      #|async fn WsConnection::read_message(self : WsConnection) -> String? {
+      #|  let message = self.conn.recv() catch {
+      #|    @websocket.ConnectionClosed(_, _) | @io.ReaderClosed => return None
+      #|    err => if self.closed { return None } else { raise err }
+      #|  }
+      #|  Some(message.read_all().text())
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for WsConnection with fn start(self, group) {
+      #|  self.reading = true
+      #|  group.spawn_bg(allow_failure=true, () => {
+      #|    defer self.inbox.close()
+      #|    try {
+      #|      while !self.closed {
+      #|        match self.read_message() {
+      #|          Some(text) => self.inbox.put(text)
+      #|          None => break
+      #|        }
+      #|      }
+      #|    } catch {
+      #|      err =>
+      #|        if !self.closed && !@async.is_being_cancelled() {
+      #|          diagnose("I lost the WebSocket: \{err}")
+      #|        }
+      #|    }
+      #|  })
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for WsConnection with fn receive(self) {
+      #|  if !self.reading {
+      #|    if self.closed {
+      #|      return None
+      #|    }
+      #|    return self.read_message()
+      #|  }
+      #|  let text = self.inbox.get() catch {
+      #|    @aqueue.QueueAlreadyClosed => return None
+      #|    err => raise err
+      #|  }
+      #|  Some(text)
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for WsConnection with fn send(self, text, related~) {
+      #|  ignore(related)
+      #|  if self.closed {
+      #|    raise TransportError(
+      #|      "I could not send the message: the WebSocket is closed.",
+      #|    )
+      #|  }
+      #|  self.conn.send_text(text) catch {
+      #|    @websocket.ConnectionClosed(_, _) =>
+      #|      raise TransportError(
+      #|        "I could not send the message: the WebSocket is closed.",
+      #|      )
+      #|    err => raise err
+      #|  }
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for WsConnection with fn close(self) {
+      #|  if !self.closed {
+      #|    self.closed = true
+      #|    self.inbox.close()
+      #|    self.conn.close()
+      #|  }
       #|}
       #|
     ),

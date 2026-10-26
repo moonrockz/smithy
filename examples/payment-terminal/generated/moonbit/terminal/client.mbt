@@ -13,23 +13,47 @@ pub fn PointOfSaleClient::new(peer : @rpc.Peer) -> PointOfSaleClient {
 }
 
 ///|
-pub async fn PointOfSaleClient::payment_progress(self : PointOfSaleClient, input : PaymentProgressInput, checked~ : Bool = true) -> Unit raise {
+pub async fn PointOfSaleClient::payment_progress(
+  self : PointOfSaleClient,
+  input : PaymentProgressInput,
+  checked~ : Bool = true,
+) -> Unit {
   self.peer.notify("payment.progress", Some(input.to_json()), checked~)
 }
 
 ///|
-pub async fn PointOfSaleClient::confirm_tip(self : PointOfSaleClient, input : ConfirmTipInput, checked~ : Bool = true) -> Bool raise {
-  let result = self.peer.request("pos.confirmTip", Some(input.to_json()), checked~)
+pub async fn PointOfSaleClient::confirm_tip(
+  self : PointOfSaleClient,
+  input : ConfirmTipInput,
+  checked~ : Bool = true,
+) -> Bool {
+  let result = self.peer.request(
+    "pos.confirmTip",
+    Some(input.to_json()),
+    checked~,
+  )
   @rpc.decode_bool(result, path="/result")
 }
 
 ///|
-pub async fn PointOfSaleClient::display(self : PointOfSaleClient, input : DisplayInput, checked~ : Bool = true) -> Unit raise {
+pub async fn PointOfSaleClient::display(
+  self : PointOfSaleClient,
+  input : DisplayInput,
+  checked~ : Bool = true,
+) -> Unit {
   self.peer.notify("pos.display", Some(input.to_json()), checked~)
 }
 
 ///|
-pub async fn PointOfSaleClient::request_signature(self : PointOfSaleClient, input : RequestSignatureInput, checked~ : Bool = true) -> Bytes raise {
-  let result = self.peer.request("pos.requestSignature", Some(input.to_json()), checked~)
+pub async fn PointOfSaleClient::request_signature(
+  self : PointOfSaleClient,
+  input : RequestSignatureInput,
+  checked~ : Bool = true,
+) -> Bytes {
+  let result = self.peer.request(
+    "pos.requestSignature",
+    Some(input.to_json()),
+    checked~,
+  )
   @rpc.decode_blob(result, path="/result")
 }

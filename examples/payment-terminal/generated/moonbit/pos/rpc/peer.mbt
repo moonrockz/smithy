@@ -57,6 +57,7 @@ priv struct PeerCore {
   handlers : Map[String, Handler]
   references : Map[String, CallReference]
   mut conn : &Connection?
+  mut started : Bool
   mut finished : Bool
   attached : @cond_var.Cond
   lock : @async.Mutex
@@ -128,6 +129,7 @@ pub fn Peer::new(
     handlers: Map([]),
     references: Map([]),
     conn: None,
+    started: false,
     finished: false,
     attached: @cond_var.Cond(),
     lock: @async.Mutex(),
@@ -411,15 +413,18 @@ pub async fn Peer::notify(
 /// TransportError.
 pub async fn Peer::run(self : Peer, conn : &Connection) -> Unit {
   let core = self.core
-  if core.conn is Some(_) || core.finished {
+  if core.started || core.finished {
     raise TransportError(
       "I expected one connection for the peer \{core.self_name}; run was called again.",
     )
   }
-  core.conn = Some(conn)
-  core.attached.broadcast()
+  core.started = true
   defer core.finish()
   @async.with_task_group(group => {
+    // The transport gets the group before any message is sent on it.
+    conn.start(group)
+    core.conn = Some(conn)
+    core.attached.broadcast()
     while conn.receive() is Some(text) {
       core.locked(() => core.receive_locked(group, conn, text))
     }

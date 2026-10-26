@@ -134,11 +134,15 @@ struct ProcessConnection {
   pid : Int32
   reader : @process.ReadFromProcess
   writer : @process.WriteToProcess
+  /// True after `close`: the stdin of the child is closed.
   mut closed : Bool
+  /// True after the end of the stdout of the child.
+  mut ended : Bool
 }
 
 ///|
-/// Starts `argv` as a child process and connects to its stdio.
+/// Starts `argv` as a child process and connects to its stdio. A command
+/// without a `/` is searched in PATH; an absolute path is the safe choice.
 pub async fn spawn_stdio(argv : Array[String]) -> ProcessConnection {
   guard argv.length() > 0 else {
     raise TransportError(
@@ -153,7 +157,7 @@ pub async fn spawn_stdio(argv : Array[String]) -> ProcessConnection {
     stdin=child_in,
     stdout=child_out,
   )
-  { pid, reader, writer, closed: false, }
+  { pid, reader, writer, closed: false, ended: false, }
 }
 
 ///|
@@ -170,10 +174,17 @@ pub async fn ProcessConnection::wait(self : ProcessConnection) -> Int32 {
 
 ///|
 pub impl Connection for ProcessConnection with fn receive(self) {
-  if self.closed {
+  if self.ended {
     return None
   }
-  read_frame(self.reader)
+  // After `close`, the frames that the child still writes are read until
+  // the end of its stdout.
+  let frame = read_frame(self.reader)
+  if frame is None {
+    self.ended = true
+    self.reader.close()
+  }
+  frame
 }
 
 ///|
@@ -188,12 +199,13 @@ pub impl Connection for ProcessConnection with fn send(self, text, related~) {
 }
 
 ///|
-/// Closes the stdin of the child, so that it reads the end of its input,
-/// and stops the reading of its stdout.
+/// Closes the stdin of the child, so that it reads the end of its input.
+/// `receive` then gives the rest of the stdout of the child, and None when
+/// the child closes its stdout (usually when it exits). The read end is not
+/// closed here: a read that waits on a closed handle would never end.
 pub impl Connection for ProcessConnection with fn close(self) {
   if !self.closed {
     self.closed = true
     self.writer.close()
-    self.reader.close()
   }
 }

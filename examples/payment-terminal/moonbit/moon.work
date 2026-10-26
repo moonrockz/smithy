@@ -1,0 +1,5 @@
+members = [
+  ".",
+  "../generated/moonbit/pos",
+  "../generated/moonbit/terminal",
+]

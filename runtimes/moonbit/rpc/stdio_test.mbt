@@ -92,3 +92,31 @@ async test "spawn_stdio needs a command" {
     content="I expected a command to start, found an empty argument list.",
   )
 }
+
+///|
+async test "Peer::run returns when the child process exits" {
+  // The child reads one frame header line and exits.
+  let conn = @rpc.spawn_stdio(["/bin/sh", "-c", "head -n 1 >/dev/null; exit 0"])
+  let pos = new_pos(@rpc.TranscriptLog::memory())
+  @async.with_timeout(5000, () => {
+    @async.with_task_group(group => {
+      group.spawn_bg(() => pos.run(conn))
+      pos.notify("terminal.ping", None, checked=false)
+    })
+  })
+  inspect(conn.wait(), content="0")
+}
+
+///|
+async test "Peer::run returns after close while it reads from a child" {
+  let conn = @rpc.spawn_stdio(["/bin/cat"])
+  let pos = new_pos(@rpc.TranscriptLog::memory())
+  @async.with_timeout(5000, () => {
+    @async.with_task_group(group => {
+      group.spawn_bg(() => pos.run(conn))
+      @async.sleep(20)
+      conn.close()
+    })
+  })
+  inspect(conn.wait(), content="0")
+}

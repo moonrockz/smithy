@@ -112,6 +112,16 @@ async fn main {
       println("I skipped `\{artifact}`: the build did not write it.")
       continue
     }
+    // A generated MoonBit module is formatted with `moon fmt`, so the golden
+    // files are the formatted text and a format run in a workspace that
+    // includes them changes nothing.
+    if artifact.has_prefix("moonbit-") {
+      let code = @process.run("moon", ["-C", source, "fmt"])
+      if code != 0 {
+        println("❌ moon fmt failed in \{source} with exit status \{code}.")
+        @sys.exit(1)
+      }
+    }
     let generated = files_below(source)
     let existing = files_below(golden)
     for path in existing {

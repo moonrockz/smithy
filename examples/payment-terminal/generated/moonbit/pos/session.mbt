@@ -4,17 +4,55 @@
 /// The session rules of the protocol, from the prepared contract.
 pub fn session_rules() -> @rpc.SessionRules {
   @rpc.SessionRules::new(
-    states=["starting", "initializing", "ready", "paying", "stopping", "stopped"],
+    states=[
+      "starting", "initializing", "ready", "paying", "stopping", "stopped",
+    ],
     capabilities=[
-      @rpc.CapabilitySource::new(name="cancellation", method_name="terminal.initialize", pointer="/capabilities/cancellation"),
-      @rpc.CapabilitySource::new(name="chip", method_name="terminal.initialize", pointer="/capabilities/chip"),
-      @rpc.CapabilitySource::new(name="contactless", method_name="terminal.initialize", pointer="/capabilities/contactless"),
-      @rpc.CapabilitySource::new(name="payment", method_name="terminal.initialize", pointer="/capabilities/payment"),
-      @rpc.CapabilitySource::new(name="pin", method_name="terminal.initialize", pointer="/capabilities/pin"),
-      @rpc.CapabilitySource::new(name="progress", method_name="terminal.initialize", pointer="/capabilities/progress"),
-      @rpc.CapabilitySource::new(name="signature", method_name="terminal.initialize", pointer="/capabilities/signature"),
-      @rpc.CapabilitySource::new(name="swipe", method_name="terminal.initialize", pointer="/capabilities/swipe"),
-      @rpc.CapabilitySource::new(name="tips", method_name="terminal.initialize", pointer="/capabilities/tips"),
+      @rpc.CapabilitySource::new(
+        name="cancellation",
+        method_name="terminal.initialize",
+        pointer="/capabilities/cancellation",
+      ),
+      @rpc.CapabilitySource::new(
+        name="chip",
+        method_name="terminal.initialize",
+        pointer="/capabilities/chip",
+      ),
+      @rpc.CapabilitySource::new(
+        name="contactless",
+        method_name="terminal.initialize",
+        pointer="/capabilities/contactless",
+      ),
+      @rpc.CapabilitySource::new(
+        name="payment",
+        method_name="terminal.initialize",
+        pointer="/capabilities/payment",
+      ),
+      @rpc.CapabilitySource::new(
+        name="pin",
+        method_name="terminal.initialize",
+        pointer="/capabilities/pin",
+      ),
+      @rpc.CapabilitySource::new(
+        name="progress",
+        method_name="terminal.initialize",
+        pointer="/capabilities/progress",
+      ),
+      @rpc.CapabilitySource::new(
+        name="signature",
+        method_name="terminal.initialize",
+        pointer="/capabilities/signature",
+      ),
+      @rpc.CapabilitySource::new(
+        name="swipe",
+        method_name="terminal.initialize",
+        pointer="/capabilities/swipe",
+      ),
+      @rpc.CapabilitySource::new(
+        name="tips",
+        method_name="terminal.initialize",
+        pointer="/capabilities/tips",
+      ),
     ],
     methods=[
       @rpc.MethodRule::new(
@@ -65,7 +103,9 @@ pub fn session_rules() -> @rpc.SessionRules {
         on_success=None,
         on_error=None,
         requires=["cancellation"],
-        cancels=Some(@rpc.CancelRule::new(id_member="id", position=None, code=Some(-32800))),
+        cancels=Some(
+          @rpc.CancelRule::new(id_member="id", position=None, code=Some(-32800)),
+        ),
       ),
       @rpc.MethodRule::new(
         receiver="terminal",
@@ -168,7 +208,12 @@ pub fn session_rules() -> @rpc.SessionRules {
         cancels=None,
       ),
     ],
-    refusals=[("initializing", 1007), ("starting", 1007), ("stopped", 1007), ("stopping", 1007)],
+    refusals=[
+      ("initializing", 1007),
+      ("starting", 1007),
+      ("stopped", 1007),
+      ("stopping", 1007),
+    ],
     capability_refusal=Some(1008),
   )
 }
@@ -176,5 +221,10 @@ pub fn session_rules() -> @rpc.SessionRules {
 ///|
 /// A peer `pos` that talks to peer `terminal`, with the session rules.
 pub fn new_peer(log? : @rpc.TranscriptLog) -> @rpc.Peer {
-  @rpc.Peer::new(self_name="pos", remote_name="terminal", rules=session_rules(), log~)
+  @rpc.Peer::new(
+    self_name="pos",
+    remote_name="terminal",
+    rules=session_rules(),
+    log~,
+  )
 }

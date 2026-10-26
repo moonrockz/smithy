@@ -4,31 +4,58 @@
 /// The handlers of service `example.payments#PointOfSale`. The generated code decodes the
 /// parameters, calls the handler and encodes the result.
 pub(open) trait PointOfSaleHandler {
-  async payment_progress(Self, PaymentProgressInput, @rpc.CallContext) -> Unit raise
-  async confirm_tip(Self, ConfirmTipInput, @rpc.CallContext) -> Bool raise
-  async display(Self, DisplayInput, @rpc.CallContext) -> Unit raise
-  async request_signature(Self, RequestSignatureInput, @rpc.CallContext) -> Bytes raise
+  async fn payment_progress(Self, PaymentProgressInput, @rpc.CallContext) -> Unit
+  async fn confirm_tip(Self, ConfirmTipInput, @rpc.CallContext) -> Bool
+  async fn display(Self, DisplayInput, @rpc.CallContext) -> Unit
+  async fn request_signature(Self, RequestSignatureInput, @rpc.CallContext) -> Bytes
 }
 
 ///|
 /// Register the handlers of `PointOfSaleHandler` on a peer.
-pub fn register_point_of_sale(peer : @rpc.Peer, handler : &PointOfSaleHandler) -> Unit {
+pub fn register_point_of_sale(
+  peer : @rpc.Peer,
+  handler : &PointOfSaleHandler,
+) -> Unit {
   peer.call_reference("payment.progress", id_member="requestId", position=None)
-  peer.on_notification("payment.progress", @rpc.NotificationOnly, async fn(params, context) {
-    let input = PaymentProgressInput::from_json(@rpc.named_params(params, path="/params"), path="/params")
+  peer.on_notification("payment.progress", @rpc.NotificationOnly, async fn(
+    params,
+    context,
+  ) {
+    let input = PaymentProgressInput::from_json(
+      @rpc.named_params(params, path="/params"),
+      path="/params",
+    )
     handler.payment_progress(input, context)
   })
-  peer.on_request("pos.confirmTip", @rpc.RequestOnly, async fn(params, context) {
-    let input = ConfirmTipInput::from_json(@rpc.named_params(params, path="/params"), path="/params")
+  peer.on_request("pos.confirmTip", @rpc.RequestOnly, async fn(
+    params,
+    context,
+  ) {
+    let input = ConfirmTipInput::from_json(
+      @rpc.named_params(params, path="/params"),
+      path="/params",
+    )
     let result = handler.confirm_tip(input, context)
     Json::boolean(result)
   })
-  peer.on_notification("pos.display", @rpc.NotificationOnly, async fn(params, context) {
-    let input = DisplayInput::from_json(@rpc.named_params(params, path="/params"), path="/params")
+  peer.on_notification("pos.display", @rpc.NotificationOnly, async fn(
+    params,
+    context,
+  ) {
+    let input = DisplayInput::from_json(
+      @rpc.named_params(params, path="/params"),
+      path="/params",
+    )
     handler.display(input, context)
   })
-  peer.on_request("pos.requestSignature", @rpc.RequestOnly, async fn(params, context) {
-    let input = RequestSignatureInput::from_json(@rpc.named_params(params, path="/params"), path="/params")
+  peer.on_request("pos.requestSignature", @rpc.RequestOnly, async fn(
+    params,
+    context,
+  ) {
+    let input = RequestSignatureInput::from_json(
+      @rpc.named_params(params, path="/params"),
+      path="/params",
+    )
     let result = handler.request_signature(input, context)
     @rpc.encode_blob(result)
   })

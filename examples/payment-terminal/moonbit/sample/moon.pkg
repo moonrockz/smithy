@@ -1,0 +1,12 @@
+import {
+  "example/pos",
+  "example/pos/rpc" @pos_rpc,
+  "example/terminal",
+  "example/terminal/rpc" @terminal_rpc,
+  "moonbitlang/async",
+  "moonbitlang/async/stdio",
+}
+
+import {
+  "moonbitlang/async/aqueue",
+} for "wbtest"

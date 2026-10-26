@@ -31,6 +31,8 @@ let publish_list : Array[(String, String)] = [
   ("pkgs/smithy-build", "moonrockz/smithy-build"),
   ("pkgs/smithy-codegen", "moonrockz/smithy-codegen"),
   ("pkgs/smithy-codegen-jsonrpc", "moonrockz/smithy-codegen-jsonrpc"),
+  ("pkgs/smithy-codegen-moonbit", "moonrockz/smithy-codegen-moonbit"),
+  ("pkgs/smithy-codegen-python", "moonrockz/smithy-codegen-python"),
   ("pkgs/smithy-diff", "moonrockz/smithy-diff"),
   ("pkgs/smithy-jsonschema", "moonrockz/smithy-jsonschema"),
   ("pkgs/smithy-openapi", "moonrockz/smithy-openapi"),

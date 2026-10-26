@@ -9,9 +9,12 @@ pub fn CardRemoved::to_json(_self : CardRemoved) -> Json {
 }
 
 ///|
-pub fn CardRemoved::from_json(json : Json, path~ : String = "") -> CardRemoved raise @rpc.DecodeError {
+pub fn CardRemoved::from_json(
+  json : Json,
+  path~ : String = "",
+) -> CardRemoved raise @rpc.DecodeError {
   let _ = @rpc.object_of(json, path~)
-  CardRemoved::{  }
+  CardRemoved::{ }
 }
 
 ///|
@@ -27,10 +30,16 @@ pub fn PaymentNotFound::to_json(self : PaymentNotFound) -> Json {
 }
 
 ///|
-pub fn PaymentNotFound::from_json(json : Json, path~ : String = "") -> PaymentNotFound raise @rpc.DecodeError {
+pub fn PaymentNotFound::from_json(
+  json : Json,
+  path~ : String = "",
+) -> PaymentNotFound raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   PaymentNotFound::{
-    payment_id: @rpc.decode_string(@rpc.required(fields, "paymentId", path~), path=path + "/paymentId"),
+    payment_id: @rpc.decode_string(
+      @rpc.required(fields, "paymentId", path~),
+      path=path + "/paymentId",
+    ),
   }
 }
 
@@ -43,28 +52,39 @@ pub fn Timeout::to_json(_self : Timeout) -> Json {
 }
 
 ///|
-pub fn Timeout::from_json(json : Json, path~ : String = "") -> Timeout raise @rpc.DecodeError {
+pub fn Timeout::from_json(
+  json : Json,
+  path~ : String = "",
+) -> Timeout raise @rpc.DecodeError {
   let _ = @rpc.object_of(json, path~)
-  Timeout::{  }
+  Timeout::{ }
 }
 
 ///|
 pub(all) struct TerminalBusy {
-  retry_after_seconds : Int
+  retry_after_seconds : Int32
 } derive(Eq, Debug)
 
 ///|
 pub fn TerminalBusy::to_json(self : TerminalBusy) -> Json {
   let fields : Map[String, Json] = Map([])
-  fields["retryAfterSeconds"] = Json::number(self.retry_after_seconds.to_double())
+  fields["retryAfterSeconds"] = Json::number(
+    self.retry_after_seconds.to_double(),
+  )
   Json::object(fields)
 }
 
 ///|
-pub fn TerminalBusy::from_json(json : Json, path~ : String = "") -> TerminalBusy raise @rpc.DecodeError {
+pub fn TerminalBusy::from_json(
+  json : Json,
+  path~ : String = "",
+) -> TerminalBusy raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   TerminalBusy::{
-    retry_after_seconds: @rpc.decode_int(@rpc.required(fields, "retryAfterSeconds", path~), path=path + "/retryAfterSeconds"),
+    retry_after_seconds: @rpc.decode_int(
+      @rpc.required(fields, "retryAfterSeconds", path~),
+      path=path + "/retryAfterSeconds",
+    ),
   }
 }
 
@@ -81,10 +101,16 @@ pub fn CardDeclined::to_json(self : CardDeclined) -> Json {
 }
 
 ///|
-pub fn CardDeclined::from_json(json : Json, path~ : String = "") -> CardDeclined raise @rpc.DecodeError {
+pub fn CardDeclined::from_json(
+  json : Json,
+  path~ : String = "",
+) -> CardDeclined raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   CardDeclined::{
-    reason: @rpc.decode_string(@rpc.required(fields, "reason", path~), path=path + "/reason"),
+    reason: @rpc.decode_string(
+      @rpc.required(fields, "reason", path~),
+      path=path + "/reason",
+    ),
   }
 }
 
@@ -103,11 +129,20 @@ pub fn RefundExceedsAmount::to_json(self : RefundExceedsAmount) -> Json {
 }
 
 ///|
-pub fn RefundExceedsAmount::from_json(json : Json, path~ : String = "") -> RefundExceedsAmount raise @rpc.DecodeError {
+pub fn RefundExceedsAmount::from_json(
+  json : Json,
+  path~ : String = "",
+) -> RefundExceedsAmount raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   RefundExceedsAmount::{
-    payment_id: @rpc.decode_string(@rpc.required(fields, "paymentId", path~), path=path + "/paymentId"),
-    maximum: Money::from_json(@rpc.required(fields, "maximum", path~), path=path + "/maximum"),
+    payment_id: @rpc.decode_string(
+      @rpc.required(fields, "paymentId", path~),
+      path=path + "/paymentId",
+    ),
+    maximum: Money::from_json(
+      @rpc.required(fields, "maximum", path~),
+      path=path + "/maximum",
+    ),
   }
 }
 
@@ -130,15 +165,31 @@ fn to_rpc_error(error : Error) -> Error {
     ServiceError::CardRemoved(_) =>
       @rpc.RpcError(code=1002, message="CardRemoved", data=None)
     ServiceError::PaymentNotFound(value) =>
-      @rpc.RpcError(code=1005, message="PaymentNotFound", data=Some(value.to_json()))
+      @rpc.RpcError(
+        code=1005,
+        message="PaymentNotFound",
+        data=Some(value.to_json()),
+      )
     ServiceError::Timeout(_) =>
       @rpc.RpcError(code=1004, message="Timeout", data=None)
     ServiceError::TerminalBusy(value) =>
-      @rpc.RpcError(code=1003, message="TerminalBusy", data=Some(value.to_json()))
+      @rpc.RpcError(
+        code=1003,
+        message="TerminalBusy",
+        data=Some(value.to_json()),
+      )
     ServiceError::CardDeclined(value) =>
-      @rpc.RpcError(code=1001, message="CardDeclined", data=Some(Json::string(value.reason)))
+      @rpc.RpcError(
+        code=1001,
+        message="CardDeclined",
+        data=Some(Json::string(value.reason)),
+      )
     ServiceError::RefundExceedsAmount(value) =>
-      @rpc.RpcError(code=1006, message="RefundExceedsAmount", data=Some(value.to_json()))
+      @rpc.RpcError(
+        code=1006,
+        message="RefundExceedsAmount",
+        data=Some(value.to_json()),
+      )
     other => other
   }
 }

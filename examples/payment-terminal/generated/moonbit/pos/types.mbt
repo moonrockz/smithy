@@ -13,10 +13,16 @@ pub fn PaymentIdInput::to_json(self : PaymentIdInput) -> Json {
 }
 
 ///|
-pub fn PaymentIdInput::from_json(json : Json, path~ : String = "") -> PaymentIdInput raise @rpc.DecodeError {
+pub fn PaymentIdInput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> PaymentIdInput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   PaymentIdInput::{
-    payment_id: @rpc.decode_string(@rpc.required(fields, "paymentId", path~), path=path + "/paymentId"),
+    payment_id: @rpc.decode_string(
+      @rpc.required(fields, "paymentId", path~),
+      path=path + "/paymentId",
+    ),
   }
 }
 
@@ -33,10 +39,16 @@ pub fn TestCard::to_json(self : TestCard) -> Json {
 }
 
 ///|
-pub fn TestCard::from_json(json : Json, path~ : String = "") -> TestCard raise @rpc.DecodeError {
+pub fn TestCard::from_json(
+  json : Json,
+  path~ : String = "",
+) -> TestCard raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   TestCard::{
-    masked_number: @rpc.decode_string(@rpc.required(fields, "maskedNumber", path~), path=path + "/maskedNumber"),
+    masked_number: @rpc.decode_string(
+      @rpc.required(fields, "maskedNumber", path~),
+      path=path + "/maskedNumber",
+    ),
   }
 }
 
@@ -59,15 +71,30 @@ pub fn EntryMethod::to_json(self : EntryMethod) -> Json {
 }
 
 ///|
-pub fn EntryMethod::from_json(json : Json, path~ : String = "") -> EntryMethod raise @rpc.DecodeError {
+pub fn EntryMethod::from_json(
+  json : Json,
+  path~ : String = "",
+) -> EntryMethod raise @rpc.DecodeError {
   let (tag, value) = @rpc.union_member(json, path~)
   match tag {
-    "swipe" => EntryMethod::Swipe(TestCard::from_json(value, path=path + "/swipe"))
+    "swipe" =>
+      EntryMethod::Swipe(TestCard::from_json(value, path=path + "/swipe"))
     "chip" => EntryMethod::Chip(TestCard::from_json(value, path=path + "/chip"))
-    "contactless" => EntryMethod::Contactless(TestCard::from_json(value, path=path + "/contactless"))
-    "manualEntry" => EntryMethod::ManualEntry(TestCard::from_json(value, path=path + "/manualEntry"))
+    "contactless" =>
+      EntryMethod::Contactless(
+        TestCard::from_json(value, path=path + "/contactless"),
+      )
+    "manualEntry" =>
+      EntryMethod::ManualEntry(
+        TestCard::from_json(value, path=path + "/manualEntry"),
+      )
     _ =>
-      raise @rpc.DecodeError(path~, message="I expected a member of union `EntryMethod` (chip, contactless, manualEntry, swipe), found `" + tag + "`.")
+      raise @rpc.DecodeError(
+        path~,
+        message="I expected a member of union `EntryMethod` (chip, contactless, manualEntry, swipe), found `" +
+          tag +
+          "`.",
+      )
   }
 }
 
@@ -118,7 +145,10 @@ pub fn Capabilities::to_json(self : Capabilities) -> Json {
 }
 
 ///|
-pub fn Capabilities::from_json(json : Json, path~ : String = "") -> Capabilities raise @rpc.DecodeError {
+pub fn Capabilities::from_json(
+  json : Json,
+  path~ : String = "",
+) -> Capabilities raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   Capabilities::{
     payment: match fields.get("payment") {
@@ -173,11 +203,12 @@ pub fn CancelRequestInput::to_json(self : CancelRequestInput) -> Json {
 }
 
 ///|
-pub fn CancelRequestInput::from_json(json : Json, path~ : String = "") -> CancelRequestInput raise @rpc.DecodeError {
+pub fn CancelRequestInput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> CancelRequestInput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
-  CancelRequestInput::{
-    id: @rpc.required(fields, "id", path~),
-  }
+  CancelRequestInput::{ id: @rpc.required(fields, "id", path~), }
 }
 
 ///|
@@ -193,10 +224,16 @@ pub fn Approved::to_json(self : Approved) -> Json {
 }
 
 ///|
-pub fn Approved::from_json(json : Json, path~ : String = "") -> Approved raise @rpc.DecodeError {
+pub fn Approved::from_json(
+  json : Json,
+  path~ : String = "",
+) -> Approved raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   Approved::{
-    authorization_code: @rpc.decode_string(@rpc.required(fields, "authorizationCode", path~), path=path + "/authorizationCode"),
+    authorization_code: @rpc.decode_string(
+      @rpc.required(fields, "authorizationCode", path~),
+      path=path + "/authorizationCode",
+    ),
   }
 }
 
@@ -213,10 +250,16 @@ pub fn Declined::to_json(self : Declined) -> Json {
 }
 
 ///|
-pub fn Declined::from_json(json : Json, path~ : String = "") -> Declined raise @rpc.DecodeError {
+pub fn Declined::from_json(
+  json : Json,
+  path~ : String = "",
+) -> Declined raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   Declined::{
-    reason: @rpc.decode_string(@rpc.required(fields, "reason", path~), path=path + "/reason"),
+    reason: @rpc.decode_string(
+      @rpc.required(fields, "reason", path~),
+      path=path + "/reason",
+    ),
   }
 }
 
@@ -237,10 +280,16 @@ pub fn Merchant::to_json(self : Merchant) -> Json {
 }
 
 ///|
-pub fn Merchant::from_json(json : Json, path~ : String = "") -> Merchant raise @rpc.DecodeError {
+pub fn Merchant::from_json(
+  json : Json,
+  path~ : String = "",
+) -> Merchant raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   Merchant::{
-    name: @rpc.decode_string(@rpc.required(fields, "name", path~), path=path + "/name"),
+    name: @rpc.decode_string(
+      @rpc.required(fields, "name", path~),
+      path=path + "/name",
+    ),
     address: match fields.get("address") {
       None | Some(Null) => None
       Some(value) => Some(@rpc.decode_string(value, path=path + "/address"))
@@ -267,7 +316,10 @@ pub fn ListTransactionsInput::to_json(self : ListTransactionsInput) -> Json {
 }
 
 ///|
-pub fn ListTransactionsInput::from_json(json : Json, path~ : String = "") -> ListTransactionsInput raise @rpc.DecodeError {
+pub fn ListTransactionsInput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> ListTransactionsInput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   ListTransactionsInput::{
     next_token: match fields.get("nextToken") {
@@ -276,7 +328,14 @@ pub fn ListTransactionsInput::from_json(json : Json, path~ : String = "") -> Lis
     },
     since: match fields.get("since") {
       None | Some(Null) => None
-      Some(value) => Some(@rpc.Timestamp::from_json(value, format=@rpc.EpochSeconds, path=path + "/since"))
+      Some(value) =>
+        Some(
+          @rpc.Timestamp::from_json(
+            value,
+            format=@rpc.EpochSeconds,
+            path=path + "/since",
+          ),
+        )
     },
   }
 }
@@ -300,14 +359,22 @@ pub fn Currency::to_json(self : Currency) -> Json {
 }
 
 ///|
-pub fn Currency::from_json(json : Json, path~ : String = "") -> Currency raise @rpc.DecodeError {
+pub fn Currency::from_json(
+  json : Json,
+  path~ : String = "",
+) -> Currency raise @rpc.DecodeError {
   let value = @rpc.decode_string(json, path~)
   match value {
     "USD" => Currency::Usd
     "EUR" => Currency::Eur
     "GBP" => Currency::Gbp
     _ =>
-      raise @rpc.DecodeError(path~, message="I expected a value of enum `Currency` (\"EUR\", \"GBP\", \"USD\"), found `" + value + "`.")
+      raise @rpc.DecodeError(
+        path~,
+        message="I expected a value of enum `Currency` (\"EUR\", \"GBP\", \"USD\"), found `" +
+          value +
+          "`.",
+      )
   }
 }
 
@@ -326,11 +393,20 @@ pub fn Money::to_json(self : Money) -> Json {
 }
 
 ///|
-pub fn Money::from_json(json : Json, path~ : String = "") -> Money raise @rpc.DecodeError {
+pub fn Money::from_json(
+  json : Json,
+  path~ : String = "",
+) -> Money raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   Money::{
-    amount: @rpc.Decimal::from_json(@rpc.required(fields, "amount", path~), path=path + "/amount"),
-    currency: Currency::from_json(@rpc.required(fields, "currency", path~), path=path + "/currency"),
+    amount: @rpc.Decimal::from_json(
+      @rpc.required(fields, "amount", path~),
+      path=path + "/amount",
+    ),
+    currency: Currency::from_json(
+      @rpc.required(fields, "currency", path~),
+      path=path + "/currency",
+    ),
   }
 }
 
@@ -347,10 +423,16 @@ pub fn PartiallyApproved::to_json(self : PartiallyApproved) -> Json {
 }
 
 ///|
-pub fn PartiallyApproved::from_json(json : Json, path~ : String = "") -> PartiallyApproved raise @rpc.DecodeError {
+pub fn PartiallyApproved::from_json(
+  json : Json,
+  path~ : String = "",
+) -> PartiallyApproved raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   PartiallyApproved::{
-    authorized_amount: Money::from_json(@rpc.required(fields, "authorizedAmount", path~), path=path + "/authorizedAmount"),
+    authorized_amount: Money::from_json(
+      @rpc.required(fields, "authorizedAmount", path~),
+      path=path + "/authorizedAmount",
+    ),
   }
 }
 
@@ -366,19 +448,37 @@ pub fn PaymentOutcome::to_json(self : PaymentOutcome) -> Json {
   match self {
     Approved(value) => Json::object({ "approved": value.to_json() })
     Declined(value) => Json::object({ "declined": value.to_json() })
-    PartiallyApproved(value) => Json::object({ "partiallyApproved": value.to_json() })
+    PartiallyApproved(value) =>
+      Json::object({ "partiallyApproved": value.to_json() })
   }
 }
 
 ///|
-pub fn PaymentOutcome::from_json(json : Json, path~ : String = "") -> PaymentOutcome raise @rpc.DecodeError {
+pub fn PaymentOutcome::from_json(
+  json : Json,
+  path~ : String = "",
+) -> PaymentOutcome raise @rpc.DecodeError {
   let (tag, value) = @rpc.union_member(json, path~)
   match tag {
-    "approved" => PaymentOutcome::Approved(Approved::from_json(value, path=path + "/approved"))
-    "declined" => PaymentOutcome::Declined(Declined::from_json(value, path=path + "/declined"))
-    "partiallyApproved" => PaymentOutcome::PartiallyApproved(PartiallyApproved::from_json(value, path=path + "/partiallyApproved"))
+    "approved" =>
+      PaymentOutcome::Approved(
+        Approved::from_json(value, path=path + "/approved"),
+      )
+    "declined" =>
+      PaymentOutcome::Declined(
+        Declined::from_json(value, path=path + "/declined"),
+      )
+    "partiallyApproved" =>
+      PaymentOutcome::PartiallyApproved(
+        PartiallyApproved::from_json(value, path=path + "/partiallyApproved"),
+      )
     _ =>
-      raise @rpc.DecodeError(path~, message="I expected a member of union `PaymentOutcome` (approved, declined, partiallyApproved), found `" + tag + "`.")
+      raise @rpc.DecodeError(
+        path~,
+        message="I expected a member of union `PaymentOutcome` (approved, declined, partiallyApproved), found `" +
+          tag +
+          "`.",
+      )
   }
 }
 
@@ -397,11 +497,20 @@ pub fn PaymentOutput::to_json(self : PaymentOutput) -> Json {
 }
 
 ///|
-pub fn PaymentOutput::from_json(json : Json, path~ : String = "") -> PaymentOutput raise @rpc.DecodeError {
+pub fn PaymentOutput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> PaymentOutput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   PaymentOutput::{
-    payment_id: @rpc.decode_string(@rpc.required(fields, "paymentId", path~), path=path + "/paymentId"),
-    outcome: PaymentOutcome::from_json(@rpc.required(fields, "outcome", path~), path=path + "/outcome"),
+    payment_id: @rpc.decode_string(
+      @rpc.required(fields, "paymentId", path~),
+      path=path + "/paymentId",
+    ),
+    outcome: PaymentOutcome::from_json(
+      @rpc.required(fields, "outcome", path~),
+      path=path + "/outcome",
+    ),
   }
 }
 
@@ -420,12 +529,20 @@ pub fn ProtocolVersion::to_json(self : ProtocolVersion) -> Json {
 }
 
 ///|
-pub fn ProtocolVersion::from_json(json : Json, path~ : String = "") -> ProtocolVersion raise @rpc.DecodeError {
+pub fn ProtocolVersion::from_json(
+  json : Json,
+  path~ : String = "",
+) -> ProtocolVersion raise @rpc.DecodeError {
   let value = @rpc.decode_string(json, path~)
   match value {
     "1" => ProtocolVersion::V1
     _ =>
-      raise @rpc.DecodeError(path~, message="I expected a value of enum `ProtocolVersion` (\"1\"), found `" + value + "`.")
+      raise @rpc.DecodeError(
+        path~,
+        message="I expected a value of enum `ProtocolVersion` (\"1\"), found `" +
+          value +
+          "`.",
+      )
   }
 }
 
@@ -444,11 +561,20 @@ pub fn InitializeInput::to_json(self : InitializeInput) -> Json {
 }
 
 ///|
-pub fn InitializeInput::from_json(json : Json, path~ : String = "") -> InitializeInput raise @rpc.DecodeError {
+pub fn InitializeInput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> InitializeInput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   InitializeInput::{
-    protocol_version: ProtocolVersion::from_json(@rpc.required(fields, "protocolVersion", path~), path=path + "/protocolVersion"),
-    pos_name: @rpc.decode_string(@rpc.required(fields, "posName", path~), path=path + "/posName"),
+    protocol_version: ProtocolVersion::from_json(
+      @rpc.required(fields, "protocolVersion", path~),
+      path=path + "/protocolVersion",
+    ),
+    pos_name: @rpc.decode_string(
+      @rpc.required(fields, "posName", path~),
+      path=path + "/posName",
+    ),
   }
 }
 
@@ -469,12 +595,24 @@ pub fn InitializeOutput::to_json(self : InitializeOutput) -> Json {
 }
 
 ///|
-pub fn InitializeOutput::from_json(json : Json, path~ : String = "") -> InitializeOutput raise @rpc.DecodeError {
+pub fn InitializeOutput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> InitializeOutput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   InitializeOutput::{
-    protocol_version: ProtocolVersion::from_json(@rpc.required(fields, "protocolVersion", path~), path=path + "/protocolVersion"),
-    terminal_id: @rpc.decode_string(@rpc.required(fields, "terminalId", path~), path=path + "/terminalId"),
-    capabilities: Capabilities::from_json(@rpc.required(fields, "capabilities", path~), path=path + "/capabilities"),
+    protocol_version: ProtocolVersion::from_json(
+      @rpc.required(fields, "protocolVersion", path~),
+      path=path + "/protocolVersion",
+    ),
+    terminal_id: @rpc.decode_string(
+      @rpc.required(fields, "terminalId", path~),
+      path=path + "/terminalId",
+    ),
+    capabilities: Capabilities::from_json(
+      @rpc.required(fields, "capabilities", path~),
+      path=path + "/capabilities",
+    ),
   }
 }
 
@@ -493,11 +631,20 @@ pub fn ReceiptLine::to_json(self : ReceiptLine) -> Json {
 }
 
 ///|
-pub fn ReceiptLine::from_json(json : Json, path~ : String = "") -> ReceiptLine raise @rpc.DecodeError {
+pub fn ReceiptLine::from_json(
+  json : Json,
+  path~ : String = "",
+) -> ReceiptLine raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   ReceiptLine::{
-    label: @rpc.decode_string(@rpc.required(fields, "label", path~), path=path + "/label"),
-    amount: Money::from_json(@rpc.required(fields, "amount", path~), path=path + "/amount"),
+    label: @rpc.decode_string(
+      @rpc.required(fields, "label", path~),
+      path=path + "/label",
+    ),
+    amount: Money::from_json(
+      @rpc.required(fields, "amount", path~),
+      path=path + "/amount",
+    ),
   }
 }
 
@@ -528,13 +675,29 @@ pub fn Receipt::to_json(self : Receipt) -> Json {
 }
 
 ///|
-pub fn Receipt::from_json(json : Json, path~ : String = "") -> Receipt raise @rpc.DecodeError {
+pub fn Receipt::from_json(
+  json : Json,
+  path~ : String = "",
+) -> Receipt raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   Receipt::{
-    payment_id: @rpc.decode_string(@rpc.required(fields, "paymentId", path~), path=path + "/paymentId"),
-    merchant: Merchant::from_json(@rpc.required(fields, "merchant", path~), path=path + "/merchant"),
-    lines: @rpc.decode_array(@rpc.required(fields, "lines", path~), path=path + "/lines", (item, path) => ReceiptLine::from_json(item, path=path)),
-    total: Money::from_json(@rpc.required(fields, "total", path~), path=path + "/total"),
+    payment_id: @rpc.decode_string(
+      @rpc.required(fields, "paymentId", path~),
+      path=path + "/paymentId",
+    ),
+    merchant: Merchant::from_json(
+      @rpc.required(fields, "merchant", path~),
+      path=path + "/merchant",
+    ),
+    lines: @rpc.decode_array(
+      @rpc.required(fields, "lines", path~),
+      path=path + "/lines",
+      (item, path) => ReceiptLine::from_json(item, path~),
+    ),
+    total: Money::from_json(
+      @rpc.required(fields, "total", path~),
+      path=path + "/total",
+    ),
     customer_copy: match fields.get("customerCopy") {
       None | Some(Null) => None
       Some(value) => Some(@rpc.decode_bool(value, path=path + "/customerCopy"))
@@ -561,11 +724,20 @@ pub fn RefundInput::to_json(self : RefundInput) -> Json {
 }
 
 ///|
-pub fn RefundInput::from_json(json : Json, path~ : String = "") -> RefundInput raise @rpc.DecodeError {
+pub fn RefundInput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> RefundInput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   RefundInput::{
-    payment_id: @rpc.decode_string(@rpc.required(fields, "paymentId", path~), path=path + "/paymentId"),
-    amount: Money::from_json(@rpc.required(fields, "amount", path~), path=path + "/amount"),
+    payment_id: @rpc.decode_string(
+      @rpc.required(fields, "paymentId", path~),
+      path=path + "/paymentId",
+    ),
+    amount: Money::from_json(
+      @rpc.required(fields, "amount", path~),
+      path=path + "/amount",
+    ),
   }
 }
 
@@ -584,11 +756,20 @@ pub fn RefundOutput::to_json(self : RefundOutput) -> Json {
 }
 
 ///|
-pub fn RefundOutput::from_json(json : Json, path~ : String = "") -> RefundOutput raise @rpc.DecodeError {
+pub fn RefundOutput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> RefundOutput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   RefundOutput::{
-    refund_id: @rpc.decode_string(@rpc.required(fields, "refundId", path~), path=path + "/refundId"),
-    amount: Money::from_json(@rpc.required(fields, "amount", path~), path=path + "/amount"),
+    refund_id: @rpc.decode_string(
+      @rpc.required(fields, "refundId", path~),
+      path=path + "/refundId",
+    ),
+    amount: Money::from_json(
+      @rpc.required(fields, "amount", path~),
+      path=path + "/amount",
+    ),
   }
 }
 
@@ -609,12 +790,24 @@ pub fn StartPaymentInput::to_json(self : StartPaymentInput) -> Json {
 }
 
 ///|
-pub fn StartPaymentInput::from_json(json : Json, path~ : String = "") -> StartPaymentInput raise @rpc.DecodeError {
+pub fn StartPaymentInput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> StartPaymentInput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   StartPaymentInput::{
-    payment_id: @rpc.decode_string(@rpc.required(fields, "paymentId", path~), path=path + "/paymentId"),
-    amount: Money::from_json(@rpc.required(fields, "amount", path~), path=path + "/amount"),
-    entry: EntryMethod::from_json(@rpc.required(fields, "entry", path~), path=path + "/entry"),
+    payment_id: @rpc.decode_string(
+      @rpc.required(fields, "paymentId", path~),
+      path=path + "/paymentId",
+    ),
+    amount: Money::from_json(
+      @rpc.required(fields, "amount", path~),
+      path=path + "/amount",
+    ),
+    entry: EntryMethod::from_json(
+      @rpc.required(fields, "entry", path~),
+      path=path + "/entry",
+    ),
   }
 }
 
@@ -639,15 +832,33 @@ pub fn Transaction::to_json(self : Transaction) -> Json {
 }
 
 ///|
-pub fn Transaction::from_json(json : Json, path~ : String = "") -> Transaction raise @rpc.DecodeError {
+pub fn Transaction::from_json(
+  json : Json,
+  path~ : String = "",
+) -> Transaction raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   Transaction::{
-    payment_id: @rpc.decode_string(@rpc.required(fields, "paymentId", path~), path=path + "/paymentId"),
-    created_at: @rpc.Timestamp::from_json(@rpc.required(fields, "createdAt", path~), format=@rpc.EpochSeconds, path=path + "/createdAt"),
-    amount: Money::from_json(@rpc.required(fields, "amount", path~), path=path + "/amount"),
+    payment_id: @rpc.decode_string(
+      @rpc.required(fields, "paymentId", path~),
+      path=path + "/paymentId",
+    ),
+    created_at: @rpc.Timestamp::from_json(
+      @rpc.required(fields, "createdAt", path~),
+      format=@rpc.EpochSeconds,
+      path=path + "/createdAt",
+    ),
+    amount: Money::from_json(
+      @rpc.required(fields, "amount", path~),
+      path=path + "/amount",
+    ),
     labels: match fields.get("labels") {
       None | Some(Null) => None
-      Some(value) => Some(@rpc.decode_map(value, path=path + "/labels", (item, path) => @rpc.decode_string(item, path=path)))
+      Some(value) =>
+        Some(
+          @rpc.decode_map(value, path=path + "/labels", (item, path) => {
+            @rpc.decode_string(item, path~)
+          }),
+        )
     },
   }
 }
@@ -661,7 +872,9 @@ pub(all) struct ListTransactionsOutput {
 ///|
 pub fn ListTransactionsOutput::to_json(self : ListTransactionsOutput) -> Json {
   let fields : Map[String, Json] = Map([])
-  fields["transactions"] = @rpc.encode_array(self.transactions, item => item.to_json())
+  fields["transactions"] = @rpc.encode_array(self.transactions, item => {
+    item.to_json()
+  })
   if self.next_token is Some(value) {
     fields["nextToken"] = Json::string(value)
   }
@@ -669,10 +882,17 @@ pub fn ListTransactionsOutput::to_json(self : ListTransactionsOutput) -> Json {
 }
 
 ///|
-pub fn ListTransactionsOutput::from_json(json : Json, path~ : String = "") -> ListTransactionsOutput raise @rpc.DecodeError {
+pub fn ListTransactionsOutput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> ListTransactionsOutput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   ListTransactionsOutput::{
-    transactions: @rpc.decode_array(@rpc.required(fields, "transactions", path~), path=path + "/transactions", (item, path) => Transaction::from_json(item, path=path)),
+    transactions: @rpc.decode_array(
+      @rpc.required(fields, "transactions", path~),
+      path=path + "/transactions",
+      (item, path) => Transaction::from_json(item, path~),
+    ),
     next_token: match fields.get("nextToken") {
       None | Some(Null) => None
       Some(value) => Some(@rpc.decode_string(value, path=path + "/nextToken"))
@@ -693,10 +913,16 @@ pub fn RequestSignatureOutput::to_json(self : RequestSignatureOutput) -> Json {
 }
 
 ///|
-pub fn RequestSignatureOutput::from_json(json : Json, path~ : String = "") -> RequestSignatureOutput raise @rpc.DecodeError {
+pub fn RequestSignatureOutput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> RequestSignatureOutput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   RequestSignatureOutput::{
-    signature: @rpc.decode_blob(@rpc.required(fields, "signature", path~), path=path + "/signature"),
+    signature: @rpc.decode_blob(
+      @rpc.required(fields, "signature", path~),
+      path=path + "/signature",
+    ),
   }
 }
 
@@ -713,10 +939,16 @@ pub fn ConfirmTipOutput::to_json(self : ConfirmTipOutput) -> Json {
 }
 
 ///|
-pub fn ConfirmTipOutput::from_json(json : Json, path~ : String = "") -> ConfirmTipOutput raise @rpc.DecodeError {
+pub fn ConfirmTipOutput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> ConfirmTipOutput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   ConfirmTipOutput::{
-    accepted: @rpc.decode_bool(@rpc.required(fields, "accepted", path~), path=path + "/accepted"),
+    accepted: @rpc.decode_bool(
+      @rpc.required(fields, "accepted", path~),
+      path=path + "/accepted",
+    ),
   }
 }
 
@@ -733,10 +965,16 @@ pub fn DisplayInput::to_json(self : DisplayInput) -> Json {
 }
 
 ///|
-pub fn DisplayInput::from_json(json : Json, path~ : String = "") -> DisplayInput raise @rpc.DecodeError {
+pub fn DisplayInput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> DisplayInput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   DisplayInput::{
-    message: @rpc.decode_string(@rpc.required(fields, "message", path~), path=path + "/message"),
+    message: @rpc.decode_string(
+      @rpc.required(fields, "message", path~),
+      path=path + "/message",
+    ),
   }
 }
 
@@ -755,11 +993,20 @@ pub fn RequestSignatureInput::to_json(self : RequestSignatureInput) -> Json {
 }
 
 ///|
-pub fn RequestSignatureInput::from_json(json : Json, path~ : String = "") -> RequestSignatureInput raise @rpc.DecodeError {
+pub fn RequestSignatureInput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> RequestSignatureInput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   RequestSignatureInput::{
-    payment_id: @rpc.decode_string(@rpc.required(fields, "paymentId", path~), path=path + "/paymentId"),
-    prompt: @rpc.decode_string(@rpc.required(fields, "prompt", path~), path=path + "/prompt"),
+    payment_id: @rpc.decode_string(
+      @rpc.required(fields, "paymentId", path~),
+      path=path + "/paymentId",
+    ),
+    prompt: @rpc.decode_string(
+      @rpc.required(fields, "prompt", path~),
+      path=path + "/prompt",
+    ),
   }
 }
 
@@ -778,11 +1025,20 @@ pub fn ConfirmTipInput::to_json(self : ConfirmTipInput) -> Json {
 }
 
 ///|
-pub fn ConfirmTipInput::from_json(json : Json, path~ : String = "") -> ConfirmTipInput raise @rpc.DecodeError {
+pub fn ConfirmTipInput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> ConfirmTipInput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   ConfirmTipInput::{
-    payment_id: @rpc.decode_string(@rpc.required(fields, "paymentId", path~), path=path + "/paymentId"),
-    amount: Money::from_json(@rpc.required(fields, "amount", path~), path=path + "/amount"),
+    payment_id: @rpc.decode_string(
+      @rpc.required(fields, "paymentId", path~),
+      path=path + "/paymentId",
+    ),
+    amount: Money::from_json(
+      @rpc.required(fields, "amount", path~),
+      path=path + "/amount",
+    ),
   }
 }
 
@@ -805,14 +1061,22 @@ pub fn PaymentPhase::to_json(self : PaymentPhase) -> Json {
 }
 
 ///|
-pub fn PaymentPhase::from_json(json : Json, path~ : String = "") -> PaymentPhase raise @rpc.DecodeError {
+pub fn PaymentPhase::from_json(
+  json : Json,
+  path~ : String = "",
+) -> PaymentPhase raise @rpc.DecodeError {
   let value = @rpc.decode_string(json, path~)
   match value {
     "insertCard" => PaymentPhase::InsertCard
     "enterPin" => PaymentPhase::EnterPin
     "authorizing" => PaymentPhase::Authorizing
     _ =>
-      raise @rpc.DecodeError(path~, message="I expected a value of enum `PaymentPhase` (\"authorizing\", \"enterPin\", \"insertCard\"), found `" + value + "`.")
+      raise @rpc.DecodeError(
+        path~,
+        message="I expected a value of enum `PaymentPhase` (\"authorizing\", \"enterPin\", \"insertCard\"), found `" +
+          value +
+          "`.",
+      )
   }
 }
 
@@ -831,10 +1095,16 @@ pub fn PaymentProgressInput::to_json(self : PaymentProgressInput) -> Json {
 }
 
 ///|
-pub fn PaymentProgressInput::from_json(json : Json, path~ : String = "") -> PaymentProgressInput raise @rpc.DecodeError {
+pub fn PaymentProgressInput::from_json(
+  json : Json,
+  path~ : String = "",
+) -> PaymentProgressInput raise @rpc.DecodeError {
   let fields = @rpc.object_of(json, path~)
   PaymentProgressInput::{
     request_id: @rpc.required(fields, "requestId", path~),
-    phase: PaymentPhase::from_json(@rpc.required(fields, "phase", path~), path=path + "/phase"),
+    phase: PaymentPhase::from_json(
+      @rpc.required(fields, "phase", path~),
+      path=path + "/phase",
+    ),
   }
 }

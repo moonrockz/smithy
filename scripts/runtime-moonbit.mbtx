@@ -5,7 +5,9 @@
 ///   `runtimes/moonbit`.
 /// - `generated`: runs the same checks in each generated MoonBit peer under
 ///   `examples/payment-terminal/generated/moonbit`.
-/// - `sample-build`: builds the MoonBit sample programs (not available yet).
+/// - `sample-build`: checks, tests and builds the MoonBit sample programs in
+///   `examples/payment-terminal/moonbit`, and writes the command manifest
+///   `.dev/out/payment-terminal/commands/moonbit.json`.
 ///
 /// Usage: `mise run test:runtime:moonbit`, or `moonx scripts/runtime-moonbit.mbtx test`.
 /// It exits with 0 when each step passes, else with 1.
@@ -67,6 +69,46 @@ async fn generated() -> Unit {
 }
 
 ///|
+let sample_dir : String = "examples/payment-terminal/moonbit"
+
+///|
+let sample_bin : String = "_build/native/release/build/example/payment-sample"
+
+///|
+/// A JSON string literal.
+fn json_text(text : String) -> String {
+  Json::string(text).stringify()
+}
+
+///|
+/// Checks and tests the sample module, builds its native release
+/// executables, and writes `.dev/out/payment-terminal/commands/moonbit.json`
+/// with their absolute paths.
+async fn sample_build() -> Unit {
+  check_module(sample_dir)
+  moon(sample_dir, ["build", "--target", "native", "--release"])
+  let root = @env.current_dir().unwrap_or(".")
+  let bin = "\{root}/\{sample_dir}/\{sample_bin}"
+  let pos = "\{bin}/pos_main/pos_main.exe"
+  let terminal = "\{bin}/terminal_main/terminal_main.exe"
+  for path in [pos, terminal] {
+    if !@fs.exists(path) {
+      println("❌ I expected the executable \{path} after the build, found nothing.")
+      @sys.exit(1)
+    }
+  }
+  let dir = ".dev/out/payment-terminal/commands"
+  if !@fs.exists(dir) {
+    @fs.mkdir(dir, recursive=true)
+  }
+  @fs.write_file(
+    "\{dir}/moonbit.json",
+    "{\"pos\":[\{json_text(pos)}],\"terminal\":[\{json_text(terminal)}]}\n",
+  )
+  println("✓ wrote \{dir}/moonbit.json")
+}
+
+///|
 async fn main {
   let args = @env.args()
   let command = if args.length() > 1 { args[1] } else { "" }
@@ -80,8 +122,8 @@ async fn main {
       println("✅ The generated MoonBit peers passed their checks.")
     }
     "sample-build" => {
-      println("❌ I cannot build the MoonBit sample programs yet: they are not written.")
-      @sys.exit(1)
+      sample_build()
+      println("✅ The MoonBit sample programs are built.")
     }
     other => {
       println(
