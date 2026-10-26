@@ -11,14 +11,13 @@ The runtime is for the native target only.
 
 ## Windows
 
-HTTP and WebSocket passed their runtime transport tests and all four payment
-terminal scenarios on native Windows.
-
-Stdio support requires a passing complete native Windows runtime gate after
-`spawn_stdio` keeps an `@process.Process` handle (caller-owned task group)
-instead of `spawn_orphan` plus `wait_pid`. Until that gate passes on the fixed
-source, treat stdio as unverified on Windows. Beads bug `smithy-2qe.47` holds
-the prior invalid-handle evidence and the repo-local ownership fix.
+HTTP, WebSocket and stdio passed their runtime transport tests and all four
+payment terminal scenarios on native Windows in the
+[manual matrix run](https://github.com/moonrockz/smithy/actions/runs/40384846894)
+for this change. The runtime gate was 70/70, including the delayed stdio
+child-wait cases. `spawn_stdio(group, argv)` keeps an `@process.Process`
+handle in a caller-owned task group so `wait` does not use the
+orphan/`wait_pid` path that lost handles on Windows.
 
 ## Test
 
