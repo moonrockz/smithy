@@ -423,6 +423,7 @@ pub async fn Peer::run(self : Peer, conn : &Connection) -> Unit {
   @async.with_task_group(group => {
     // The transport gets the group before any message is sent on it.
     conn.start(group)
+    conn.watch(id => core.lose(id))
     core.conn = Some(conn)
     core.attached.broadcast()
     while conn.receive() is Some(text) {
@@ -430,6 +431,21 @@ pub async fn Peer::run(self : Peer, conn : &Connection) -> Unit {
     }
     group.return_immediately(())
   })
+}
+
+///|
+/// Fails the pending call `id`, because the transport lost the stream of its
+/// reply. The session does not change: no reply came.
+fn PeerCore::lose(self : PeerCore, id : RequestId) -> Unit {
+  guard self.pending.get(id) is Some(pending) else { return }
+  self.pending.remove(id)
+  let _ = pending.slot.try_put(
+    Lost(
+      "I lost the event stream of the call to \{pending.method_name} before its reply.",
+    ),
+  ) catch {
+    _ => false
+  }
 }
 
 ///|

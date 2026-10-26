@@ -17,17 +17,27 @@ let runtime_files : Array[(String, String)] = [
       #|/// - `close` closes the connection.
       #|/// - `start` gives the transport the task group of `Peer::run`, for the
       #|///   tasks that read its streams. The default does nothing.
+      #|/// - `watch` gives the transport a function that fails a pending call of the
+      #|///   peer. A transport with one stream per call (HTTP) calls it when that
+      #|///   stream ends before the response. The default does nothing.
       #|pub(open) trait Connection {
       #|  async fn receive(Self) -> String?
       #|  async fn send(Self, String, related~ : RequestId?) -> Unit
       #|  fn close(Self) -> Unit
       #|  fn start(Self, @async.TaskGroup[Unit]) -> Unit = _
+      #|  fn watch(Self, (RequestId) -> Unit) -> Unit = _
       #|}
       #|
       #|///|
       #|impl Connection with fn start(self, group) {
       #|  ignore(self)
       #|  ignore(group)
+      #|}
+      #|
+      #|///|
+      #|impl Connection with fn watch(self, lost) {
+      #|  ignore(self)
+      #|  ignore(lost)
       #|}
       #|
       #|///|
@@ -225,6 +235,8 @@ let runtime_files : Array[(String, String)] = [
       #|  mut session : String?
       #|  inbox : @aqueue.Queue[String]
       #|  mut group : @async.TaskGroup[Unit]?
+      #|  /// Fails a pending call of the peer; see `Connection::watch`.
+      #|  mut lost : ((RequestId) -> Unit)?
       #|  mut closed : Bool
       #|}
       #|
@@ -245,6 +257,7 @@ let runtime_files : Array[(String, String)] = [
       #|    session: None,
       #|    inbox: @aqueue.Queue(kind=Unbounded),
       #|    group: None,
+      #|    lost: None,
       #|    closed: false,
       #|  }
       #|}
@@ -329,6 +342,9 @@ let runtime_files : Array[(String, String)] = [
       #|      "I need Peer::run on the HTTP connection to read the replies, found no running peer.",
       #|    )
       #|  }
+      #|  // The ID of the request that this POST carries: its stream must end with
+      #|  // the response to it.
+      #|  let call = request_id_of(text)
       #|  let body = @utf8.encode(text)
       #|  let headers : @http.Headers = {
       #|    "Content-Type": "application/json",
@@ -359,12 +375,24 @@ let runtime_files : Array[(String, String)] = [
       #|    200 if content_type.has_prefix("text/event-stream") =>
       #|      group.spawn_bg(allow_failure=true, () => {
       #|        defer client.close()
-      #|        read_events(client, data => self.inbox.put(data)) catch {
-      #|          err =>
-      #|            if !@async.is_being_cancelled() {
-      #|              diagnose("I lost the event stream from \{self.url}: \{err}")
-      #|              Connection::close(self)
+      #|        let answered = Ref(false)
+      #|        let deliver = async fn(data : String) {
+      #|          if call is Some(id) && is_response_to(data, id) {
+      #|            answered.val = true
+      #|          }
+      #|          self.inbox.put(data)
+      #|        }
+      #|        read_events(client, deliver) catch {
+      #|          err => {
+      #|            if @async.is_being_cancelled() {
+      #|              return
       #|            }
+      #|            diagnose("I lost the event stream from \{self.url}: \{err}")
+      #|          }
+      #|        }
+      #|        // A stream that ends before its response fails that call only.
+      #|        if !answered.val {
+      #|          self.lose(call)
       #|        }
       #|      })
       #|    200 => {
@@ -372,6 +400,9 @@ let runtime_files : Array[(String, String)] = [
       #|      client.close()
       #|      if reply.trim().to_owned() != "" {
       #|        self.inbox.put(reply)
+      #|      }
+      #|      if !(call is Some(id) && is_response_to(reply, id)) {
+      #|        self.lose(call)
       #|      }
       #|    }
       #|    404 => {
@@ -387,6 +418,32 @@ let runtime_files : Array[(String, String)] = [
       #|      )
       #|    }
       #|  }
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for HttpClientConnection with fn watch(self, lost) {
+      #|  self.lost = Some(lost)
+      #|}
+      #|
+      #|///|
+      #|/// Fails the call `call` of the peer, when there is one.
+      #|fn HttpClientConnection::lose(
+      #|  self : HttpClientConnection,
+      #|  call : RequestId?,
+      #|) -> Unit {
+      #|  if call is Some(id) && self.lost is Some(lost) {
+      #|    lost(id)
+      #|  }
+      #|}
+      #|
+      #|///|
+      #|/// The ID of a request, or None for any other message.
+      #|fn request_id_of(text : String) -> RequestId? {
+      #|  let value = parse_json(text) catch { _ => return None }
+      #|  guard value is Object(fields) && fields.get("method") is Some(_) else {
+      #|    return None
+      #|  }
+      #|  fields.get("id").bind(RequestId::from_json)
       #|}
       #|
       #|///|
@@ -1691,6 +1748,7 @@ let runtime_files : Array[(String, String)] = [
       #|  @async.with_task_group(group => {
       #|    // The transport gets the group before any message is sent on it.
       #|    conn.start(group)
+      #|    conn.watch(id => core.lose(id))
       #|    core.conn = Some(conn)
       #|    core.attached.broadcast()
       #|    while conn.receive() is Some(text) {
@@ -1698,6 +1756,21 @@ let runtime_files : Array[(String, String)] = [
       #|    }
       #|    group.return_immediately(())
       #|  })
+      #|}
+      #|
+      #|///|
+      #|/// Fails the pending call `id`, because the transport lost the stream of its
+      #|/// reply. The session does not change: no reply came.
+      #|fn PeerCore::lose(self : PeerCore, id : RequestId) -> Unit {
+      #|  guard self.pending.get(id) is Some(pending) else { return }
+      #|  self.pending.remove(id)
+      #|  let _ = pending.slot.try_put(
+      #|    Lost(
+      #|      "I lost the event stream of the call to \{pending.method_name} before its reply.",
+      #|    ),
+      #|  ) catch {
+      #|    _ => false
+      #|  }
       #|}
       #|
       #|///|
@@ -3227,15 +3300,16 @@ let runtime_files : Array[(String, String)] = [
       #|}
       #|
       #|///|
-      #|/// The value of a required member. An absent member and a null member are
-      #|/// errors.
+      #|/// The value of a required member. An absent member is an error. A null
+      #|/// member is given as `Null`: a Document member keeps it, and the decoder of
+      #|/// any other type rejects it.
       #|pub fn required(
       #|  obj : Map[String, Json],
       #|  name : String,
       #|  path~ : String,
       #|) -> Json raise DecodeError {
       #|  match obj.get(name) {
-      #|    Some(Null) | None =>
+      #|    None =>
       #|      raise decode_error(
       #|        child_path(path, name),
       #|        "I expected the required member \{name}, found nothing.",

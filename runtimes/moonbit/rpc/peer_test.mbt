@@ -676,3 +676,48 @@ test "a transcript log needs a path" {
     content="I expected a path for the transcript log, found an empty text.",
   )
 }
+
+///|
+async test "a cancel in the same read as its request answers with the modeled code" {
+  let log = @rpc.TranscriptLog::memory()
+  let terminal = new_terminal(log)
+  let (a, b) = @rpc.memory_pair()
+  let out = []
+  @async.with_task_group(group => {
+    group.spawn_bg(() => terminal.run(b))
+    a.send(
+      "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"terminal.initialize\",\"params\":{\"protocolVersion\":\"1\",\"posName\":\"test checkout\"}}",
+      related=None,
+    )
+    a.receive() |> ignore
+    a.send(
+      "{\"jsonrpc\":\"2.0\",\"method\":\"terminal.initialized\"}",
+      related=None,
+    )
+    // The request and its cancel are in the inbox before the terminal reads
+    // either of them, so the cancel comes before the handler task starts.
+    a.send(
+      "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"payment.start\",\"params\":{\"paymentId\":\"p\",\"amount\":{\"amount\":1.17,\"currency\":\"USD\"},\"entry\":{\"chip\":{\"maskedNumber\":\"**** 4242\"}}}}",
+      related=None,
+    )
+    a.send(
+      "{\"jsonrpc\":\"2.0\",\"method\":\"$/cancelRequest\",\"params\":{\"id\":2}}",
+      related=None,
+    )
+    a.send(
+      "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"terminal.ping\"}",
+      related=None,
+    )
+    out.push(a.receive().unwrap())
+    out.push(a.receive().unwrap())
+    inspect(terminal.state(), content="ready")
+    a.close()
+  })
+  inspect(
+    out.join("\n"),
+    content=(
+      #|{"jsonrpc":"2.0","id":2,"error":{"code":-32800,"message":"I cancelled payment.start."}}
+      #|{"jsonrpc":"2.0","id":3,"result":null}
+    ),
+  )
+}

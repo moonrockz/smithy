@@ -340,3 +340,60 @@ async test "ws: request IDs are echoed exactly" {
     )
   })
 }
+
+///|
+/// A server that answers each POSTed request with an event stream that ends
+/// before the response: one stream with nothing, then one stream that breaks
+/// after one event.
+async fn broken_stream_server(server : @http.Server) -> Unit {
+  let count = Ref(0)
+  server.run_forever(allow_failure=true, (_, body, conn) => {
+    body.read_all() |> ignore
+    count.val += 1
+    conn.send_response(200, "OK", extra_headers={
+      "Content-Type": "text/event-stream",
+      "Smithy-Session-Id": "s-1",
+    })
+    conn.write(": open\n\n")
+    if count.val == 1 {
+      conn.end_response()
+    } else {
+      conn.write(
+        "event: message\ndata: {\"jsonrpc\":\"2.0\",\"method\":\"pos.display\",\"params\":{\"message\":\"x\"}}\n\n",
+      )
+      conn.flush()
+      conn.close()
+    }
+  })
+}
+
+///|
+async test "http: a stream that ends before its response fails that call" {
+  let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"), reuse_addr=true)
+  defer server.close()
+  let pos = new_pos(@rpc.TranscriptLog::memory())
+  let failure = (f : async () -> Unit) => {
+    try f() catch {
+      @rpc.TransportError(message) => message
+      err => "other: \{err}"
+    } noraise {
+      _ => "no error"
+    }
+  }
+  @async.with_timeout(5000, () => {
+    @async.with_task_group(group => {
+      group.spawn_bg(no_wait=true, () => broken_stream_server(server))
+      let conn = @rpc.http_connect("http://127.0.0.1:\{server.addr.port()}/rpc")
+      group.spawn_bg(() => pos.run(conn))
+      inspect(
+        failure(() => pos.request("terminal.ping", None) |> ignore),
+        content="I lost the event stream of the call to terminal.ping before its reply.",
+      )
+      inspect(
+        failure(() => pos.request("terminal.ping", None) |> ignore),
+        content="I lost the event stream of the call to terminal.ping before its reply.",
+      )
+      conn.close()
+    })
+  })
+}

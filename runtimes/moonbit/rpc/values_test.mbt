@@ -71,7 +71,7 @@ test "scalar decoders name the path and the value found" {
   )
   inspect(
     decode_message(() => {
-      let obj = @rpc.object_of(@rpc.parse_json("{\"x\":null}"), path="/p")
+      let obj = @rpc.object_of(@rpc.parse_json("{}"), path="/p")
       @rpc.required(obj, "x", path="/p") |> ignore
     }),
     content="/p/x: I expected the required member x, found nothing.",
@@ -224,5 +224,29 @@ test "named and positional params" {
   inspect(
     @rpc.write_json(@rpc.to_positional(@rpc.parse_json("{\"a\":1}"), names)),
     content="[1]",
+  )
+}
+
+///|
+test "a required member may be null; only an absent member is an error" {
+  let fields = @rpc.object_of(@rpc.parse_json("{\"id\":null}"), path="/params")
+  // A Document member keeps the null value.
+  assert_true(@rpc.required(fields, "id", path="/params") is Null)
+  inspect(
+    decode_message(() => {
+      @rpc.required(fields, "other", path="/params") |> ignore
+    }),
+    content="/params/other: I expected the required member other, found nothing.",
+  )
+  // A typed member rejects the null value with its own decoder.
+  inspect(
+    decode_message(() => {
+      @rpc.decode_string(
+        @rpc.required(fields, "id", path="/params"),
+        path="/params/id",
+      )
+      |> ignore
+    }),
+    content="/params/id: I expected a string, found null.",
   )
 }

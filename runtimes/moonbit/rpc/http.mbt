@@ -51,6 +51,8 @@ struct HttpClientConnection {
   mut session : String?
   inbox : @aqueue.Queue[String]
   mut group : @async.TaskGroup[Unit]?
+  /// Fails a pending call of the peer; see `Connection::watch`.
+  mut lost : ((RequestId) -> Unit)?
   mut closed : Bool
 }
 
@@ -71,6 +73,7 @@ pub async fn http_connect(url : String) -> HttpClientConnection {
     session: None,
     inbox: @aqueue.Queue(kind=Unbounded),
     group: None,
+    lost: None,
     closed: false,
   }
 }
@@ -155,6 +158,9 @@ pub impl Connection for HttpClientConnection with fn send(self, text, related~) 
       "I need Peer::run on the HTTP connection to read the replies, found no running peer.",
     )
   }
+  // The ID of the request that this POST carries: its stream must end with
+  // the response to it.
+  let call = request_id_of(text)
   let body = @utf8.encode(text)
   let headers : @http.Headers = {
     "Content-Type": "application/json",
@@ -185,12 +191,24 @@ pub impl Connection for HttpClientConnection with fn send(self, text, related~) 
     200 if content_type.has_prefix("text/event-stream") =>
       group.spawn_bg(allow_failure=true, () => {
         defer client.close()
-        read_events(client, data => self.inbox.put(data)) catch {
-          err =>
-            if !@async.is_being_cancelled() {
-              diagnose("I lost the event stream from \{self.url}: \{err}")
-              Connection::close(self)
+        let answered = Ref(false)
+        let deliver = async fn(data : String) {
+          if call is Some(id) && is_response_to(data, id) {
+            answered.val = true
+          }
+          self.inbox.put(data)
+        }
+        read_events(client, deliver) catch {
+          err => {
+            if @async.is_being_cancelled() {
+              return
             }
+            diagnose("I lost the event stream from \{self.url}: \{err}")
+          }
+        }
+        // A stream that ends before its response fails that call only.
+        if !answered.val {
+          self.lose(call)
         }
       })
     200 => {
@@ -198,6 +216,9 @@ pub impl Connection for HttpClientConnection with fn send(self, text, related~) 
       client.close()
       if reply.trim().to_owned() != "" {
         self.inbox.put(reply)
+      }
+      if !(call is Some(id) && is_response_to(reply, id)) {
+        self.lose(call)
       }
     }
     404 => {
@@ -213,6 +234,32 @@ pub impl Connection for HttpClientConnection with fn send(self, text, related~) 
       )
     }
   }
+}
+
+///|
+pub impl Connection for HttpClientConnection with fn watch(self, lost) {
+  self.lost = Some(lost)
+}
+
+///|
+/// Fails the call `call` of the peer, when there is one.
+fn HttpClientConnection::lose(
+  self : HttpClientConnection,
+  call : RequestId?,
+) -> Unit {
+  if call is Some(id) && self.lost is Some(lost) {
+    lost(id)
+  }
+}
+
+///|
+/// The ID of a request, or None for any other message.
+fn request_id_of(text : String) -> RequestId? {
+  let value = parse_json(text) catch { _ => return None }
+  guard value is Object(fields) && fields.get("method") is Some(_) else {
+    return None
+  }
+  fields.get("id").bind(RequestId::from_json)
 }
 
 ///|

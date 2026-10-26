@@ -37,6 +37,12 @@ The task runs `moon check --deny-warn` and `moon test --target native` in `runti
 
 - `parse_json` accepts at most `max_json_depth` (1000) nested arrays and objects. The generated
   decoders recurse once for each level of a recursive shape, so this limit also bounds their stack.
+- `required` fails only for an absent member. A null member is given to the decoder of its type: a
+  Document member keeps `null`, and every other type rejects it. An optional member that is `null` is
+  absent, so an optional Document member set to `Some(Json::null())` is written as `null` and read back
+  as `None`.
+- HTTP: when the event stream of a POSTed request ends or breaks before its response, that call fails
+  with a `TransportError` that names the method. The session and the other calls continue.
 - A peer never sends a batch. A received JSON array gets one `-32600` error with the ID `null`.
 - A request ID is a string or an integer. An integer keeps its text, also beyond the Int64 range.
 - Unknown members of a message are ignored.

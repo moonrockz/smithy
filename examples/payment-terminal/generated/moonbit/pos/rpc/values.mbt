@@ -467,15 +467,16 @@ pub fn array_of(json : Json, path~ : String) -> Array[Json] raise DecodeError {
 }
 
 ///|
-/// The value of a required member. An absent member and a null member are
-/// errors.
+/// The value of a required member. An absent member is an error. A null
+/// member is given as `Null`: a Document member keeps it, and the decoder of
+/// any other type rejects it.
 pub fn required(
   obj : Map[String, Json],
   name : String,
   path~ : String,
 ) -> Json raise DecodeError {
   match obj.get(name) {
-    Some(Null) | None =>
+    None =>
       raise decode_error(
         child_path(path, name),
         "I expected the required member \{name}, found nothing.",

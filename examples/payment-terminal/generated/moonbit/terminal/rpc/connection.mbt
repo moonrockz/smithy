@@ -10,17 +10,27 @@
 /// - `close` closes the connection.
 /// - `start` gives the transport the task group of `Peer::run`, for the
 ///   tasks that read its streams. The default does nothing.
+/// - `watch` gives the transport a function that fails a pending call of the
+///   peer. A transport with one stream per call (HTTP) calls it when that
+///   stream ends before the response. The default does nothing.
 pub(open) trait Connection {
   async fn receive(Self) -> String?
   async fn send(Self, String, related~ : RequestId?) -> Unit
   fn close(Self) -> Unit
   fn start(Self, @async.TaskGroup[Unit]) -> Unit = _
+  fn watch(Self, (RequestId) -> Unit) -> Unit = _
 }
 
 ///|
 impl Connection with fn start(self, group) {
   ignore(self)
   ignore(group)
+}
+
+///|
+impl Connection with fn watch(self, lost) {
+  ignore(self)
+  ignore(lost)
 }
 
 ///|
