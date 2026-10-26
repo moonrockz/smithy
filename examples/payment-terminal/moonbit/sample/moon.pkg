@@ -5,6 +5,7 @@ import {
   "example/terminal/rpc" @terminal_rpc,
   "moonbitlang/async",
   "moonbitlang/async/stdio",
+  "moonbitlang/x/sys",
 }
 
 import {

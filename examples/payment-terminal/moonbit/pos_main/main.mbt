@@ -65,8 +65,18 @@ async fn main {
       }
       failed || status != 0
     }
+    _ if target.has_prefix("http://") => {
+      let conn = @pos_rpc.http_connect(target)
+      run(peer, conn, pos, client)
+    }
+    _ if target.has_prefix("ws://") => {
+      let conn = @pos_rpc.ws_connect(target)
+      run(peer, conn, pos, client)
+    }
     _ => {
-      usage("I expected --connect stdio, found `\{target}`.")
+      usage(
+        "I expected --connect stdio, http://HOST:PORT/rpc or ws://HOST:PORT/ws, found `\{target}`.",
+      )
       true
     }
   }

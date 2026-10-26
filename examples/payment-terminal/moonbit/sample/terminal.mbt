@@ -12,11 +12,15 @@ priv struct StoredPayment {
 pub struct Terminal {
   priv payments : Map[String, StoredPayment]
   priv order : Array[String]
+  priv exit_process : Bool
 }
 
 ///|
-pub fn Terminal::new() -> Terminal {
-  { payments: Map([]), order: [], }
+/// With `exit_process`, the terminal process ends a short time after the
+/// `terminal.exit` notification. A server needs this: an HTTP session does
+/// not end by itself.
+pub fn Terminal::new(exit_process~ : Bool = false) -> Terminal {
+  { payments: Map([]), order: [], exit_process, }
 }
 
 ///|
@@ -259,10 +263,13 @@ pub impl @terminal.PaymentTerminalHandler for Terminal with fn shutdown(
 
 ///|
 pub impl @terminal.PaymentTerminalHandler for Terminal with fn exit(
-  _self,
+  self,
   _context,
 ) {
-  ()
+  if self.exit_process {
+    @async.sleep(200)
+    @sys.exit(0)
+  }
 }
 
 ///|

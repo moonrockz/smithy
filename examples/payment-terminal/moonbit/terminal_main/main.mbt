@@ -13,6 +13,7 @@ async fn main {
   let mode = if args.length() > 1 { args[1] } else { "" }
   let mut log_path : String? = None
   let mut port = -1
+  let mut exit_after_session = false
   let mut index = 2
   while index < args.length() {
     match args[index] {
@@ -34,12 +35,23 @@ async fn main {
       None => None
     }
     let peer = @gen_terminal.new_peer(log?)
-    @gen_terminal.register_payment_terminal(peer, @sample.Terminal::new())
+    @gen_terminal.register_payment_terminal(
+      peer,
+      @sample.Terminal::new(exit_process=exit_after_session),
+    )
     peer
   }
   match mode {
     "stdio" => new_peer().run(@terminal_rpc.stdio_connection())
-    "serve" => usage("I cannot serve on port \{port} yet.")
+    "serve" => {
+      if port < 0 {
+        usage("I expected --port N with serve.")
+      }
+      // An HTTP session does not end, so the terminal stops after the
+      // `terminal.exit` notification of a session.
+      exit_after_session = true
+      @terminal_rpc.serve(port~, async fn(conn) { new_peer().run(conn) })
+    }
     _ => usage("I expected `stdio` or `serve`, found `\{mode}`.")
   }
 }
