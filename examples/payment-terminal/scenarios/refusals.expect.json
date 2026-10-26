@@ -1,0 +1,5 @@
+[
+  {"code": "StateViolation", "entry": 0},
+  {"code": "CapabilityNotAdvertised", "entry": 5},
+  {"code": "StateViolation", "entry": 9}
+]

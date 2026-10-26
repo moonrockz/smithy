@@ -15,6 +15,10 @@ yamllint = "1.38.0"
 # Git hooks manager; the hooks are in lefthook.yml
 lefthook = "2.1.1"
 
+# Python projects of the JSON-RPC runtime and the generated Python peers. uv installs the Python
+# version that each project pins, and the locked dependencies, only when a Python task runs.
+uv = "0.13.5"
+
 # C cross compiler for the published zig-cross tool (Linux and macOS release binaries)
 zig = "0.17.0"
 
@@ -323,3 +327,43 @@ run = "moonx scripts/site-linkcheck.mbtx"
 description = "Print the newest stable release tag (prereleases ignored); prints nothing when there is none"
 run = "moonx scripts/site-latest-tag.mbtx"
 hide = true
+
+[tasks."runtime:embed"]
+description = "Copy the JSON-RPC runtime sources into the MoonBit and Python generators"
+run = "moonx scripts/runtime-embed.mbtx write"
+
+[tasks."runtime:embed:check"]
+description = "Fail when a generator's embedded JSON-RPC runtime differs from runtimes/"
+run = "moonx scripts/runtime-embed.mbtx check"
+
+[tasks."test:runtime:moonbit"]
+description = "Run the tests of the MoonBit JSON-RPC runtime (native)"
+run = "moonx scripts/runtime-moonbit.mbtx test"
+
+[tasks."test:runtime:python"]
+description = "Run pytest, pyright --strict and ruff on the Python JSON-RPC runtime"
+run = "moonx scripts/runtime-python.mbtx test"
+
+[tasks."sample:build:moonbit"]
+description = "Build the MoonBit payment terminal sample programs and write commands/moonbit.json"
+run = "moonx scripts/runtime-moonbit.mbtx sample-build"
+
+[tasks."sample:build:python"]
+description = "Prepare the Python payment terminal sample programs and write commands/python.json"
+run = "moonx scripts/runtime-python.mbtx sample-build"
+
+[tasks."test:generated:moonbit"]
+description = "Run moon check --deny-warn and the tests of the generated MoonBit peers (native)"
+run = "moonx scripts/runtime-moonbit.mbtx generated"
+
+[tasks."test:generated:python"]
+description = "Run pyright --strict, ruff and pytest on the generated Python peers"
+run = "moonx scripts/runtime-python.mbtx generated"
+
+[tasks."codegen:payment-terminal"]
+description = "Regenerate the golden generated peers of examples/payment-terminal (args: --check)"
+run = "moonx scripts/codegen-payment-terminal.mbtx"
+
+[tasks."test:payment-terminal"]
+description = "Run the MoonBit POS against the Python terminal over stdio and check each transcript"
+run = "moonx scripts/payment-terminal.mbtx"
