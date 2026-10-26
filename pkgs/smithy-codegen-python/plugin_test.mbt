@@ -95,7 +95,8 @@ test "a server peer gets models, errors, a handler and session rules" {
   assert_true(models.contains("    amount: BigDecimal\n"))
   assert_true(models.contains("    at: EpochSecondsTimestamp | None = None\n"))
   assert_true(models.contains("    seen: DateTimeTimestamp | None = None\n"))
-  assert_true(models.contains("    left: BigInteger\n"))
+  assert_true(models.contains("    left: Integer\n"))
+  assert_true(models.contains("    right: Long | None = None\n"))
   assert_true(models.contains("    flag: StrictBool | None = None\n"))
   assert_true(models.contains("    ratio: Double | None = None\n"))
   assert_true(models.contains("    data: Blob | None = None\n"))
@@ -196,7 +197,6 @@ test "a client peer gets a typed client with modeled errors" {
     "peer": "client",
     "package": "echo_client",
     "transports": ["stdio"],
-    "integrations": ["fastapi"],
   })
   let names = sorted_names(files)
   assert_true(names.contains("echo_client/client.py"))
@@ -233,8 +233,60 @@ test "a client peer gets a typed client with modeled errors" {
     client.contains("        return PickInput.model_validate(result)\n"),
   )
   let pyproject = files["pyproject.toml"]
-  assert_true(pyproject.contains("    \"fastapi==0.162.0\",\n"))
+  assert_false(pyproject.contains("fastapi"))
   assert_false(pyproject.contains("httpx"))
+  // Only the stdio transport: no transport module that needs another package.
+  assert_true(names.contains("echo_client/_runtime/stdio.py"))
+  assert_false(names.contains("echo_client/_runtime/http_client.py"))
+  assert_false(names.contains("echo_client/_runtime/ws_client.py"))
+  assert_false(names.contains("echo_client/_runtime/server.py"))
+}
+
+///|
+test "the fastapi integration wires the handler into the runtime server" {
+  let files = generate({
+    "service": "example#Echo",
+    "peer": "server",
+    "package": "echo_server",
+    "integrations": ["fastapi"],
+  })
+  let names = sorted_names(files)
+  assert_true(names.contains("echo_server/_runtime/server.py"))
+  assert_true(names.contains("echo_server/_runtime/http_client.py"))
+  let app = files["echo_server/fastapi_app.py"]
+  assert_true(
+    app.contains(
+      "from ._runtime import Peer, TranscriptLog, server\nfrom .handler import EchoHandler, register_echo\nfrom .session import new_peer\n",
+    ),
+  )
+  assert_true(
+    app.contains(
+      "def create_app(handler_factory: Callable[[], EchoHandler], *, log: TranscriptLog | None = None) -> FastAPI:\n",
+    ),
+  )
+  assert_true(
+    app.contains(
+      "    await server.serve(port, peer_factory(handler_factory, log))\n",
+    ),
+  )
+  let pyproject = files["pyproject.toml"]
+  assert_true(pyproject.contains("    \"fastapi==0.162.0\",\n"))
+  assert_true(pyproject.contains("    \"uvicorn==0.54.0\",\n"))
+  let message = try {
+    let _ = generate({
+      "service": "example#Echo",
+      "peer": "client",
+      "package": "echo_client",
+      "integrations": ["fastapi"],
+    })
+    "no error"
+  } catch {
+    @codegen.InvalidSettings(text) => text
+    error => error.to_string()
+  }
+  assert_eq(
+    message, "I cannot add integration `fastapi` to peer `client`: it accepts no service.",
+  )
 }
 
 ///|
@@ -300,4 +352,167 @@ test "bad settings give first-person errors" {
       msg="I expected `\{expected}`, found `\{message}`",
     )
   }
+}
+
+///|
+let review_model : String =
+  #|$version: "2"
+  #|namespace review
+  #|use smithy.rpc#jsonRpc
+  #|use smithy.rpc#method
+  #|use smithy.rpc#rpcError
+  #|@jsonRpc(versions: ["2.0"])
+  #|service Echo { version: "1", operations: [NoOutput, Numbers] }
+  #|@method(name: "noOutput", params: "named")
+  #|operation NoOutput { input: NoOutputInput, errors: [Quiet, Partly] }
+  #|structure NoOutputInput { name: String }
+  #|@method(name: "numbers", params: "named")
+  #|operation Numbers { input: NumbersInput, output: NumbersInput }
+  #|structure NumbersInput { ratio: Double, small: Byte, medium: Short, big: BigInteger, decimal: Decimal }
+  #|structure Decimal { value: String }
+  #|@error("client")
+  #|@rpcError(code: 1001, absentData: true)
+  #|structure Quiet { detail: String }
+  #|@error("client")
+  #|@rpcError(code: 1002, dataMember: "reason")
+  #|structure Partly { reason: String, extra: String }
+
+///|
+fn generate_from(
+  model_text : String,
+  settings : Json,
+) -> Map[String, String] raise {
+  let loaded = @rpc.loader().add_idl("review.smithy", model_text).assemble()
+  guard loaded.model is Some(model) else {
+    fail(loaded.diagnostics.map(d => d.message).join("\n"))
+  }
+  @python.run(@codegen.PluginContext::from_build(model, settings))
+}
+
+///|
+test "no output, optional error data, integer widths and escaped names" {
+  let server = generate_from(review_model, {
+    "service": "review#Echo",
+    "peer": "server",
+    "package": "review_server",
+  })
+  let handler = server["review_server/handler.py"]
+  // An operation with no output and no nullResult gives an empty object.
+  assert_true(
+    handler.contains(
+      "    async def no_output(self, input: NoOutputInput, context: CallContext) -> None:\n",
+    ),
+  )
+  assert_true(handler.contains("        return {}\n"))
+  assert_false(handler.contains("Unit"))
+  let models = server["review_server/models.py"]
+  assert_true(models.contains("    small: Byte | None = None\n"))
+  assert_true(models.contains("    medium: Short | None = None\n"))
+  assert_true(models.contains("    big: BigInteger | None = None\n"))
+  assert_true(models.contains("    ratio: Double | None = None\n"))
+  // A shape with a name that the modules import gets a suffix.
+  assert_true(models.contains("class Decimal_(BaseModel):"))
+  assert_true(models.contains("    decimal: Decimal_ | None = None\n"))
+  let errors = server["review_server/errors.py"]
+  // absentData with optional members: the data model gets its defaults.
+  assert_true(
+    errors.contains(
+      "    def __init__(self, data: QuietData | None = None) -> None:\n",
+    ),
+  )
+  assert_true(errors.contains("        return Quiet()\n"))
+  // dataMember with another optional member.
+  assert_true(
+    errors.contains(
+      "        return Partly(PartlyData.model_validate({} if data is None else {\"reason\": data}))\n",
+    ),
+  )
+  let client = generate_from(review_model, {
+      "service": "review#Echo",
+      "peer": "client",
+      "package": "review_client",
+    })["review_client/client.py"]
+  assert_true(
+    client.contains(
+      "    async def no_output(self, input: NoOutputInput, *, checked: bool = True) -> None:\n",
+    ),
+  )
+  assert_false(client.contains("Unit"))
+}
+
+///|
+test "name collisions give first-person errors" {
+  let cases : Array[(String, String)] = [
+    (
+      (
+        #|$version: "2"
+        #|namespace review
+        #|use smithy.rpc#jsonRpc
+        #|use smithy.rpc#method
+        #|@jsonRpc(versions: ["2.0"])
+        #|service Echo { version: "1", operations: [Both, BothNotification] }
+        #|@method(name: "both", params: "named", kind: "either")
+        #|operation Both {}
+        #|@method(name: "bothNotification", params: "named", kind: "notification")
+        #|operation BothNotification {}
+      ),
+      "I found operations `review#Both` and `review#BothNotification` with the same client method name `both_notification`.",
+    ),
+    (
+      (
+        #|$version: "2"
+        #|namespace review
+        #|use smithy.rpc#jsonRpc
+        #|use smithy.rpc#method
+        #|@jsonRpc(versions: ["2.0"])
+        #|service Echo { version: "1", operations: [Say] }
+        #|@method(name: "say", params: "named")
+        #|operation Say { input: EchoClient }
+        #|structure EchoClient { text: String }
+      ),
+      "I cannot name the client class `EchoClient`: shape `review#EchoClient` has that Python class name.",
+    ),
+  ]
+  for case in cases {
+    let (model_text, expected) = case
+    let message = try {
+      let _ = generate_from(model_text, {
+        "service": "review#Echo",
+        "peer": "client",
+        "package": "review_client",
+      })
+      "no error"
+    } catch {
+      @codegen.InvalidSettings(text) => text
+      error => error.to_string()
+    }
+    assert_eq(message, expected)
+  }
+  // New and Close are valid method names.
+  let files = generate_from(
+    (
+      #|$version: "2"
+      #|namespace review
+      #|use smithy.rpc#jsonRpc
+      #|use smithy.rpc#method
+      #|@jsonRpc(versions: ["2.0"])
+      #|service Echo { version: "1", operations: [New, Close] }
+      #|@method(name: "new", params: "named", nullResult: true)
+      #|operation New {}
+      #|@method(name: "close", params: "named", nullResult: true)
+      #|operation Close {}
+    ),
+    { "service": "review#Echo", "peer": "client", "package": "review_client" },
+  )
+  let client = files["review_client/client.py"]
+  assert_true(
+    client.contains(
+      "    async def new(self, *, checked: bool = True) -> None:\n",
+    ),
+  )
+  assert_true(
+    client.contains(
+      "    async def close(self, *, checked: bool = True) -> None:\n",
+    ),
+  )
 }

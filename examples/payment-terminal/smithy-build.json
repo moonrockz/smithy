@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "outputDirectory": "../../.dev/out/payment-terminal",
+  "outputDirectory": "../../.dev/out/payment-terminal/build",
   "sources": ["model.smithy"],
   "plugins": {
     "openrpc::terminal": {"service": "example.payments#PaymentTerminal"},

@@ -40,7 +40,7 @@ own capability rules. The card entry choice stays part of the payment input.
 
 The build file exports the two accepted services as OpenRPC documents with the
 `openrpc` plugin, and generates the MoonBit and Python peers. It writes them
-under `.dev/out/payment-terminal/`.
+under `.dev/out/payment-terminal/build/`.
 
 ```shell
 mise exec -- moon run apps/smithy --target native -- build --config examples/payment-terminal/smithy-build.json

@@ -184,6 +184,9 @@ pub fn run(
       gen.write_client()
       gen.write_session()
       gen.write_init()
+      if integrations.contains(FastApi) {
+        gen.write_fastapi()
+      }
       gen.write_test()
     },
   )
@@ -191,9 +194,105 @@ pub fn run(
   files["pyproject.toml"] = pyproject_file(package_name, settings, integrations)
   files["\{package_name}/py.typed"] = ""
   for entry in runtime_files {
-    files["\{package_name}/_runtime/" + entry.0] = entry.1
+    if runtime_file_used(entry.0, settings, integrations) {
+      files["\{package_name}/_runtime/" + entry.0] = entry.1
+    }
   }
   files
+}
+
+///|
+/// Whether the output needs a runtime file. A transport module needs its
+/// transport, and the server module needs the fastapi integration, so the
+/// output imports only the packages that its `pyproject.toml` lists.
+fn runtime_file_used(
+  name : String,
+  settings : @jsonrpc.PeerSettings,
+  integrations : Array[PyIntegration],
+) -> Bool {
+  match name {
+    "http_client.py" => settings.transports.contains(Http)
+    "ws_client.py" => settings.transports.contains(WebSocket)
+    "server.py" => integrations.contains(FastApi)
+    _ => true
+  }
+}
+
+///|
+/// Write the FastAPI module: the wiring of the runtime server with the
+/// generated handler. Each session gets a new handler.
+fn Gen::write_fastapi(self : Gen) -> Unit raise @codegen.CodegenError {
+  guard self.settings.peer.accepts is Some(description) else {
+    raise @codegen.InvalidSettings(
+      "I cannot add integration `fastapi` to peer `\{self.settings.peer.name.to_string()}`: it accepts no service.",
+    )
+  }
+  let service = self.service_class(description.service)
+  let protocol_name = service + "Handler"
+  let register = "register_" +
+    snake_name(self.names.shape_name(description.service))
+  let doc = "The FastAPI app of peer `\{self.settings.peer.name.to_string()}`: POST /rpc and WebSocket /ws."
+  self.with_module(".fastapi_app", doc, w => {
+    let callable = use_name(w, "collections.abc", "Callable")
+    let fastapi = use_name(w, "fastapi", "FastAPI")
+    let peer = use_name(w, runtime_module, "Peer")
+    let log = use_name(w, runtime_module, "TranscriptLog")
+    let server = use_name(w, runtime_module, "server")
+    let handler = use_name(w, ".handler", protocol_name)
+    let register_fn = use_name(w, ".handler", register)
+    let new_peer = use_name(w, ".session", "new_peer")
+    let factory_type = "\{callable}[[], \{handler}]"
+    w.blank_line()
+    w.blank_line()
+    w.write("def peer_factory($L) -> $L[[], $L]:", args=[
+      Text("handler_factory: \{factory_type}, log: \{log} | None = None"),
+      Text(callable),
+      Text(peer),
+    ])
+    w.indent()
+    w.write(
+      "\"\"\"Give a function that makes a peer with a new handler for each session.\"\"\"",
+    )
+    w.blank_line()
+    w.write("def make() -> $L:", args=[Text(peer)])
+    w.indent()
+    w.write("peer = $L(log)", args=[Text(new_peer)])
+    w.write("$L(peer, handler_factory())", args=[Text(register_fn)])
+    w.write("return peer")
+    w.dedent()
+    w.blank_line()
+    w.write("return make")
+    w.dedent()
+    w.blank_line()
+    w.blank_line()
+    w.write("def create_app($L) -> $L:", args=[
+      Text("handler_factory: \{factory_type}, *, log: \{log} | None = None"),
+      Text(fastapi),
+    ])
+    w.indent()
+    w.write(
+      "\"\"\"Give a FastAPI app with POST /rpc and WebSocket /ws for the handlers.\"\"\"",
+    )
+    w.write("return $L.create_app(peer_factory(handler_factory, log))", args=[
+      Text(server),
+    ])
+    w.dedent()
+    w.blank_line()
+    w.blank_line()
+    w.write("async def serve($L) -> None:", args=[
+      Text(
+        "port: int, handler_factory: \{factory_type}, *, log: \{log} | None = None",
+      ),
+    ])
+    w.indent()
+    w.write(
+      "\"\"\"Serve the app on 127.0.0.1:`port`. I write `listening N` to stderr when I am ready.\"\"\"",
+    )
+    w.write("await $L.serve(port, peer_factory(handler_factory, log))", args=[
+      Text(server),
+    ])
+    w.dedent()
+  })
 }
 
 ///|

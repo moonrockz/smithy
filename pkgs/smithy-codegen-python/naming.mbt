@@ -24,7 +24,8 @@ let model_attributes : Array[String] = [
 /// The names that the generated modules import or define. A shape with one of
 /// these names gets a `_` suffix.
 let python_type_names : Array[String] = [
-  "Annotated", "BaseModel", "BigDecimal", "BigInteger", "Blob", "CallContext", "CancelRule",
+  "Annotated", "Any", "BaseModel", "BigDecimal", "BigInteger", "Blob", "Byte", "CallContext",
+  "Callable", "CancelRule", "Decimal", "FastAPI", "Integer", "Long", "Short", "TypeAlias",
   "CapabilitySource", "ClassVar", "ConfigDict", "DateTimeTimestamp", "Discriminator",
   "Document", "Double", "Enum", "EpochSecondsTimestamp", "Exception", "Field", "HttpDateTimestamp",
   "IntEnum", "JsonValue", "MethodKind", "MethodRule", "ModeledError", "Peer", "Protocol",

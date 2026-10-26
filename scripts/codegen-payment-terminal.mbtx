@@ -22,7 +22,7 @@ import {
 let build_config : String = "examples/payment-terminal/smithy-build.json"
 
 ///|
-let build_output : String = ".dev/out/payment-terminal/source"
+let build_output : String = ".dev/out/payment-terminal/build/source"
 
 ///|
 /// Each generated peer: the artifact name of the build and the golden directory.

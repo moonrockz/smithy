@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ._runtime import BigInteger, JsonValue, ModeledError, RpcError, to_wire
+from ._runtime import Integer, JsonValue, ModeledError, RpcError, to_wire
 from .models import Money
 
 
@@ -101,7 +101,7 @@ class TerminalBusyData(BaseModel):
         extra="ignore", frozen=True, validate_by_name=True, validate_by_alias=True
     )
 
-    retry_after_seconds: BigInteger = Field(validation_alias="retryAfterSeconds", serialization_alias="retryAfterSeconds")
+    retry_after_seconds: Integer = Field(validation_alias="retryAfterSeconds", serialization_alias="retryAfterSeconds")
 
 
 class TerminalBusy(ModeledError):

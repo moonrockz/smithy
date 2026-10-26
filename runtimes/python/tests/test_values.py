@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -10,12 +11,18 @@ from smithy_jsonrpc_runtime import (
     BigDecimal,
     BigInteger,
     Blob,
+    Byte,
     DateTimeTimestamp,
     DecodeError,
+    Double,
+    Integer,
+    Long,
     RequestId,
+    Short,
     Timestamp,
     TimestampFormat,
     json_codec,
+    to_wire,
 )
 
 
@@ -137,3 +144,43 @@ def test_timestamps_convert_to_datetimes() -> None:
     assert parsed == http
     with pytest.raises(DecodeError, match="epoch seconds"):
         Timestamp.from_json("1", format=TimestampFormat.EPOCH_SECONDS, path="/since")
+
+
+class Sized(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    small: Byte = 0
+    medium: Short = 0
+    whole: Integer = 0
+    big: Long = 0
+    ratio: Double = 0.0
+
+
+def test_integer_ranges_follow_smithy() -> None:
+    edge = Sized.model_validate(
+        {"small": -128, "medium": 32767, "whole": -(2**31), "big": 2**63 - 1}
+    )
+    assert (edge.small, edge.medium, edge.whole, edge.big) == (-128, 32767, -(2**31), 2**63 - 1)
+    for wire in (
+        {"small": 128},
+        {"medium": -32769},
+        {"whole": 2**31},
+        {"big": 2**63},
+        {"small": "1"},
+    ):
+        with pytest.raises(ValidationError):
+            Sized.model_validate(wire)
+
+
+def test_non_finite_doubles_use_the_strings_of_the_validator() -> None:
+    nan = Sized.model_validate({"ratio": "NaN"})
+    assert math.isnan(nan.ratio)
+    infinite = Sized.model_validate({"ratio": "Infinity"})
+    assert infinite.ratio == math.inf
+    for value, text in ((nan, "NaN"), (infinite, "Infinity")):
+        wire = to_wire(value)
+        assert isinstance(wire, dict) and wire["ratio"] == text
+    negative = Sized(ratio=-math.inf)
+    assert json_codec.dumps(to_wire(negative)).endswith('"ratio":"-Infinity"}')
+    assert to_wire(math.nan) == "NaN"
+    with pytest.raises(ValidationError):
+        Sized.model_validate({"ratio": "nan"})

@@ -43,11 +43,15 @@ let runtime_files : Array[(String, String)] = [
       #|    BigDecimal,
       #|    BigInteger,
       #|    Blob,
+      #|    Byte,
       #|    DateTimeTimestamp,
       #|    Document,
       #|    Double,
       #|    EpochSecondsTimestamp,
       #|    HttpDateTimestamp,
+      #|    Integer,
+      #|    Long,
+      #|    Short,
       #|    Timestamp,
       #|    TimestampFormat,
       #|    Unit,
@@ -57,6 +61,7 @@ let runtime_files : Array[(String, String)] = [
       #|    decode_double,
       #|    decode_integer,
       #|    encode_blob,
+      #|    encode_double,
       #|    to_wire,
       #|    to_wire_object,
       #|    union_tag,
@@ -72,6 +77,7 @@ let runtime_files : Array[(String, String)] = [
       #|    "BigDecimal",
       #|    "BigInteger",
       #|    "Blob",
+      #|    "Byte",
       #|    "CallContext",
       #|    "CancelRule",
       #|    "CapabilitySource",
@@ -83,8 +89,10 @@ let runtime_files : Array[(String, String)] = [
       #|    "EpochSecondsTimestamp",
       #|    "FramingError",
       #|    "HttpDateTimestamp",
+      #|    "Integer",
       #|    "JsonObject",
       #|    "JsonValue",
+      #|    "Long",
       #|    "MemoryConnection",
       #|    "MethodKind",
       #|    "MethodRule",
@@ -98,6 +106,7 @@ let runtime_files : Array[(String, String)] = [
       #|    "RpcError",
       #|    "Session",
       #|    "SessionRules",
+      #|    "Short",
       #|    "StdioConnection",
       #|    "StreamConnection",
       #|    "Timestamp",
@@ -110,6 +119,7 @@ let runtime_files : Array[(String, String)] = [
       #|    "decode_double",
       #|    "decode_integer",
       #|    "encode_blob",
+      #|    "encode_double",
       #|    "json_codec",
       #|    "memory_pair",
       #|    "modeled_error",
@@ -136,6 +146,9 @@ let runtime_files : Array[(String, String)] = [
       #|from typing import Protocol
       #|
       #|from .ids import RequestId
+      #|
+      #|SESSION_HEADER = "Smithy-Session-Id"
+      #|"""The HTTP header that ties the posts of one session together."""
       #|
       #|
       #|class Connection(Protocol):
@@ -281,6 +294,153 @@ let runtime_files : Array[(String, String)] = [
       #|        return decoder(error.data)
       #|    except (DecodeError, ValueError):
       #|        return error
+      #|
+    ),
+  ),
+  (
+    "http_client.py",
+    (
+      #|"""The HTTP client transport, in the Streamable HTTP style. It needs `httpx`.
+      #|
+      #|- The client posts each message to the endpoint, such as `http://127.0.0.1:N/rpc`,
+      #|  on a new connection. It posts the next message only after the response
+      #|  headers of the last post arrive, so the server receives the messages in order.
+      #|- The server answers a request with `text/event-stream`: each event carries one
+      #|  message. The stream ends after the response to the request. The client also
+      #|  accepts a response as `application/json`.
+      #|- The server answers a notification or a response with 202.
+      #|- The server sets `Smithy-Session-Id` on its responses. The client sends it on
+      #|  each later post.
+      #|"""
+      #|
+      #|from __future__ import annotations
+      #|
+      #|import asyncio
+      #|import contextlib
+      #|import logging
+      #|
+      #|import httpx
+      #|
+      #|from .connection import SESSION_HEADER
+      #|from .ids import RequestId
+      #|
+      #|_LOG = logging.getLogger(__name__)
+      #|
+      #|
+      #|class HttpClientConnection:
+      #|    """A connection to a JSON-RPC peer at an HTTP endpoint."""
+      #|
+      #|    def __init__(self, url: str, client: httpx.AsyncClient | None = None) -> None:
+      #|        self.url = url
+      #|        self.session_id: str | None = None
+      #|        self._client = (
+      #|            client
+      #|            if client is not None
+      #|            else httpx.AsyncClient(
+      #|                timeout=httpx.Timeout(None, connect=10.0),
+      #|                limits=httpx.Limits(max_keepalive_connections=0),
+      #|            )
+      #|        )
+      #|        self._inbox: asyncio.Queue[str | None] = asyncio.Queue()
+      #|        self._order = asyncio.Lock()
+      #|        self._readers: set[asyncio.Task[None]] = set()
+      #|        self._closed = False
+      #|
+      #|    async def receive(self) -> str | None:
+      #|        if self._closed and self._inbox.empty():
+      #|            return None
+      #|        return await self._inbox.get()
+      #|
+      #|    async def send(self, text: str, *, related: RequestId | None = None) -> None:
+      #|        async with self._order:
+      #|            if self._closed:
+      #|                raise ConnectionError(f"I cannot post to {self.url}: the connection is closed.")
+      #|            headers = {
+      #|                "Content-Type": "application/json",
+      #|                "Accept": "application/json, text/event-stream",
+      #|            }
+      #|            if self.session_id is not None:
+      #|                headers[SESSION_HEADER] = self.session_id
+      #|            request = self._client.build_request(
+      #|                "POST", self.url, content=text.encode("utf-8"), headers=headers
+      #|            )
+      #|            try:
+      #|                response = await self._client.send(request, stream=True)
+      #|            except httpx.HTTPError as error:
+      #|                raise ConnectionError(f"I could not post to {self.url}: {error}") from error
+      #|            found = response.headers.get(SESSION_HEADER)
+      #|            if found is not None and self.session_id is None:
+      #|                self.session_id = found
+      #|            status = response.status_code
+      #|            if status == 202:
+      #|                await response.aclose()
+      #|                return
+      #|            if status != 200:
+      #|                await response.aclose()
+      #|                if status == 404:
+      #|                    raise ConnectionError(
+      #|                        f"I posted to {self.url} with session {self.session_id}; "
+      #|                        "the server does not know the session (404)."
+      #|                    )
+      #|                raise ConnectionError(
+      #|                    f"I expected status 200 or 202 from {self.url}; I received {status}."
+      #|                )
+      #|            kind = response.headers.get("content-type", "")
+      #|            if kind.startswith("text/event-stream"):
+      #|                task = asyncio.create_task(self._read_events(response))
+      #|                self._readers.add(task)
+      #|                task.add_done_callback(self._readers.discard)
+      #|                return
+      #|            try:
+      #|                body = (await response.aread()).decode("utf-8")
+      #|            finally:
+      #|                await response.aclose()
+      #|            if body.strip():
+      #|                self._inbox.put_nowait(body)
+      #|
+      #|    async def _read_events(self, response: httpx.Response) -> None:
+      #|        data: list[str] = []
+      #|        try:
+      #|            async for raw in response.aiter_lines():
+      #|                line = raw.rstrip("\r\n")
+      #|                if line == "":
+      #|                    if data:
+      #|                        self._inbox.put_nowait("\n".join(data))
+      #|                        data = []
+      #|                    continue
+      #|                if line.startswith(":"):
+      #|                    continue
+      #|                name, _, value = line.partition(":")
+      #|                if name == "data":
+      #|                    data.append(value.removeprefix(" "))
+      #|            if data:
+      #|                self._inbox.put_nowait("\n".join(data))
+      #|        except httpx.HTTPError as error:
+      #|            _LOG.warning("I lost an event stream from %s: %s", self.url, error)
+      #|        finally:
+      #|            await response.aclose()
+      #|
+      #|    async def close(self) -> None:
+      #|        if self._closed:
+      #|            return
+      #|        self._closed = True
+      #|        for task in list(self._readers):
+      #|            task.cancel()
+      #|        for task in list(self._readers):
+      #|            with contextlib.suppress(asyncio.CancelledError):
+      #|                await task
+      #|        self._inbox.put_nowait(None)
+      #|        await self._client.aclose()
+      #|
+      #|
+      #|async def http_connect(url: str) -> HttpClientConnection:
+      #|    """Give a connection to the JSON-RPC endpoint at `url`, such as `http://127.0.0.1:8080/rpc`.
+      #|
+      #|    The first post opens the session.
+      #|    """
+      #|    if not (url.startswith("http://") or url.startswith("https://")):
+      #|        raise ValueError(f"I expected an http:// or https:// URL; I found {url!r}.")
+      #|    return HttpClientConnection(url)
       #|
     ),
   ),
@@ -1222,6 +1382,298 @@ let runtime_files : Array[(String, String)] = [
     ),
   ),
   (
+    "server.py",
+    (
+      #|"""The FastAPI integration: `POST /rpc` and `WebSocket /ws` for a peer.
+      #|
+      #|It needs FastAPI and uvicorn.
+      #|
+      #|`POST /rpc` follows the Streamable HTTP style:
+      #|
+      #|- The first post without `Smithy-Session-Id` opens a session with a new peer
+      #|  from the peer factory. Each response has the header. A post with an
+      #|  unknown session ID gets 404.
+      #|- A posted request gets 200 `text/event-stream`. The stream starts with the
+      #|  comment `: open`. Each event is `event: message` and `data: <message>`.
+      #|  The notifications and requests of the handler of that request come first,
+      #|  then the response, then the stream ends.
+      #|- A message of the peer that belongs to no open stream goes on the latest
+      #|  open stream of the session. When no stream is open, the session keeps it
+      #|  for the next stream.
+      #|- A posted notification or response gets 202 with an empty body.
+      #|- Text that is not JSON, a batch or a value that is not an object gets 200
+      #|  `application/json` with the error (-32700 or -32600, ID null). The session
+      #|  does not see it.
+      #|
+      #|`WebSocket /ws` carries one message in each text frame. Each WebSocket
+      #|connection has a new peer.
+      #|"""
+      #|
+      #|from __future__ import annotations
+      #|
+      #|import asyncio
+      #|import contextlib
+      #|import sys
+      #|import uuid
+      #|from collections.abc import AsyncIterator, Callable
+      #|from dataclasses import dataclass
+      #|
+      #|import uvicorn
+      #|from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
+      #|from fastapi.responses import StreamingResponse
+      #|
+      #|from .connection import SESSION_HEADER
+      #|from .errors import INVALID_REQUEST, PARSE_ERROR, DecodeError
+      #|from .ids import RequestId
+      #|from .json_codec import JsonValue, describe, dumps, loads
+      #|from .peer import Peer
+      #|
+      #|PeerFactory = Callable[[], Peer]
+      #|"""Makes a new peer, with its handlers, for each session."""
+      #|
+      #|
+      #|def _is_response_to(text: str, request_id: RequestId) -> bool:
+      #|    try:
+      #|        value = loads(text)
+      #|    except DecodeError:
+      #|        return False
+      #|    if not isinstance(value, dict) or "method" in value or "id" not in value:
+      #|        return False
+      #|    try:
+      #|        return RequestId.from_json(value["id"]) == request_id
+      #|    except DecodeError:
+      #|        return False
+      #|
+      #|
+      #|class HttpSessionConnection:
+      #|    """The connection of the peer of one HTTP session."""
+      #|
+      #|    def __init__(self) -> None:
+      #|        self._inbox: asyncio.Queue[str | None] = asyncio.Queue()
+      #|        self._streams: dict[RequestId, asyncio.Queue[str | None]] = {}
+      #|        self._held: list[str] = []
+      #|        self._closed = False
+      #|
+      #|    def is_open(self, request_id: RequestId) -> bool:
+      #|        """Whether the stream of the request is open."""
+      #|        return request_id in self._streams
+      #|
+      #|    def open_stream(self, request_id: RequestId) -> asyncio.Queue[str | None]:
+      #|        """Open the stream of a posted request. It gets the messages that the session kept."""
+      #|        queue: asyncio.Queue[str | None] = asyncio.Queue()
+      #|        self._streams[request_id] = queue
+      #|        for text in self._held:
+      #|            queue.put_nowait(text)
+      #|        self._held.clear()
+      #|        return queue
+      #|
+      #|    def deliver(self, text: str) -> None:
+      #|        """Give a posted message to the peer."""
+      #|        self._inbox.put_nowait(text)
+      #|
+      #|    async def receive(self) -> str | None:
+      #|        if self._closed and self._inbox.empty():
+      #|            return None
+      #|        return await self._inbox.get()
+      #|
+      #|    async def send(self, text: str, *, related: RequestId | None = None) -> None:
+      #|        if self._closed:
+      #|            raise ConnectionError("I cannot send: the HTTP session is closed.")
+      #|        if related is not None and related in self._streams:
+      #|            target: RequestId | None = related
+      #|        elif self._streams:
+      #|            target = next(reversed(self._streams))
+      #|        else:
+      #|            target = None
+      #|        if target is None:
+      #|            self._held.append(text)
+      #|            return
+      #|        queue = self._streams[target]
+      #|        queue.put_nowait(text)
+      #|        if related == target and _is_response_to(text, target):
+      #|            queue.put_nowait(None)
+      #|            del self._streams[target]
+      #|
+      #|    async def close(self) -> None:
+      #|        if self._closed:
+      #|            return
+      #|        self._closed = True
+      #|        self._inbox.put_nowait(None)
+      #|        for queue in self._streams.values():
+      #|            queue.put_nowait(None)
+      #|        self._streams.clear()
+      #|
+      #|
+      #|@dataclass(slots=True)
+      #|class _Session:
+      #|    conn: HttpSessionConnection
+      #|    peer: Peer
+      #|    task: asyncio.Task[None]
+      #|
+      #|
+      #|class _WebSocketConnection:
+      #|    def __init__(self, socket: WebSocket) -> None:
+      #|        self._socket = socket
+      #|
+      #|    async def receive(self) -> str | None:
+      #|        try:
+      #|            return await self._socket.receive_text()
+      #|        except (WebSocketDisconnect, RuntimeError):
+      #|            return None
+      #|
+      #|    async def send(self, text: str, *, related: RequestId | None = None) -> None:
+      #|        try:
+      #|            await self._socket.send_text(text)
+      #|        except (WebSocketDisconnect, RuntimeError) as error:
+      #|            raise ConnectionError(f"I cannot send: the WebSocket closed ({error}).") from error
+      #|
+      #|    async def close(self) -> None:
+      #|        with contextlib.suppress(RuntimeError):
+      #|            await self._socket.close()
+      #|
+      #|
+      #|def _json_error(code: int, message: str, request_id: JsonValue = None) -> Response:
+      #|    body = dumps({"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}})
+      #|    return Response(content=body, media_type="application/json")
+      #|
+      #|
+      #|async def _events(queue: asyncio.Queue[str | None]) -> AsyncIterator[bytes]:
+      #|    yield b": open\n\n"
+      #|    while True:
+      #|        text = await queue.get()
+      #|        if text is None:
+      #|            return
+      #|        yield b"event: message\ndata: " + text.encode("utf-8") + b"\n\n"
+      #|
+      #|
+      #|def create_app(peer_factory: PeerFactory) -> FastAPI:
+      #|    """Give a FastAPI app with `POST /rpc` and `WebSocket /ws` for the peers of `peer_factory`."""
+      #|    app = FastAPI()
+      #|    sessions: dict[str, _Session] = {}
+      #|
+      #|    @app.post("/rpc")
+      #|    async def rpc(request: Request) -> Response:  # pyright: ignore[reportUnusedFunction]
+      #|        session_id = request.headers.get(SESSION_HEADER)
+      #|        session = None
+      #|        if session_id is not None:
+      #|            session = sessions.get(session_id)
+      #|            if session is None:
+      #|                return Response(status_code=404)
+      #|        raw = await request.body()
+      #|        try:
+      #|            text = raw.decode("utf-8")
+      #|            value = loads(text)
+      #|        except UnicodeDecodeError as error:
+      #|            return _json_error(PARSE_ERROR, f"I could not parse the message as JSON: {error}.")
+      #|        except DecodeError as error:
+      #|            return _json_error(PARSE_ERROR, error.message)
+      #|        if isinstance(value, list):
+      #|            return _json_error(INVALID_REQUEST, "I do not accept a batch; I received a JSON array.")
+      #|        if not isinstance(value, dict):
+      #|            return _json_error(
+      #|                INVALID_REQUEST,
+      #|                f"I expected a valid JSON-RPC 2.0 request; I found {describe(value)}.",
+      #|            )
+      #|        request_id: RequestId | None = None
+      #|        if "method" in value and "id" in value:
+      #|            try:
+      #|                request_id = RequestId.from_json(value["id"])
+      #|            except DecodeError:
+      #|                return _json_error(
+      #|                    INVALID_REQUEST,
+      #|                    "I expected a valid JSON-RPC 2.0 request; "
+      #|                    f"I found the id {describe(value['id'])}.",
+      #|                )
+      #|        if session is None:
+      #|            session_id = uuid.uuid4().hex
+      #|            conn = HttpSessionConnection()
+      #|            peer = peer_factory()
+      #|            session = _Session(conn, peer, asyncio.create_task(peer.run(conn)))
+      #|            sessions[session_id] = session
+      #|        assert session_id is not None
+      #|        headers = {SESSION_HEADER: session_id}
+      #|        if request_id is None:
+      #|            session.conn.deliver(text)
+      #|            return Response(status_code=202, headers=headers)
+      #|        if session.conn.is_open(request_id):
+      #|            return _json_error(
+      #|                INVALID_REQUEST,
+      #|                f"I expected a valid JSON-RPC 2.0 request; I found the id {request_id}, "
+      #|                "which an active call still uses.",
+      #|                request_id.to_json(),
+      #|            )
+      #|        queue = session.conn.open_stream(request_id)
+      #|        session.conn.deliver(text)
+      #|        return StreamingResponse(
+      #|            _events(queue),
+      #|            media_type="text/event-stream",
+      #|            headers={**headers, "Cache-Control": "no-cache"},
+      #|        )
+      #|
+      #|    @app.websocket("/ws")
+      #|    async def ws(socket: WebSocket) -> None:  # pyright: ignore[reportUnusedFunction]
+      #|        await socket.accept()
+      #|        await peer_factory().run(_WebSocketConnection(socket))
+      #|
+      #|    return app
+      #|
+      #|
+      #|class RunningServer:
+      #|    """A uvicorn server that runs in a task. `port` is the port that it listens on."""
+      #|
+      #|    def __init__(self, server: uvicorn.Server, task: asyncio.Task[None], port: int) -> None:
+      #|        self._server = server
+      #|        self._task = task
+      #|        self.port = port
+      #|
+      #|    async def wait(self) -> None:
+      #|        """Wait until the server stops."""
+      #|        await self._task
+      #|
+      #|    async def stop(self) -> None:
+      #|        """Stop the server and wait until it stops."""
+      #|        self._server.should_exit = True
+      #|        await self._task
+      #|
+      #|
+      #|async def start_server(
+      #|    port: int, peer_factory: PeerFactory, *, host: str = "127.0.0.1"
+      #|) -> RunningServer:
+      #|    """Start the app of `peer_factory` on `host:port`. Port 0 selects a free port."""
+      #|    config = uvicorn.Config(
+      #|        create_app(peer_factory),
+      #|        host=host,
+      #|        port=port,
+      #|        log_level="warning",
+      #|        access_log=False,
+      #|        ws="websockets-sansio",
+      #|        lifespan="off",
+      #|    )
+      #|    server = uvicorn.Server(config)
+      #|    task = asyncio.create_task(server.serve())
+      #|    while not server.started:
+      #|        if task.done():
+      #|            await task
+      #|            raise OSError(f"I could not start the server on {host}:{port}.")
+      #|        await asyncio.sleep(0.01)
+      #|    sockets = [sock for listener in server.servers for sock in listener.sockets]
+      #|    actual = int(sockets[0].getsockname()[1]) if sockets else port
+      #|    return RunningServer(server, task, actual)
+      #|
+      #|
+      #|async def serve(port: int, peer_factory: PeerFactory, *, host: str = "127.0.0.1") -> None:
+      #|    """Serve the app of `peer_factory` until the process stops.
+      #|
+      #|    When the server is ready, I write `listening N` to stderr.
+      #|    """
+      #|    running = await start_server(port, peer_factory, host=host)
+      #|    sys.stderr.write(f"listening {running.port}\n")
+      #|    sys.stderr.flush()
+      #|    await running.wait()
+      #|
+    ),
+  ),
+  (
     "session.py",
     (
       #|"""Session rules and the session state machine.
@@ -1750,13 +2202,21 @@ let runtime_files : Array[(String, String)] = [
       #|import base64
       #|import binascii
       #|import email.utils
+      #|import math
       #|from dataclasses import dataclass
       #|from datetime import UTC, datetime
       #|from decimal import Decimal
       #|from enum import Enum
       #|from typing import TYPE_CHECKING, Annotated, Any, cast
       #|
-      #|from pydantic import BaseModel, BeforeValidator, ConfigDict, GetCoreSchemaHandler, PlainSerializer
+      #|from pydantic import (
+      #|    BaseModel,
+      #|    BeforeValidator,
+      #|    ConfigDict,
+      #|    Field,
+      #|    GetCoreSchemaHandler,
+      #|    PlainSerializer,
+      #|)
       #|from pydantic_core import core_schema
       #|
       #|from .errors import DecodeError
@@ -1982,7 +2442,9 @@ let runtime_files : Array[(String, String)] = [
       #|        return to_wire(value.value)  # pyright: ignore[reportUnknownMemberType]
       #|    if isinstance(value, BaseModel):
       #|        return to_wire(value.model_dump(mode="python", by_alias=True, exclude_none=True))
-      #|    if isinstance(value, (int, Decimal, str, float)):
+      #|    if isinstance(value, float):
+      #|        return encode_double(value)
+      #|    if isinstance(value, (int, Decimal, str)):
       #|        return value
       #|    if isinstance(value, (bytes, bytearray)):
       #|        return encode_blob(bytes(value))
@@ -2010,17 +2472,56 @@ let runtime_files : Array[(String, String)] = [
       #|    return wire
       #|
       #|
+      #|_NON_FINITE = {"NaN": math.nan, "Infinity": math.inf, "-Infinity": -math.inf}
+      #|
+      #|
       #|def decode_double(value: object, *, path: str = "") -> float:
-      #|    """Read a JSON number as a `float`. A string or a boolean is an error."""
+      #|    """Read a JSON number as a `float`. The strings "NaN", "Infinity" and "-Infinity"
+      #|    give the non-finite values. Another string or a boolean is an error."""
       #|    if isinstance(value, float):
       #|        return value
       #|    if isinstance(value, (int, Decimal)) and not isinstance(value, bool):
       #|        return float(value)
+      #|    if isinstance(value, str) and value in _NON_FINITE:
+      #|        return _NON_FINITE[value]
       #|    raise DecodeError(path=path, message=f"I expected a JSON number; I found {_name(value)}.")
       #|
       #|
-      #|Double = Annotated[float, BeforeValidator(_pydantic_value_error(decode_double))]
-      #|"""A Smithy float or double. It accepts a JSON number only."""
+      #|def encode_double(value: float) -> float | str:
+      #|    """Give a finite float unchanged, and a non-finite float as "NaN", "Infinity" or "-Infinity"."""
+      #|    if math.isnan(value):
+      #|        return "NaN"
+      #|    if math.isinf(value):
+      #|        return "Infinity" if value > 0 else "-Infinity"
+      #|    return value
+      #|
+      #|
+      #|Double = Annotated[
+      #|    float,
+      #|    BeforeValidator(_pydantic_value_error(decode_double)),
+      #|    PlainSerializer(encode_double),
+      #|]
+      #|"""A Smithy float or double. It accepts a JSON number, or "NaN", "Infinity" and "-Infinity"."""
+      #|
+      #|Byte = Annotated[
+      #|    int, BeforeValidator(_pydantic_value_error(decode_integer)), Field(ge=-(2**7), le=2**7 - 1)
+      #|]
+      #|"""A Smithy byte: an integer from -128 to 127."""
+      #|
+      #|Short = Annotated[
+      #|    int, BeforeValidator(_pydantic_value_error(decode_integer)), Field(ge=-(2**15), le=2**15 - 1)
+      #|]
+      #|"""A Smithy short: an integer from -32768 to 32767."""
+      #|
+      #|Integer = Annotated[
+      #|    int, BeforeValidator(_pydantic_value_error(decode_integer)), Field(ge=-(2**31), le=2**31 - 1)
+      #|]
+      #|"""A Smithy integer: a 32-bit signed integer."""
+      #|
+      #|Long = Annotated[
+      #|    int, BeforeValidator(_pydantic_value_error(decode_integer)), Field(ge=-(2**63), le=2**63 - 1)
+      #|]
+      #|"""A Smithy long: a 64-bit signed integer, kept exactly."""
       #|
       #|
       #|def check_document(value: object, *, path: str = "") -> JsonValue:
@@ -2088,6 +2589,52 @@ let runtime_files : Array[(String, String)] = [
       #|        return None
       #|    tag = getattr(type(value), "union_member", None)
       #|    return tag if isinstance(tag, str) else None
+      #|
+    ),
+  ),
+  (
+    "ws_client.py",
+    (
+      #|"""The WebSocket client transport: one message in each text frame. It needs `websockets`."""
+      #|
+      #|from __future__ import annotations
+      #|
+      #|from websockets.asyncio.client import ClientConnection, connect
+      #|from websockets.exceptions import ConnectionClosed
+      #|
+      #|from .ids import RequestId
+      #|from .stdio import MAX_FRAME_BYTES
+      #|
+      #|
+      #|class WsConnection:
+      #|    """A connection to a JSON-RPC peer at a WebSocket endpoint."""
+      #|
+      #|    def __init__(self, socket: ClientConnection) -> None:
+      #|        self._socket = socket
+      #|
+      #|    async def receive(self) -> str | None:
+      #|        try:
+      #|            message = await self._socket.recv()
+      #|        except ConnectionClosed:
+      #|            return None
+      #|        return message if isinstance(message, str) else message.decode("utf-8")
+      #|
+      #|    async def send(self, text: str, *, related: RequestId | None = None) -> None:
+      #|        try:
+      #|            await self._socket.send(text)
+      #|        except ConnectionClosed as error:
+      #|            raise ConnectionError(f"I cannot send: the WebSocket closed ({error}).") from error
+      #|
+      #|    async def close(self) -> None:
+      #|        await self._socket.close()
+      #|
+      #|
+      #|async def ws_connect(url: str) -> WsConnection:
+      #|    """Open a WebSocket connection to `url`, such as `ws://127.0.0.1:8080/ws`."""
+      #|    if not (url.startswith("ws://") or url.startswith("wss://")):
+      #|        raise ValueError(f"I expected a ws:// or wss:// URL; I found {url!r}.")
+      #|    socket = await connect(url, max_size=MAX_FRAME_BYTES)
+      #|    return WsConnection(socket)
       #|
     ),
   ),

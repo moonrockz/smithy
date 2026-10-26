@@ -11,13 +11,21 @@ from __future__ import annotations
 import base64
 import binascii
 import email.utils
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, GetCoreSchemaHandler, PlainSerializer
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    GetCoreSchemaHandler,
+    PlainSerializer,
+)
 from pydantic_core import core_schema
 
 from .errors import DecodeError
@@ -243,7 +251,9 @@ def to_wire(value: object) -> JsonValue:
         return to_wire(value.value)  # pyright: ignore[reportUnknownMemberType]
     if isinstance(value, BaseModel):
         return to_wire(value.model_dump(mode="python", by_alias=True, exclude_none=True))
-    if isinstance(value, (int, Decimal, str, float)):
+    if isinstance(value, float):
+        return encode_double(value)
+    if isinstance(value, (int, Decimal, str)):
         return value
     if isinstance(value, (bytes, bytearray)):
         return encode_blob(bytes(value))
@@ -271,17 +281,56 @@ def to_wire_object(value: object) -> dict[str, JsonValue]:
     return wire
 
 
+_NON_FINITE = {"NaN": math.nan, "Infinity": math.inf, "-Infinity": -math.inf}
+
+
 def decode_double(value: object, *, path: str = "") -> float:
-    """Read a JSON number as a `float`. A string or a boolean is an error."""
+    """Read a JSON number as a `float`. The strings "NaN", "Infinity" and "-Infinity"
+    give the non-finite values. Another string or a boolean is an error."""
     if isinstance(value, float):
         return value
     if isinstance(value, (int, Decimal)) and not isinstance(value, bool):
         return float(value)
+    if isinstance(value, str) and value in _NON_FINITE:
+        return _NON_FINITE[value]
     raise DecodeError(path=path, message=f"I expected a JSON number; I found {_name(value)}.")
 
 
-Double = Annotated[float, BeforeValidator(_pydantic_value_error(decode_double))]
-"""A Smithy float or double. It accepts a JSON number only."""
+def encode_double(value: float) -> float | str:
+    """Give a finite float unchanged, and a non-finite float as "NaN", "Infinity" or "-Infinity"."""
+    if math.isnan(value):
+        return "NaN"
+    if math.isinf(value):
+        return "Infinity" if value > 0 else "-Infinity"
+    return value
+
+
+Double = Annotated[
+    float,
+    BeforeValidator(_pydantic_value_error(decode_double)),
+    PlainSerializer(encode_double),
+]
+"""A Smithy float or double. It accepts a JSON number, or "NaN", "Infinity" and "-Infinity"."""
+
+Byte = Annotated[
+    int, BeforeValidator(_pydantic_value_error(decode_integer)), Field(ge=-(2**7), le=2**7 - 1)
+]
+"""A Smithy byte: an integer from -128 to 127."""
+
+Short = Annotated[
+    int, BeforeValidator(_pydantic_value_error(decode_integer)), Field(ge=-(2**15), le=2**15 - 1)
+]
+"""A Smithy short: an integer from -32768 to 32767."""
+
+Integer = Annotated[
+    int, BeforeValidator(_pydantic_value_error(decode_integer)), Field(ge=-(2**31), le=2**31 - 1)
+]
+"""A Smithy integer: a 32-bit signed integer."""
+
+Long = Annotated[
+    int, BeforeValidator(_pydantic_value_error(decode_integer)), Field(ge=-(2**63), le=2**63 - 1)
+]
+"""A Smithy long: a 64-bit signed integer, kept exactly."""
 
 
 def check_document(value: object, *, path: str = "") -> JsonValue:

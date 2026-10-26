@@ -16,15 +16,20 @@ dev = [
     "ruff==0.17.2",
 ]
 
-[tool.uv]
-package = false
+[build-system]
+requires = ["uv_build==0.13.5"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = ["payment_pos_app", "payment_terminal_app"]
+module-root = ""
 
 [tool.uv.sources]
 payment-pos = { path = "../generated/python/pos", editable = true }
 payment-terminal = { path = "../generated/python/terminal", editable = true }
 
 [tool.pyright]
-include = ["tests"]
+include = ["payment_pos_app", "payment_terminal_app", "tests"]
 typeCheckingMode = "strict"
 pythonVersion = "3.11"
 

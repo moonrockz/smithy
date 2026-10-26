@@ -205,10 +205,18 @@ fn Gen::result_ty(
   method_ : @rpc.MethodContract,
 ) -> Ty? raise @codegen.CodegenError {
   match method_.result {
+    OutputStructure(id) if id == unit_id => None
     OutputStructure(id) => Some(self.named(id))
     OutputMember(member_id) => Some(self.member_ty(member_id))
     NullResult => None
   }
+}
+
+///|
+/// Whether the result of a method is an empty object: an operation with no
+/// output and no `nullResult`.
+fn empty_result(method_ : @rpc.MethodContract) -> Bool {
+  method_.result is OutputStructure(id) && id == unit_id
 }
 
 ///|
@@ -255,6 +263,37 @@ fn Gen::cancels(self : Gen, method_ : @rpc.MethodContract) -> Bool {
 }
 
 ///|
+/// Raise when a shape already has the class name of a generated class.
+fn Gen::check_generated_name(
+  self : Gen,
+  name : String,
+  construct : String,
+) -> Unit raise @codegen.CodegenError {
+  if self.type_names.get(name) is Some(shape) {
+    raise @codegen.InvalidSettings(
+      "I cannot name the \{construct} `\{name}`: shape `\{shape}` has that Python class name.",
+    )
+  }
+}
+
+///|
+/// Record a generated method name; raise when another operation has it.
+fn claim_method(
+  seen : Map[String, @smithy.ShapeId],
+  name : String,
+  operation : @smithy.ShapeId,
+  construct : String,
+) -> Unit raise @codegen.CodegenError {
+  match seen.get(name) {
+    Some(other) if other != operation =>
+      raise @codegen.InvalidSettings(
+        "I found operations `\{other}` and `\{operation}` with the same \{construct} method name `\{name}`.",
+      )
+    _ => seen[name] = operation
+  }
+}
+
+///|
 fn Gen::service_class(self : Gen, service : @smithy.ShapeId) -> String {
   class_name(self.names.shape_name(service))
 }
@@ -282,6 +321,16 @@ fn Gen::write_handler(self : Gen) -> Unit raise @codegen.CodegenError {
   let service = self.service_class(description.service)
   let protocol_name = service + "Handler"
   let methods = description.methods.filter(m => !self.cancels(m))
+  self.check_generated_name(protocol_name, "handler protocol")
+  let handler_methods : Map[String, @smithy.ShapeId] = Map([])
+  for method_ in methods {
+    claim_method(
+      handler_methods,
+      self.method_of(method_.operation),
+      method_.operation,
+      "handler",
+    )
+  }
   let doc = "The handler of service `\{description.service}` for peer `\{self.settings.peer.name.to_string()}`."
   self.with_module(".handler", doc, w => {
     let protocol = use_name(w, "typing", "Protocol")
@@ -401,6 +450,8 @@ fn Gen::write_handler(self : Gen) -> Unit raise @codegen.CodegenError {
         if result is Some(_) {
           let to_wire = use_name(w, runtime_module, "to_wire")
           w.write("return $L(result)", args=[Text(to_wire)])
+        } else if empty_result(method_) {
+          w.write("return {}")
         } else {
           w.write("return None")
         }
@@ -428,6 +479,22 @@ fn Gen::write_handler(self : Gen) -> Unit raise @codegen.CodegenError {
 fn Gen::write_client(self : Gen) -> Unit raise @codegen.CodegenError {
   guard self.settings.peer.calls is Some(description) else { return }
   let client = self.service_class(description.service) + "Client"
+  self.check_generated_name(client, "client class")
+  let client_methods : Map[String, @smithy.ShapeId] = Map([])
+  for method_ in description.methods {
+    let name = self.method_of(method_.operation)
+    if !(method_.kind is RequestOnly) {
+      let fn_name = if method_.kind is NotificationOnly {
+        name
+      } else {
+        name + "_notification"
+      }
+      claim_method(client_methods, fn_name, method_.operation, "client")
+    }
+    if !(method_.kind is NotificationOnly) {
+      claim_method(client_methods, name, method_.operation, "client")
+    }
+  }
   let doc = "The client of service `\{description.service}` for peer `\{self.settings.peer.name.to_string()}`."
   self.with_module(".client", doc, w => {
     w.reserve_name(@codegen.SymbolName::parse(client).unwrap())
@@ -561,6 +628,7 @@ fn Gen::write_client(self : Gen) -> Unit raise @codegen.CodegenError {
       }
       match method_.result {
         NullResult => ()
+        OutputStructure(id) if id == unit_id => ()
         OutputStructure(_) =>
           w.write("return $L.model_validate(result)", args=[Text(result_text)])
         OutputMember(_) =>

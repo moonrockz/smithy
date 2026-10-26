@@ -7,6 +7,9 @@ from typing import Protocol
 
 from .ids import RequestId
 
+SESSION_HEADER = "Smithy-Session-Id"
+"""The HTTP header that ties the posts of one session together."""
+
 
 class Connection(Protocol):
     """A transport that carries one JSON-RPC message per `send` and `receive`."""

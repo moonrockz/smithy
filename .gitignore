@@ -94,3 +94,12 @@ site/playwright-report
 
 .superpowers/
 .playwright-mcp/
+
+# Python Artifacts
+
+# Caches and virtual environments of the JSON-RPC runtime, the generated peers and the samples.
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/

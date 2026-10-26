@@ -14,11 +14,17 @@
 ///   generated `pyproject.toml`) and `pytest` run with that environment. Then
 ///   the shared project runs its own checks: the generated POS and terminal
 ///   talk to each other in its tests.
+/// - `sample-build` (`mise run sample:build:python`): `uv sync --locked` the
+///   sample project, run its gates (ruff, pyright strict, pytest: each scenario
+///   over stdio, HTTP and WebSocket), and write
+///   `.dev/out/payment-terminal/commands/python.json` with the absolute path of
+///   the Python of `examples/payment-terminal/python/.venv`.
 ///
 /// Usage: `moonx scripts/runtime-python.mbtx test` or `... generated`.
 /// It stops at the first step that fails, and exits with the code of that step.
 import {
   "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/async@0.22.5/stdio",
   "moonbitlang/core/env",
@@ -91,6 +97,50 @@ async fn check_golden(dir : String) -> Unit {
 }
 
 ///|
+/// The text of a JSON string.
+fn json_text(text : String) -> String {
+  Json::string(text).stringify()
+}
+
+///|
+/// Run the gates of the sample project and write the command manifest of the
+/// Python sample programs.
+async fn sample_build() -> Unit {
+  check_project(samples_dir)
+  let probe = "import sys; print(sys.executable); print(sys.prefix)"
+  let (code, out, err) = @process.collect_output(
+    "uv",
+    ["run", "--locked", "python", "-c", probe],
+    cwd=samples_dir,
+  ) catch {
+    error => {
+      println("❌ ERROR: I could not start uv to find the sample Python: \{error}")
+      @sys.exit(1)
+      return
+    }
+  }
+  let lines = out.text().split("\n").map(line => line.trim_end(chars="\r").to_owned()).filter(line => !line.is_empty()).collect()
+  if code != 0 || lines.length() < 2 {
+    println("❌ ERROR: I could not find the Python of the sample venv: \{err.text()}")
+    @sys.exit(1)
+  }
+  let python = lines[0]
+  let venv = lines[1]
+  let dir = ".dev/out/payment-terminal/commands"
+  if !@fs.exists(dir) {
+    @fs.mkdir(dir, recursive=true)
+  }
+  let pos = [python, "-m", "payment_pos_app"].map(json_text).join(",")
+  let terminal = [python, "-m", "payment_terminal_app"].map(json_text).join(",")
+  @fs.write_file(
+    "\{dir}/python.json",
+    "{\"pos\":[\{pos}],\"terminal\":[\{terminal}]}\n",
+  )
+  println("✓ the sample venv is \{venv}")
+  println("✓ wrote \{dir}/python.json")
+}
+
+///|
 async fn main {
   let args = @env.args()
   let command = if args.length() > 1 { args[1] } else { "" }
@@ -107,13 +157,19 @@ async fn main {
       check_project(samples_dir)
       println("✅ The generated Python peers pass ruff, pyright --strict and pytest")
     }
+    "sample-build" => {
+      sample_build()
+      println("✅ The Python sample programs pass their checks")
+    }
     "" => {
-      println("❌ ERROR: I expected a subcommand (test or generated); I found none.")
+      println(
+        "❌ ERROR: I expected a subcommand (test, generated or sample-build); I found none.",
+      )
       @sys.exit(2)
     }
     other => {
       println(
-        "❌ ERROR: I expected the subcommand test or generated; I found \{other}.",
+        "❌ ERROR: I expected the subcommand test, generated or sample-build; I found \{other}.",
       )
       @sys.exit(2)
     }

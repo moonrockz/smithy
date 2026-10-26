@@ -15,7 +15,8 @@ let errors_module : String = ".errors"
 priv enum Ty {
   Str
   Boolean
-  Integer
+  /// An integer type of the runtime: Byte, Short, Integer, Long or BigInteger.
+  IntOf(String)
   Floating
   BigDec
   Blob
@@ -52,7 +53,7 @@ fn Ty::leaf_import(self : Ty) -> (String, String)? {
   match self {
     Str => None
     Boolean => Some(("pydantic", "StrictBool"))
-    Integer => Some((runtime_module, "BigInteger"))
+    IntOf(name) => Some((runtime_module, name))
     Floating => Some((runtime_module, "Double"))
     BigDec => Some((runtime_module, "BigDecimal"))
     Blob => Some((runtime_module, "Blob"))
@@ -117,15 +118,11 @@ fn prelude_ty(name : String, format : String) -> Ty? {
   match name {
     "String" => Some(Str)
     "Boolean" | "PrimitiveBoolean" => Some(Boolean)
-    "Byte"
-    | "PrimitiveByte"
-    | "Short"
-    | "PrimitiveShort"
-    | "Integer"
-    | "PrimitiveInteger"
-    | "Long"
-    | "PrimitiveLong"
-    | "BigInteger" => Some(Integer)
+    "Byte" | "PrimitiveByte" => Some(IntOf("Byte"))
+    "Short" | "PrimitiveShort" => Some(IntOf("Short"))
+    "Integer" | "PrimitiveInteger" => Some(IntOf("Integer"))
+    "Long" | "PrimitiveLong" => Some(IntOf("Long"))
+    "BigInteger" => Some(IntOf("BigInteger"))
     "Float" | "PrimitiveFloat" | "Double" | "PrimitiveDouble" => Some(Floating)
     "BigDecimal" => Some(BigDec)
     "Blob" => Some(Blob)
@@ -141,7 +138,11 @@ fn simple_ty(simple : @smithy.SimpleType, format : String) -> Ty {
   match simple {
     String => Str
     Boolean => Boolean
-    Byte | Short | Integer | Long | BigInteger => Integer
+    Byte => IntOf("Byte")
+    Short => IntOf("Short")
+    Integer => IntOf("Integer")
+    Long => IntOf("Long")
+    BigInteger => IntOf("BigInteger")
     Float | Double => Floating
     BigDecimal => BigDec
     Blob => Blob
