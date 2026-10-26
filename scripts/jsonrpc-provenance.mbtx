@@ -1,0 +1,308 @@
+///|
+/// Bind payment command manifests to source and executable bytes.
+/// Usage: moonx scripts/jsonrpc-provenance.mbtx seal|check moonbit|python|go.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/path",
+}
+
+///|
+fn digest(bytes : Bytes) -> String {
+  @crypto.bytes_to_hex_string(@crypto.sha256(bytes))
+}
+
+///|
+fn record(value : Json, construct : String) -> Map[String, Json] raise {
+  guard value is Object(fields) else {
+    fail("I expected an object for `" + construct + "`.")
+  }
+  fields
+}
+
+///|
+async fn git_output(args : Array[String]) -> String {
+  let (status, out, err) = @process.collect_output("git", args)
+  if status != 0 {
+    fail("I could not read the matrix source: " + err.text())
+  }
+  out.text()
+}
+
+///|
+async fn source_provenance() -> Json {
+  let head = git_output(["rev-parse", "HEAD"]).trim().to_owned()
+  let diff = git_output([
+    "diff", "--no-ext-diff", "--no-textconv", "--binary", "HEAD", "--",
+  ])
+  let paths = git_output(["ls-files", "--others", "--exclude-standard", "-z"])
+    .split("\u{0000}")
+    .filter(path => !path.is_empty())
+    .map(path => path.to_owned())
+    .to_array()
+  paths.sort_by((a, b) => a.lexical_compare(b))
+  let material = StringBuilder()
+  material.write_string(head + "\u{0000}" + diff)
+  for path in paths {
+    material.write_string(
+      "\u{0000}" + path + "\u{0000}" + digest(@fs.read_file(path).binary()),
+    )
+  }
+  Json::object({
+    "head": Json::string(head),
+    "dirty": Json::boolean(!diff.is_empty() || !paths.is_empty()),
+    "fingerprint": Json::string(digest(@utf8.encode(material.to_string()))),
+  })
+}
+
+///|
+async fn executable_hashes(fields : Map[String, Json]) -> Json {
+  let binaries : Map[String, Json] = Map([])
+  for role in ["pos", "terminal"] {
+    guard fields.get(role) is Some(Array(argv)) &&
+      argv.length() > 0 &&
+      argv[0] is String(executable) else {
+      fail("I expected a command array for payment peer `" + role + "`.")
+    }
+    let path : @path.Path = @path.Path(executable)
+    if !path.is_absolute() {
+      fail(
+        "I expected an absolute executable path for payment peer `" +
+        role +
+        "`.",
+      )
+    }
+    binaries[executable] = Json::string(
+      digest(@fs.read_file(executable).binary()),
+    )
+  }
+  match fields.get("artifacts") {
+    None => ()
+    Some(Array(roots)) => {
+      let pending : Array[String] = []
+      for root in roots {
+        guard root is String(root) && @path.Path(root).is_absolute() else {
+          fail("I expected an absolute payment artifact path.")
+        }
+        pending.push(root)
+      }
+      let files : Array[String] = []
+      let seen : Set[String] = Set([])
+      while pending.pop() is Some(path) {
+        if @fs.kind(path) is Directory {
+          let physical = @fs.realpath(path)
+          if seen.contains(physical) {
+            continue
+          }
+          seen.add(physical)
+          for name in @fs.readdir(path) {
+            if name != "__pycache__" &&
+              !name.has_suffix(".pyc") &&
+              !name.has_suffix(".pyo") {
+              pending.push(path + "/" + name)
+            }
+          }
+        } else {
+          files.push(path)
+        }
+      }
+      files.sort_by((a, b) => a.lexical_compare(b))
+      for path in files {
+        binaries[path] = Json::string(digest(@fs.read_file(path).binary()))
+      }
+    }
+    Some(_) =>
+      fail("I expected an artifact path array for payment command provenance.")
+  }
+  Json::object(binaries)
+}
+
+///|
+fn require_current(
+  provenance : Json,
+  source : Json,
+  binaries : Json,
+  commands : Json,
+) -> Unit raise {
+  let fields = record(provenance, "payment command provenance")
+  if fields.get("source") != Some(source) {
+    fail(
+      "I found stale payment source provenance. Build each selected language again.",
+    )
+  }
+  if fields.get("commands") != Some(commands) {
+    fail(
+      "I found changed payment command arguments. Build each selected language again.",
+    )
+  }
+  if fields.get("executables") != Some(binaries) {
+    fail(
+      "I found changed payment executable bytes. Build each selected language again.",
+    )
+  }
+}
+
+///|
+test "matrix provenance rejects changed source or executable bytes" {
+  let source = Json::object({ "fingerprint": Json::string("source-a") })
+  let binaries = Json::object({ "/bin/pos": Json::string("binary-a") })
+  let commands = Json::object({ "pos": Json::array([Json::string("/bin/pos")]) })
+  let provenance = Json::object({
+    "source": source,
+    "executables": binaries,
+    "commands": commands,
+  })
+  require_current(provenance, source, binaries, commands)
+  let source_rejected = try {
+    require_current(
+      provenance,
+      Json::object({ "fingerprint": Json::string("source-b") }),
+      binaries,
+      commands,
+    )
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(source_rejected)
+  let binary_rejected = try {
+    require_current(
+      provenance,
+      source,
+      Json::object({ "/bin/pos": Json::string("binary-b") }),
+      commands,
+    )
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(binary_rejected)
+  let command_rejected = try {
+    require_current(
+      provenance,
+      source,
+      binaries,
+      Json::object({
+        "pos": Json::array([
+          Json::string("/bin/pos"),
+          Json::string("other-module"),
+        ]),
+      }),
+    )
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(command_rejected)
+}
+
+///|
+async test "changed interpreted program bytes invalidate the command seal" {
+  let root = @fs.realpath("..") + "/.dev/out/provenance-regression"
+  if @fs.exists(root) {
+    @fs.rmdir(root, recursive=true)
+  }
+  @fs.mkdir(root + "/package", recursive=true)
+  defer @fs.rmdir(root, recursive=true)
+  @fs.write_file(root + "/python", "test interpreter bytes")
+  @fs.write_file(root + "/package/main.py", "print('first')\n")
+  let fields : Map[String, Json] = {
+    "pos": Json::array([
+      Json::string(root + "/python"),
+      Json::string("-m"),
+      Json::string("sample.pos"),
+    ]),
+    "terminal": Json::array([
+      Json::string(root + "/python"),
+      Json::string("-m"),
+      Json::string("sample.terminal"),
+    ]),
+    "artifacts": Json::array([Json::string(root + "/package")]),
+  }
+  let original = executable_hashes(fields)
+  @fs.mkdir(root + "/package/__pycache__")
+  @fs.write_file(root + "/package/__pycache__/main.pyc", "runtime cache")
+  assert_eq(executable_hashes(fields), original)
+  @fs.write_file(root + "/package/main.py", "print('second')\n")
+  assert_true(executable_hashes(fields) != original)
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  if args.length() != 3 ||
+    !["seal", "check"].contains(args[1]) ||
+    !["moonbit", "python", "go"].contains(args[2]) {
+    fail(
+      "I expected provenance command seal or check and a language moonbit, python or go.",
+    )
+  }
+  let path = ".dev/out/payment-terminal/commands/" + args[2] + ".json"
+  let fields = record(
+    @json.parse(@fs.read_file(path).text()),
+    "payment command manifest",
+  )
+  if args[2] == "python" {
+    guard fields.get("artifacts") is Some(Array(roots)) && !roots.is_empty() else {
+      fail(
+        "I expected Python package artifact paths in the payment command manifest.",
+      )
+    }
+  }
+  let source = source_provenance()
+  let binaries = executable_hashes(fields)
+  let commands = Json::object({
+    "pos": fields["pos"],
+    "terminal": fields["terminal"],
+  })
+  if args[1] == "seal" {
+    let (status, moon, errors) = @process.collect_output("moon", [
+      "version", "--all",
+    ])
+    if status != 0 {
+      fail("I could not read the pinned MoonBit toolchain: " + errors.text())
+    }
+    let compiler = if args[2] == "go" {
+      let (code, version, errors) = @process.collect_output("go", ["version"])
+      if code != 0 {
+        fail("I could not read the Go compiler version: " + errors.text())
+      }
+      version.text().trim().to_owned()
+    } else if args[2] == "python" {
+      guard fields["pos"] is Array(argv) && argv[0] is String(python) else {
+        fail("I expected the Python interpreter command.")
+      }
+      let (code, version, errors) = @process.collect_output(python, [
+        "--version",
+      ])
+      if code != 0 {
+        fail(
+          "I could not read the Python interpreter version: " + errors.text(),
+        )
+      }
+      version.text().trim().to_owned()
+    } else {
+      moon.text().trim().to_owned()
+    }
+    fields["provenance"] = Json::object({
+      "source": source,
+      "executables": binaries,
+      "commands": commands,
+      "compiler": Json::string(compiler),
+      "moonbit": Json::string(moon.text().trim().to_owned()),
+    })
+    @fs.write_file(path, Json::object(fields).stringify(indent=2) + "\n")
+  } else {
+    guard fields.get("provenance") is Some(provenance) else {
+      fail(
+        "I found no build provenance for the payment commands. Build the selected language again.",
+      )
+    }
+    require_current(provenance, source, binaries, commands)
+  }
+}

@@ -24,6 +24,7 @@ import {
   "moonrockz/smithy-codegen@0.6.0",
   "moonrockz/smithy-codegen-moonbit@0.6.0",
   "moonrockz/smithy-codegen-python@0.6.0",
+  "moonrockz/smithy-codegen-go@0.6.0",
   "moonrockz/smithy-diff@0.6.0",
   "moonrockz/smithy-jsonschema@0.6.0",
   "moonrockz/smithy-openapi@0.6.0",

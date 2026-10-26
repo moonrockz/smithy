@@ -229,6 +229,12 @@ jobs:
       - name: Check that the golden generated peers are current
         run: mise run codegen:payment-terminal -- --check
 
+      - name: Check the Go runtime embedding
+        run: mise run jsonrpc:go:runtime -- --check
+
+      - name: Check that the generated Go golden peers are current
+        run: mise run codegen:go -- --check
+
       - name: Test the MoonBit runtime
         run: mise run test:runtime:moonbit
 

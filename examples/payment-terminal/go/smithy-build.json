@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "outputDirectory": "../../../.dev/out/payment-terminal-go",
+  "sources": ["../model.smithy"],
+  "plugins": {
+    "go-jsonrpc-codegen::pos": {
+      "service": "example.payments#PaymentTerminal",
+      "protocol": "example.payments#TerminalProtocol",
+      "peer": "pos",
+      "module": "example/payments/pos",
+      "package": "payments",
+      "transports": ["stdio", "http", "websocket"]
+    },
+    "go-jsonrpc-codegen::terminal": {
+      "service": "example.payments#PaymentTerminal",
+      "protocol": "example.payments#TerminalProtocol",
+      "peer": "terminal",
+      "module": "example/payments/terminal",
+      "package": "payments",
+      "transports": ["stdio", "http", "websocket"]
+    }
+  }
+}

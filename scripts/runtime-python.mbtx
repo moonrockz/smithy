@@ -114,14 +114,23 @@ async fn sample_build() -> Unit {
     cwd=samples_dir,
   ) catch {
     error => {
-      println("❌ ERROR: I could not start uv to find the sample Python: \{error}")
+      println(
+        "❌ ERROR: I could not start uv to find the sample Python: \{error}",
+      )
       @sys.exit(1)
       return
     }
   }
-  let lines = out.text().split("\n").map(line => line.trim_end(chars="\r").to_owned()).filter(line => !line.is_empty()).collect()
+  let lines = out
+    .text()
+    .split("\n")
+    .map(line => line.trim_end(chars="\r").to_owned())
+    .filter(line => !line.is_empty())
+    .collect()
   if code != 0 || lines.length() < 2 {
-    println("❌ ERROR: I could not find the Python of the sample venv: \{err.text()}")
+    println(
+      "❌ ERROR: I could not find the Python of the sample venv: \{err.text()}",
+    )
     @sys.exit(1)
   }
   let python = lines[0]
@@ -130,12 +139,31 @@ async fn sample_build() -> Unit {
   if !@fs.exists(dir) {
     @fs.mkdir(dir, recursive=true)
   }
+  let root = @fs.realpath(".")
+  let artifacts = [
+      venv,
+      root + "/" + samples_dir + "/payment_pos_app",
+      root + "/" + samples_dir + "/payment_terminal_app",
+      root + "/" + golden_dirs[0] + "/payment_pos",
+      root + "/" + golden_dirs[1] + "/payment_terminal",
+    ]
+    .map(json_text)
+    .join(",")
   let pos = [python, "-m", "payment_pos_app"].map(json_text).join(",")
   let terminal = [python, "-m", "payment_terminal_app"].map(json_text).join(",")
   @fs.write_file(
     "\{dir}/python.json",
-    "{\"pos\":[\{pos}],\"terminal\":[\{terminal}]}\n",
+    "{\"pos\":[\{pos}],\"terminal\":[\{terminal}],\"artifacts\":[\{artifacts}]}\n",
   )
+  let seal = @process.run(
+    "moonx",
+    ["scripts/jsonrpc-provenance.mbtx", "seal", "python"],
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  if seal != 0 {
+    @sys.exit(1)
+  }
   println("✓ the sample venv is \{venv}")
   println("✓ wrote \{dir}/python.json")
 }
@@ -147,7 +175,9 @@ async fn main {
   match command {
     "test" => {
       check_project(runtime_dir)
-      println("✅ The Python JSON-RPC runtime passes ruff, pyright --strict and pytest")
+      println(
+        "✅ The Python JSON-RPC runtime passes ruff, pyright --strict and pytest",
+      )
     }
     "generated" => {
       step(samples_dir, "uv sync --locked", ["sync", "--locked"])
@@ -155,7 +185,9 @@ async fn main {
         check_golden(dir)
       }
       check_project(samples_dir)
-      println("✅ The generated Python peers pass ruff, pyright --strict and pytest")
+      println(
+        "✅ The generated Python peers pass ruff, pyright --strict and pytest",
+      )
     }
     "sample-build" => {
       sample_build()

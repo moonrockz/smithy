@@ -37,6 +37,10 @@ notifications and contextual responses against modeled service methods through `
 Explicit JSON-RPC 2.0 batch checks preserve element paths and associate unordered replies by exact IDs.
 `smithy validate rpc transcript` checks two-peer exchanges in JSON or Markdown transcripts and JSONL logs.
 
+The `go-jsonrpc-codegen` plugin generates typed Go JSON-RPC peers for stdio,
+HTTP and WebSocket. See the [Go generator API](pkgs/smithy-codegen-go/README.mbt.md)
+and the [manual interoperability matrix](examples/payment-terminal/INTEROPERABILITY.md).
+
 `moonrockz/smithy-ion-validation` validates immutable Ion values directly with a documented
 native type profile. See [Ion validation](pkgs/smithy-ion-validation/README.mbt.md) and the
 [standalone consumer](examples/ion-validation-consumer/main.mbtx).
@@ -61,7 +65,7 @@ protocol implementations. Validate case definitions with
 | `pkgs/smithy-codegen-jsonrpc` | `moonrockz/smithy-codegen-jsonrpc` | Language-neutral JSON-RPC methods, peers and session contracts for code generators |
 | `pkgs/smithy-codegen-moonbit` | `moonrockz/smithy-codegen-moonbit` | MoonBit JSON-RPC peers on moonbitlang/async (plugin `moonbit-jsonrpc-codegen`) |
 | `pkgs/smithy-codegen-python` | `moonrockz/smithy-codegen-python` | Python JSON-RPC peers with Pydantic v2, asyncio and FastAPI (plugin `python-jsonrpc-codegen`) |
-
+| `pkgs/smithy-codegen-go` | `moonrockz/smithy-codegen-go` | Generate typed Go JSON-RPC peers with a vendored runtime |
 | `pkgs/smithy-jsonschema` | `moonrockz/smithy-jsonschema` | Convert assembled value shapes to JSON Schema |
 | `pkgs/smithy-openapi` | `moonrockz/smithy-openapi` | Convert services to OpenAPI with REST JSON and RPC v2 JSON protocols |
 | `pkgs/smithy-openrpc` | `moonrockz/smithy-openrpc` | Export JSON-RPC 2.0 services as OpenRPC 1.3.2 |

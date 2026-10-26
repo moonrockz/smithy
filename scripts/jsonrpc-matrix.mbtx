@@ -1,0 +1,556 @@
+///|
+/// Run the generated payment peers for every language and transport pair.
+/// Build each language once before this task. Command arrays are in
+/// .dev/out/payment-terminal/commands/<language>.json.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/socket",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+enum Language {
+  MoonBit
+  Python
+  Go
+} derive(Eq, Debug)
+
+///|
+enum Transport {
+  Stdio
+  Http
+  WebSocket
+} derive(Eq, Debug)
+
+///|
+struct MatrixCase {
+  caller : Language
+  receiver : Language
+  transport : Transport
+} derive(Eq, Debug)
+
+///|
+fn language_name(language : Language) -> String {
+  match language {
+    MoonBit => "moonbit"
+    Python => "python"
+    Go => "go"
+  }
+}
+
+///|
+fn transport_name(transport : Transport) -> String {
+  match transport {
+    Stdio => "stdio"
+    Http => "http"
+    WebSocket => "websocket"
+  }
+}
+
+///|
+fn cases() -> Array[MatrixCase] {
+  let result = []
+  for caller in [MoonBit, Python, Go] {
+    for receiver in [MoonBit, Python, Go] {
+      for transport in [Stdio, Http, WebSocket] {
+        result.push({ caller, receiver, transport, })
+      }
+    }
+  }
+  result
+}
+
+///|
+test "the manual matrix contains all 27 distinct pairs and transports" {
+  let all = cases()
+  assert_eq(all.length(), 27)
+  for caller in [MoonBit, Python, Go] {
+    for receiver in [MoonBit, Python, Go] {
+      for transport in [Stdio, Http, WebSocket] {
+        assert_eq(
+          all.filter(c => c == { caller, receiver, transport, }).length(),
+          1,
+        )
+      }
+    }
+  }
+}
+
+///|
+async fn main {
+  let args = @env.args()[1:].to_owned()
+  let out = ".dev/out/jsonrpc-matrix"
+  if args.contains("--summary") {
+    let summary = if @fs.exists(out + "/summary.md") {
+      @fs.read_file(out + "/summary.md").text()
+    } else {
+      "# JSON-RPC interoperability matrix\n\nThe matrix did not run. A required setup or language gate failed.\n"
+    }
+    match @env.get_env_vars().get("GITHUB_STEP_SUMMARY") {
+      Some(path) => {
+        let previous = if @fs.exists(path) {
+          @fs.read_file(path).text()
+        } else {
+          ""
+        }
+        @fs.write_file(path, previous + summary)
+      }
+      None => println(summary)
+    }
+    return
+  }
+  let mut selected = cases()
+  let mut index = 0
+  while index < args.length() {
+    let key = args[index]
+    if index + 1 >= args.length() ||
+      !["--caller", "--receiver", "--transport"].contains(key) {
+      fail("I found an invalid matrix option `" + key + "`.")
+    }
+    let value = args[index + 1]
+    selected = selected.filter(item => {
+      match key {
+        "--caller" => language_name(item.caller) == value
+        "--receiver" => language_name(item.receiver) == value
+        _ => transport_name(item.transport) == value
+      }
+    })
+    index += 2
+  }
+  if selected.is_empty() {
+    fail("I found no cases for the selected matrix options.")
+  }
+  if @fs.exists(out) {
+    @fs.rmdir(out, recursive=true)
+  }
+  @fs.mkdir(out, recursive=true, allow_exist=true)
+  @fs.write_file(
+    out + "/summary.md",
+    "# JSON-RPC interoperability matrix\n\nThe matrix has not completed. Setup or command verification did not pass.\n",
+  )
+  let (sha_status, sha, _) = @process.collect_output("git", [
+    "rev-parse", "HEAD",
+  ])
+  if sha_status != 0 {
+    fail("I could not read the matrix source commit.")
+  }
+  let provenance : Map[String, Json] = Map([])
+  for language in [MoonBit, Python, Go] {
+    if selected
+      .iter()
+      .any(item => item.caller == language || item.receiver == language) {
+      let name = language_name(language)
+      let (status, _, error) = @process.collect_output("moonx", [
+        "scripts/jsonrpc-provenance.mbtx", "check", name,
+      ])
+      if status != 0 {
+        fail(
+          "I could not verify payment commands for `" +
+          name +
+          "`: " +
+          error.text(),
+        )
+      }
+      let manifest = @json.parse(
+        @fs.read_file(".dev/out/payment-terminal/commands/" + name + ".json").text(),
+      )
+      guard manifest is Object(fields) &&
+        fields.get("provenance") is Some(value) else {
+        fail("I expected verified payment command provenance.")
+      }
+      provenance[name] = value
+    }
+  }
+  let (tree_status, tree, _) = @process.collect_output("git", [
+    "status", "--porcelain", "--untracked-files=all",
+  ])
+  if tree_status != 0 {
+    fail("I could not read the matrix working tree status.")
+  }
+  let dirty = !tree.text().trim().is_empty()
+  let source_label = if dirty {
+    "Working tree at base commit"
+  } else {
+    "Source commit"
+  }
+  let started = @async.now()
+  let table = StringBuilder()
+  table.write_string(
+    "# JSON-RPC interoperability matrix\n\n" +
+    source_label +
+    ": `" +
+    sha.text().trim().to_owned() +
+    "`\n\n| Caller | Receiver | Transport | Payment | Cancellation | Errors | Refusals | Result |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n",
+  )
+  let results : Array[Json] = []
+  let mut failures = 0
+  for item in selected {
+    let folder = out + "/" + case_name(item)
+    if @fs.exists(folder) {
+      @fs.rmdir(folder, recursive=true)
+    }
+    @fs.mkdir(folder, recursive=true, allow_exist=true)
+    let statuses : Array[Bool] = []
+    let scenario_results : Map[String, Json] = Map([])
+    for scenario in ["payment", "cancellation", "errors", "refusals"] {
+      println(case_name(item) + ": " + scenario)
+      let passed = run_scenario(item, scenario, folder) catch {
+        error => {
+          @fs.write_file(
+            folder + "/" + scenario + ".runner-error",
+            error.to_string(),
+          )
+          false
+        }
+      }
+      statuses.push(passed)
+      scenario_results[scenario] = Json::boolean(passed)
+    }
+    let passed = statuses.iter().all(ok => ok)
+    if !passed {
+      failures += 1
+    }
+    let marks = statuses.map(ok => if ok { "pass" } else { "FAIL" })
+    table.write_string(
+      "| " +
+      language_name(item.caller) +
+      " | " +
+      language_name(item.receiver) +
+      " | " +
+      transport_name(item.transport) +
+      " | " +
+      marks.join(" | ") +
+      " | " +
+      (if passed { "pass" } else { "FAIL" }) +
+      " |\n",
+    )
+    results.push(
+      Json::object({
+        "caller": Json::string(language_name(item.caller)),
+        "receiver": Json::string(language_name(item.receiver)),
+        "transport": Json::string(transport_name(item.transport)),
+        "passed": Json::boolean(passed),
+        "scenarios": Json::object(scenario_results),
+      }),
+    )
+    @fs.write_file(out + "/summary.md", table.to_string())
+    @fs.write_file(
+      out + "/results.json",
+      Json::object({
+        "commit": Json::string(sha.text().trim().to_owned()),
+        "dirty": Json::boolean(dirty),
+        "provenance": Json::object(provenance),
+        "cases": Json::array(results),
+      }).stringify(indent=2) +
+      "\n",
+    )
+  }
+  table.write_string(
+    "\n" +
+    (selected.length() - failures).to_string() +
+    "/" +
+    selected.length().to_string() +
+    " combinations passed. Elapsed: " +
+    ((@async.now() - started) / 1000L).to_string() +
+    " seconds.\n",
+  )
+  @fs.write_file(out + "/summary.md", table.to_string())
+  println(table.to_string())
+  if failures != 0 {
+    @sys.exit(1)
+  }
+}
+
+///|
+fn case_name(item : MatrixCase) -> String {
+  language_name(item.caller) +
+  "-" +
+  language_name(item.receiver) +
+  "-" +
+  transport_name(item.transport)
+}
+
+///|
+fn command_array(value : Json, role : String) -> Array[String] raise {
+  guard value is Object(fields) &&
+    fields.get(role) is Some(Array(parts)) &&
+    !parts.is_empty() else {
+    fail("I expected a command array for payment peer `" + role + "`.")
+  }
+  let result = []
+  for part in parts {
+    guard part is String(text) && !text.is_empty() else {
+      fail(
+        "I expected a nonempty command argument for payment peer `" +
+        role +
+        "`.",
+      )
+    }
+    result.push(text)
+  }
+  result
+}
+
+///|
+test "matrix commands keep argument boundaries and reject missing peers" {
+  assert_eq(
+    command_array(
+      Json::object({
+        "pos": Json::array([
+          Json::string("/path with spaces/pos"),
+          Json::string("-m"),
+          Json::string("payment_pos"),
+        ]),
+      }),
+      "pos",
+    ),
+    ["/path with spaces/pos", "-m", "payment_pos"],
+  )
+  let rejected = try {
+    ignore(command_array(Json::empty_object(), "terminal"))
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(rejected)
+}
+
+///|
+async fn command(language : Language, role : String) -> Array[String] {
+  let path = ".dev/out/payment-terminal/commands/" +
+    language_name(language) +
+    ".json"
+  command_array(@json.parse(@fs.read_file(path).text()), role)
+}
+
+///|
+async fn run_pos(
+  argv : Array[String],
+  args : Array[String],
+  output : String,
+) -> Int32 {
+  let all = argv[1:].to_owned() + args
+  @async.with_timeout(60000, () => {
+    @process.run(
+      argv[0],
+      all,
+      stdout=@process.redirect_to_file(output + ".stdout"),
+      stderr=@process.redirect_to_file(output + ".stderr"),
+    )
+  }) catch {
+    error => {
+      @fs.write_file(output + ".runner-error", error.to_string())
+      1
+    }
+  }
+}
+
+///|
+async fn run_scenario(
+  item : MatrixCase,
+  scenario : String,
+  folder : String,
+) -> Bool {
+  let caller = command(item.caller, "pos")
+  let receiver = command(item.receiver, "terminal")
+  let output = folder + "/" + scenario
+  let log = output + ".jsonl"
+  let base = ["--scenario", scenario, "--log", log, "--connect"]
+  let status = if item.transport == Stdio {
+    run_pos(caller, base + ["stdio", "--"] + receiver + ["stdio"], output)
+  } else {
+    // Reserve a free local port, then give it to the terminal command.
+    let reservation = @socket.TcpServer(@socket.Addr::parse("127.0.0.1:0"))
+    let port = reservation.addr
+      .to_string()
+      .split(":")
+      .to_array()
+      .last()
+      .unwrap()
+      .to_owned()
+    reservation.close()
+    @async.with_task_group(group => {
+      let server = @process.spawn(
+        group,
+        receiver[0],
+        receiver[1:].to_owned() + ["serve", "--port", port],
+        stdout=@process.redirect_to_file(output + ".terminal.stdout"),
+        stderr=@process.redirect_to_file(output + ".terminal.stderr"),
+        no_wait=true,
+      )
+      let mut ready = false
+      for _ in 0..<100 {
+        if @fs.exists(output + ".terminal.stderr") &&
+          @fs.read_file(output + ".terminal.stderr")
+          .text()
+          .contains("listening " + port) {
+          ready = true
+          break
+        }
+        if server.try_wait() is Some(_) {
+          break
+        }
+        @async.sleep(100)
+      }
+      if !ready {
+        @fs.write_file(
+          output + ".runner-error",
+          "I did not see the terminal ready message for port " + port + ".\n",
+        )
+        1
+      } else {
+        let target = if item.transport == Http {
+          "http://127.0.0.1:" + port + "/rpc"
+        } else {
+          "ws://127.0.0.1:" + port + "/ws"
+        }
+        let caller_status = run_pos(caller, base + [target], output)
+        let exited_early = server.try_wait()
+        if exited_early is None {
+          server.cancel()
+        }
+        let receiver_status = server.wait()
+        let receiver_ok = match exited_early {
+          Some(code) => code == 0
+          None => clean_server_exit(receiver_status)
+        }
+        if !receiver_ok {
+          @fs.write_file(
+            output + ".runner-error",
+            "I found an unexpected receiver exit with status " +
+            receiver_status.to_string() +
+            ".\n",
+          )
+          1
+        } else {
+          caller_status
+        }
+      }
+    })
+  }
+  if item.transport != Stdio &&
+    @fs.exists(output + ".terminal.stdout") &&
+    !@fs.read_file(output + ".terminal.stdout").text().is_empty() {
+    @fs.write_file(
+      output + ".runner-error",
+      "I found terminal output on stdout for a network transport.\n",
+    )
+    return false
+  }
+  if status != 0 ||
+    !@fs.exists(log) ||
+    @fs.read_file(log).text().trim().is_empty() {
+    return false
+  }
+  let checker = [
+    "run",
+    "apps/smithy",
+    "--target",
+    "native",
+    "--",
+    "validate",
+    "rpc",
+    "transcript",
+    "--protocol",
+    "example.payments#TerminalProtocol",
+    "--version",
+    "2.0",
+    "--log-preset",
+    "dir-message",
+    "--direction",
+    "send=pos",
+    "--direction",
+    "recv=terminal",
+    "--complete",
+    "--expect",
+    "examples/payment-terminal/scenarios/" + scenario + ".expect.json",
+    "--diagnostics",
+    "json",
+    "examples/payment-terminal/model.smithy",
+    log,
+  ]
+  let code = @process.run(
+    "moon",
+    checker,
+    stdout=@process.redirect_to_file(output + ".check.jsonl"),
+    stderr=@process.redirect_to_file(output + ".check.stderr"),
+  )
+  if code != 0 {
+    return false
+  }
+  let qualified = checked_scenario(
+    @fs.read_file(output + ".check.jsonl").text(),
+    scenario,
+  )
+  if !qualified {
+    @fs.write_file(
+      output + ".runner-error",
+      "I expected a complete `" +
+      scenario +
+      "` scenario log with only RPC records.\n",
+    )
+  }
+  qualified
+}
+
+///|
+fn clean_server_exit(status : Int32) -> Bool {
+  // Zero is a graceful stop. Negative 15 is the default Unix SIGTERM stop.
+  status == 0 || status == -15
+}
+
+///|
+test "a receiver crash or forced kill fails the matrix" {
+  assert_true(clean_server_exit(0))
+  assert_true(clean_server_exit(-15))
+  assert_false(clean_server_exit(2))
+  assert_false(clean_server_exit(-9))
+}
+
+///|
+fn checked_scenario(summary : String, scenario : String) -> Bool {
+  let minimum = match scenario {
+    "payment" => 30.0
+    "cancellation" => 10.0
+    "errors" => 32.0
+    "refusals" => 12.0
+    _ => return false
+  }
+  let lines = summary
+    .split("\n")
+    .filter(line => !line.trim().is_empty())
+    .to_array()
+  guard lines.last() is Some(last) else { return false }
+  let report = @json.parse(last.to_owned()) catch { _ => return false }
+  guard report
+    is {
+      "summary": {
+        "complete": True,
+        "entries": Number(entries, ..),
+        "outstanding": Number(outstanding, ..),
+        "correlation": True,
+        "not_json": Number(not_json, ..),
+        "skipped": Number(skipped, ..),
+        "expectations": { "matched": True, .. },
+        ..
+      },
+      ..
+    } else {
+    return false
+  }
+  entries >= minimum && outstanding == 0.0 && not_json == 0.0 && skipped == 0.0
+}
+
+///|
+test "a successful checker cannot qualify an empty or partial scenario log" {
+  let empty = "{\"summary\":{\"complete\":true,\"entries\":0,\"outstanding\":0,\"correlation\":true,\"not_json\":1,\"skipped\":0,\"expectations\":{\"matched\":true}}}"
+  assert_false(checked_scenario(empty, "payment"))
+  let partial = "{\"summary\":{\"complete\":true,\"entries\":2,\"outstanding\":0,\"correlation\":true,\"not_json\":0,\"skipped\":0,\"expectations\":{\"matched\":true}}}"
+  assert_false(checked_scenario(partial, "payment"))
+  let refusal = "{\"summary\":{\"valid\":false,\"complete\":true,\"entries\":12,\"outstanding\":0,\"correlation\":true,\"not_json\":0,\"skipped\":0,\"expectations\":{\"matched\":true}}}"
+  assert_true(checked_scenario(refusal, "refusals"))
+}

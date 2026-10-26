@@ -32,9 +32,16 @@ async fn moon(dir : String, args : Array[String]) -> Unit {
   let all = ["-C", dir]
   all.append(args)
   println("$ moon -C \{dir} \{args.join(" ")}")
-  let code = @process.run("moon", all, stdout=@stdio.stdout, stderr=@stdio.stderr)
+  let code = @process.run(
+    "moon",
+    all,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
   if code != 0 {
-    println("❌ moon \{args.join(" ")} failed in \{dir} with exit code \{code}")
+    println(
+      "❌ moon \{args.join(" ")} failed in \{dir} with exit code \{code}",
+    )
     @sys.exit(1)
   }
 }
@@ -49,7 +56,9 @@ async fn check_module(dir : String) -> Unit {
 ///|
 async fn generated() -> Unit {
   if !@fs.exists(generated_root) {
-    println("❌ I expected generated MoonBit peers in \{generated_root}, found no directory.")
+    println(
+      "❌ I expected generated MoonBit peers in \{generated_root}, found no directory.",
+    )
     @sys.exit(1)
   }
   let modules = []
@@ -60,7 +69,9 @@ async fn generated() -> Unit {
     }
   }
   if modules.is_empty() {
-    println("❌ I expected a moon.mod in a directory of \{generated_root}, found none.")
+    println(
+      "❌ I expected a moon.mod in a directory of \{generated_root}, found none.",
+    )
     @sys.exit(1)
   }
   for dir in modules {
@@ -93,7 +104,9 @@ async fn sample_build() -> Unit {
   let terminal = "\{bin}/terminal_main/terminal_main.exe"
   for path in [pos, terminal] {
     if !@fs.exists(path) {
-      println("❌ I expected the executable \{path} after the build, found nothing.")
+      println(
+        "❌ I expected the executable \{path} after the build, found nothing.",
+      )
       @sys.exit(1)
     }
   }
@@ -105,6 +118,15 @@ async fn sample_build() -> Unit {
     "\{dir}/moonbit.json",
     "{\"pos\":[\{json_text(pos)}],\"terminal\":[\{json_text(terminal)}]}\n",
   )
+  let seal = @process.run(
+    "moonx",
+    ["scripts/jsonrpc-provenance.mbtx", "seal", "moonbit"],
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  if seal != 0 {
+    @sys.exit(1)
+  }
   println("✓ wrote \{dir}/moonbit.json")
 }
 

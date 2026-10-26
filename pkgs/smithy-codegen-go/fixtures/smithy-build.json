@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "outputDirectory": "../../../.dev/out/go-values",
+  "sources": ["values.smithy"],
+  "plugins": {
+    "go-jsonrpc-codegen": {
+      "service": "example.values#Api",
+      "peer": "client",
+      "module": "example/values",
+      "package": "values"
+    }
+  }
+}

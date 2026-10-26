@@ -1,0 +1,103 @@
+///|
+/// Run the Go quality gates on the runtime and generated payment peers.
+/// Usage: mise run test:jsonrpc:go [-- --runtime-only].
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+fn go_paths(runtime_only : Bool) -> Array[String] {
+  if runtime_only {
+    ["runtimes/go"]
+  } else {
+    [
+      "runtimes/go", ".dev/out/payment-terminal-go/source/pos", ".dev/out/payment-terminal-go/source/terminal",
+      ".dev/out/go-values/source/go-jsonrpc-codegen", "examples/payment-terminal/go",
+    ]
+  }
+}
+
+///|
+test "the Go gate includes source, both generated peers and handlers" {
+  assert_eq(go_paths(false).length(), 5)
+  assert_eq(go_paths(true), ["runtimes/go"])
+}
+
+///|
+async fn main {
+  let runtime_only = @env.args().contains("--runtime-only")
+  if !runtime_only {
+    for
+      config in [
+        "examples/payment-terminal/go/smithy-build.json", "pkgs/smithy-codegen-go/fixtures/smithy-build.json",
+      ] {
+      let generated = @process.run(
+        "moon",
+        [
+          "run", "apps/smithy", "--target", "native", "--", "build", "--config",
+          config,
+        ],
+        stdout=@stdio.stdout,
+        stderr=@stdio.stderr,
+      )
+      if generated != 0 {
+        @sys.exit(1)
+      }
+    }
+    @fs.write_file(
+      ".dev/out/go-values/source/go-jsonrpc-codegen/values_codec_test.go",
+      @fs.read_file("pkgs/smithy-codegen-go/fixtures/values_codec_test.go").text(),
+    )
+    @fs.write_file(
+      ".dev/out/payment-terminal-go/source/pos/payment_codec_test.go",
+      @fs.read_file("pkgs/smithy-codegen-go/fixtures/payment_codec_test.go").text(),
+    )
+  }
+  for path in go_paths(runtime_only) {
+    println("Checking Go in " + path)
+    if path.has_prefix(".dev/") {
+      let format_status = @process.run(
+        "gofmt",
+        ["-w", "."],
+        cwd=path,
+        stdout=@stdio.stdout,
+        stderr=@stdio.stderr,
+      )
+      if format_status != 0 {
+        @sys.exit(1)
+      }
+    }
+    let (status, output, errors) = @process.collect_output(
+      "gofmt",
+      ["-l", "."],
+      cwd=path,
+    )
+    if status != 0 || !output.text().trim().is_empty() {
+      eprintln(
+        "I found Go format errors in `" +
+        path +
+        "`.\n" +
+        output.text() +
+        errors.text(),
+      )
+      @sys.exit(1)
+    }
+    for command in ["build", "vet", "test"] {
+      let status = @process.run(
+        "go",
+        [command, "./..."],
+        cwd=path,
+        stdout=@stdio.stdout,
+        stderr=@stdio.stderr,
+      )
+      if status != 0 {
+        @sys.exit(1)
+      }
+    }
+  }
+}

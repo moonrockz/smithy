@@ -1,0 +1,68 @@
+///|
+/// Build the Go sample once and write command arrays for the manual matrix.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/x@0.5.5/path",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+fn peer_binary(root : String, role : String) -> String {
+  root + "/.dev/out/payment-terminal/bin/go-" + role
+}
+
+///|
+test "Go command paths name each runnable peer" {
+  assert_eq(
+    peer_binary("/repo", "pos"),
+    "/repo/.dev/out/payment-terminal/bin/go-pos",
+  )
+  assert_eq(
+    peer_binary("/repo", "terminal"),
+    "/repo/.dev/out/payment-terminal/bin/go-terminal",
+  )
+}
+
+///|
+async fn main {
+  let here : @path.Path = "."
+  let root = here.resolve().to_string()
+  @fs.mkdir(".dev/out/payment-terminal/bin", recursive=true, allow_exist=true)
+  @fs.mkdir(
+    ".dev/out/payment-terminal/commands",
+    recursive=true,
+    allow_exist=true,
+  )
+  for role in ["pos", "terminal"] {
+    let code = @process.run(
+      "go",
+      ["build", "-o", peer_binary(root, role), "./cmd/" + role],
+      cwd="examples/payment-terminal/go",
+      stdout=@stdio.stdout,
+      stderr=@stdio.stderr,
+    )
+    if code != 0 {
+      @sys.exit(1)
+    }
+  }
+  @fs.write_file(
+    ".dev/out/payment-terminal/commands/go.json",
+    Json::object({
+      "pos": Json::array([Json::string(peer_binary(root, "pos"))]),
+      "terminal": Json::array([Json::string(peer_binary(root, "terminal"))]),
+    }).stringify(indent=2) +
+    "\n",
+  )
+  let seal = @process.run(
+    "moonx",
+    ["scripts/jsonrpc-provenance.mbtx", "seal", "go"],
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  if seal != 0 {
+    @sys.exit(1)
+  }
+}

@@ -1,0 +1,77 @@
+name: JSON-RPC interoperability matrix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MISE_EXPERIMENTAL: 'true'
+
+jobs:
+  matrix:
+    name: All 27 language and transport combinations
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out the selected source
+        uses: actions/checkout@v6
+
+      - name: Install the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check Go runtime embedding
+        run: mise run jsonrpc:go:runtime -- --check
+
+      - name: Check Go generated golden files
+        run: mise run codegen:go -- --check
+
+      - name: Check MoonBit and Python runtime embedding
+        run: mise run runtime:embed:check
+
+      - name: Check MoonBit and Python generated golden files
+        run: mise run codegen:payment-terminal -- --check
+
+      - name: Check the MoonBit runtime
+        run: mise run test:runtime:moonbit
+
+      - name: Check the Python runtime
+        run: mise run test:runtime:python
+
+      - name: Check the generated MoonBit peers
+        run: mise run test:generated:moonbit
+
+      - name: Check the generated Python peers
+        run: mise run test:generated:python
+
+      - name: Build the MoonBit sample once
+        run: mise run sample:build:moonbit
+
+      - name: Build the Python sample once
+        run: mise run sample:build:python
+
+      - name: Build the Go sample once
+        run: mise run sample:build:go
+
+      - name: Run the Go quality gates
+        run: mise run test:jsonrpc:go
+
+      - name: Run all 27 pairs and check each scenario transcript
+        run: mise run test:jsonrpc:matrix
+
+      - name: Write the pass and fail table
+        if: always()
+        run: mise run test:jsonrpc:matrix -- --summary
+
+      - name: Retain transcripts, checks and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jsonrpc-matrix-${{ github.sha }}
+          path: .dev/out/jsonrpc-matrix/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
