@@ -87,6 +87,108 @@ test "the manual matrix contains all 27 distinct pairs and transports" {
 }
 
 ///|
+/// Select the cases of `--caller`, `--receiver` and `--transport`. Each option
+/// takes a comma-separated list, once. A case passes when each selected value
+/// is in its list.
+fn select_cases(args : Array[String]) -> Array[MatrixCase] raise {
+  let languages = [MoonBit, Python, Go].map(language_name)
+  let transports = [Stdio, Http, WebSocket].map(transport_name)
+  let chosen : Map[String, Array[String]] = Map([])
+  let mut index = 0
+  while index < args.length() {
+    let key = args[index]
+    let known = match key {
+      "--caller" | "--receiver" => languages
+      "--transport" => transports
+      _ => fail("I found an invalid matrix option `" + key + "`.")
+    }
+    if index + 1 >= args.length() {
+      fail("I expected a value after the matrix option `" + key + "`.")
+    }
+    if chosen.contains(key) {
+      fail("I found the matrix option `" + key + "` more than once.")
+    }
+    let values = args[index + 1].split(",").map(v => v.to_owned()).to_array()
+    for value in values {
+      if !known.contains(value) {
+        fail(
+          "I expected one of " +
+          known.join(", ") +
+          " for `" +
+          key +
+          "`; I found `" +
+          value +
+          "`.",
+        )
+      }
+    }
+    chosen[key] = values
+    index += 2
+  }
+  fn allows(key : String, value : String) -> Bool {
+    match chosen.get(key) {
+      Some(values) => values.contains(value)
+      None => true
+    }
+  }
+
+  cases().filter(item => {
+    allows("--caller", language_name(item.caller)) &&
+    allows("--receiver", language_name(item.receiver)) &&
+    allows("--transport", transport_name(item.transport))
+  })
+}
+
+///|
+test "a matrix selection takes comma-separated languages and transports" {
+  assert_eq(select_cases([]).length(), 27)
+  let mixed = select_cases([
+    "--caller", "moonbit,python", "--receiver", "moonbit,python",
+  ])
+  assert_eq(mixed.length(), 12)
+  for caller in [MoonBit, Python] {
+    for receiver in [MoonBit, Python] {
+      assert_eq(
+        mixed
+        .filter(item => item.caller == caller && item.receiver == receiver)
+        .length(),
+        3,
+      )
+    }
+  }
+  assert_eq(
+    select_cases(["--caller", "moonbit", "--receiver", "moonbit"]).length(),
+    3,
+  )
+  assert_eq(
+    select_cases(["--transport", "http,websocket", "--caller", "go"]).length(),
+    6,
+  )
+}
+
+///|
+test "a matrix selection rejects unknown, empty and repeated values" {
+  for
+    args in [
+      ["--caller", "pyhton"],
+      ["--caller", "moonbit,"],
+      ["--receiver", ""],
+      ["--transport", "tcp"],
+      ["--caller", "go", "--caller", "python"],
+      ["--caller"],
+      ["--language", "go"],
+    ] {
+    let rejected = try {
+      ignore(select_cases(args))
+      false
+    } catch {
+      _ => true
+    }
+    assert_true(rejected)
+  }
+}
+
+///|
 async fn main {
   let args = @env.args()[1:].to_owned()
   let out = ".dev/out/jsonrpc-matrix"
@@ -109,24 +211,7 @@ async fn main {
     }
     return
   }
-  let mut selected = cases()
-  let mut index = 0
-  while index < args.length() {
-    let key = args[index]
-    if index + 1 >= args.length() ||
-      !["--caller", "--receiver", "--transport"].contains(key) {
-      fail("I found an invalid matrix option `" + key + "`.")
-    }
-    let value = args[index + 1]
-    selected = selected.filter(item => {
-      match key {
-        "--caller" => language_name(item.caller) == value
-        "--receiver" => language_name(item.receiver) == value
-        _ => transport_name(item.transport) == value
-      }
-    })
-    index += 2
-  }
+  let selected = select_cases(args)
   if selected.is_empty() {
     fail("I found no cases for the selected matrix options.")
   }
