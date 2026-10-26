@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from decimal import Decimal
 
@@ -17,7 +17,12 @@ from smithy_jsonrpc_runtime import (
     RpcError,
     json_codec,
 )
-from smithy_jsonrpc_runtime.http_client import HttpClientConnection, http_connect
+from smithy_jsonrpc_runtime.http_client import (
+    HttpClientConnection,
+    StreamLimitError,
+    http_connect,
+    read_events,
+)
 from smithy_jsonrpc_runtime.server import RunningServer, start_server
 from smithy_jsonrpc_runtime.ws_client import ws_connect
 
@@ -268,3 +273,82 @@ async def test_frames_of_a_dropped_stream_go_through_the_dispatcher_first() -> N
     ]
     await conn.close()
     await asyncio.wait_for(task, 5)
+
+
+async def chunks_of(data: bytes, size: int = 7) -> AsyncIterator[bytes]:
+    for start in range(0, len(data), size):
+        yield data[start : start + size]
+
+
+async def collect(data: bytes, limit: int) -> list[str]:
+    return [event async for event in read_events(chunks_of(data), limit=limit)]
+
+
+async def test_events_are_read_in_chunks_with_comments_and_crlf() -> None:
+    body = b': open\r\n\r\nevent: message\r\ndata: {"a":1}\r\n\r\ndata: one\ndata: two\n\n'
+    assert await collect(body, 64) == ['{"a":1}', "one\ntwo"]
+
+
+async def test_an_event_line_longer_than_the_limit_is_an_error() -> None:
+    with pytest.raises(
+        StreamLimitError,
+        match=r"^I expected an event-stream line of at most 64 bytes, found more\.$",
+    ):
+        await collect(b"data: " + b"x" * 100 + b"\n\n", 64)
+
+
+async def test_an_event_whose_data_passes_the_limit_is_an_error() -> None:
+    with pytest.raises(
+        StreamLimitError,
+        match=r"^I expected the data of one event-stream event to be at most 64 bytes, "
+        r"found more\.$",
+    ):
+        await collect(b"data: 0123456789\n" * 10 + b"\n", 64)
+
+
+async def test_a_held_open_endless_event_stops_at_the_limit() -> None:
+    async def endless() -> AsyncIterator[bytes]:
+        while True:
+            yield b"data: 0123456789abcdef\n"
+
+    with pytest.raises(StreamLimitError):
+        async for _ in read_events(endless(), limit=1024):
+            pass
+
+
+async def test_an_oversized_event_fails_the_pending_request() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"Smithy-Session-Id": "s1", "content-type": "text/event-stream"},
+            content=b"event: message\ndata: " + b"x" * 200 + b"\n\n",
+        )
+
+    conn = HttpClientConnection(
+        "http://test/rpc", httpx.AsyncClient(transport=httpx.MockTransport(respond)), limit=64
+    )
+    peer = Peer(self_name="pos", remote_name="terminal", rules=session_rules())
+    task = asyncio.create_task(peer.run(conn))
+    with pytest.raises(ConnectionError, match=r"terminal\.ping"):
+        await asyncio.wait_for(peer.request("terminal.ping", None), 5)
+    await conn.close()
+    await asyncio.wait_for(task, 5)
+
+
+async def test_an_oversized_json_body_is_refused() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"Smithy-Session-Id": "s1", "content-type": "application/json"},
+            content=b'{"jsonrpc":"2.0","id":1,"result":"' + b"x" * 200 + b'"}',
+        )
+
+    conn = HttpClientConnection(
+        "http://test/rpc", httpx.AsyncClient(transport=httpx.MockTransport(respond)), limit=64
+    )
+    with pytest.raises(
+        StreamLimitError,
+        match=r"^I expected a JSON response body of at most 64 bytes, found more\.$",
+    ):
+        await conn.send('{"jsonrpc":"2.0","id":1,"method":"terminal.ping"}')
+    await conn.close()
