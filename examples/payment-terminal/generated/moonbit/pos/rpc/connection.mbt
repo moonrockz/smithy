@@ -7,7 +7,7 @@
 ///   the message belongs to, when there is one: its response, or a
 ///   notification or request that its handler sends. A transport that has
 ///   one stream per call (HTTP) uses it; other transports ignore it.
-/// - `close` forces synchronous resource cleanup.
+/// - `close` requests forced cleanup without waiting for async I/O.
 /// - `shutdown` closes gracefully in the caller's async task. The default
 ///   calls `close`. WebSocket sends a normal close frame before cleanup.
 /// - `start` gives the transport the task group of `Peer::run`, for the

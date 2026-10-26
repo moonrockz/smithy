@@ -79,10 +79,16 @@ need no system shell or external executable.
   normal close frame with code 1000, then closes the socket and inbox. Sending the frame has a
   one-second timeout. If the WebSocket protocol is already closed, shutdown just cleans up.
   Other errors, timeout and cancellation still close the resources and propagate to the caller.
+  Cleanup cancels and joins the reader before closing its socket, and protects that join from
+  caller cancellation so Windows I/O can finish cancellation while the handle is valid.
   Shutdown is safe to repeat, including after the peer's reader task group ends.
   It does not wait for a close reply. The default implementation calls `close`, preserving the
   behavior of memory, stdio and HTTP connections. Use synchronous `close` for forced cleanup,
-  including in a `defer` around graceful shutdown. The server shuts down a WebSocket when its
+  including in a `defer` around graceful shutdown. With a running WebSocket reader, `close` requests
+  cancellation immediately and the reader disposes its socket after cancellation completes.
+  If graceful shutdown is already active, it retains socket disposal until its close operation
+  finishes or times out.
+  The server shuts down a WebSocket when its
   `on_peer` callback returns normally.
 - `serve(port~, on_peer)` serves `/rpc` and `/ws` on 127.0.0.1, and writes `listening N` to stderr.
   Port 0 picks a free port. `on_peer` runs once for each HTTP session and for each WebSocket.

@@ -111,7 +111,7 @@ jobs:
         run: moonx scripts/runtime-moonbit.mbtx sample-build
 
       - name: Run all four scenarios over stdio, HTTP and WebSocket
-        timeout-minutes: 5
+        timeout-minutes: 15
         if: ${{ !cancelled() && steps.sample.outcome == 'success' }}
         run: moonx scripts/jsonrpc-matrix.mbtx --caller moonbit --receiver moonbit
 

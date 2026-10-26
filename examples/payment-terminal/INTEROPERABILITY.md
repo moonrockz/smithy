@@ -84,6 +84,10 @@ has a POS JSONL log, process output, and a checker result. A setup failure canno
 reuse a previous pass table. For network transports, a receiver can stop with status 0 after the caller
 finishes. The runner stops a receiver that is still running. A crash or forced
 kill fails the cell.
+After the runner requests a stop, it accepts the default cancellation result
+of the host: SIGTERM on Unix, or CTRL_BREAK with `STATUS_CONTROL_C_EXIT` on
+Windows. A receiver that exits before the runner requests a stop must return
+zero. Ordinary errors, access violations and forced termination still fail.
 
 ## Shared wire contract
 

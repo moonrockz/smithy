@@ -1,5 +1,8 @@
 ///|
-async fn with_raw_ws(body : async (&@rpc.Connection) -> Unit) -> Unit {
+async fn with_raw_ws(
+  body : async (&@rpc.Connection) -> Unit,
+  expected~ : String = "ConnectionClosed(Normal, None)",
+) -> Unit {
   @async.with_timeout(5000, () => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     defer server.close()
@@ -14,7 +17,7 @@ async fn with_raw_ws(body : async (&@rpc.Connection) -> Unit) -> Unit {
         } noraise {
           _ => "message"
         }
-        inspect(outcome, content="ConnectionClosed(Normal, None)")
+        assert_eq(outcome, expected)
       })
       let conn = @rpc.ws_connect("ws://127.0.0.1:\{server.addr.port()}/ws")
       defer conn.close()
@@ -62,6 +65,19 @@ async test "ws: shutdown while a peer reads" {
       group.spawn_bg(() => peer.run(conn))
       @async.sleep(10)
       conn.shutdown()
+    })
+    assert_true(conn.receive() is None)
+  })
+}
+
+///|
+async test "ws: forced close while a peer reads" {
+  with_raw_ws(expected="ReaderClosed", conn => {
+    let peer = new_pos(@rpc.TranscriptLog::memory())
+    @async.with_task_group(group => {
+      group.spawn_bg(() => peer.run(conn))
+      @async.sleep(10)
+      conn.close()
     })
     assert_true(conn.receive() is None)
   })

@@ -50,7 +50,7 @@ async fn moon(dir : String, args : Array[String]) -> Unit {
 /// Checks a MoonBit module and runs its native tests.
 async fn check_module(dir : String) -> Unit {
   moon(dir, ["check", "--deny-warn", "--target", "native"])
-  moon(dir, ["test", "--target", "native"])
+  moon(dir, ["test", "--target", "native", "--verbose"])
 }
 
 ///|
