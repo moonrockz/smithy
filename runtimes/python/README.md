@@ -42,6 +42,9 @@ are not copied.
 - `serve(port, peer_factory)`: serves HTTP (`/rpc`) and WebSocket (`/ws`) until the process stops.
   When it is ready, it writes the bytes `listening N\n` to stderr, where N is the port. It writes
   them with no newline translation, so the line is the same on Windows and in the other runtimes.
+  After SIGINT, SIGTERM or (on Windows) CTRL_BREAK, it stops gracefully and returns, so the
+  process exits with 0. uvicorn alone raises the signal again after its shutdown; on Windows that
+  exits with 3, the code of `abort()`, which a supervisor cannot tell from a crash.
 
 ## Checks
 
