@@ -4,18 +4,27 @@ from decimal import Decimal
 from enum import Enum
 
 import pytest
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from smithy_jsonrpc_runtime import (
     CapabilitySource,
     DecodeError,
+    Document,
+    Double,
     MethodRule,
+    ModeledError,
+    RpcError,
     Session,
     SessionRules,
     Timestamp,
+    Unit,
+    modeled_error,
     named_params,
     positional_params,
     to_positional,
     to_wire,
+    to_wire_object,
+    union_tag,
 )
 
 from .payment import session_rules
@@ -75,6 +84,12 @@ def test_params_helpers() -> None:
     assert to_positional({}, ["a"]) == []
 
 
+class Holder(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    doc: Document = None
+    ratio: Double = 0.0
+
+
 class Phase(Enum):
     INSERT_CARD = "insertCard"
 
@@ -98,3 +113,35 @@ def test_to_wire_converts_python_dumps() -> None:
     }
     with pytest.raises(TypeError, match="set"):
         to_wire({1})
+
+
+def test_generator_support_types() -> None:
+    held = Holder.model_validate({"doc": {"a": [Decimal("1.10"), None]}, "ratio": Decimal("0.5")})
+    assert held.doc == {"a": [Decimal("1.10"), None]}
+    assert held.ratio == 0.5
+    assert to_wire_object(held) == {"doc": {"a": [Decimal("1.10"), None]}, "ratio": 0.5}
+    with pytest.raises(ValidationError):
+        Holder.model_validate({"ratio": "0.5"})
+    with pytest.raises(ValidationError):
+        Holder.model_validate({"doc": {1, 2}})
+    assert to_wire(Unit()) == {}
+    assert union_tag({"chip": {}, "swipe": None}) == "chip"
+    assert union_tag({"chip": {}, "swipe": {}}) is None
+    assert union_tag(3) is None
+
+    class Declined(ModeledError):
+        code = 1001
+
+    def decode(data: object) -> ModeledError:
+        if data != "test decline":
+            raise ValueError("I expected the test reason.")
+        return Declined("CardDeclined")
+
+    found = modeled_error(RpcError(1001, "x", "test decline"), {1001: decode})
+    assert isinstance(found, Declined) and found.to_rpc_error().code == 1001
+    other = RpcError(1001, "x", "other")
+    assert modeled_error(other, {1001: decode}) is other
+    unknown = RpcError(7, "x")
+    assert modeled_error(unknown, {1001: decode}) is unknown
+    with pytest.raises(TypeError, match="JSON object"):
+        to_wire_object(3)

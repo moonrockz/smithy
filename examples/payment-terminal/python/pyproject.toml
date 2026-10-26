@@ -1,0 +1,43 @@
+[project]
+name = "payment-terminal-samples"
+version = "0.0.0"
+description = "The Python payment terminal sample programs, and the checks of the generated Python peers."
+requires-python = ">=3.11"
+dependencies = [
+    "payment-pos",
+    "payment-terminal",
+]
+
+[dependency-groups]
+dev = [
+    "pyright==1.1.414",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.1",
+    "ruff==0.17.2",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+payment-pos = { path = "../generated/python/pos", editable = true }
+payment-terminal = { path = "../generated/python/terminal", editable = true }
+
+[tool.pyright]
+include = ["tests"]
+typeCheckingMode = "strict"
+pythonVersion = "3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "RUF", "SIM", "PL", "T20"]
+ignore = ["PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR2004"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -15,6 +15,7 @@ import {
   "moonrockz/smithy-build" @build,
   "moonrockz/smithy-codegen/fixture" @codegen_fixture,
   "moonrockz/smithy-codegen-moonbit" @codegen_moonbit,
+  "moonrockz/smithy-codegen-python" @codegen_python,
   "moonrockz/smithy-diff" @diff,
   "moonrockz/smithy-jsonschema" @jsonschema,
   "moonrockz/smithy-openapi" @openapi,

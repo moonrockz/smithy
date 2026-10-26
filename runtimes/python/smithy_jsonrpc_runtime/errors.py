@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     from .json_codec import JsonValue
@@ -48,4 +49,34 @@ class RpcError(Exception):
         error: dict[str, JsonValue] = {"code": self.code, "message": self.message}
         if self.data is not None:
             error["data"] = self.data
+        return error
+
+
+class ModeledError(Exception):
+    """The base of the generated exception classes of modeled errors.
+
+    A subclass sets `code` and implements `to_rpc_error`. A handler raises a
+    subclass; the generated dispatcher sends `to_rpc_error()`.
+    """
+
+    code: ClassVar[int] = INTERNAL_ERROR
+
+    def to_rpc_error(self) -> RpcError:
+        """Give the JSON-RPC error with the modeled code, message and data."""
+        return RpcError(self.code, str(self))
+
+
+def modeled_error(
+    error: RpcError, decoders: Mapping[int, Callable[[JsonValue | None], ModeledError]]
+) -> Exception:
+    """Give the modeled error of an error response, or the error itself.
+
+    When the decoder of the code cannot read the data, I give the `RpcError`.
+    """
+    decoder = decoders.get(error.code)
+    if decoder is None:
+        return error
+    try:
+        return decoder(error.data)
+    except (DecodeError, ValueError):
         return error

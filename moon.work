@@ -9,6 +9,7 @@ members = [
   "./pkgs/smithy-codegen",
   "./pkgs/smithy-codegen-jsonrpc",
   "./pkgs/smithy-codegen-moonbit",
+  "./pkgs/smithy-codegen-python",
   "./pkgs/smithy-diff",
   "./pkgs/smithy-jsonschema",
   "./pkgs/smithy-openapi",

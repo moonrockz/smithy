@@ -15,9 +15,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
-from pydantic import BeforeValidator, GetCoreSchemaHandler, PlainSerializer
+from pydantic import BaseModel, BeforeValidator, ConfigDict, GetCoreSchemaHandler, PlainSerializer
 from pydantic_core import core_schema
 
 from .errors import DecodeError
@@ -229,16 +229,21 @@ HttpDateTimestamp = Annotated[Timestamp, _TimestampAs(TimestampFormat.HTTP_DATE)
 
 
 def to_wire(value: object) -> JsonValue:
-    """Convert a Python value, such as a `model_dump(mode="python")` result, to a JSON value.
+    """Convert a Python value, such as a generated model, to a JSON value.
 
-    `Decimal` and `int` stay exact, `bytes` become base64 text, a `Timestamp`
-    gives its JSON value, an aware `datetime` gives date-time text, an `Enum`
-    gives its value, and a tuple becomes an array. Raises `TypeError` for any
-    other value.
+    A Pydantic model is dumped with its wire names, without the members that
+    are None. `Decimal` and `int` stay exact, `bytes` become base64 text, a
+    `Timestamp` gives its JSON value, an aware `datetime` gives date-time text,
+    an `Enum` gives its value, and a tuple becomes an array. Raises `TypeError`
+    for any other value.
     """
-    if value is None or isinstance(value, (bool, int, Decimal, str)):
+    if value is None or isinstance(value, bool):
         return value
-    if isinstance(value, float):
+    if isinstance(value, Enum):
+        return to_wire(value.value)  # pyright: ignore[reportUnknownMemberType]
+    if isinstance(value, BaseModel):
+        return to_wire(value.model_dump(mode="python", by_alias=True, exclude_none=True))
+    if isinstance(value, (int, Decimal, str, float)):
         return value
     if isinstance(value, (bytes, bytearray)):
         return encode_blob(bytes(value))
@@ -246,8 +251,6 @@ def to_wire(value: object) -> JsonValue:
         return value.value
     if isinstance(value, datetime):
         return Timestamp.from_datetime(value, format=TimestampFormat.DATE_TIME).value
-    if isinstance(value, Enum):
-        return to_wire(value.value)  # pyright: ignore[reportUnknownMemberType]
     if isinstance(value, dict):
         out: dict[str, JsonValue] = {}
         for key, item in cast("dict[object, object]", value).items():
@@ -258,3 +261,91 @@ def to_wire(value: object) -> JsonValue:
     if isinstance(value, (list, tuple)):
         return [to_wire(item) for item in cast("list[object]", value)]
     raise TypeError(f"I expected a value that JSON can carry; I found a {type(value).__name__}.")
+
+
+def to_wire_object(value: object) -> dict[str, JsonValue]:
+    """Convert a model to a JSON object. Raises `TypeError` when the value is not an object."""
+    wire = to_wire(value)
+    if not isinstance(wire, dict):
+        raise TypeError(f"I expected a value that gives a JSON object; I found {describe(wire)}.")
+    return wire
+
+
+def decode_double(value: object, *, path: str = "") -> float:
+    """Read a JSON number as a `float`. A string or a boolean is an error."""
+    if isinstance(value, float):
+        return value
+    if isinstance(value, (int, Decimal)) and not isinstance(value, bool):
+        return float(value)
+    raise DecodeError(path=path, message=f"I expected a JSON number; I found {_name(value)}.")
+
+
+Double = Annotated[float, BeforeValidator(_pydantic_value_error(decode_double))]
+"""A Smithy float or double. It accepts a JSON number only."""
+
+
+def check_document(value: object, *, path: str = "") -> JsonValue:
+    """Give the value when it is a JSON value. Raises `DecodeError` at the first other value.
+
+    The check keeps its own stack, so a deep value does not recurse.
+    """
+    stack: list[tuple[object, str]] = [(value, path)]
+    while stack:
+        item, at = stack.pop()
+        if item is None or isinstance(item, (bool, int, Decimal, float, str)):
+            continue
+        if isinstance(item, list):
+            for index, inner in enumerate(cast("list[object]", item)):
+                stack.append((inner, f"{at}/{index}"))
+        elif isinstance(item, dict):
+            for key, inner in cast("dict[object, object]", item).items():
+                if not isinstance(key, str):
+                    raise DecodeError(path=at, message=f"I expected a string key; I found {key!r}.")
+                stack.append((inner, f"{at}/{key.replace('~', '~0').replace('/', '~1')}"))
+        else:
+            raise DecodeError(path=at, message=f"I expected a JSON value; I found {_name(item)}.")
+    return cast("JsonValue", value)
+
+
+@dataclass(frozen=True, slots=True)
+class _DocumentSchema:
+    def __get_pydantic_core_schema__(
+        self, source: object, handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_plain_validator_function(
+            _pydantic_value_error(check_document),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda value: value  # pyright: ignore[reportUnknownLambdaType]
+            ),
+        )
+
+
+if TYPE_CHECKING:
+    Document = JsonValue
+    """A Smithy document: any JSON value, kept exactly."""
+else:
+    # Pydantic must not resolve the recursive alias; the schema checks the value.
+    Document = Annotated[object, _DocumentSchema()]
+
+
+class Unit(BaseModel):
+    """The value of a union member that targets `smithy.api#Unit`: an empty object."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+def union_tag(value: object) -> str | None:
+    """Give the member name of a tagged union value, for a Pydantic `Discriminator`.
+
+    A JSON object gives its one member that is not null. A generated member
+    model gives its `union_member` class attribute. Any other value gives None.
+    """
+    if isinstance(value, dict):
+        keys = [
+            key for key, item in cast("dict[object, object]", value).items() if item is not None
+        ]
+        if len(keys) == 1 and isinstance(keys[0], str):
+            return keys[0]
+        return None
+    tag = getattr(type(value), "union_member", None)
+    return tag if isinstance(tag, str) else None

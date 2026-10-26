@@ -16,6 +16,19 @@
       "protocol": "example.payments#TerminalProtocol",
       "peer": "pos",
       "module": "example/pos"
+    },
+    "python-jsonrpc-codegen::python-terminal": {
+      "service": "example.payments#PaymentTerminal",
+      "protocol": "example.payments#TerminalProtocol",
+      "peer": "terminal",
+      "package": "payment_terminal",
+      "integrations": ["fastapi"]
+    },
+    "python-jsonrpc-codegen::python-pos": {
+      "service": "example.payments#PaymentTerminal",
+      "protocol": "example.payments#TerminalProtocol",
+      "peer": "pos",
+      "package": "payment_pos"
     }
   }
 }

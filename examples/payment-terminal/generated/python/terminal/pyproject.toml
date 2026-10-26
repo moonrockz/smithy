@@ -1,0 +1,44 @@
+[project]
+name = "payment-terminal"
+version = "0.0.0"
+description = "The generated JSON-RPC peer terminal."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.162.0",
+    "httpx==0.28.1",
+    "pydantic==2.14.1",
+    "uvicorn==0.54.0",
+    "websockets==17.3",
+]
+
+[dependency-groups]
+dev = [
+    "pyright==1.1.414",
+    "pytest==9.1.1",
+    "ruff==0.17.2",
+]
+
+[build-system]
+requires = ["uv_build==0.13.5"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "payment_terminal"
+module-root = ""
+
+[tool.pyright]
+include = ["payment_terminal", "tests"]
+typeCheckingMode = "strict"
+pythonVersion = "3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "RUF", "SIM", "PL", "T20"]
+ignore = ["E501", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR2004"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

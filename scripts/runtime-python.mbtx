@@ -1,13 +1,21 @@
 ///|
-/// Check the Python JSON-RPC runtime in `runtimes/python`.
+/// Check the Python JSON-RPC runtime and the generated Python peers.
 ///
 /// Subcommands:
 ///
-/// - `test`: `uv sync --locked`, then `ruff format --check`, `ruff check`,
-///   `pyright` (strict, from `pyproject.toml`) and `pytest`, all with
-///   `uv run --locked`.
+/// - `test` (`mise run test:runtime:python`): in `runtimes/python`, run
+///   `uv sync --locked`, then `ruff format --check`, `ruff check`, `pyright`
+///   (strict, from `pyproject.toml`) and `pytest`, all with `uv run --locked`.
+/// - `generated` (`mise run test:generated:python`): check the golden
+///   generated peers in `examples/payment-terminal/generated/python`. One
+///   shared uv project, `examples/payment-terminal/python`, installs both
+///   generated packages (editable path dependencies) and the tools. In each
+///   golden directory, `ruff check`, `pyright` (the strict settings of the
+///   generated `pyproject.toml`) and `pytest` run with that environment. Then
+///   the shared project runs its own checks: the generated POS and terminal
+///   talk to each other in its tests.
 ///
-/// Usage: `mise run test:runtime:python`, or `moonx scripts/runtime-python.mbtx test`.
+/// Usage: `moonx scripts/runtime-python.mbtx test` or `... generated`.
 /// It stops at the first step that fails, and exits with the code of that step.
 import {
   "moonbitlang/async@0.22.5",
@@ -21,13 +29,31 @@ import {
 let runtime_dir : String = "runtimes/python"
 
 ///|
-/// Run one command in `dir`; exit with its code when it fails.
+/// The shared uv project of the sample programs and the generated peers.
+let samples_dir : String = "examples/payment-terminal/python"
+
+///|
+/// The golden generated peers, and the path of the shared project from each.
+let golden_dirs : Array[String] = [
+  "examples/payment-terminal/generated/python/pos", "examples/payment-terminal/generated/python/terminal",
+]
+
+///|
+let samples_from_golden : String = "../../../python"
+
+///|
+/// The tools write no bytecode and no cache into a golden directory.
+let quiet_env : Map[String, String] = { "PYTHONDONTWRITEBYTECODE": "1" }
+
+///|
+/// Run one uv command in `dir`; exit with its code when it fails.
 async fn step(dir : String, label : String, args : Array[String]) -> Unit {
-  println("▶ \{label}")
+  println("▶ \{label} (\{dir})")
   let code = @process.run(
     "uv",
     args,
     cwd=dir,
+    extra_env=quiet_env,
     stdout=@stdio.stdout,
     stderr=@stdio.stderr,
   ) catch {
@@ -38,7 +64,7 @@ async fn step(dir : String, label : String, args : Array[String]) -> Unit {
     }
   }
   if code != 0 {
-    println("❌ ERROR: \{label} failed with exit code \{code}")
+    println("❌ ERROR: \{label} failed in \{dir} with exit code \{code}")
     @sys.exit(if code > 0 { code } else { 1 })
   }
 }
@@ -46,13 +72,22 @@ async fn step(dir : String, label : String, args : Array[String]) -> Unit {
 ///|
 /// The quality gate of a uv project: lock, format, lint, types, tests.
 async fn check_project(dir : String) -> Unit {
-  step(dir, "uv sync --locked (\{dir})", ["sync", "--locked"])
+  step(dir, "uv sync --locked", ["sync", "--locked"])
   step(dir, "ruff format --check", [
     "run", "--locked", "ruff", "format", "--check",
   ])
   step(dir, "ruff check", ["run", "--locked", "ruff", "check"])
   step(dir, "pyright (strict)", ["run", "--locked", "pyright"])
   step(dir, "pytest", ["run", "--locked", "pytest", "-q"])
+}
+
+///|
+/// Check one golden directory with the environment of the shared project.
+async fn check_golden(dir : String) -> Unit {
+  let run = ["run", "--locked", "--project", samples_from_golden]
+  step(dir, "ruff check", [..run, "ruff", "check", "--no-cache", "."])
+  step(dir, "pyright (strict)", [..run, "pyright"])
+  step(dir, "pytest", [..run, "pytest", "-q", "-p", "no:cacheprovider"])
 }
 
 ///|
@@ -64,12 +99,22 @@ async fn main {
       check_project(runtime_dir)
       println("✅ The Python JSON-RPC runtime passes ruff, pyright --strict and pytest")
     }
+    "generated" => {
+      step(samples_dir, "uv sync --locked", ["sync", "--locked"])
+      for dir in golden_dirs {
+        check_golden(dir)
+      }
+      check_project(samples_dir)
+      println("✅ The generated Python peers pass ruff, pyright --strict and pytest")
+    }
     "" => {
-      println("❌ ERROR: I expected a subcommand (test); I found none.")
+      println("❌ ERROR: I expected a subcommand (test or generated); I found none.")
       @sys.exit(2)
     }
     other => {
-      println("❌ ERROR: I expected the subcommand test; I found \{other}.")
+      println(
+        "❌ ERROR: I expected the subcommand test or generated; I found \{other}.",
+      )
       @sys.exit(2)
     }
   }
