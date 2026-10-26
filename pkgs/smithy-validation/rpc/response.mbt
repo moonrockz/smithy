@@ -226,11 +226,17 @@ fn PreparedService::validate_response_checked(
           )
         } else {
           expected_id = Some(request.id)
-          if self.version == V1_0 && !request.is_valid() {
+          let invalid_call = !request.complete ||
+            request.findings
+            .iter()
+            .any(f => {
+              f.severity == @validation.Error && f.code != NotificationExpected
+            })
+          if self.version == V1_0 && invalid_call {
             expected_legacy_error = true
           } else if request.findings.iter().any(f => f.code == UnknownMethod) {
             expected_code = Some(error_code("-32601"))
-          } else if !request.is_valid() {
+          } else if invalid_call {
             expected_code = Some(error_code("-32602"))
           }
         }

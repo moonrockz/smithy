@@ -139,17 +139,16 @@ test "--no-release clears has_release, also as the last flag" {
 }
 
 ///|
-/// The examples of the repository, read as the build reads them. After the
-/// examples task these are the six that had a README and the five that got one.
-test "the repository examples with a README are the eleven documented ones" {
+/// The examples of the repository, read as the build reads them.
+test "the repository examples with a README are the twelve documented ones" {
   let dirs = read_example_dirs("..") catch {
     _ => fail("I could not read ../examples")
   }
   let found = @content.Example::build(dirs)
   assert_eq(found.map(e => e.dir), [
     "authenticated-repositories", "github-release", "json-rpc", "maven-repository",
-    "npm-archive", "npm-registry", "openrpc", "protocol-tests", "public-archive",
-    "rpc-consumer", "validation-consumer",
+    "npm-archive", "npm-registry", "openrpc", "payment-terminal", "protocol-tests",
+    "public-archive", "rpc-consumer", "validation-consumer",
   ])
   for e in found {
     assert_true(e.title != "", msg="\{e.dir} has no title")

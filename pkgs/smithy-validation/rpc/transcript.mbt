@@ -64,6 +64,8 @@ priv struct Pending {
   /// The method of an accepted call when the protocol has a session; its
   /// reply settles the session.
   method_ : MethodName?
+  optional_reply : Bool
+  refusal : RefusalExpectation?
 }
 
 ///|
@@ -536,6 +538,7 @@ fn TranscriptChecker::track_call(
           "I expected at most \{self.limits.active_calls} active calls from \{sender.to_string()}; I do not track the call at entry \{step.index} with \{render_id(id)}.",
         )
       } else {
+        let refusal = self.expected_refusal(receiver, value)
         let method_ = self.order_request(step, receiver, value, call=true)
         state.active[key] = {
           entry: step.index,
@@ -544,6 +547,14 @@ fn TranscriptChecker::track_call(
           id,
           form,
           method_,
+          optional_reply: self.protocol
+          .service_for(receiver)
+          .bind(service => {
+            request_method(value).bind(name => service.methods.get(name))
+          })
+          .map(m => m.kind == NotificationOnly)
+          .unwrap_or(false),
+          refusal,
         }
       }
   }
@@ -586,6 +597,8 @@ fn TranscriptChecker::track_unreadable(
     id: Absent,
     form,
     method_: None,
+    optional_reply: false,
+    refusal: None,
   })
   true
 }
@@ -796,6 +809,11 @@ fn TranscriptChecker::answer(
   envelope_errors : Array[Finding],
   excused : ErrorCode?,
 ) -> Unit {
+  if call.refusal is Some(refusal) {
+    self.report_messages(step, envelope_errors, [call.entry])
+    self.check_refusal(step, call.entry, value, refusal)
+    return
+  }
   let findings = match (service, call.form) {
     (Some((service, false)), SingleMessage) =>
       service.validate_response_json(
@@ -848,7 +866,9 @@ pub fn TranscriptChecker::finish(self : TranscriptChecker) -> TranscriptSummary 
   if self.correlation {
     for state in self.peers {
       for _, call in state.active {
-        waiting.push((state.name, WaitingCall(call)))
+        if !call.optional_reply {
+          waiting.push((state.name, WaitingCall(call)))
+        }
       }
       // A 1.0 unreadable entry needs no reply.
       if self.protocol.version() == V2_0 {
@@ -857,7 +877,9 @@ pub fn TranscriptChecker::finish(self : TranscriptChecker) -> TranscriptSummary 
         }
       }
       for batch in state.batches {
-        waiting.push((state.name, WaitingBatch(batch)))
+        if !batch.keys.iter().all(key => batch.optional_keys.contains(key)) {
+          waiting.push((state.name, WaitingBatch(batch)))
+        }
       }
     }
   }

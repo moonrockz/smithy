@@ -157,6 +157,7 @@ Feature: JSON-RPC transcripts
     And the transcript has the error "StateViolation" at entry 0
     And the transcript has the error "CapabilityNotAdvertised" at entry 3
     And the transcript has the advisory "CancelInactiveCall" at entry 5
+    And the transcript has the error "RefusalExpected" at entry 6
     And the transcript has the error "StateViolation" at entry 9
     And the transcript matches its expected findings
 

@@ -988,6 +988,9 @@ multi-message transport framing is separate. Batches introduce no handler execut
 `smithy validate rpc transcript` checks a conversation between the two peers of a
 `@smithy.rpc#jsonRpcProtocol` structure. The positionals are the model files, then the transcript file
 or `-` for stdin. Options and model inputs go after `transcript`.
+`--unknown-members reject|ignore` sets the default payload policy. A service
+`@smithy.rpc#unknownMembers` trait overrides this flag. A structure trait overrides
+the service policy. The default is `reject`.
 
 ```shell
 smithy validate rpc transcript --protocol example.peers#Editor \

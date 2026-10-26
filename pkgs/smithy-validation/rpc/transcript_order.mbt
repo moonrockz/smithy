@@ -58,15 +58,17 @@ fn TranscriptChecker::order_request(
   batch~ : Set[CallKey]? = None,
   call~ : Bool = false,
 ) -> MethodName? {
-  guard self.session is Some(session) && request_method(value) is Some(method_) else {
-    return None
-  }
+  guard request_method(value) is Some(method_) else { return None }
   // A method that the receiver does not model is an UnknownMethod finding
   // already, so it applies no rule, no transition and no capability.
   guard self.protocol.service_for(receiver) is Some(service) &&
-    service.methods.contains(method_) else {
+    service.methods.get(method_) is Some(prepared) else {
     return None
   }
+  if prepared.refers_to_call is Some(rule) {
+    self.check_call_reference(step, receiver, method_, rule, value)
+  }
+  guard self.session is Some(session) else { return None }
   if session.rules.rule(receiver, method_) is Some(rule) &&
     !self.apply_rule(step, session, method_, rule, value, batch) {
     return None
@@ -297,4 +299,114 @@ fn TranscriptChecker::settle(
       }
     }
   }
+}
+
+///|
+priv struct RefusalExpectation {
+  code : ErrorCode?
+}
+
+///|
+fn TranscriptChecker::expected_refusal(
+  self : TranscriptChecker,
+  receiver : PeerName,
+  value : Json,
+) -> RefusalExpectation? {
+  guard self.session is Some(session) &&
+    request_method(value) is Some(method_) &&
+    session.rules.rule(receiver, method_) is Some(rule) else {
+    return None
+  }
+  if rule.allowed is Some(allowed) && !allowed.contains(session.state) {
+    return Some({ code: session.rules.refusals.get(session.state), })
+  }
+  if rule.requires
+    .iter()
+    .any(source => !session.advertised.contains(source.name)) {
+    return Some({ code: session.rules.capability_refusal, })
+  }
+  None
+}
+
+///|
+fn TranscriptChecker::check_refusal(
+  self : TranscriptChecker,
+  step : Step,
+  request_entry : Int32,
+  value : Json,
+  refusal : RefusalExpectation,
+) -> Unit {
+  let has_error = match value {
+    Object(fields) =>
+      match fields.get("error") {
+        None | Some(Null) => false
+        Some(_) => true
+      }
+    _ => false
+  }
+  let found = match value {
+    Object(fields) =>
+      match fields.get("error") {
+        Some(Object(error)) =>
+          match error.get("code") {
+            Some(Number(n, repr~)) =>
+              @smithy.NodeNumber::parse(repr.unwrap_or(n.to_string())).bind(
+                ErrorCode::from_number,
+              )
+            _ => None
+          }
+        _ => None
+      }
+    _ => None
+  }
+  if has_error && (refusal.code is None || found == refusal.code) {
+    return
+  }
+  let expected = refusal.code
+    .map(code => " with code " + code.to_string())
+    .unwrap_or("")
+  let actual = found
+    .map(code => "error code " + code.to_string())
+    .unwrap_or("no integer error code")
+  self.report(
+    step,
+    RefusalExpected,
+    [request_entry],
+    "I expected an error reply\{expected} to the refused call at entry \{request_entry}; I found \{actual}.",
+  )
+}
+
+///|
+fn TranscriptChecker::check_call_reference(
+  self : TranscriptChecker,
+  step : Step,
+  receiver : PeerName,
+  method_ : MethodName,
+  rule : CancelRule,
+  value : Json,
+) -> Unit {
+  guard value is Object(fields) else { return }
+  let named = match fields.get("params") {
+    Some(Object(params)) => params.get(rule.wire_name)
+    Some(Array(params)) => rule.position.bind(i => params.get(i))
+    _ => None
+  }
+  guard named is Some(raw) else { return }
+  let id = Present(@smithy.NodeValue::from_json(raw)) catch { _ => return }
+  guard call_key(id) is Some(key) else { return }
+  let state = self.state(receiver)
+  if state.active.contains(key) ||
+    (key != Scalar(NullId) && state.batch_with(key) is Some(_)) {
+    return
+  }
+  let related = state.answered
+    .get(key)
+    .map(answer => [answer.reply])
+    .unwrap_or([])
+  self.report(
+    step,
+    UnknownCallReference,
+    related,
+    "I expected method \{method_.to_string()} to name an active call from \{receiver.to_string()}; I found \{render_id(id)}, which is not active.",
+  )
 }

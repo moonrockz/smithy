@@ -11,6 +11,8 @@ priv struct PendingBatch {
   /// The calls that a later cancellation named, with the error code they may
   /// answer with.
   cancelled : Map[CallKey, ErrorCode]
+  optional_keys : Set[CallKey]
+  refusals : Map[CallKey, RefusalExpectation]
 }
 
 ///|
@@ -182,8 +184,24 @@ fn TranscriptChecker::track_batch(
   }
   let version = self.protocol.version()
   let methods : Map[CallKey, MethodName] = Map([])
+  let optional_keys : Set[CallKey] = Set([])
+  let refusals : Map[CallKey, RefusalExpectation] = Map([])
   for element in values {
     let class = classify_unchecked(version, element)
+    if class is Call(key, _) {
+      if self.protocol
+        .service_for(receiver)
+        .bind(service => {
+          request_method(element).bind(name => service.methods.get(name))
+        })
+        .map(m => m.kind == NotificationOnly)
+        .unwrap_or(false) {
+        optional_keys.add(key)
+      }
+      if self.expected_refusal(receiver, element) is Some(refusal) {
+        refusals[key] = refusal
+      }
+    }
     if self.order_request(
         step,
         receiver,
@@ -206,6 +224,8 @@ fn TranscriptChecker::track_batch(
     keys,
     methods,
     cancelled: Map([]),
+    optional_keys,
+    refusals,
   })
 }
 
@@ -292,9 +312,33 @@ fn TranscriptChecker::reply_batch(
         Some(step.entry.message),
         context=Some(OriginalBatch(batch.text)),
       )
+      let refused : Set[Int32] = Set([])
+      for entry in result.entries {
+        if entry.request_index is Some(_) &&
+          entry.index is Some(index) &&
+          values.get(index) is Some(value) &&
+          call_key(read_id(value)) is Some(key) &&
+          batch.refusals.get(key) is Some(refusal) {
+          refused.add(index)
+          self.check_refusal(step, batch.entry, value, refusal)
+        }
+      }
+      let findings = result.findings.filter(f => {
+        match f.path.steps() {
+          [@validation.Index(index), ..] => !refused.contains(index)
+          _ => true
+        }
+      })
+      for finding in errors {
+        match finding.path.steps() {
+          [@validation.Index(index), ..] if refused.contains(index) =>
+            findings.push(finding)
+          _ => ()
+        }
+      }
       self.report_messages(
         step,
-        excuse_cancelled_batch(result.findings, values, batch.cancelled),
+        excuse_cancelled_batch(findings, values, batch.cancelled),
         [batch.entry],
       )
     }

@@ -16,12 +16,15 @@ priv struct PreparedMember {
 ///|
 priv struct PreparedShape {
   id : @smithy.ShapeId
+  value_shape : @smithy.ShapeId
   body : @smithy.ShapeBody
   constraints : Constraints
   members : Array[PreparedMember]
   by_name : Map[String, PreparedMember]
   enum_values : Array[@smithy.NodeValue]
   sparse : Bool
+  unknown_members : UnknownMembers
+  critical_separator : String?
 } derive(Debug)
 
 ///|
@@ -101,6 +104,10 @@ pub fn PreparedValidator::prepare(
       Enum(ids) => @smithy.Enum(ids.copy())
       IntEnum(ids) => @smithy.IntEnum(ids.copy())
       other => other
+    }
+    let critical_separator = prepare_critical_paths(model, shape, body)
+    if critical_separator is Some(_) {
+      stack.push(shape.id.root())
     }
     let members : Array[PreparedMember] = []
     let enum_values : Array[@smithy.NodeValue] = []
@@ -201,9 +208,15 @@ pub fn PreparedValidator::prepare(
     shapes[id] = {
       id,
       body,
+      value_shape: effective.id,
       members,
       by_name,
       enum_values,
+      unknown_members: prepare_unknown_members(
+        effective,
+        config.unknown_members,
+      ),
+      critical_separator,
       constraints: prepare_constraints(shape, effective, config),
       sparse: annotation(
         effective_trait(shape, effective, "smithy.api#sparse"),

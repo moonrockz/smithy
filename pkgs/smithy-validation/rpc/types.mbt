@@ -53,6 +53,13 @@ pub(all) enum MessageKind {
 } derive(Eq, Debug)
 
 ///|
+pub(all) enum MethodKind {
+  RequestOnly
+  NotificationOnly
+  RequestOrNotification
+} derive(Eq, Debug)
+
+///|
 pub(all) enum ParameterMode {
   Named
   Positional
@@ -82,6 +89,8 @@ pub(all) enum FindingCode {
   DiscouragedId
   UnknownMethod
   InvalidParams
+  NotificationExpected
+  RequestExpected
   UnsupportedMessage
   MissingContext
   LimitedScope
@@ -108,6 +117,8 @@ pub fn FindingCode::to_string(self : FindingCode) -> String {
     DiscouragedId => "DiscouragedId"
     UnknownMethod => "UnknownMethod"
     InvalidParams => "InvalidParams"
+    NotificationExpected => "NotificationExpected"
+    RequestExpected => "RequestExpected"
     UnsupportedMessage => "UnsupportedMessage"
     MissingContext => "MissingContext"
     LimitedScope => "LimitedScope"

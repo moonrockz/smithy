@@ -20,6 +20,7 @@ import {
   "moonrockz/smithy-ion-validation@0.6.0",
   "moonrockz/ion@0.6.0",
   "moonrockz/smithy-build@0.6.0",
+  "moonrockz/smithy-codegen-jsonrpc@0.6.0",
   "moonrockz/smithy-diff@0.6.0",
   "moonrockz/smithy-openapi@0.6.0",
   "moonrockz/smithy-openrpc@0.6.0",

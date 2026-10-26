@@ -118,6 +118,12 @@ the service or its resources needs a `method` trait with a nonempty unique wire 
 `params` mode `named`, `positional` or `either`. Positional-capable methods must declare a
 complete `positional` array of Smithy input member names, even for an empty input. This order
 never comes from map iteration. Named-only methods cannot belong to services declaring 1.0.
+
+The optional `kind` is `request`, `notification` or `either`. The default is `either`.
+A request to a notification-only method gives `NotificationExpected`. A notification to a
+request-only method gives `RequestExpected`. The transcript checker tracks a request to a
+notification-only method. Its reply is optional. If a reply arrives, the checker validates it
+against the normal result and error contract.
 The `rpc.` namespace is reserved and this profile provides no system extensions.
 
 `resultMember` selects an output member contract; `nullResult: true` selects a null result.
@@ -403,6 +409,18 @@ order: initialize first, then shutdown, then exit.
   allowed in every state.
 - `@jsonRpcCancels(idMember, code)` on an operation names the input member that holds the ID of the
   call to cancel, and the error code that the cancelled call may answer with.
+
+The session can carry `refusals: [{states: ["starting"], code: 1007}]` and
+`capabilityRefusal: 1008`. A state or capability refusal requires an error reply.
+The state refusal has priority if both rules fail. The error code must match the modeled code
+when one applies. If no state code applies, any error code is permitted. A success reply or a
+wrong code gives `RefusalExpected`. The refused call still gives its sender finding.
+
+`@jsonRpcRefersToCall(idMember: "requestId")` on an operation names an input member that holds
+the ID of an active call from the receiving peer. It also works without `jsonRpcSession`.
+The checker reports `UnknownCallReference` if no such call is active. This is an error because
+the sender answers these calls and knows when they end. The rule uses the selected member
+name policy and the declared positional order. It compares numeric IDs by exact value.
 
 One session state is shared by both peers. The rules apply only to a method that the receiving peer
 models; a request that the receiver does not model is an `UnknownMethod` finding, and it takes no
@@ -800,7 +818,11 @@ means an empty input and still checks required members.
 
 The generic validator supplies required/type/range/length/pattern/enum/collection checks,
 null/default/sparse policies and exact numeric validation. It inserts no defaults and performs
-no coercion. Unknown input members are rejected unless `--unknown-members ignore` is selected.
+no coercion. A structure's `@unknownMembers("ignore" | "reject")` policy has priority over
+the service policy. The service policy has priority over the CLI option or `Config` default.
+The default rejects unknown input members. `validate rpc transcript` also accepts
+`--unknown-members ignore|reject`. A `@criticalPaths(separator: ".")` input member holds a list
+of declared member paths. An unknown path gives `UnknownCriticalPath` at that list element.
 Unknown envelope extension fields are ignored. These are separate policies.
 
 Findings have stable codes, severity, structured paths, semantic shape/member IDs, optional

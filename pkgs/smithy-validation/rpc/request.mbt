@@ -22,7 +22,7 @@ impl @validation.ValueView for ParameterValue with fn inspect(self) {
         Array(values) => @validation.Array(values.map(v => Original(v)))
         Object(fields) => {
           let names = fields.keys().to_array()
-          names.sort()
+          names.sort_by((a, b) => a.lexical_compare(b))
           @validation.Object(
             names.map(name => (name, Original(fields.get(name).unwrap()))),
           )
@@ -316,6 +316,21 @@ pub fn PreparedService::validate_json(
     return self.finish({ findings, complete: true, kind, id, operation, })
   }
   operation = Some(method_.operation)
+  match (method_.kind, kind) {
+    (NotificationOnly, Some(Call)) =>
+      emit(
+        NotificationExpected,
+        Some("id"),
+        "I expected a notification for method \{request_method(value).unwrap().to_string()}; I found a request ID.",
+      )
+    (RequestOnly, Some(Notification)) =>
+      emit(
+        RequestExpected,
+        Some("id"),
+        "I expected a request ID for method \{request_method(value).unwrap().to_string()}; I found a notification.",
+      )
+    _ => ()
+  }
   let root = @validation.InstancePath::root()
   let base = root.field("params") catch { _ => root }
   let input = match params {

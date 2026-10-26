@@ -162,9 +162,10 @@ test "examples: the lifecycle violations match the README and the expect list" {
     ("StateViolation", "error", Some(0)),
     ("CapabilityNotAdvertised", "error", Some(3)),
     ("CancelInactiveCall", "advisory", Some(5)),
+    ("RefusalExpected", "error", Some(6)),
     ("StateViolation", "error", Some(9)),
   ])
-  assert_eq(findings[0].line, Some(11))
+  assert_eq(findings[0].line, Some(12))
   assert_eq(findings[0].column, Some(34))
   assert_eq(summary.expectations.map(e => e.matched), Some(true))
 }

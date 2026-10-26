@@ -53,6 +53,9 @@ let summaries : Array[(String, String)] = [
   ("npm-archive", "Build with models from local npm archives."),
   ("npm-registry", "Build with models from public npm packages."),
   ("openrpc", "Generate an OpenRPC 1.3.2 document from a service."),
+  (
+    "payment-terminal", "Check payment calls, progress, cancellation and refusal codes.",
+  ),
   ("protocol-tests", "Check HTTP protocol test cases in a model."),
   ("public-archive", "Build with models from a public ZIP archive."),
   ("rpc-consumer", "Check JSON-RPC messages from a MoonBit program."),
