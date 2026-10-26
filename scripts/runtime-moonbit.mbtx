@@ -1,0 +1,93 @@
+///|
+/// Tasks of the MoonBit JSON-RPC runtime in `runtimes/moonbit`.
+///
+/// - `test`: runs `moon check --deny-warn` and `moon test --target native` in
+///   `runtimes/moonbit`.
+/// - `generated`: runs the same checks in each generated MoonBit peer under
+///   `examples/payment-terminal/generated/moonbit`.
+/// - `sample-build`: builds the MoonBit sample programs (not available yet).
+///
+/// Usage: `mise run test:runtime:moonbit`, or `moonx scripts/runtime-moonbit.mbtx test`.
+/// It exits with 0 when each step passes, else with 1.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let runtime_dir : String = "runtimes/moonbit"
+
+///|
+let generated_root : String = "examples/payment-terminal/generated/moonbit"
+
+///|
+/// Runs `moon` with `args` in `dir`, and stops the script when it fails.
+async fn moon(dir : String, args : Array[String]) -> Unit {
+  let all = ["-C", dir]
+  all.append(args)
+  println("$ moon -C \{dir} \{args.join(" ")}")
+  let code = @process.run("moon", all, stdout=@stdio.stdout, stderr=@stdio.stderr)
+  if code != 0 {
+    println("❌ moon \{args.join(" ")} failed in \{dir} with exit code \{code}")
+    @sys.exit(1)
+  }
+}
+
+///|
+/// Checks a MoonBit module and runs its native tests.
+async fn check_module(dir : String) -> Unit {
+  moon(dir, ["check", "--deny-warn", "--target", "native"])
+  moon(dir, ["test", "--target", "native"])
+}
+
+///|
+async fn generated() -> Unit {
+  if !@fs.exists(generated_root) {
+    println("❌ I expected generated MoonBit peers in \{generated_root}, found no directory.")
+    @sys.exit(1)
+  }
+  let modules = []
+  for entry in @fs.readdir(generated_root, sort=true) {
+    let dir = "\{generated_root}/\{entry}"
+    if @fs.exists("\{dir}/moon.mod") {
+      modules.push(dir)
+    }
+  }
+  if modules.is_empty() {
+    println("❌ I expected a moon.mod in a directory of \{generated_root}, found none.")
+    @sys.exit(1)
+  }
+  for dir in modules {
+    check_module(dir)
+  }
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let command = if args.length() > 1 { args[1] } else { "" }
+  match command {
+    "test" => {
+      check_module(runtime_dir)
+      println("✅ The MoonBit JSON-RPC runtime passed its checks.")
+    }
+    "generated" => {
+      generated()
+      println("✅ The generated MoonBit peers passed their checks.")
+    }
+    "sample-build" => {
+      println("❌ I cannot build the MoonBit sample programs yet: they are not written.")
+      @sys.exit(1)
+    }
+    other => {
+      println(
+        "❌ I expected the command test, generated or sample-build, found '\{other}'.",
+      )
+      @sys.exit(1)
+    }
+  }
+}
