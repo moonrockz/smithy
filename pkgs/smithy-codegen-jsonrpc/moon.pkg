@@ -7,6 +7,7 @@ import {
 
 import {
   "moonrockz/smithy",
+  "moonrockz/smithy-codegen" @codegen,
   "moonrockz/smithy-codegen-jsonrpc" @jsonrpc,
   "moonrockz/smithy-validation" @validation,
   "moonrockz/smithy-validation/rpc",
