@@ -14,6 +14,7 @@ from smithy_jsonrpc_runtime import (
     Byte,
     DateTimeTimestamp,
     DecodeError,
+    Document,
     Double,
     Integer,
     Long,
@@ -184,3 +185,17 @@ def test_non_finite_doubles_use_the_strings_of_the_validator() -> None:
     assert to_wire(math.nan) == "NaN"
     with pytest.raises(ValidationError):
         Sized.model_validate({"ratio": "nan"})
+
+
+class WithDocument(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    value: Document
+    extra: Document | None = None
+    note: str | None = None
+
+
+def test_to_wire_keeps_a_present_null_and_drops_absent_members() -> None:
+    assert to_wire(WithDocument(value=None)) == {"value": None}
+    assert to_wire(WithDocument(value=1, extra=None)) == {"value": 1, "extra": None}
+    assert to_wire(WithDocument(value=1, note=None)) == {"value": 1}
+    assert to_wire(WithDocument.model_validate({"value": None, "note": None})) == {"value": None}

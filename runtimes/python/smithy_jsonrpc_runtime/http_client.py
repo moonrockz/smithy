@@ -20,7 +20,9 @@ import logging
 import httpx
 
 from .connection import SESSION_HEADER
+from .errors import DecodeError
 from .ids import RequestId
+from .json_codec import loads
 
 _LOG = logging.getLogger(__name__)
 
@@ -42,7 +44,9 @@ class HttpClientConnection:
         self._inbox: asyncio.Queue[str | None] = asyncio.Queue()
         self._order = asyncio.Lock()
         self._readers: set[asyncio.Task[None]] = set()
+        # Closed for sending: after close() or after a lost stream.
         self._closed = False
+        self._shut = False
 
     async def receive(self) -> str | None:
         if self._closed and self._inbox.empty():
@@ -85,7 +89,7 @@ class HttpClientConnection:
                 )
             kind = response.headers.get("content-type", "")
             if kind.startswith("text/event-stream"):
-                task = asyncio.create_task(self._read_events(response))
+                task = asyncio.create_task(self._read_events(response, _request_id(text)))
                 self._readers.add(task)
                 task.add_done_callback(self._readers.discard)
                 return
@@ -96,15 +100,30 @@ class HttpClientConnection:
             if body.strip():
                 self._inbox.put_nowait(body)
 
-    async def _read_events(self, response: httpx.Response) -> None:
+    async def _read_events(self, response: httpx.Response, request_id: RequestId | None) -> None:
+        """Read the events of the stream of a request.
+
+        When the stream ends before the response to the request, the session
+        cannot continue: I close the connection, so the calls that wait fail.
+        """
         data: list[str] = []
+        answered = request_id is None
+        problem = "the stream ended before the response"
+
+        def deliver() -> None:
+            nonlocal answered
+            message = "\n".join(data)
+            data.clear()
+            if not answered and _answers(message, request_id):
+                answered = True
+            self._inbox.put_nowait(message)
+
         try:
             async for raw in response.aiter_lines():
                 line = raw.rstrip("\r\n")
                 if line == "":
                     if data:
-                        self._inbox.put_nowait("\n".join(data))
-                        data = []
+                        deliver()
                     continue
                 if line.startswith(":"):
                     continue
@@ -112,23 +131,63 @@ class HttpClientConnection:
                 if name == "data":
                     data.append(value.removeprefix(" "))
             if data:
-                self._inbox.put_nowait("\n".join(data))
+                deliver()
         except httpx.HTTPError as error:
-            _LOG.warning("I lost an event stream from %s: %s", self.url, error)
+            problem = f"the stream failed: {error}"
         finally:
             await response.aclose()
+        if not answered and not self._closed:
+            _LOG.warning(
+                "I lost the event stream of request %s from %s: %s. I close the connection.",
+                request_id,
+                self.url,
+                problem,
+            )
+            self._closed = True
+            self._inbox.put_nowait(None)
 
     async def close(self) -> None:
-        if self._closed:
+        if self._shut:
             return
+        self._shut = True
+        lost = self._closed
         self._closed = True
         for task in list(self._readers):
             task.cancel()
         for task in list(self._readers):
             with contextlib.suppress(asyncio.CancelledError):
                 await task
-        self._inbox.put_nowait(None)
+        if not lost:
+            self._inbox.put_nowait(None)
         await self._client.aclose()
+
+
+def _request_id(text: str) -> RequestId | None:
+    """The ID of a request message, or None for any other message."""
+    try:
+        value = loads(text)
+    except DecodeError:
+        return None
+    if not isinstance(value, dict) or "method" not in value or "id" not in value:
+        return None
+    try:
+        return RequestId.from_json(value["id"])
+    except DecodeError:
+        return None
+
+
+def _answers(text: str, request_id: RequestId | None) -> bool:
+    """Whether a message is the response to the request."""
+    try:
+        value = loads(text)
+    except DecodeError:
+        return False
+    if not isinstance(value, dict) or "method" in value or "id" not in value:
+        return False
+    try:
+        return RequestId.from_json(value["id"]) == request_id
+    except DecodeError:
+        return False
 
 
 async def http_connect(url: str) -> HttpClientConnection:

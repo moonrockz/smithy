@@ -410,3 +410,25 @@ async def test_modeled_error_data_passes_through() -> None:
         with pytest.raises(RpcError) as missing:
             await pos.request("payment.void", {"paymentId": "test-missing"})
         assert (missing.value.code, missing.value.data) == (1005, {"paymentId": "test-missing"})
+
+
+async def test_cancel_buffered_with_its_request_settles_the_call() -> None:
+    async with raw_terminal() as (raw, terminal):
+        await exchange(raw, '{"jsonrpc":"2.0","id":1,"method":"terminal.initialize"}')
+        await raw.send('{"jsonrpc":"2.0","method":"terminal.initialized"}')
+        start = (
+            '{"jsonrpc":"2.0","id":2,"method":"payment.start","params":{"paymentId":"p",'
+            '"amount":{"amount":1.17,"currency":"USD"},"entry":{"chip":{}}}}'
+        )
+        # Both messages wait in the queue, so the read loop reads the cancel
+        # before the task of the call runs.
+        await raw.send(start)
+        await raw.send('{"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":2}}')
+        reply = json_codec.loads(await asyncio.wait_for(raw.receive(), 2) or "")
+        assert reply == {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {"code": -32800, "message": "I cancelled payment.start."},
+        }
+        assert terminal.peer.session.state == "ready"
+        assert terminal.cancelled == []

@@ -322,7 +322,9 @@ let runtime_files : Array[(String, String)] = [
       #|import httpx
       #|
       #|from .connection import SESSION_HEADER
+      #|from .errors import DecodeError
       #|from .ids import RequestId
+      #|from .json_codec import loads
       #|
       #|_LOG = logging.getLogger(__name__)
       #|
@@ -344,7 +346,9 @@ let runtime_files : Array[(String, String)] = [
       #|        self._inbox: asyncio.Queue[str | None] = asyncio.Queue()
       #|        self._order = asyncio.Lock()
       #|        self._readers: set[asyncio.Task[None]] = set()
+      #|        # Closed for sending: after close() or after a lost stream.
       #|        self._closed = False
+      #|        self._shut = False
       #|
       #|    async def receive(self) -> str | None:
       #|        if self._closed and self._inbox.empty():
@@ -387,7 +391,7 @@ let runtime_files : Array[(String, String)] = [
       #|                )
       #|            kind = response.headers.get("content-type", "")
       #|            if kind.startswith("text/event-stream"):
-      #|                task = asyncio.create_task(self._read_events(response))
+      #|                task = asyncio.create_task(self._read_events(response, _request_id(text)))
       #|                self._readers.add(task)
       #|                task.add_done_callback(self._readers.discard)
       #|                return
@@ -398,15 +402,30 @@ let runtime_files : Array[(String, String)] = [
       #|            if body.strip():
       #|                self._inbox.put_nowait(body)
       #|
-      #|    async def _read_events(self, response: httpx.Response) -> None:
+      #|    async def _read_events(self, response: httpx.Response, request_id: RequestId | None) -> None:
+      #|        """Read the events of the stream of a request.
+      #|
+      #|        When the stream ends before the response to the request, the session
+      #|        cannot continue: I close the connection, so the calls that wait fail.
+      #|        """
       #|        data: list[str] = []
+      #|        answered = request_id is None
+      #|        problem = "the stream ended before the response"
+      #|
+      #|        def deliver() -> None:
+      #|            nonlocal answered
+      #|            message = "\n".join(data)
+      #|            data.clear()
+      #|            if not answered and _answers(message, request_id):
+      #|                answered = True
+      #|            self._inbox.put_nowait(message)
+      #|
       #|        try:
       #|            async for raw in response.aiter_lines():
       #|                line = raw.rstrip("\r\n")
       #|                if line == "":
       #|                    if data:
-      #|                        self._inbox.put_nowait("\n".join(data))
-      #|                        data = []
+      #|                        deliver()
       #|                    continue
       #|                if line.startswith(":"):
       #|                    continue
@@ -414,23 +433,63 @@ let runtime_files : Array[(String, String)] = [
       #|                if name == "data":
       #|                    data.append(value.removeprefix(" "))
       #|            if data:
-      #|                self._inbox.put_nowait("\n".join(data))
+      #|                deliver()
       #|        except httpx.HTTPError as error:
-      #|            _LOG.warning("I lost an event stream from %s: %s", self.url, error)
+      #|            problem = f"the stream failed: {error}"
       #|        finally:
       #|            await response.aclose()
+      #|        if not answered and not self._closed:
+      #|            _LOG.warning(
+      #|                "I lost the event stream of request %s from %s: %s. I close the connection.",
+      #|                request_id,
+      #|                self.url,
+      #|                problem,
+      #|            )
+      #|            self._closed = True
+      #|            self._inbox.put_nowait(None)
       #|
       #|    async def close(self) -> None:
-      #|        if self._closed:
+      #|        if self._shut:
       #|            return
+      #|        self._shut = True
+      #|        lost = self._closed
       #|        self._closed = True
       #|        for task in list(self._readers):
       #|            task.cancel()
       #|        for task in list(self._readers):
       #|            with contextlib.suppress(asyncio.CancelledError):
       #|                await task
-      #|        self._inbox.put_nowait(None)
+      #|        if not lost:
+      #|            self._inbox.put_nowait(None)
       #|        await self._client.aclose()
+      #|
+      #|
+      #|def _request_id(text: str) -> RequestId | None:
+      #|    """The ID of a request message, or None for any other message."""
+      #|    try:
+      #|        value = loads(text)
+      #|    except DecodeError:
+      #|        return None
+      #|    if not isinstance(value, dict) or "method" not in value or "id" not in value:
+      #|        return None
+      #|    try:
+      #|        return RequestId.from_json(value["id"])
+      #|    except DecodeError:
+      #|        return None
+      #|
+      #|
+      #|def _answers(text: str, request_id: RequestId | None) -> bool:
+      #|    """Whether a message is the response to the request."""
+      #|    try:
+      #|        value = loads(text)
+      #|    except DecodeError:
+      #|        return False
+      #|    if not isinstance(value, dict) or "method" in value or "id" not in value:
+      #|        return False
+      #|    try:
+      #|        return RequestId.from_json(value["id"]) == request_id
+      #|    except DecodeError:
+      #|        return False
       #|
       #|
       #|async def http_connect(url: str) -> HttpClientConnection:
@@ -907,6 +966,7 @@ let runtime_files : Array[(String, String)] = [
       #|    accepted: bool
       #|    task: asyncio.Task[None] | None = None
       #|    cancel_code: int | None = None
+      #|    started: bool = False
       #|
       #|
       #|@dataclass(slots=True)
@@ -1210,7 +1270,11 @@ let runtime_files : Array[(String, String)] = [
       #|            return
       #|        if call.cancel_code is None:
       #|            call.cancel_code = rule.answer_code
-      #|            call.task.cancel()
+      #|            # A task that has not started gets the code when it starts. A
+      #|            # cancel before the first step would skip its handler of the
+      #|            # cancellation, and the call would get no reply.
+      #|            if call.started:
+      #|                call.task.cancel()
       #|
       #|    def _start(
       #|        self,
@@ -1238,6 +1302,13 @@ let runtime_files : Array[(String, String)] = [
       #|    ) -> None:
       #|        _current_call.set(request_id)
       #|        context = CallContext(self, method, request_id)
+      #|        incoming = None if request_id is None else self._incoming.get(request_id)
+      #|        if incoming is not None:
+      #|            incoming.started = True
+      #|            if incoming.cancel_code is not None:
+      #|                error = RpcError(incoming.cancel_code, f"I cancelled {method}.")
+      #|                await self._reply(request_id, method, _Reply(error=error))
+      #|                return
       #|        try:
       #|            result: JsonValue = await registration.handler(params, context)
       #|            reply = _Reply(result=result if registration.answers else None)
@@ -2207,7 +2278,7 @@ let runtime_files : Array[(String, String)] = [
       #|from datetime import UTC, datetime
       #|from decimal import Decimal
       #|from enum import Enum
-      #|from typing import TYPE_CHECKING, Annotated, Any, cast
+      #|from typing import TYPE_CHECKING, Annotated, Any, cast, get_args
       #|
       #|from pydantic import (
       #|    BaseModel,
@@ -2430,8 +2501,9 @@ let runtime_files : Array[(String, String)] = [
       #|def to_wire(value: object) -> JsonValue:
       #|    """Convert a Python value, such as a generated model, to a JSON value.
       #|
-      #|    A Pydantic model is dumped with its wire names, without the members that
-      #|    are None. `Decimal` and `int` stay exact, `bytes` become base64 text, a
+      #|    A Pydantic model gives an object with its wire names. A member that is
+      #|    None is absent, but a required member and a document member that was set
+      #|    keep their null. `Decimal` and `int` stay exact, `bytes` become base64 text, a
       #|    `Timestamp` gives its JSON value, an aware `datetime` gives date-time text,
       #|    an `Enum` gives its value, and a tuple becomes an array. Raises `TypeError`
       #|    for any other value.
@@ -2441,7 +2513,7 @@ let runtime_files : Array[(String, String)] = [
       #|    if isinstance(value, Enum):
       #|        return to_wire(value.value)  # pyright: ignore[reportUnknownMemberType]
       #|    if isinstance(value, BaseModel):
-      #|        return to_wire(value.model_dump(mode="python", by_alias=True, exclude_none=True))
+      #|        return _model_to_wire(value)
       #|    if isinstance(value, float):
       #|        return encode_double(value)
       #|    if isinstance(value, (int, Decimal, str)):
@@ -2462,6 +2534,37 @@ let runtime_files : Array[(String, String)] = [
       #|    if isinstance(value, (list, tuple)):
       #|        return [to_wire(item) for item in cast("list[object]", value)]
       #|    raise TypeError(f"I expected a value that JSON can carry; I found a {type(value).__name__}.")
+      #|
+      #|
+      #|def _is_document(annotation: object) -> bool:
+      #|    """Whether an annotation is `Document` or `Document | None`."""
+      #|    if any(isinstance(item, _DocumentSchema) for item in getattr(annotation, "__metadata__", ())):
+      #|        return True
+      #|    return any(
+      #|        isinstance(item, _DocumentSchema)
+      #|        for arg in get_args(annotation)
+      #|        for item in getattr(arg, "__metadata__", ())
+      #|    )
+      #|
+      #|
+      #|def _model_to_wire(model: BaseModel) -> dict[str, JsonValue]:
+      #|    out: dict[str, JsonValue] = {}
+      #|    fields_set = model.model_fields_set
+      #|    for name, info in type(model).model_fields.items():
+      #|        item = getattr(model, name)
+      #|        key = info.serialization_alias or info.alias or name
+      #|        if item is None:
+      #|            if info.is_required() or (
+      #|                name in fields_set
+      #|                and (
+      #|                    _is_document(info.annotation)
+      #|                    or any(isinstance(meta, _DocumentSchema) for meta in info.metadata)
+      #|                )
+      #|            ):
+      #|                out[key] = None
+      #|            continue
+      #|        out[key] = to_wire(item)
+      #|    return out
       #|
       #|
       #|def to_wire_object(value: object) -> dict[str, JsonValue]:

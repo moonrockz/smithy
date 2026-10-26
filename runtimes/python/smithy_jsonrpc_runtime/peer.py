@@ -101,6 +101,7 @@ class _Incoming:
     accepted: bool
     task: asyncio.Task[None] | None = None
     cancel_code: int | None = None
+    started: bool = False
 
 
 @dataclass(slots=True)
@@ -404,7 +405,11 @@ class Peer:
             return
         if call.cancel_code is None:
             call.cancel_code = rule.answer_code
-            call.task.cancel()
+            # A task that has not started gets the code when it starts. A
+            # cancel before the first step would skip its handler of the
+            # cancellation, and the call would get no reply.
+            if call.started:
+                call.task.cancel()
 
     def _start(
         self,
@@ -432,6 +437,13 @@ class Peer:
     ) -> None:
         _current_call.set(request_id)
         context = CallContext(self, method, request_id)
+        incoming = None if request_id is None else self._incoming.get(request_id)
+        if incoming is not None:
+            incoming.started = True
+            if incoming.cancel_code is not None:
+                error = RpcError(incoming.cancel_code, f"I cancelled {method}.")
+                await self._reply(request_id, method, _Reply(error=error))
+                return
         try:
             result: JsonValue = await registration.handler(params, context)
             reply = _Reply(result=result if registration.answers else None)

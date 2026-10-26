@@ -201,3 +201,22 @@ async def test_http_client_reads_a_json_response() -> None:
     assert conn.session_id == "s1"
     await conn.close()
     await asyncio.wait_for(task, 5)
+
+
+async def test_a_dropped_event_stream_fails_the_pending_request() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        # The stream ends before the response to the request.
+        return httpx.Response(
+            200,
+            headers={"Smithy-Session-Id": "s1", "content-type": "text/event-stream"},
+            content=b': open\n\nevent: message\ndata: {"jsonrpc":"2.0","method":"pos.display"}\n\n',
+        )
+
+    conn = HttpClientConnection(
+        "http://test/rpc", httpx.AsyncClient(transport=httpx.MockTransport(respond))
+    )
+    peer = Peer(self_name="pos", remote_name="terminal", rules=session_rules())
+    task = asyncio.create_task(peer.run(conn))
+    with pytest.raises(ConnectionError, match=r"terminal\.ping"):
+        await asyncio.wait_for(peer.request("terminal.ping", None), 5)
+    await asyncio.wait_for(task, 5)

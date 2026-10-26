@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast, get_args
 
 from pydantic import (
     BaseModel,
@@ -239,8 +239,9 @@ HttpDateTimestamp = Annotated[Timestamp, _TimestampAs(TimestampFormat.HTTP_DATE)
 def to_wire(value: object) -> JsonValue:
     """Convert a Python value, such as a generated model, to a JSON value.
 
-    A Pydantic model is dumped with its wire names, without the members that
-    are None. `Decimal` and `int` stay exact, `bytes` become base64 text, a
+    A Pydantic model gives an object with its wire names. A member that is
+    None is absent, but a required member and a document member that was set
+    keep their null. `Decimal` and `int` stay exact, `bytes` become base64 text, a
     `Timestamp` gives its JSON value, an aware `datetime` gives date-time text,
     an `Enum` gives its value, and a tuple becomes an array. Raises `TypeError`
     for any other value.
@@ -250,7 +251,7 @@ def to_wire(value: object) -> JsonValue:
     if isinstance(value, Enum):
         return to_wire(value.value)  # pyright: ignore[reportUnknownMemberType]
     if isinstance(value, BaseModel):
-        return to_wire(value.model_dump(mode="python", by_alias=True, exclude_none=True))
+        return _model_to_wire(value)
     if isinstance(value, float):
         return encode_double(value)
     if isinstance(value, (int, Decimal, str)):
@@ -271,6 +272,37 @@ def to_wire(value: object) -> JsonValue:
     if isinstance(value, (list, tuple)):
         return [to_wire(item) for item in cast("list[object]", value)]
     raise TypeError(f"I expected a value that JSON can carry; I found a {type(value).__name__}.")
+
+
+def _is_document(annotation: object) -> bool:
+    """Whether an annotation is `Document` or `Document | None`."""
+    if any(isinstance(item, _DocumentSchema) for item in getattr(annotation, "__metadata__", ())):
+        return True
+    return any(
+        isinstance(item, _DocumentSchema)
+        for arg in get_args(annotation)
+        for item in getattr(arg, "__metadata__", ())
+    )
+
+
+def _model_to_wire(model: BaseModel) -> dict[str, JsonValue]:
+    out: dict[str, JsonValue] = {}
+    fields_set = model.model_fields_set
+    for name, info in type(model).model_fields.items():
+        item = getattr(model, name)
+        key = info.serialization_alias or info.alias or name
+        if item is None:
+            if info.is_required() or (
+                name in fields_set
+                and (
+                    _is_document(info.annotation)
+                    or any(isinstance(meta, _DocumentSchema) for meta in info.metadata)
+                )
+            ):
+                out[key] = None
+            continue
+        out[key] = to_wire(item)
+    return out
 
 
 def to_wire_object(value: object) -> dict[str, JsonValue]:
