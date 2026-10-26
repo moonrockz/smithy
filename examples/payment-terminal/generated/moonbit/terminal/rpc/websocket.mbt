@@ -106,10 +106,19 @@ pub impl Connection for WsConnection with fn close(self) {
 
 ///|
 pub impl Connection for WsConnection with fn shutdown(self) {
+  self.shutdown_with(() => self.conn.send_close(code=Normal))
+}
+
+///|
+/// Bounds the close operation and cleans up on failure or cancellation.
+async fn WsConnection::shutdown_with(
+  self : WsConnection,
+  close_frame : async () -> Unit,
+) -> Unit {
   guard !self.closed else { return }
   self.closed = true
   defer Connection::close(self)
-  @async.with_timeout(1000, () => self.conn.send_close(code=Normal)) catch {
+  @async.with_timeout(1000, close_frame) catch {
     @websocket.ConnectionClosed(_, _) => ()
     err => raise err
   }
