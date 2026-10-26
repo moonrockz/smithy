@@ -1,0 +1,76 @@
+///|
+/// Check the Python JSON-RPC runtime in `runtimes/python`.
+///
+/// Subcommands:
+///
+/// - `test`: `uv sync --locked`, then `ruff format --check`, `ruff check`,
+///   `pyright` (strict, from `pyproject.toml`) and `pytest`, all with
+///   `uv run --locked`.
+///
+/// Usage: `mise run test:runtime:python`, or `moonx scripts/runtime-python.mbtx test`.
+/// It stops at the first step that fails, and exits with the code of that step.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let runtime_dir : String = "runtimes/python"
+
+///|
+/// Run one command in `dir`; exit with its code when it fails.
+async fn step(dir : String, label : String, args : Array[String]) -> Unit {
+  println("▶ \{label}")
+  let code = @process.run(
+    "uv",
+    args,
+    cwd=dir,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  ) catch {
+    error => {
+      println("❌ ERROR: I could not start uv for \{label}: \{error}")
+      @sys.exit(1)
+      return
+    }
+  }
+  if code != 0 {
+    println("❌ ERROR: \{label} failed with exit code \{code}")
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+}
+
+///|
+/// The quality gate of a uv project: lock, format, lint, types, tests.
+async fn check_project(dir : String) -> Unit {
+  step(dir, "uv sync --locked (\{dir})", ["sync", "--locked"])
+  step(dir, "ruff format --check", [
+    "run", "--locked", "ruff", "format", "--check",
+  ])
+  step(dir, "ruff check", ["run", "--locked", "ruff", "check"])
+  step(dir, "pyright (strict)", ["run", "--locked", "pyright"])
+  step(dir, "pytest", ["run", "--locked", "pytest", "-q"])
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let command = if args.length() > 1 { args[1] } else { "" }
+  match command {
+    "test" => {
+      check_project(runtime_dir)
+      println("✅ The Python JSON-RPC runtime passes ruff, pyright --strict and pytest")
+    }
+    "" => {
+      println("❌ ERROR: I expected a subcommand (test); I found none.")
+      @sys.exit(2)
+    }
+    other => {
+      println("❌ ERROR: I expected the subcommand test; I found \{other}.")
+      @sys.exit(2)
+    }
+  }
+}
