@@ -57,13 +57,15 @@ async fn main {
       if terminal.is_empty() {
         usage("I expected the terminal command after `--`.")
       }
-      let conn = @pos_rpc.spawn_stdio(terminal)
-      let failed = run(peer, conn, pos, client)
-      let status = conn.wait()
-      if status != 0 {
-        @sample.note("pos: the terminal exited with status \{status}.")
-      }
-      failed || status != 0
+      @async.with_task_group(owner => {
+        let conn = @pos_rpc.spawn_stdio(owner, terminal)
+        let failed = run(peer, conn, pos, client)
+        let status = conn.wait()
+        if status != 0 {
+          @sample.note("pos: the terminal exited with status \{status}.")
+        }
+        failed || status != 0
+      })
     }
     _ if target.has_prefix("http://") => {
       let conn = @pos_rpc.http_connect(target)

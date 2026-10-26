@@ -80,24 +80,30 @@ async fn stdio_fixture(mode : String) -> Array[String] {
 
 ///|
 async test "spawn_stdio talks to a child process" {
-  let conn = @rpc.spawn_stdio(stdio_fixture("echo"))
-  conn.send("{\"jsonrpc\":\"2.0\",\"method\":\"terminal.ping\"}", related=None)
-  inspect(
-    conn.receive().unwrap(),
-    content="{\"jsonrpc\":\"2.0\",\"method\":\"terminal.ping\"}",
-  )
-  conn.shutdown()
-  inspect(conn.wait(), content="0")
+  @async.with_task_group(owner => {
+    let conn = @rpc.spawn_stdio(owner, stdio_fixture("echo"))
+    conn.send("{\"jsonrpc\":\"2.0\",\"method\":\"terminal.ping\"}", related=None)
+    inspect(
+      conn.receive().unwrap(),
+      content="{\"jsonrpc\":\"2.0\",\"method\":\"terminal.ping\"}",
+    )
+    conn.shutdown()
+    inspect(conn.wait(), content="0")
+    // Process::wait caches the exit status on the retained handle.
+    inspect(conn.wait(), content="0")
+  })
 }
 
 ///|
 async test "spawn_stdio needs a command" {
-  let text = try @rpc.spawn_stdio([]) |> ignore catch {
-    @rpc.TransportError(message) => message
-    err => "other: \{err}"
-  } noraise {
-    _ => "no error"
-  }
+  let text = @async.with_task_group(owner => {
+    try @rpc.spawn_stdio(owner, []) |> ignore catch {
+      @rpc.TransportError(message) => message
+      err => "other: \{err}"
+    } noraise {
+      _ => "no error"
+    }
+  })
   inspect(
     text,
     content="I expected a command to start, found an empty argument list.",
@@ -126,27 +132,46 @@ async test "default shutdown preserves memory and stdio closure" {
 ///|
 async test "Peer::run returns when the child process exits" {
   // The child reads one frame header line and exits.
-  let conn = @rpc.spawn_stdio(stdio_fixture("exit-after-header"))
-  let pos = new_pos(@rpc.TranscriptLog::memory())
-  @async.with_timeout(5000, () => {
-    @async.with_task_group(group => {
-      group.spawn_bg(() => pos.run(conn))
-      pos.notify("terminal.ping", None, checked=false)
+  @async.with_task_group(owner => {
+    let conn = @rpc.spawn_stdio(owner, stdio_fixture("exit-after-header"))
+    let pos = new_pos(@rpc.TranscriptLog::memory())
+    @async.with_timeout(5000, () => {
+      @async.with_task_group(group => {
+        group.spawn_bg(() => pos.run(conn))
+        pos.notify("terminal.ping", None, checked=false)
+      })
     })
+    inspect(conn.wait(), content="0")
   })
-  inspect(conn.wait(), content="0")
 }
 
 ///|
 async test "Peer::run returns after close while it reads from a child" {
-  let conn = @rpc.spawn_stdio(stdio_fixture("echo"))
-  let pos = new_pos(@rpc.TranscriptLog::memory())
-  @async.with_timeout(5000, () => {
-    @async.with_task_group(group => {
-      group.spawn_bg(() => pos.run(conn))
-      @async.sleep(20)
-      conn.close()
+  @async.with_task_group(owner => {
+    let conn = @rpc.spawn_stdio(owner, stdio_fixture("echo"))
+    let pos = new_pos(@rpc.TranscriptLog::memory())
+    @async.with_timeout(5000, () => {
+      @async.with_task_group(group => {
+        group.spawn_bg(() => pos.run(conn))
+        @async.sleep(20)
+        conn.close()
+      })
     })
+    inspect(conn.wait(), content="0")
   })
-  inspect(conn.wait(), content="0")
+}
+
+///|
+async test "spawn_stdio wait returns after the child already exited" {
+  @async.with_task_group(owner => {
+    let conn = @rpc.spawn_stdio(owner, stdio_fixture("echo"))
+    assert_true(conn.pid() > 0)
+    conn.close()
+    // Drain stdout so the child can finish before wait.
+    while conn.receive() is Some(_) {
+      ignore(())
+    }
+    @async.sleep(50)
+    inspect(conn.wait(), content="0")
+  })
 }

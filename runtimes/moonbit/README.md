@@ -12,18 +12,13 @@ The runtime is for the native target only.
 ## Windows
 
 HTTP and WebSocket passed their runtime transport tests and all four payment
-terminal scenarios on native Windows in the
-[manual matrix run](https://github.com/moonrockz/smithy/actions/runs/40368678704).
+terminal scenarios on native Windows.
 
-**Stdio is not supported on Windows.** The pinned `moonbitlang/async` 0.22.5
-can lose the process handle before `wait_pid` opens it after a child exits.
-The runtime test `Peer::run returns after close while it reads from a child`
-fails with `OSError("@process.wait_pid(): The handle is invalid.")`.
-Beads bug `smithy-2qe.47` records the evidence and the dependency source paths.
-All four stdio sample scenarios passed, but the failed runtime test prevents
-a support claim. The full Windows runtime gate keeps this test enabled and
-fails when this race occurs. Support requires an upstream fix and a passing
-native runtime gate.
+Stdio support requires a passing complete native Windows runtime gate after
+`spawn_stdio` keeps an `@process.Process` handle (caller-owned task group)
+instead of `spawn_orphan` plus `wait_pid`. Until that gate passes on the fixed
+source, treat stdio as unverified on Windows. Beads bug `smithy-2qe.47` holds
+the prior invalid-handle evidence and the repo-local ownership fix.
 
 ## Test
 
@@ -81,8 +76,10 @@ need no system shell or external executable.
 - A handler can call the remote peer while its call runs. `CallContext::peer` gives a peer whose
   messages are related to the call, and `CallContext::id_json` gives the ID for a progress notification.
 - stdio: `Content-Length: N` and a blank line, then N bytes of UTF-8 JSON. A reader ignores the headers
-  that it does not know. `spawn_stdio(argv)` starts a child process. A command without a `/` is searched
-  in PATH. `close` closes the stdin of the child, and `receive` then gives the rest of its output.
+  that it does not know. `spawn_stdio(group, argv)` starts a child process in the caller's task group
+  and retains `@process.Process` for `wait`. The group must outlive peer I/O and exit-status collection.
+  A command without a `/` is searched in PATH. `close` closes the stdin of the child, and `receive`
+  then gives the rest of its output.
 - HTTP, in the style of MCP Streamable HTTP: the client POSTs each message to `/rpc`. The server gives
   `Smithy-Session-Id` on its first response, and the client sends it on each later POST. An unknown
   session gets 404. A request gets 200 `text/event-stream`: first the comment `: open`, then one
