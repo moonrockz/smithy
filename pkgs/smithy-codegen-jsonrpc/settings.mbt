@@ -29,9 +29,16 @@ pub struct PeerSettings {
 ///|
 fn peer_settings_error(error : Error) -> @codegen.CodegenError {
   match error {
-    @rpc.InvalidContract(id, text) =>
+    @rpc.InvalidContract(id, text)
+    | @validation.InvalidTarget(id, text)
+    | @validation.InvalidModel(id, text)
+    | @validation.UnsupportedConstraint(id, text) =>
       @codegen.InvalidSettings(
         "I could not prepare the JSON-RPC contract of `\{id}`: \{text}",
+      )
+    @validation.InvalidConfiguration(text) =>
+      @codegen.InvalidSettings(
+        "I could not prepare the JSON-RPC contract: \{text}",
       )
     error =>
       @codegen.InvalidSettings(

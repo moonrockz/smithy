@@ -15,12 +15,13 @@ let moonbit_keywords : Array[String] = [
 ]
 
 ///|
-/// The type names that the generated code uses from the core library. A shape
-/// with one of these names gets a `_` suffix.
+/// The type and trait names that the generated code uses from the core
+/// library. A shape with one of these names gets a `_` suffix.
 let moonbit_type_names : Array[String] = [
   "Array", "Bool", "Byte", "Bytes", "Char", "Double", "Error", "Float", "FixedArray",
   "Int", "Int16", "Int64", "Json", "Map", "Option", "Result", "Self", "Set", "String",
-  "StringBuilder", "UInt", "UInt16", "UInt64", "Unit",
+  "StringBuilder", "UInt", "UInt16", "UInt64", "Unit", "Compare", "Debug", "Default",
+  "Eq", "FromJson", "Hash", "Logger", "Show", "ToJson",
 ]
 
 ///|

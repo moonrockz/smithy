@@ -117,6 +117,7 @@ pub fn run(
       written: Map([]),
       errors: [],
       type_names: Map([]),
+      generated_names: generated_type_names(settings, names),
     },
     delegator=gen => gen.delegator,
     generate_service=(_, _) => (),
@@ -173,6 +174,22 @@ fn tidy(text : String) -> String {
   }
   out.write_string("\n")
   out.to_string()
+}
+
+///|
+/// The type names that the generated code declares: the error type, and the
+/// handler trait and the client of each service.
+fn generated_type_names(
+  settings : @jsonrpc.PeerSettings,
+  names : @codegen.ServiceNames,
+) -> Array[String] {
+  let out = [service_error_name]
+  for service in settings.services() {
+    let base = type_name(names.shape_name(service))
+    out.push(base + "Handler")
+    out.push(base + "Client")
+  }
+  out
 }
 
 ///|

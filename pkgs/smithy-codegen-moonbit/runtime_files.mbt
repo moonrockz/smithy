@@ -843,14 +843,27 @@ let runtime_files : Array[(String, String)] = [
       #|}
       #|
       #|///|
+      #|/// The default limit of nested arrays and objects in `parse_json`. The
+      #|/// generated decoders recurse once for each level of a recursive shape, so
+      #|/// the limit also bounds their stack.
+      #|pub let max_json_depth : Int32 = 1000
+      #|
+      #|///|
       #|/// Parses JSON text. Every number keeps its exact source text as its `repr`.
-      #|/// A duplicate member name keeps the last value.
-      #|pub fn parse_json(text : String) -> Json raise DecodeError {
+      #|/// A duplicate member name keeps the last value. Text with more than
+      #|/// `max_depth` nested arrays and objects is an error.
+      #|pub fn parse_json(
+      #|  text : String,
+      #|  max_depth~ : Int32 = max_json_depth,
+      #|) -> Json raise DecodeError {
       #|  let p = JsonParser::{ text, pos: 0, }
       #|  let stack : Array[ParseFrame] = []
       #|  p.skip_space()
       #|  while true {
       #|    // Read the start of one value.
+      #|    if stack.length() >= max_depth && (p.peek() == 0x7B || p.peek() == 0x5B) {
+      #|      raise p.fail("at most \{max_depth} nested arrays and objects")
+      #|    }
       #|    let mut value = match p.peek() {
       #|      0x7B => {
       #|        p.pos += 1

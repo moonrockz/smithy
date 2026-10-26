@@ -111,6 +111,29 @@ fn Gen::data_mapping(
 }
 
 ///|
+/// The struct literal of an error. Each optional field is `None`, except the
+/// data member, which gets its decoded value.
+fn Gen::error_literal(
+  self : Gen,
+  shape : @smithy.ShapeId,
+  data : (String, String)?,
+) -> String raise @codegen.CodegenError {
+  let name = self.type_name_of(shape)
+  let fields = self.fields(self.shape(shape))
+  if fields.is_empty() {
+    return "\{name}::{  }"
+  }
+  let parts = fields.map(field => {
+    match data {
+      Some((data_field, value)) if data_field == field.field_name =>
+        "\{field.field_name}: \{value}"
+      _ => "\{field.field_name}: None"
+    }
+  })
+  "\{name}::{ \{parts.join(", ")} }"
+}
+
+///|
 /// Write the error type, the conversion to `@rpc.RpcError` and the decoders.
 fn Gen::write_errors(self : Gen) -> Unit raise @codegen.CodegenError {
   let contracts = self.error_contracts()
@@ -124,6 +147,16 @@ fn Gen::write_errors(self : Gen) -> Unit raise @codegen.CodegenError {
     Some(description) =>
       description.methods.iter().any(m => !m.errors.is_empty())
     None => false
+  }
+  let called_errors : Array[@smithy.ShapeId] = []
+  if self.settings.peer.calls is Some(description) {
+    for method_ in description.methods {
+      for error in method_.errors {
+        if !called_errors.contains(error.shape) {
+          called_errors.push(error.shape)
+        }
+      }
+    }
   }
   let calls_errors = match self.settings.peer.calls {
     Some(description) =>
@@ -200,11 +233,12 @@ fn Gen::write_errors(self : Gen) -> Unit raise @codegen.CodegenError {
       for entry in mappings {
         let (contract, mapping) = entry
         let name = self.type_name_of(contract.shape)
-        w.write("///|")
         // An error without data needs no decoder: the client builds it inline.
-        if mapping is NoData {
+        // A decoder is only for an error of the service that the peer calls.
+        if mapping is NoData || !called_errors.contains(contract.shape) {
           continue
         }
+        w.write("///|")
         w.write(
           "fn $L_from_data(data : Json?) -> Error raise @rpc.DecodeError {",
           args=[Text(snake_name(self.names.shape_name(contract.shape)))],
@@ -220,7 +254,10 @@ fn Gen::write_errors(self : Gen) -> Unit raise @codegen.CodegenError {
             } else {
               "match data { None | Some(Null) => None; Some(item) => Some(\{field.ty.decode("item", "\"/error/data\"")}) }"
             }
-            "\{name}::{ \{field.field_name}: \{decoded} }"
+            self.error_literal(
+              contract.shape,
+              Some((field.field_name, decoded)),
+            )
           }
         }
         w.write("$L::$L($L)", args=[
@@ -278,6 +315,8 @@ fn Gen::result_ty(
   method_ : @rpc.MethodContract,
 ) -> Ty raise @codegen.CodegenError {
   match method_.result {
+    // An operation without output answers an empty object.
+    OutputStructure(id) if id == unit_id => UnitT
     OutputStructure(id) => Named(self.type_name_of(id))
     OutputMember(member_id) => self.member_ty(member_id)
     NullResult => UnitT
@@ -349,6 +388,16 @@ fn Gen::write_handler(self : Gen) -> Unit raise @codegen.CodegenError {
     w.write("/// parameters, calls the handler and encodes the result.")
     w.write("pub(open) trait $L {", args=[Text(trait_name)])
     w.indent()
+    let used : Map[String, String] = Map([])
+    for method_ in methods {
+      let handler_name = self.method_name(method_.operation)
+      if used.get(handler_name) is Some(other) {
+        raise @codegen.InvalidSettings(
+          "I found methods `\{other}` and `\{method_.name.to_string()}` with the same MoonBit handler method name `\{handler_name}`.",
+        )
+      }
+      used[handler_name] = method_.name.to_string()
+    }
     for method_ in methods {
       let input = if has_input(method_) {
         ", " + self.type_name_of(method_.input)
@@ -436,7 +485,11 @@ fn Gen::write_handler(self : Gen) -> Unit raise @codegen.CodegenError {
         let result = self.result_ty(method_)
         if result is UnitT {
           w.write("$L", args=[Text(call)])
-          w.write("Json::null()")
+          if method_.result is NullResult {
+            w.write("Json::null()")
+          } else {
+            w.write("Json::empty_object()")
+          }
         } else {
           w.write("let result = $L", args=[Text(call)])
           w.write("$L", args=[Text(result.encode("result"))])
@@ -482,8 +535,34 @@ fn Gen::write_client(self : Gen) -> Unit raise @codegen.CodegenError {
     w.dedent()
     w.write("}")
     w.blank_line()
+    // `new` is the constructor of the client; a method named so gets a suffix.
+    let used : Map[String, String] = Map([])
+    let claim = (fn_name : String, method_ : @rpc.MethodContract) => {
+      if used.get(fn_name) is Some(other) {
+        raise @codegen.InvalidSettings(
+          "I found methods `\{other}` and `\{method_.name.to_string()}` with the same MoonBit client method name `\{fn_name}`.",
+        )
+      }
+      used[fn_name] = method_.name.to_string()
+    }
     for method_ in description.methods {
-      let name = self.method_name(method_.operation)
+      let name = match self.method_name(method_.operation) {
+        "new" => "new_"
+        other => other
+      }
+      if !(method_.kind is NotificationOnly) {
+        claim(name, method_)
+      }
+      if !(method_.kind is RequestOnly) {
+        claim(
+          if method_.kind is NotificationOnly {
+            name
+          } else {
+            name + "_notification"
+          },
+          method_,
+        )
+      }
       let input_param = if has_input(method_) {
         "input : \{self.type_name_of(method_.input)}, "
       } else {
@@ -543,7 +622,7 @@ fn Gen::write_client(self : Gen) -> Unit raise @codegen.CodegenError {
         for error in method_.errors {
           let decoder = if error.data is None {
             let name = self.type_name_of(error.shape)
-            "_ => \{service_error_name}::\{name}(\{name}::{  })"
+            "_ => \{service_error_name}::\{name}(\{self.error_literal(error.shape, None)})"
           } else {
             "\{snake_name(self.names.shape_name(error.shape))}_from_data"
           }

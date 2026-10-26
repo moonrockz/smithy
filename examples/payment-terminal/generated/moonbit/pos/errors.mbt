@@ -159,15 +159,11 @@ pub(all) suberror ServiceError {
 }
 
 ///|
-
-///|
 fn payment_not_found_from_data(data : Json?) -> Error raise @rpc.DecodeError {
   ServiceError::PaymentNotFound(
     PaymentNotFound::from_json(data.unwrap_or(Json::null()), path="/error/data"),
   )
 }
-
-///|
 
 ///|
 fn terminal_busy_from_data(data : Json?) -> Error raise @rpc.DecodeError {

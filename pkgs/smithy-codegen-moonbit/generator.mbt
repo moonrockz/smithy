@@ -23,6 +23,8 @@ priv struct Gen {
   errors : Array[@smithy.ShapeId]
   // The generated type names, to find two shapes with one name.
   type_names : Map[String, @smithy.ShapeId]
+  // The type names that the generator itself declares.
+  generated_names : Array[String]
 }
 
 ///|
@@ -248,6 +250,11 @@ fn Gen::claim_type_name(
   shape : @smithy.Shape,
 ) -> String raise @codegen.CodegenError {
   let name = self.type_name_of(shape.id)
+  if self.generated_names.contains(name) {
+    raise @codegen.InvalidSettings(
+      "I cannot use the MoonBit name `\{name}` for shape `\{shape.id}`: the generated code uses it. Add a rename to the service.",
+    )
+  }
   match self.type_names.get(name) {
     Some(other) if other != shape.id =>
       raise @codegen.InvalidSettings(

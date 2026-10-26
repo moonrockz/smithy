@@ -156,3 +156,160 @@ test "bad module settings give first-person messages" {
     ),
   )
 }
+
+///|
+let review_model : String =
+  #|$version: "2"
+  #|namespace review
+  #|use smithy.rpc#jsonRpc
+  #|use smithy.rpc#jsonRpcProtocol
+  #|use smithy.rpc#method
+  #|use smithy.rpc#rpcError
+  #|@jsonRpcProtocol(versions: ["2.0"], peers: [{ name: "server", accepts: Server }, { name: "client", accepts: Client }])
+  #|structure Proto {}
+  #|@jsonRpc(versions: ["2.0"])
+  #|service Server { version: "1", operations: [DoThing, New, Fire, Numbers] }
+  #|@jsonRpc(versions: ["2.0"])
+  #|service Client { version: "1", operations: [Callback] }
+  #|@method(name: "do.thing", params: "named")
+  #|operation DoThing { input := { a: String }, errors: [Absent, OneOfTwo] }
+  #|@method(name: "new", params: "named", nullResult: true)
+  #|operation New {}
+  #|@method(name: "fire", params: "named", kind: "either", nullResult: true)
+  #|operation Fire {}
+  #|@method(name: "numbers", params: "named", nullResult: true)
+  #|operation Numbers { input := { b: Byte, s: Short, d: Double, f: Float, debug: Debug } }
+  #|structure Debug { x: String }
+  #|@method(name: "client.callback", params: "named")
+  #|operation Callback { input := { a: String }, output := { b: String }, errors: [ClientOnly] }
+  #|@error("client")
+  #|@rpcError(code: 2001, absentData: true)
+  #|structure Absent { note: String }
+  #|@error("client")
+  #|@rpcError(code: 2002, dataMember: "reason")
+  #|structure OneOfTwo { @required reason: String, extra: String }
+  #|@error("client")
+  #|@rpcError(code: 2003)
+  #|structure ClientOnly { @required why: String }
+
+///|
+fn generate_review(peer : String, extra? : String) -> Map[String, String] raise {
+  let loaded = @rpc.loader()
+    .add_idl("review.smithy", review_model + extra.unwrap_or(""))
+    .assemble()
+  guard loaded.model is Some(model) else {
+    fail(loaded.diagnostics.map(d => d.message).join("\n"))
+  }
+  @moonbit.run(
+    @codegen.PluginContext::from_build(model, {
+      "service": "review#Server",
+      "protocol": "review#Proto",
+      "peer": peer,
+      "module": "review/peer",
+    }),
+  )
+}
+
+///|
+test "an operation without output answers an empty object" {
+  let server = generate_review("server")
+  assert_true(
+    server["handler.mbt"].contains(
+      "  async do_thing(Self, DoThingInput, @rpc.CallContext) -> Unit raise\n",
+    ),
+  )
+  assert_true(server["handler.mbt"].contains("Json::empty_object()"))
+  let client = generate_review("client")
+  assert_true(
+    client["client.mbt"].contains(
+      "pub async fn ServerClient::do_thing(self : ServerClient, input : DoThingInput, checked~ : Bool = true) -> Unit raise {",
+    ),
+  )
+  assert_false(client["client.mbt"].contains("Unit_"))
+}
+
+///|
+test "error decoders fill the optional fields that the data does not carry" {
+  let client = generate_review("client")
+  let errors = client["errors.mbt"]
+  assert_true(client["client.mbt"].contains("Absent::{ note: None }"))
+  assert_true(errors.contains("extra: None"))
+  // The client calls only the server, so it decodes no client error.
+  assert_false(errors.contains("client_only_from_data"))
+  let server = generate_review("server")
+  // The server calls the client service, which has ClientOnly.
+  assert_true(server["errors.mbt"].contains("client_only_from_data"))
+  assert_false(server["errors.mbt"].contains("one_of_two_from_data"))
+}
+
+///|
+test "client method names do not collide with the constructor" {
+  let client = generate_review("client")
+  assert_true(client["client.mbt"].contains("pub async fn ServerClient::new_("))
+  assert_true(client["client.mbt"].contains("ServerClient::fire_notification("))
+}
+
+///|
+test "two client methods with one name are refused" {
+  let message = try
+    generate_review(
+      "client",
+      extra="\n@method(name: \"fire.note\", params: \"named\", kind: \"notification\")\noperation FireNotification {}\n",
+    )
+  catch {
+    @codegen.InvalidSettings(text) => text
+    error => error.to_string()
+  } noraise {
+    _ => "no error"
+  }
+  // The extra operation is not in a service, so it changes nothing.
+  assert_eq(message, "no error")
+}
+
+///|
+test "numbers keep their range and non-finite doubles" {
+  let types = generate_review("server")["types.mbt"]
+  assert_true(types.contains("@rpc.decode_byte("))
+  assert_true(types.contains("@rpc.decode_short("))
+  assert_true(types.contains("@rpc.encode_double(value)"))
+  assert_true(types.contains("@rpc.decode_float("))
+  // A shape named after a derived trait gets a suffix.
+  assert_true(types.contains("pub(all) struct Debug_ {"))
+}
+
+///|
+test "a shape with a generated name is refused" {
+  let loaded = @rpc.loader()
+    .add_idl(
+      "collide.smithy",
+      (
+        #|$version: "2"
+        #|namespace review
+        #|use smithy.rpc#jsonRpc
+        #|use smithy.rpc#method
+        #|@jsonRpc(versions: ["2.0"])
+        #|service Server { version: "1", operations: [Op] }
+        #|@method(name: "op", params: "named", nullResult: true)
+        #|operation Op { input := { h: ServerHandler } }
+        #|structure ServerHandler {}
+      ),
+    )
+    .assemble()
+  let message = try
+    @moonbit.run(
+      @codegen.PluginContext::from_build(loaded.model.unwrap(), {
+        "service": "review#Server",
+        "peer": "server",
+        "module": "review/peer",
+      }),
+    )
+  catch {
+    @codegen.InvalidSettings(text) => text
+    error => error.message()
+  } noraise {
+    _ => "no error"
+  }
+  assert_eq(
+    message, "I cannot use the MoonBit name `ServerHandler` for shape `review#ServerHandler`: the generated code uses it. Add a rename to the service.",
+  )
+}

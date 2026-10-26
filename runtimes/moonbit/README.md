@@ -35,6 +35,8 @@ The task runs `moon check --deny-warn` and `moon test --target native` in `runti
 
 ## Behavior
 
+- `parse_json` accepts at most `max_json_depth` (1000) nested arrays and objects. The generated
+  decoders recurse once for each level of a recursive shape, so this limit also bounds their stack.
 - A peer never sends a batch. A received JSON array gets one `-32600` error with the ID `null`.
 - A request ID is a string or an integer. An integer keeps its text, also beyond the Int64 range.
 - Unknown members of a message are ignored.

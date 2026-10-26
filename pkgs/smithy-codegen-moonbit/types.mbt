@@ -4,8 +4,11 @@
 priv enum Ty {
   Str
   Boolean
+  ByteT
+  ShortT
   IntT
   Int64T
+  FloatT
   DoubleT
   BigDec
   BigInt
@@ -55,8 +58,9 @@ fn Ty::leaf_text(self : Ty) -> String {
   match self {
     Str => "String"
     Boolean => "Bool"
-    IntT => "Int"
+    ByteT | ShortT | IntT => "Int"
     Int64T => "Int64"
+    FloatT => "Float"
     DoubleT => "Double"
     BigDec => "@rpc.Decimal"
     BigInt => "@rpc.BigInteger"
@@ -74,9 +78,10 @@ fn Ty::leaf_encode(self : Ty, expr : String) -> String {
   match self {
     Str => "Json::string(\{expr})"
     Boolean => "Json::boolean(\{expr})"
-    IntT => "Json::number(\{expr}.to_double())"
+    ByteT | ShortT | IntT => "Json::number(\{expr}.to_double())"
     Int64T => "@rpc.encode_int64(\{expr})"
-    DoubleT => "Json::number(\{expr})"
+    FloatT => "@rpc.encode_float(\{expr})"
+    DoubleT => "@rpc.encode_double(\{expr})"
     BigDec | BigInt | Time(_) | Named(_) => "\{expr}.to_json()"
     Blob => "@rpc.encode_blob(\{expr})"
     Doc => expr
@@ -110,7 +115,10 @@ fn Ty::leaf_decode(self : Ty, json : String, path : String) -> String {
   match self {
     Str => "@rpc.decode_string(\{json}, path=\{path})"
     Boolean => "@rpc.decode_bool(\{json}, path=\{path})"
+    ByteT => "@rpc.decode_byte(\{json}, path=\{path})"
+    ShortT => "@rpc.decode_short(\{json}, path=\{path})"
     IntT => "@rpc.decode_int(\{json}, path=\{path})"
+    FloatT => "@rpc.decode_float(\{json}, path=\{path})"
     Int64T => "@rpc.decode_int64(\{json}, path=\{path})"
     DoubleT => "@rpc.decode_double(\{json}, path=\{path})"
     BigDec => "@rpc.Decimal::from_json(\{json}, path=\{path})"
@@ -160,14 +168,12 @@ fn prelude_ty(name : String, format : String) -> Ty? {
   match name {
     "String" => Some(Str)
     "Boolean" | "PrimitiveBoolean" => Some(Boolean)
-    "Byte"
-    | "PrimitiveByte"
-    | "Short"
-    | "PrimitiveShort"
-    | "Integer"
-    | "PrimitiveInteger" => Some(IntT)
+    "Byte" | "PrimitiveByte" => Some(ByteT)
+    "Short" | "PrimitiveShort" => Some(ShortT)
+    "Integer" | "PrimitiveInteger" => Some(IntT)
     "Long" | "PrimitiveLong" => Some(Int64T)
-    "Float" | "PrimitiveFloat" | "Double" | "PrimitiveDouble" => Some(DoubleT)
+    "Float" | "PrimitiveFloat" => Some(FloatT)
+    "Double" | "PrimitiveDouble" => Some(DoubleT)
     "BigInteger" => Some(BigInt)
     "BigDecimal" => Some(BigDec)
     "Blob" => Some(Blob)
@@ -183,9 +189,12 @@ fn simple_ty(simple : @smithy.SimpleType, format : String) -> Ty {
   match simple {
     String => Str
     Boolean => Boolean
-    Byte | Short | Integer => IntT
+    Byte => ByteT
+    Short => ShortT
+    Integer => IntT
     Long => Int64T
-    Float | Double => DoubleT
+    Float => FloatT
+    Double => DoubleT
     BigInteger => BigInt
     BigDecimal => BigDec
     Blob => Blob

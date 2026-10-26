@@ -158,3 +158,27 @@ test "a protocol that does not name the service is refused" {
     _ => fail("expected a settings error")
   }
 }
+
+///|
+test "an unsupported constraint names its shape" {
+  let source = payment_model +
+    "\n@jsonRpc(versions: [\"2.0\"])\nservice Clock { version: \"1\", operations: [Now] }\n@method(name: \"now\", params: \"named\")\noperation Now { input := { @timestampFormat(\"http-date\") at: Timestamp } }\n"
+  let ctx = @codegen.PluginContext::from_build(model(source), {
+    "service": "example#Clock",
+    "peer": "server",
+  })
+  try @jsonrpc.PeerSettings::from_context(ctx) catch {
+    error => {
+      let text = error.message()
+      assert_true(
+        text.has_prefix(
+          "I could not prepare the JSON-RPC contract of `example#",
+        ),
+        msg=text,
+      )
+      assert_false(text.contains("PreparationError"), msg=text)
+    }
+  } noraise {
+    _ => fail("expected a settings error")
+  }
+}

@@ -43,8 +43,30 @@ test "numbers without repr are written as JSON numbers" {
 test "deep nesting does not overflow the stack" {
   let depth = 100000
   let text = "[".repeat(depth) + "]".repeat(depth)
-  let json = @rpc.parse_json(text)
+  let json = @rpc.parse_json(text, max_depth=depth)
   inspect(@rpc.write_json(json) == text, content="true")
+}
+
+///|
+test "the nesting depth is limited" {
+  let at_limit = "[".repeat(@rpc.max_json_depth) +
+    "]".repeat(@rpc.max_json_depth)
+  inspect(
+    @rpc.write_json(@rpc.parse_json(at_limit)) == at_limit,
+    content="true",
+  )
+  let deeper = "{\"next\":".repeat(@rpc.max_json_depth) +
+    "[]" +
+    "}".repeat(@rpc.max_json_depth)
+  let message = try @rpc.parse_json(deeper) |> ignore catch {
+    DecodeError(message~, ..) => message
+  } noraise {
+    _ => "no error"
+  }
+  inspect(
+    message,
+    content="I expected at most 1000 nested arrays and objects at offset 8000 of the JSON text, found '['.",
+  )
 }
 
 ///|

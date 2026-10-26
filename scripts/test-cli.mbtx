@@ -1399,6 +1399,94 @@ async fn exercise_codegen_fixture(runner : Runner) -> Unit {
 }
 
 ///|
+/// The MoonBit output of the JSON-RPC plugins on the first target of this run.
+/// Each later target must write the same bytes.
+let jsonrpc_reference : Ref[Map[String, String]?] = { val: None }
+
+///|
+/// The relative paths of the files below `root`, in lexical order.
+async fn jsonrpc_files(root : String) -> Map[String, String] {
+  let found : Map[String, String] = Map([])
+  let stack = [""]
+  while stack.pop() is Some(relative) {
+    let dir = if relative.is_empty() { root } else { "\{root}/\{relative}" }
+    for entry in @fs.readdir(dir) {
+      // Tools write caches into a golden directory; they are not output.
+      guard ![
+          "__pycache__", ".venv", ".pytest_cache", ".ruff_cache", "_build", ".mooncakes",
+        ].contains(entry) else {
+        continue
+      }
+      let path = if relative.is_empty() { entry } else { "\{relative}/\{entry}" }
+      match @fs.kind("\{root}/\{path}") {
+        Directory => stack.push(path)
+        _ => found[path] = @fs.read_file("\{root}/\{path}").text()
+      }
+    }
+  }
+  found
+}
+
+///|
+/// Build the payment terminal peers with the `moonbit-jsonrpc-codegen` and
+/// `python-jsonrpc-codegen` plugins. The Python output must equal the golden
+/// files. The MoonBit golden files are formatted with `moon fmt`, so the raw
+/// MoonBit output must be the same bytes on every target.
+async fn exercise_jsonrpc_codegen(runner : Runner, root : String) -> Unit {
+  let dir = runner.dir
+  let example = "\{root}/examples/payment-terminal"
+  @fs.write_file(
+    dir + "/payment.smithy",
+    @fs.read_file("\{example}/model.smithy").text(),
+  )
+  let peer = (plugin : String, artifact : String, peer : String, key : String, value : String) => {
+    "\"\{plugin}::\{artifact}\":{\"service\":\"example.payments#PaymentTerminal\",\"protocol\":\"example.payments#TerminalProtocol\",\"peer\":\"\{peer}\",\"\{key}\":\"\{value}\"}"
+  }
+  let plugins = [
+    peer("moonbit-jsonrpc-codegen", "moonbit-terminal", "terminal", "module", "example/terminal"),
+    peer("moonbit-jsonrpc-codegen", "moonbit-pos", "pos", "module", "example/pos"),
+    peer("python-jsonrpc-codegen", "python-pos", "pos", "package", "payment_pos"),
+  ]
+  @fs.write_file(
+    dir + "/payment-build.json",
+    "{\"version\":\"1.0\",\"sources\":[\"payment.smithy\"],\"outputDirectory\":\"payment-output\",\"plugins\":{\{plugins.join(",")}}}",
+  )
+  runner.command(["build", "--config", "payment-build.json"], 0) |> ignore
+  let out = dir + "/payment-output/source"
+  let python = jsonrpc_files(out + "/python-pos")
+  let golden = jsonrpc_files("\{example}/generated/python/pos")
+  assert_eq(python.length(), golden.length(), msg="\{runner.target}: python file count")
+  for path, text in python {
+    assert_true(golden.get(path) == Some(text), msg="\{runner.target}: python-pos/\{path} differs from the golden file")
+  }
+  let moonbit : Map[String, String] = Map([])
+  for artifact in ["moonbit-pos", "moonbit-terminal"] {
+    for path, text in jsonrpc_files(out + "/" + artifact) {
+      moonbit[artifact + "/" + path] = text
+    }
+  }
+  assert_true(moonbit.contains("moonbit-terminal/handler.mbt"))
+  assert_true(moonbit["moonbit-pos/client.mbt"].contains("PaymentTerminalClient"))
+  match jsonrpc_reference.val {
+    None => jsonrpc_reference.val = Some(moonbit)
+    Some(reference) => {
+      assert_eq(moonbit.length(), reference.length(), msg="\{runner.target}: moonbit file count")
+      for path, text in moonbit {
+        assert_true(reference.get(path) == Some(text), msg="\{runner.target}: \{path} differs from the first target")
+      }
+    }
+  }
+  @fs.write_file(
+    dir + "/payment-bad.json",
+    "{\"version\":\"1.0\",\"sources\":[\"payment.smithy\"],\"outputDirectory\":\"payment-bad-output\",\"plugins\":{\{peer("moonbit-jsonrpc-codegen", "bad", "kiosk", "module", "example/kiosk")}}}",
+  )
+  let (bad_out, bad_err) = runner.command(["build", "--config", "payment-bad.json"], 1)
+  let shown = bad_out + bad_err
+  assert_true(shown.contains("I expected setting `peer` to name a peer of protocol"), msg=shown)
+  runner.command(["clean", "--config", "payment-build.json"], 0) |> ignore
+}
+
+///|
 /// The README files whose `console` and `LANG file=NAME` fences run. Keep it equal to
 /// `@source.cli_doc_files` in site/tour/source/include.mbt.
 let readme_files : Array[String] = ["apps/smithy/README.md"]
@@ -1958,6 +2046,7 @@ async fn exercise(
   exercise_ion(runner, skip_stdin)
   exercise_bad_doc_comment(runner)
   exercise_codegen_fixture(runner)
+  exercise_jsonrpc_codegen(runner, root)
   @fs.write_file(
     "\{dir}/broken.smithy",
     "$version: \"2\"\nnamespace example\nstructure Broken { x: Missing }",
