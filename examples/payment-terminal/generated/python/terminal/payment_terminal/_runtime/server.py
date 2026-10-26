@@ -27,10 +27,13 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import signal
 import sys
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
+from types import FrameType
+from typing import BinaryIO
 
 import uvicorn
 from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
@@ -250,6 +253,22 @@ class RunningServer:
         await self._task
 
 
+class _Server(uvicorn.Server):
+    """A uvicorn server that ends normally after a stop signal.
+
+    uvicorn stops gracefully on SIGINT, SIGTERM and (on Windows) SIGBREAK, and
+    then raises the signal again. That kills the process with -15 on Unix, and
+    on Windows it exits with 3, the code of `abort()`. A stop request is a normal
+    end here: the server stops gracefully and does not raise the signal again.
+    """
+
+    def handle_exit(self, sig: int, frame: FrameType | None) -> None:
+        if self.should_exit and sig == signal.SIGINT:
+            self.force_exit = True
+        else:
+            self.should_exit = True
+
+
 async def start_server(
     port: int, peer_factory: PeerFactory, *, host: str = "127.0.0.1"
 ) -> RunningServer:
@@ -263,7 +282,7 @@ async def start_server(
         ws="websockets-sansio",
         lifespan="off",
     )
-    server = uvicorn.Server(config)
+    server = _Server(config)
     task = asyncio.create_task(server.serve())
     while not server.started:
         if task.done():
@@ -276,11 +295,29 @@ async def start_server(
 
 
 async def serve(port: int, peer_factory: PeerFactory, *, host: str = "127.0.0.1") -> None:
-    """Serve the app of `peer_factory` until the process stops.
+    """Serve the app of `peer_factory` until the process stops or gets a stop signal.
 
-    When the server is ready, I write `listening N` to stderr.
+    When the server is ready, I write `listening N` to stderr. After SIGINT,
+    SIGTERM or (on Windows) CTRL_BREAK, I stop gracefully and return.
     """
     running = await start_server(port, peer_factory, host=host)
-    sys.stderr.write(f"listening {running.port}\n")
-    sys.stderr.flush()
+    _write_ready_line(running.port)
     await running.wait()
+
+
+def _write_ready_line(port: int) -> None:
+    """Write the bytes `listening N\\n` to stderr, with no newline translation.
+
+    Text-mode stderr writes `\\r\\n` on Windows. Other runtimes and test
+    harnesses read this line, so it has the same bytes on every platform.
+    """
+    line = f"listening {port}\n"
+    stream = sys.stderr
+    buffer: BinaryIO | None = getattr(stream, "buffer", None)
+    stream.flush()
+    if buffer is None:
+        stream.write(line)
+        stream.flush()
+        return
+    buffer.write(line.encode("ascii"))
+    buffer.flush()

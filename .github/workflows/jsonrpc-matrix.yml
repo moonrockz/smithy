@@ -77,9 +77,9 @@ jobs:
           retention-days: 14
 
   windows:
-    name: MoonBit peers on Windows
+    name: MoonBit and Python peers on Windows
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out the selected source
         uses: actions/checkout@v6
@@ -91,6 +91,15 @@ jobs:
         with:
           version: '0.10.15+943464bfa'
           core-version: '0.10.15+943464bfa'
+
+      # Keep this version aligned with the uv pin in .config/mise/config.toml.
+      # runtime-python.mbtx stops when uv --version differs from that pin.
+      # uv installs the Python of .python-version and the locked dependencies.
+      - name: Install the pinned uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: '0.13.5'
+          enable-cache: false
 
       - name: Update the registry
         run: moon update
@@ -105,14 +114,39 @@ jobs:
         run: moonx scripts/runtime-moonbit.mbtx generated
 
       - name: Build the MoonBit sample once on Windows
-        id: sample
+        id: moonbit_sample
         timeout-minutes: 10
         if: ${{ !cancelled() }}
         run: moonx scripts/runtime-moonbit.mbtx sample-build
 
-      - name: Run all four scenarios over stdio, HTTP and WebSocket
+      - name: Check the Python runtime
+        timeout-minutes: 10
+        if: ${{ !cancelled() }}
+        run: moonx scripts/runtime-python.mbtx test
+
+      - name: Check the generated Python peers
+        timeout-minutes: 10
+        if: ${{ !cancelled() }}
+        run: moonx scripts/runtime-python.mbtx generated
+
+      - name: Build the Python sample once on Windows
+        id: python_sample
+        timeout-minutes: 10
+        if: ${{ !cancelled() }}
+        run: moonx scripts/runtime-python.mbtx sample-build
+
+      # Twelve combinations: each MoonBit and Python caller and receiver over
+      # stdio, HTTP and WebSocket, each with all four scenarios.
+      - name: Run all four scenarios for MoonBit and Python over every transport
+        timeout-minutes: 20
+        if: ${{ !cancelled() && steps.moonbit_sample.outcome == 'success' && steps.python_sample.outcome == 'success' }}
+        run: moonx scripts/jsonrpc-matrix.mbtx --caller moonbit,python --receiver moonbit,python
+
+      # The Python sample failed, so the job fails. Still collect the
+      # MoonBit-to-MoonBit evidence.
+      - name: Run all four scenarios for MoonBit only
         timeout-minutes: 15
-        if: ${{ !cancelled() && steps.sample.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.moonbit_sample.outcome == 'success' && steps.python_sample.outcome != 'success' }}
         run: moonx scripts/jsonrpc-matrix.mbtx --caller moonbit --receiver moonbit
 
       - name: Write the Windows pass and fail table

@@ -8,6 +8,15 @@ All imports in the package are relative, and the package does not import its own
 copy works under any package name. `tests/test_vendored_copy.py` checks this. The tests in `tests/`
 are not copied.
 
+## Windows
+
+The runtime gate, the generated peers, the sample gates and all four payment terminal scenarios
+pass on native Windows over stdio, HTTP and WebSocket, for Python to Python and for both MoonBit and
+Python directions, in the [manual matrix run](https://github.com/moonrockz/smithy/actions/runs/40414824528)
+for this change. Two Windows defects were fixed: the ready line had `\r\n` from text-mode stderr,
+and a stopped server exited with 3 (see `serve` below). uv installs the Python of `.python-version`
+and the locked dependencies on Windows too.
+
 ## Rules
 
 - Values are exact. A `bigDecimal` is a `decimal.Decimal`. A `bigInteger` or a `long` is an `int`.
@@ -39,6 +48,12 @@ are not copied.
   that it does not know.
 - `spawn_stdio(argv)`: starts a child process and connects to its stdin and stdout.
 - `memory_pair()`: two connected in-memory ends, for tests.
+- `serve(port, peer_factory)`: serves HTTP (`/rpc`) and WebSocket (`/ws`) until the process stops.
+  When it is ready, it writes the bytes `listening N\n` to stderr, where N is the port. It writes
+  them with no newline translation, so the line is the same on Windows and in the other runtimes.
+  After SIGINT, SIGTERM or (on Windows) CTRL_BREAK, it stops gracefully and returns, so the
+  process exits with 0. uvicorn alone raises the signal again after its shutdown; on Windows that
+  exits with 3, the code of `abort()`, which a supervisor cannot tell from a crash.
 
 ## Checks
 
