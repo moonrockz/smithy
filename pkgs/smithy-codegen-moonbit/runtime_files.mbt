@@ -14,7 +14,9 @@ let runtime_files : Array[(String, String)] = [
       #|///   the message belongs to, when there is one: its response, or a
       #|///   notification or request that its handler sends. A transport that has
       #|///   one stream per call (HTTP) uses it; other transports ignore it.
-      #|/// - `close` closes the connection.
+      #|/// - `close` requests forced cleanup without waiting for async I/O.
+      #|/// - `shutdown` closes gracefully in the caller's async task. The default
+      #|///   calls `close`. WebSocket sends a normal close frame before cleanup.
       #|/// - `start` gives the transport the task group of `Peer::run`, for the
       #|///   tasks that read its streams. The default does nothing.
       #|/// - `watch` gives the transport a function that fails a pending call of the
@@ -24,8 +26,14 @@ let runtime_files : Array[(String, String)] = [
       #|  async fn receive(Self) -> String?
       #|  async fn send(Self, String, related~ : RequestId?) -> Unit
       #|  fn close(Self) -> Unit
+      #|  async fn shutdown(Self) -> Unit = _
       #|  fn start(Self, @async.TaskGroup[Unit]) -> Unit = _
       #|  fn watch(Self, (RequestId) -> Unit) -> Unit = _
+      #|}
+      #|
+      #|///|
+      #|impl Connection with fn shutdown(self) {
+      #|  self.close()
       #|}
       #|
       #|///|
@@ -2341,6 +2349,7 @@ let runtime_files : Array[(String, String)] = [
       #|          let connection = WsConnection::wrap(ws)
       #|          defer Connection::close(connection)
       #|          on_peer(connection)
+      #|          Connection::shutdown(connection)
       #|        }
       #|        _ => {
       #|          conn.skip_request_body()
@@ -3576,6 +3585,21 @@ let runtime_files : Array[(String, String)] = [
       #|// directions.
       #|
       #|///|
+      #|priv enum WsCloseState {
+      #|  Open
+      #|  Graceful
+      #|  Forced
+      #|} derive(Eq)
+      #|
+      #|///|
+      #|priv enum WsReaderState {
+      #|  NotStarted
+      #|  Starting
+      #|  Running(@async.Task[Unit])
+      #|  Finished
+      #|}
+      #|
+      #|///|
       #|/// A WebSocket as a connection.
       #|///
       #|/// With `Peer::run`, a reader task of the peer reads the frames into an
@@ -3584,13 +3608,18 @@ let runtime_files : Array[(String, String)] = [
       #|struct WsConnection {
       #|  conn : @websocket.Conn
       #|  inbox : @aqueue.Queue[String]
-      #|  mut reading : Bool
-      #|  mut closed : Bool
+      #|  mut reader : WsReaderState
+      #|  mut close_state : WsCloseState
       #|}
       #|
       #|///|
       #|fn WsConnection::wrap(conn : @websocket.Conn) -> WsConnection {
-      #|  { conn, inbox: @aqueue.Queue(kind=Unbounded), reading: false, closed: false, }
+      #|  {
+      #|    conn,
+      #|    inbox: @aqueue.Queue(kind=Unbounded),
+      #|    reader: NotStarted,
+      #|    close_state: Open,
+      #|  }
       #|}
       #|
       #|///|
@@ -3613,18 +3642,24 @@ let runtime_files : Array[(String, String)] = [
       #|async fn WsConnection::read_message(self : WsConnection) -> String? {
       #|  let message = self.conn.recv() catch {
       #|    @websocket.ConnectionClosed(_, _) | @io.ReaderClosed => return None
-      #|    err => if self.closed { return None } else { raise err }
+      #|    err => if self.close_state != Open { return None } else { raise err }
       #|  }
       #|  Some(message.read_all().text())
       #|}
       #|
       #|///|
       #|pub impl Connection for WsConnection with fn start(self, group) {
-      #|  self.reading = true
-      #|  group.spawn_bg(allow_failure=true, () => {
-      #|    defer self.inbox.close()
+      #|  self.reader = Starting
+      #|  let reader = group.spawn(allow_failure=true, () => {
+      #|    defer {
+      #|      self.reader = Finished
+      #|      self.inbox.close()
+      #|      if self.close_state == Forced {
+      #|        self.conn.close()
+      #|      }
+      #|    }
       #|    try {
-      #|      while !self.closed {
+      #|      while self.close_state == Open {
       #|        match self.read_message() {
       #|          Some(text) => self.inbox.put(text)
       #|          None => break
@@ -3632,17 +3667,21 @@ let runtime_files : Array[(String, String)] = [
       #|      }
       #|    } catch {
       #|      err =>
-      #|        if !self.closed && !@async.is_being_cancelled() {
+      #|        if self.close_state == Open && !@async.is_being_cancelled() {
       #|          diagnose("I lost the WebSocket: \{err}")
       #|        }
       #|    }
       #|  })
+      #|  // A spawned task may finish before spawn returns.
+      #|  if self.reader is Starting {
+      #|    self.reader = Running(reader)
+      #|  }
       #|}
       #|
       #|///|
       #|pub impl Connection for WsConnection with fn receive(self) {
-      #|  if !self.reading {
-      #|    if self.closed {
+      #|  if self.reader is NotStarted {
+      #|    if self.close_state != Open {
       #|      return None
       #|    }
       #|    return self.read_message()
@@ -3657,7 +3696,7 @@ let runtime_files : Array[(String, String)] = [
       #|///|
       #|pub impl Connection for WsConnection with fn send(self, text, related~) {
       #|  ignore(related)
-      #|  if self.closed {
+      #|  if self.close_state != Open {
       #|    raise TransportError(
       #|      "I could not send the message: the WebSocket is closed.",
       #|    )
@@ -3673,10 +3712,54 @@ let runtime_files : Array[(String, String)] = [
       #|
       #|///|
       #|pub impl Connection for WsConnection with fn close(self) {
-      #|  if !self.closed {
-      #|    self.closed = true
+      #|  // An active shutdown owns disposal until its close operation finishes.
+      #|  if self.close_state != Graceful {
+      #|    self.close_state = Forced
+      #|  }
+      #|  self.inbox.close()
+      #|  match self.reader {
+      #|    Running(reader) => reader.cancel()
+      #|    Starting => ()
+      #|    NotStarted | Finished => if self.close_state == Forced { self.conn.close() }
+      #|  }
+      #|}
+      #|
+      #|///|
+      #|pub impl Connection for WsConnection with fn shutdown(self) {
+      #|  self.shutdown_with(() => self.conn.send_close(code=Normal))
+      #|}
+      #|
+      #|///|
+      #|/// Bounds the close operation and cleans up on failure or cancellation.
+      #|async fn WsConnection::shutdown_with(
+      #|  self : WsConnection,
+      #|  close_frame : async () -> Unit,
+      #|) -> Unit {
+      #|  guard self.close_state == Open else { return }
+      #|  self.close_state = Graceful
+      #|  let result : Result[Unit, Error]? = @async.handle_cancellation(() => {
+      #|    try @async.with_timeout(1000, close_frame) catch {
+      #|      @websocket.ConnectionClosed(_, _) => Ok(())
+      #|      err => Err(err)
+      #|    } noraise {
+      #|      _ => Ok(())
+      #|    }
+      #|  })
+      #|  @async.protect_from_cancel(() => {
+      #|    defer self.conn.close()
       #|    self.inbox.close()
-      #|    self.conn.close()
+      #|    if self.reader is Running(reader) {
+      #|      reader.cancel()
+      #|      reader.wait() catch {
+      #|        _ => ()
+      #|      }
+      #|    }
+      #|  })
+      #|  match result {
+      #|    Some(Ok(_)) => ()
+      #|    Some(Err(err)) => raise err
+      #|    // The unprotected pause resumes cancellation after cleanup finishes.
+      #|    None => @async.pause()
       #|  }
       #|}
       #|

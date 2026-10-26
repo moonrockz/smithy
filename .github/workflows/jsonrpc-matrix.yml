@@ -75,3 +75,56 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
+
+  windows:
+    name: MoonBit peers on Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the selected source
+        uses: actions/checkout@v6
+
+      # Use the same native setup as release.yml. Cross-built Windows
+      # programs resolve core's platform from the host and read arguments wrongly.
+      - name: Install the pinned MoonBit toolchain
+        uses: hustcer/setup-moonbit@v1
+        with:
+          version: '0.10.15+943464bfa'
+          core-version: '0.10.15+943464bfa'
+
+      - name: Update the registry
+        run: moon update
+
+      - name: Check the MoonBit runtime
+        timeout-minutes: 5
+        run: moonx scripts/runtime-moonbit.mbtx test
+
+      - name: Check the generated MoonBit peers
+        timeout-minutes: 5
+        if: ${{ !cancelled() }}
+        run: moonx scripts/runtime-moonbit.mbtx generated
+
+      - name: Build the MoonBit sample once on Windows
+        id: sample
+        timeout-minutes: 10
+        if: ${{ !cancelled() }}
+        run: moonx scripts/runtime-moonbit.mbtx sample-build
+
+      - name: Run all four scenarios over stdio, HTTP and WebSocket
+        timeout-minutes: 15
+        if: ${{ !cancelled() && steps.sample.outcome == 'success' }}
+        run: moonx scripts/jsonrpc-matrix.mbtx --caller moonbit --receiver moonbit
+
+      - name: Write the Windows pass and fail table
+        if: always()
+        run: moonx scripts/jsonrpc-matrix.mbtx --summary
+
+      - name: Retain Windows transcripts, checks and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jsonrpc-matrix-windows-${{ github.sha }}
+          path: .dev/out/jsonrpc-matrix/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

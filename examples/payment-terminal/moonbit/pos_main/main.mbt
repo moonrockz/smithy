@@ -92,6 +92,7 @@ async fn run(
   pos : @sample.Pos,
   client : @gen_pos.PaymentTerminalClient,
 ) -> Bool {
+  defer conn.close()
   @async.with_task_group(group => {
     group.spawn_bg(() => peer.run(conn))
     let failed = try @sample.run_scenario(pos, client) catch {
@@ -102,7 +103,7 @@ async fn run(
     } noraise {
       _ => false
     }
-    conn.close()
+    conn.shutdown()
     failed
   })
 }

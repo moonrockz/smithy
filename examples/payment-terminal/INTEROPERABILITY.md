@@ -26,7 +26,13 @@ gh workflow run jsonrpc-matrix.yml --ref main
 ```
 
 The workflow checks embedding and golden files, runs the language quality
-gates, and builds each sample once. One runner then executes all combinations.
+gates, and builds each sample once. A Linux runner then executes all 27 combinations.
+An independent Windows runner checks the MoonBit runtime and generated peers,
+builds the MoonBit sample natively, and runs all four scenarios over stdio, HTTP
+and WebSocket. These three Windows combinations add 12 checked logs. A Windows
+binary must be built on Windows because a cross-built binary reads its arguments
+wrongly. Windows uses the same pinned setup as the release build and calls the
+MoonBit task scripts directly, without installing the other language toolchains.
 The job fails if a scenario, receiver process, or transcript check fails.
 Each checked log must meet the minimum message count for its fixed scenario.
 Skipped and non-JSON log rows fail the run.
@@ -34,8 +40,18 @@ It also fails if any required build or language gate fails.
 
 The job summary has one row per language and transport combination. The
 `jsonrpc-matrix-<commit>` artifact has logs, checker results, command provenance,
-and the pass/fail table. GitHub retains the artifact for 14 days. A maintainer
+and the pass/fail table. The Windows artifact is `jsonrpc-matrix-windows-<commit>`.
+GitHub retains both artifacts for 14 days. A maintainer
 must inspect a failed cell and its logs before using the result as evidence.
+Both jobs must pass on the selected source before the result can support an
+unqualified Windows compatibility claim. If a pinned upstream dependency fails,
+retain the failing check, file a beads bug with its evidence, and mark the
+affected transport unsupported in the runtime README. A passing scenario alone
+does not qualify that transport. This recorded limit can complete a Windows
+verification follow-up; it does not turn the failed gate into a pass.
+The manual workflow keeps these checks outside
+normal PR CI. A failed runtime gate remains a job failure even when the generated
+peer and scenario steps can still run to collect more evidence.
 
 ## Run locally
 
@@ -73,6 +89,10 @@ has a POS JSONL log, process output, and a checker result. A setup failure canno
 reuse a previous pass table. For network transports, a receiver can stop with status 0 after the caller
 finishes. The runner stops a receiver that is still running. A crash or forced
 kill fails the cell.
+After the runner requests a stop, it accepts the default cancellation result
+of the host: SIGTERM on Unix, or CTRL_BREAK with `STATUS_CONTROL_C_EXIT` on
+Windows. A receiver that exits before the runner requests a stop must return
+zero. Ordinary errors, access violations and forced termination still fail.
 
 ## Shared wire contract
 

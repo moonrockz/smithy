@@ -7,7 +7,9 @@
 ///   the message belongs to, when there is one: its response, or a
 ///   notification or request that its handler sends. A transport that has
 ///   one stream per call (HTTP) uses it; other transports ignore it.
-/// - `close` closes the connection.
+/// - `close` requests forced cleanup without waiting for async I/O.
+/// - `shutdown` closes gracefully in the caller's async task. The default
+///   calls `close`. WebSocket sends a normal close frame before cleanup.
 /// - `start` gives the transport the task group of `Peer::run`, for the
 ///   tasks that read its streams. The default does nothing.
 /// - `watch` gives the transport a function that fails a pending call of the
@@ -17,8 +19,14 @@ pub(open) trait Connection {
   async fn receive(Self) -> String?
   async fn send(Self, String, related~ : RequestId?) -> Unit
   fn close(Self) -> Unit
+  async fn shutdown(Self) -> Unit = _
   fn start(Self, @async.TaskGroup[Unit]) -> Unit = _
   fn watch(Self, (RequestId) -> Unit) -> Unit = _
+}
+
+///|
+impl Connection with fn shutdown(self) {
+  self.close()
 }
 
 ///|

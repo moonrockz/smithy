@@ -74,6 +74,7 @@ pub async fn RpcServer::run(
           let connection = WsConnection::wrap(ws)
           defer Connection::close(connection)
           on_peer(connection)
+          Connection::shutdown(connection)
         }
         _ => {
           conn.skip_request_body()

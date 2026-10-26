@@ -50,7 +50,7 @@ async fn moon(dir : String, args : Array[String]) -> Unit {
 /// Checks a MoonBit module and runs its native tests.
 async fn check_module(dir : String) -> Unit {
   moon(dir, ["check", "--deny-warn", "--target", "native"])
-  moon(dir, ["test", "--target", "native"])
+  moon(dir, ["test", "--target", "native", "--verbose"])
 }
 
 ///|
@@ -136,6 +136,8 @@ async fn main {
   let command = if args.length() > 1 { args[1] } else { "" }
   match command {
     "test" => {
+      // Build the native child-process fixture used by the stdio tests.
+      moon(runtime_dir, ["build", "--target", "native"])
       check_module(runtime_dir)
       println("✅ The MoonBit JSON-RPC runtime passed its checks.")
     }

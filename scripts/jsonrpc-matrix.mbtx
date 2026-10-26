@@ -27,6 +27,12 @@ enum Transport {
 } derive(Eq, Debug)
 
 ///|
+enum HostOs {
+  Posix
+  Windows
+}
+
+///|
 struct MatrixCase {
   caller : Language
   receiver : Language
@@ -416,7 +422,15 @@ async fn run_scenario(
         let receiver_status = server.wait()
         let receiver_ok = match exited_early {
           Some(code) => code == 0
-          None => clean_server_exit(receiver_status)
+          None =>
+            clean_server_exit(
+              receiver_status,
+              if @env.get_env_vars().get("OS") == Some("Windows_NT") {
+                Windows
+              } else {
+                Posix
+              },
+            )
         }
         if !receiver_ok {
           @fs.write_file(
@@ -498,17 +512,36 @@ async fn run_scenario(
 }
 
 ///|
-fn clean_server_exit(status : Int32) -> Bool {
-  // Zero is a graceful stop. Negative 15 is the default Unix SIGTERM stop.
-  status == 0 || status == -15
+fn clean_server_exit(status : Int32, host : HostOs) -> Bool {
+  // This is used only after this runner requested cancellation. A receiver
+  // that exits first must still return zero. async's default cancellation
+  // sends SIGTERM on Unix and CTRL_BREAK on Windows. The Windows result is
+  // STATUS_CONTROL_C_EXIT (0xC000013A), returned as a signed Int32.
+  let expected = match host {
+    Posix => -15
+    Windows => -1073741510
+  }
+  status == 0 || status == expected
 }
 
 ///|
 test "a receiver crash or forced kill fails the matrix" {
-  assert_true(clean_server_exit(0))
-  assert_true(clean_server_exit(-15))
-  assert_false(clean_server_exit(2))
-  assert_false(clean_server_exit(-9))
+  assert_true(clean_server_exit(0, Posix))
+  assert_true(clean_server_exit(-15, Posix))
+  assert_false(clean_server_exit(2, Posix))
+  assert_false(clean_server_exit(-9, Posix))
+}
+
+///|
+test "a requested Windows CTRL_BREAK stop has the same policy as Unix SIGTERM" {
+  assert_true(clean_server_exit(0, Windows))
+  assert_true(clean_server_exit(-1073741510, Windows))
+  assert_false(clean_server_exit(-1073741510, Posix))
+  assert_false(clean_server_exit(-15, Windows))
+  // TerminateProcess uses 1. Access violations and ordinary failures also fail.
+  assert_false(clean_server_exit(1, Windows))
+  assert_false(clean_server_exit(2, Windows))
+  assert_false(clean_server_exit(-1073741819, Windows))
 }
 
 ///|

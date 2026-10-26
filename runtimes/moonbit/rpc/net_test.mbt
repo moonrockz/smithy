@@ -28,7 +28,7 @@ async fn over_network(
     }
     group.spawn_bg(() => pos.run(conn))
     body(pos, terminal)
-    conn.close()
+    conn.shutdown()
   })
   (lines(pos_log), lines(terminal_log))
 }
