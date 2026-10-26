@@ -113,7 +113,8 @@ of `pkgs/smithy-codegen-jsonrpc`; they do not read the RPC traits a second time.
 - Python uses the uv version in mise and locked dependencies. Go uses pinned `go.mod`
   and `go.sum` files. Do not add unpinned generated dependencies.
 - The manual `jsonrpc-matrix.yml` workflow checks all 27 language and transport pairs.
-  Each pair runs all four scenarios and checks its logs. See
+  Each pair runs all four scenarios and checks its logs. Its Windows job checks the
+  MoonBit and Python runtimes and peers, and the 12 MoonBit and Python pairs. See
   `examples/payment-terminal/INTEROPERABILITY.md` for commands and build provenance.
 
 ## Tour

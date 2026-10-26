@@ -8,6 +8,15 @@ All imports in the package are relative, and the package does not import its own
 copy works under any package name. `tests/test_vendored_copy.py` checks this. The tests in `tests/`
 are not copied.
 
+## Windows
+
+The runtime gate, the generated peers, the sample gates and all four payment terminal scenarios
+pass on native Windows over stdio, HTTP and WebSocket, for Python to Python and for both MoonBit and
+Python directions, in the [manual matrix run](https://github.com/moonrockz/smithy/actions/runs/40414824528)
+for this change. Two Windows defects were fixed: the ready line had `\r\n` from text-mode stderr,
+and a stopped server exited with 3 (see `serve` below). uv installs the Python of `.python-version`
+and the locked dependencies on Windows too.
+
 ## Rules
 
 - Values are exact. A `bigDecimal` is a `decimal.Decimal`. A `bigInteger` or a `long` is an `int`.
