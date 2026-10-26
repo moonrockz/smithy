@@ -1,0 +1,135 @@
+///|
+/// Tasks of the MoonBit JSON-RPC runtime in `runtimes/moonbit`.
+///
+/// - `test`: runs `moon check --deny-warn` and `moon test --target native` in
+///   `runtimes/moonbit`.
+/// - `generated`: runs the same checks in each generated MoonBit peer under
+///   `examples/payment-terminal/generated/moonbit`.
+/// - `sample-build`: checks, tests and builds the MoonBit sample programs in
+///   `examples/payment-terminal/moonbit`, and writes the command manifest
+///   `.dev/out/payment-terminal/commands/moonbit.json`.
+///
+/// Usage: `mise run test:runtime:moonbit`, or `moonx scripts/runtime-moonbit.mbtx test`.
+/// It exits with 0 when each step passes, else with 1.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let runtime_dir : String = "runtimes/moonbit"
+
+///|
+let generated_root : String = "examples/payment-terminal/generated/moonbit"
+
+///|
+/// Runs `moon` with `args` in `dir`, and stops the script when it fails.
+async fn moon(dir : String, args : Array[String]) -> Unit {
+  let all = ["-C", dir]
+  all.append(args)
+  println("$ moon -C \{dir} \{args.join(" ")}")
+  let code = @process.run("moon", all, stdout=@stdio.stdout, stderr=@stdio.stderr)
+  if code != 0 {
+    println("❌ moon \{args.join(" ")} failed in \{dir} with exit code \{code}")
+    @sys.exit(1)
+  }
+}
+
+///|
+/// Checks a MoonBit module and runs its native tests.
+async fn check_module(dir : String) -> Unit {
+  moon(dir, ["check", "--deny-warn", "--target", "native"])
+  moon(dir, ["test", "--target", "native"])
+}
+
+///|
+async fn generated() -> Unit {
+  if !@fs.exists(generated_root) {
+    println("❌ I expected generated MoonBit peers in \{generated_root}, found no directory.")
+    @sys.exit(1)
+  }
+  let modules = []
+  for entry in @fs.readdir(generated_root, sort=true) {
+    let dir = "\{generated_root}/\{entry}"
+    if @fs.exists("\{dir}/moon.mod") {
+      modules.push(dir)
+    }
+  }
+  if modules.is_empty() {
+    println("❌ I expected a moon.mod in a directory of \{generated_root}, found none.")
+    @sys.exit(1)
+  }
+  for dir in modules {
+    check_module(dir)
+  }
+}
+
+///|
+let sample_dir : String = "examples/payment-terminal/moonbit"
+
+///|
+let sample_bin : String = "_build/native/release/build/example/payment-sample"
+
+///|
+/// A JSON string literal.
+fn json_text(text : String) -> String {
+  Json::string(text).stringify()
+}
+
+///|
+/// Checks and tests the sample module, builds its native release
+/// executables, and writes `.dev/out/payment-terminal/commands/moonbit.json`
+/// with their absolute paths.
+async fn sample_build() -> Unit {
+  check_module(sample_dir)
+  moon(sample_dir, ["build", "--target", "native", "--release"])
+  let root = @env.current_dir().unwrap_or(".")
+  let bin = "\{root}/\{sample_dir}/\{sample_bin}"
+  let pos = "\{bin}/pos_main/pos_main.exe"
+  let terminal = "\{bin}/terminal_main/terminal_main.exe"
+  for path in [pos, terminal] {
+    if !@fs.exists(path) {
+      println("❌ I expected the executable \{path} after the build, found nothing.")
+      @sys.exit(1)
+    }
+  }
+  let dir = ".dev/out/payment-terminal/commands"
+  if !@fs.exists(dir) {
+    @fs.mkdir(dir, recursive=true)
+  }
+  @fs.write_file(
+    "\{dir}/moonbit.json",
+    "{\"pos\":[\{json_text(pos)}],\"terminal\":[\{json_text(terminal)}]}\n",
+  )
+  println("✓ wrote \{dir}/moonbit.json")
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let command = if args.length() > 1 { args[1] } else { "" }
+  match command {
+    "test" => {
+      check_module(runtime_dir)
+      println("✅ The MoonBit JSON-RPC runtime passed its checks.")
+    }
+    "generated" => {
+      generated()
+      println("✅ The generated MoonBit peers passed their checks.")
+    }
+    "sample-build" => {
+      sample_build()
+      println("✅ The MoonBit sample programs are built.")
+    }
+    other => {
+      println(
+        "❌ I expected the command test, generated or sample-build, found '\{other}'.",
+      )
+      @sys.exit(1)
+    }
+  }
+}

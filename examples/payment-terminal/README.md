@@ -39,12 +39,103 @@ gates `payment.start`. The POS callbacks and control notifications have their
 own capability rules. The card entry choice stays part of the payment input.
 
 The build file exports the two accepted services as OpenRPC documents with the
-existing `openrpc` plugin. It writes them under `.dev/out/payment-terminal/`.
+`openrpc` plugin, and generates the MoonBit and Python peers. It writes them
+under `.dev/out/payment-terminal/build/`.
 
 ```shell
 mise exec -- moon run apps/smithy --target native -- build --config examples/payment-terminal/smithy-build.json
 ```
 
-Language generators and sample handlers belong to stages 3 to 5 of
-`smithy-2qe.46`. This stage supplies the shared model and the hand-written
-transcripts for those handlers.
+## Generated peers
+
+`generated/` holds the golden output of the generators. The golden files change
+only on purpose: `mise run codegen:payment-terminal` writes them, and
+`mise run codegen:payment-terminal -- --check` fails when they are not current.
+
+| Directory | Plugin | Peer |
+| --- | --- | --- |
+| `generated/moonbit/pos` | `moonbit-jsonrpc-codegen::moonbit-pos` | `pos`, module `example/pos` |
+| `generated/moonbit/terminal` | `moonbit-jsonrpc-codegen::moonbit-terminal` | `terminal`, module `example/terminal` |
+| `generated/python/pos` | `python-jsonrpc-codegen::python-pos` | `pos`, package `payment_pos` |
+| `generated/python/terminal` | `python-jsonrpc-codegen::python-terminal` | `terminal`, package `payment_terminal` |
+
+`moonbit/` holds the hand-written MoonBit sample: the terminal rules, the POS
+scenarios and the executables `pos_main` and `terminal_main`. `python/` holds
+the Python sample. `mise run sample:build:moonbit` and
+`mise run sample:build:python` build them and write the command manifests
+`.dev/out/payment-terminal/commands/<language>.json`
+(`{"pos": [argv], "terminal": [argv]}`, absolute paths).
+
+## Sample programs
+
+Each language has the same command line, so a POS of one language can use a
+terminal of another.
+
+- Terminal: `<terminal> stdio [--log PATH]` uses Content-Length frames on
+  stdin and stdout. `<terminal> serve --port N [--log PATH]` serves `POST /rpc`
+  and `GET /ws` on 127.0.0.1:N, and writes `listening N` to stderr when it is
+  ready.
+- POS: `<pos> --scenario NAME --connect TARGET [--log PATH] [-- TERMINAL...]`.
+  TARGET is `stdio` (the POS starts the terminal command after `--`),
+  `http://127.0.0.1:N/rpc` or `ws://127.0.0.1:N/ws`. The POS exits with 0 when
+  every check of the scenario passes.
+- `--log PATH` writes one JSON line for each message:
+  `{"dir": "send" | "recv", "message": ...}`, from the view of the writer.
+  Diagnostics go to stderr only.
+
+HTTP follows the Streamable HTTP style. The client posts each message to
+`/rpc`. The server answers a request with a `text/event-stream` response: the
+notifications and requests of its handler come first, then the response. The
+client answers a request from the server with a new POST. The server sets
+`Smithy-Session-Id` on its responses, and the client sends it on each later
+POST. WebSocket carries one message in each text frame.
+
+Check a log with one command. Swap the two `--direction` values for a terminal
+log.
+
+```shell
+smithy validate rpc transcript --protocol example.payments#TerminalProtocol --version 2.0 \
+  --log-preset dir-message --direction send=pos --direction recv=terminal --complete \
+  --expect examples/payment-terminal/scenarios/<scenario>.expect.json \
+  examples/payment-terminal/model.smithy <log.jsonl>
+```
+
+`mise run test:payment-terminal` runs the MoonBit POS against the Python
+terminal over stdio for each scenario, and checks the POS log and the terminal
+log. Normal CI runs it. The manual matrix workflow runs every pair of languages
+over every transport.
+
+## Scenarios
+
+All amounts are in USD, and the card is `**** 4242`. The terminal rules depend
+only on the input:
+
+| Amount cents | Terminal answer |
+| --- | --- |
+| `.13` | `CardDeclined`, data `"test decline"` |
+| `.14` | `CardRemoved`, no data |
+| `.15` | `TerminalBusy`, data `{"retryAfterSeconds": 1}` |
+| `.16` | `Timeout`, no data |
+| `.17` | Progress `insertCard`, then a wait for `$/cancelRequest` |
+| `.21` | Outcome `declined` with reason `test decline` |
+| `.22` | Outcome `partiallyApproved` with 1.00 |
+| other | Progress `insertCard` and `enterPin`, `pos.confirmTip` with 2.50, `pos.requestSignature`, `pos.display`, progress `authorizing`, outcome `approved` with `TEST-OK` |
+
+A POS name that ends with `(no payment)` gets `capabilities: {"payment": false}`.
+The terminal keeps approved payments for status, receipt, refund and void. A
+receipt has the merchant `Test shop` at `Test street`, the lines `Test item` (the
+paid amount) and `Test tip` (2.50), the exact total of the two, and
+`customerCopy: true`. Each page of transactions lists the kept payments with
+`createdAt` 1792886400 and the labels `checkout: test` and `card: **** 4242`; the
+first page has `nextToken: test-page-2`, and the page for that token is empty. A
+refund over the paid amount gives `RefundExceedsAmount` with the paid amount as
+`maximum`. An unknown payment gives `PaymentNotFound`. The POS answers
+`pos.confirmTip` with `true` and `pos.requestSignature` with the base64 text of
+`test-signature`.
+
+| Scenario | POS steps |
+| --- | --- |
+| `payment` | Ping, initialize, pay 20.00 with the callbacks, status, receipt, two pages of transactions, refund 2.50 (the POS checks the exact text `2.50`), void, shutdown, exit. |
+| `errors` | Pay 1.13, 1.14, 1.15 and 1.16 (each modeled error and its data), 1.21 and 1.22 (the outcomes), pay 12345678901234567.00, refund 12345678901234568.00 (the POS checks the exact `maximum` 12345678901234567.00), void an unknown payment, shutdown, exit. |
+| `cancellation` | Pay 12345678901234567.17. On the first progress, the POS sends `$/cancelRequest`, and the terminal answers the payment with `-32800`. Shutdown, exit. |
+| `refusals` | Each refusal twice: first a checked call, which the POS refuses locally with the modeled code and does not send; then an unchecked call, which the terminal refuses with the modeled code. `payment.status` before initialize (1007), `payment.start` without the payment capability (1008), `payment.status` after shutdown (1007). The log has three expected sender findings, in `scenarios/refusals.expect.json`. |

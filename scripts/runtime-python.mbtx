@@ -1,0 +1,177 @@
+///|
+/// Check the Python JSON-RPC runtime and the generated Python peers.
+///
+/// Subcommands:
+///
+/// - `test` (`mise run test:runtime:python`): in `runtimes/python`, run
+///   `uv sync --locked`, then `ruff format --check`, `ruff check`, `pyright`
+///   (strict, from `pyproject.toml`) and `pytest`, all with `uv run --locked`.
+/// - `generated` (`mise run test:generated:python`): check the golden
+///   generated peers in `examples/payment-terminal/generated/python`. One
+///   shared uv project, `examples/payment-terminal/python`, installs both
+///   generated packages (editable path dependencies) and the tools. In each
+///   golden directory, `ruff check`, `pyright` (the strict settings of the
+///   generated `pyproject.toml`) and `pytest` run with that environment. Then
+///   the shared project runs its own checks: the generated POS and terminal
+///   talk to each other in its tests.
+/// - `sample-build` (`mise run sample:build:python`): `uv sync --locked` the
+///   sample project, run its gates (ruff, pyright strict, pytest: each scenario
+///   over stdio, HTTP and WebSocket), and write
+///   `.dev/out/payment-terminal/commands/python.json` with the absolute path of
+///   the Python of `examples/payment-terminal/python/.venv`.
+///
+/// Usage: `moonx scripts/runtime-python.mbtx test` or `... generated`.
+/// It stops at the first step that fails, and exits with the code of that step.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let runtime_dir : String = "runtimes/python"
+
+///|
+/// The shared uv project of the sample programs and the generated peers.
+let samples_dir : String = "examples/payment-terminal/python"
+
+///|
+/// The golden generated peers, and the path of the shared project from each.
+let golden_dirs : Array[String] = [
+  "examples/payment-terminal/generated/python/pos", "examples/payment-terminal/generated/python/terminal",
+]
+
+///|
+let samples_from_golden : String = "../../../python"
+
+///|
+/// The tools write no bytecode and no cache into a golden directory.
+let quiet_env : Map[String, String] = { "PYTHONDONTWRITEBYTECODE": "1" }
+
+///|
+/// Run one uv command in `dir`; exit with its code when it fails.
+async fn step(dir : String, label : String, args : Array[String]) -> Unit {
+  println("▶ \{label} (\{dir})")
+  let code = @process.run(
+    "uv",
+    args,
+    cwd=dir,
+    extra_env=quiet_env,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  ) catch {
+    error => {
+      println("❌ ERROR: I could not start uv for \{label}: \{error}")
+      @sys.exit(1)
+      return
+    }
+  }
+  if code != 0 {
+    println("❌ ERROR: \{label} failed in \{dir} with exit code \{code}")
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+}
+
+///|
+/// The quality gate of a uv project: lock, format, lint, types, tests.
+async fn check_project(dir : String) -> Unit {
+  step(dir, "uv sync --locked", ["sync", "--locked"])
+  step(dir, "ruff format --check", [
+    "run", "--locked", "ruff", "format", "--check",
+  ])
+  step(dir, "ruff check", ["run", "--locked", "ruff", "check"])
+  step(dir, "pyright (strict)", ["run", "--locked", "pyright"])
+  step(dir, "pytest", ["run", "--locked", "pytest", "-q"])
+}
+
+///|
+/// Check one golden directory with the environment of the shared project.
+async fn check_golden(dir : String) -> Unit {
+  let run = ["run", "--locked", "--project", samples_from_golden]
+  step(dir, "ruff check", [..run, "ruff", "check", "--no-cache", "."])
+  step(dir, "pyright (strict)", [..run, "pyright"])
+  step(dir, "pytest", [..run, "pytest", "-q", "-p", "no:cacheprovider"])
+}
+
+///|
+/// The text of a JSON string.
+fn json_text(text : String) -> String {
+  Json::string(text).stringify()
+}
+
+///|
+/// Run the gates of the sample project and write the command manifest of the
+/// Python sample programs.
+async fn sample_build() -> Unit {
+  check_project(samples_dir)
+  let probe = "import sys; print(sys.executable); print(sys.prefix)"
+  let (code, out, err) = @process.collect_output(
+    "uv",
+    ["run", "--locked", "python", "-c", probe],
+    cwd=samples_dir,
+  ) catch {
+    error => {
+      println("❌ ERROR: I could not start uv to find the sample Python: \{error}")
+      @sys.exit(1)
+      return
+    }
+  }
+  let lines = out.text().split("\n").map(line => line.trim_end(chars="\r").to_owned()).filter(line => !line.is_empty()).collect()
+  if code != 0 || lines.length() < 2 {
+    println("❌ ERROR: I could not find the Python of the sample venv: \{err.text()}")
+    @sys.exit(1)
+  }
+  let python = lines[0]
+  let venv = lines[1]
+  let dir = ".dev/out/payment-terminal/commands"
+  if !@fs.exists(dir) {
+    @fs.mkdir(dir, recursive=true)
+  }
+  let pos = [python, "-m", "payment_pos_app"].map(json_text).join(",")
+  let terminal = [python, "-m", "payment_terminal_app"].map(json_text).join(",")
+  @fs.write_file(
+    "\{dir}/python.json",
+    "{\"pos\":[\{pos}],\"terminal\":[\{terminal}]}\n",
+  )
+  println("✓ the sample venv is \{venv}")
+  println("✓ wrote \{dir}/python.json")
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let command = if args.length() > 1 { args[1] } else { "" }
+  match command {
+    "test" => {
+      check_project(runtime_dir)
+      println("✅ The Python JSON-RPC runtime passes ruff, pyright --strict and pytest")
+    }
+    "generated" => {
+      step(samples_dir, "uv sync --locked", ["sync", "--locked"])
+      for dir in golden_dirs {
+        check_golden(dir)
+      }
+      check_project(samples_dir)
+      println("✅ The generated Python peers pass ruff, pyright --strict and pytest")
+    }
+    "sample-build" => {
+      sample_build()
+      println("✅ The Python sample programs pass their checks")
+    }
+    "" => {
+      println(
+        "❌ ERROR: I expected a subcommand (test, generated or sample-build); I found none.",
+      )
+      @sys.exit(2)
+    }
+    other => {
+      println(
+        "❌ ERROR: I expected the subcommand test, generated or sample-build; I found \{other}.",
+      )
+      @sys.exit(2)
+    }
+  }
+}

@@ -1,0 +1,185 @@
+///|
+/// Copy the JSON-RPC runtime sources into the generators, or check the copies.
+///
+/// Each generator embeds the source files of its runtime in `runtime_files.mbt`,
+/// and writes them into the generated output. The runtime in `runtimes/` is
+/// the source of truth: it is real code with its own tests.
+///
+/// Usage: `moonx scripts/runtime-embed.mbtx write` (`mise run runtime:embed`)
+/// or `moonx scripts/runtime-embed.mbtx check` (`mise run runtime:embed:check`).
+/// `check` exits with 1 when an embedded copy differs from its source.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+/// One embedded runtime: its name, the source directory, the generated file and
+/// the file name suffixes that it copies.
+struct Runtime {
+  name : String
+  source : String
+  target : String
+  suffixes : Array[String]
+  extra : Array[String]
+}
+
+///|
+let runtimes : Array[Runtime] = [
+  {
+    name: "MoonBit",
+    source: "runtimes/moonbit/rpc",
+    target: "pkgs/smithy-codegen-moonbit/runtime_files.mbt",
+    suffixes: [".mbt"],
+    extra: ["moon.pkg"],
+  },
+  {
+    name: "Python",
+    source: "runtimes/python/smithy_jsonrpc_runtime",
+    target: "pkgs/smithy-codegen-python/runtime_files.mbt",
+    suffixes: [".py"],
+    extra: ["py.typed"],
+  },
+]
+
+///|
+/// Whether the runtime copies a file: a source suffix and not a test file.
+fn Runtime::copies(self : Runtime, name : String) -> Bool {
+  if self.extra.contains(name) {
+    return true
+  }
+  if name.has_suffix("_test.mbt") || name.has_suffix("_wbtest.mbt") {
+    return false
+  }
+  self.suffixes.iter().any(suffix => name.has_suffix(suffix))
+}
+
+///|
+/// The relative paths of the copied files, in lexical order. The walk keeps its
+/// own stack of directories.
+async fn Runtime::files(self : Runtime) -> Array[String] {
+  let found = []
+  let stack = [""]
+  while stack.pop() is Some(relative) {
+    let dir = if relative.is_empty() {
+      self.source
+    } else {
+      "\{self.source}/\{relative}"
+    }
+    for entry in @fs.readdir(dir) {
+      guard entry != "__pycache__" && entry != "_build" else { continue }
+      let path = if relative.is_empty() { entry } else { "\{relative}/\{entry}" }
+      match @fs.kind("\{self.source}/\{path}") {
+        Directory => stack.push(path)
+        _ => if self.copies(entry) { found.push(path) }
+      }
+    }
+  }
+  found.sort_by((a, b) => a.lexical_compare(b))
+  found
+}
+
+///|
+/// A MoonBit string literal for a short text without control characters.
+fn quote(text : String) -> String {
+  "\"" + text.replace_all(old="\\", new="\\\\").replace_all(old="\"", new="\\\"") +
+  "\""
+}
+
+///|
+/// The text of `runtime_files.mbt`. A file is a multi-line raw string: each
+/// line starts with `#|`, so the text needs no escapes.
+fn render(runtime : Runtime, files : Array[(String, String)]) -> String raise {
+  let out = StringBuilder()
+  out.write_string("///|\n")
+  out.write_string(
+    "/// The source files of the \{runtime.name} JSON-RPC runtime, from `\{runtime.source}`.\n",
+  )
+  out.write_string(
+    "/// `mise run runtime:embed` writes this file; do not edit it.\n",
+  )
+  if files.is_empty() {
+    out.write_string("let runtime_files : Array[(String, String)] = []\n")
+    return out.to_string()
+  }
+  out.write_string("let runtime_files : Array[(String, String)] = [\n")
+  for file in files {
+    let (path, text) = file
+    if text.contains("\r") {
+      fail("I expected LF line ends in \{runtime.source}/\{path}, found a CR character.")
+    }
+    out.write_string("  (\n")
+    out.write_string("    \{quote(path)},\n")
+    out.write_string("    (\n")
+    for line in text.split("\n") {
+      let line = line.to_owned()
+      if line.is_empty() {
+        out.write_string("      #|\n")
+      } else {
+        out.write_string("      #|\{line}\n")
+      }
+    }
+    out.write_string("    ),\n")
+    out.write_string("  ),\n")
+  }
+  out.write_string("]\n")
+  out.to_string()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let mode = if args.length() > 1 { args[1] } else { "check" }
+  guard mode == "write" || mode == "check" else {
+    println("I expected `write` or `check`, found `\{mode}`.")
+    @sys.exit(2)
+  }
+  let mut drift = 0
+  for runtime in runtimes {
+    guard @fs.exists(runtime.source) else {
+      println("I skipped the \{runtime.name} runtime: \{runtime.source} does not exist.")
+      continue
+    }
+    let package_dir = runtime.target[:runtime.target.rev_find("/").unwrap()].to_owned()
+    guard @fs.exists(package_dir) else {
+      println("I skipped the \{runtime.name} runtime: \{package_dir} does not exist.")
+      continue
+    }
+    let files = []
+    for path in runtime.files() {
+      files.push((path, @fs.read_file("\{runtime.source}/\{path}").text()))
+    }
+    let text = render(runtime, files) catch {
+      error => {
+        println(error.to_string())
+        @sys.exit(1)
+        ""
+      }
+    }
+    let current = if @fs.exists(runtime.target) {
+      @fs.read_file(runtime.target).text()
+    } else {
+      ""
+    }
+    if mode == "write" {
+      if current != text {
+        @fs.write_file(runtime.target, text)
+        println("✓ wrote \{runtime.target} (\{files.length()} files)")
+      } else {
+        println("✓ \{runtime.target} is current (\{files.length()} files)")
+      }
+    } else if current != text {
+      println(
+        "❌ \{runtime.target} differs from \{runtime.source}. Run `mise run runtime:embed`.",
+      )
+      drift += 1
+    } else {
+      println("✓ \{runtime.target} matches \{runtime.source}")
+    }
+  }
+  if drift > 0 {
+    @sys.exit(1)
+  }
+}

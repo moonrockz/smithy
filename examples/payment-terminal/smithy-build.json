@@ -1,9 +1,34 @@
 {
   "version": "1.0",
-  "outputDirectory": "../../.dev/out/payment-terminal",
+  "outputDirectory": "../../.dev/out/payment-terminal/build",
   "sources": ["model.smithy"],
   "plugins": {
     "openrpc::terminal": {"service": "example.payments#PaymentTerminal"},
-    "openrpc::pos": {"service": "example.payments#PointOfSale"}
+    "openrpc::pos": {"service": "example.payments#PointOfSale"},
+    "moonbit-jsonrpc-codegen::moonbit-terminal": {
+      "service": "example.payments#PaymentTerminal",
+      "protocol": "example.payments#TerminalProtocol",
+      "peer": "terminal",
+      "module": "example/terminal"
+    },
+    "moonbit-jsonrpc-codegen::moonbit-pos": {
+      "service": "example.payments#PaymentTerminal",
+      "protocol": "example.payments#TerminalProtocol",
+      "peer": "pos",
+      "module": "example/pos"
+    },
+    "python-jsonrpc-codegen::python-terminal": {
+      "service": "example.payments#PaymentTerminal",
+      "protocol": "example.payments#TerminalProtocol",
+      "peer": "terminal",
+      "package": "payment_terminal",
+      "integrations": ["fastapi"]
+    },
+    "python-jsonrpc-codegen::python-pos": {
+      "service": "example.payments#PaymentTerminal",
+      "protocol": "example.payments#TerminalProtocol",
+      "peer": "pos",
+      "package": "payment_pos"
+    }
   }
 }

@@ -1,0 +1,138 @@
+///|
+/// Run the MoonBit POS against the Python terminal over stdio, for each
+/// scenario, and check both recorded transcripts with `smithy validate rpc
+/// transcript`.
+///
+/// The task `test:payment-terminal` first runs `sample:build:moonbit` and
+/// `sample:build:python`, which write the command manifests
+/// `.dev/out/payment-terminal/commands/<lang>.json`. The logs go to
+/// `.dev/out/payment-terminal/logs/`.
+///
+/// Usage: `mise run test:payment-terminal` (all scenarios), or
+/// `mise run test:payment-terminal -- payment refusals`.
+/// It exits with 1 when a scenario or a transcript check fails.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let scenarios : Array[String] = ["payment", "errors", "cancellation", "refusals"]
+
+///|
+let out_dir : String = ".dev/out/payment-terminal"
+
+///|
+let model : String = "examples/payment-terminal/model.smithy"
+
+///|
+/// The POS and terminal commands of a language manifest.
+async fn manifest(lang : String) -> (Array[String], Array[String]) {
+  let path = "\{out_dir}/commands/\{lang}.json"
+  guard @fs.exists(path) else {
+    println("❌ I could not find \{path}. Run `mise run sample:build:\{lang}`.")
+    @sys.exit(1)
+    return ([], [])
+  }
+  let text = @fs.read_file(path).text()
+  let json = @json.parse(text) catch {
+    _ => {
+      println("❌ I expected JSON in \{path}.")
+      @sys.exit(1)
+      Json::null()
+    }
+  }
+  let argv = (key : String) => match json {
+    Object(fields) =>
+      match fields.get(key) {
+        Some(Array(items)) =>
+          items.filter_map(item => if item is String(text) { Some(text) } else { None })
+        _ => []
+      }
+    _ => []
+  }
+  let pos = argv("pos")
+  let terminal = argv("terminal")
+  if pos.is_empty() || terminal.is_empty() {
+    println("❌ I expected the arrays `pos` and `terminal` in \{path}.")
+    @sys.exit(1)
+  }
+  (pos, terminal)
+}
+
+///|
+/// Check one log with the uniform transcript command. `writer` is the peer that
+/// wrote the log; `send` is its direction.
+async fn check_log(log : String, writer : String, scenario : String) -> Bool {
+  let other = if writer == "pos" { "terminal" } else { "pos" }
+  let args = [
+    "run", "apps/smithy", "--target", "native", "--", "validate", "rpc", "transcript",
+    "--protocol", "example.payments#TerminalProtocol", "--version", "2.0", "--log-preset",
+    "dir-message", "--direction", "send=\{writer}", "--direction", "recv=\{other}",
+    "--complete",
+  ]
+  // The expected findings are the sender violations of the POS. A terminal log
+  // has the same entries in the same order.
+  args.append(["--expect", "examples/payment-terminal/scenarios/\{scenario}.expect.json"])
+  args.append([model, log])
+  @process.run("moon", args) == 0
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let selected = if args.length() > 1 { args[1:].to_array() } else { scenarios }
+  for name in selected {
+    guard scenarios.contains(name) else {
+      println("❌ I expected a scenario of \{scenarios.join(", ")}, found `\{name}`.")
+      @sys.exit(2)
+    }
+  }
+  let (pos, _) = manifest("moonbit")
+  let (_, terminal) = manifest("python")
+  let logs = "\{out_dir}/logs"
+  if !@fs.exists(logs) {
+    @fs.mkdir(logs, recursive=true)
+  }
+  let mut failures = 0
+  for scenario in selected {
+    let stem = "\{logs}/moonbit-python-stdio-\{scenario}"
+    let pos_log = "\{stem}.pos.jsonl"
+    let terminal_log = "\{stem}.terminal.jsonl"
+    for log in [pos_log, terminal_log] {
+      if @fs.exists(log) {
+        @fs.remove(log)
+      }
+    }
+    let argv = [..pos[1:].to_array()]
+    argv.append([
+      "--scenario", scenario, "--connect", "stdio", "--log", pos_log, "--",
+    ])
+    argv.append(terminal)
+    argv.append(["stdio", "--log", terminal_log])
+    println("▶ \{scenario}: MoonBit POS -> Python terminal (stdio)")
+    let status = @process.run(pos[0], argv)
+    if status != 0 {
+      println("❌ \{scenario}: the POS exited with status \{status}.")
+      failures += 1
+      continue
+    }
+    if !check_log(pos_log, "pos", scenario) {
+      println("❌ \{scenario}: the POS transcript failed the check.")
+      failures += 1
+    }
+    if !check_log(terminal_log, "terminal", scenario) {
+      println("❌ \{scenario}: the terminal transcript failed the check.")
+      failures += 1
+    }
+  }
+  if failures > 0 {
+    println("❌ \{failures} problem(s) in the payment terminal scenarios.")
+    @sys.exit(1)
+  }
+  println("✅ All payment terminal scenarios passed, with checked transcripts.")
+}

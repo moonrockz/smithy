@@ -1,0 +1,10 @@
+pkgtype(kind: "executable")
+
+import {
+  "example/payment-sample/sample",
+  "example/pos" @gen_pos,
+  "example/pos/rpc" @pos_rpc,
+  "moonbitlang/async",
+  "moonbitlang/core/env",
+  "moonbitlang/x/sys",
+}

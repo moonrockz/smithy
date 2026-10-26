@@ -59,6 +59,8 @@ protocol implementations. Validate case definitions with
 | `pkgs/smithy-build` | `moonrockz/smithy-build` | Build configuration, projections and plugins |
 | `pkgs/smithy-codegen` | `moonrockz/smithy-codegen` | Language-neutral core for code generators: symbols, code writer, delegator and director |
 | `pkgs/smithy-codegen-jsonrpc` | `moonrockz/smithy-codegen-jsonrpc` | Language-neutral JSON-RPC methods, peers and session contracts for code generators |
+| `pkgs/smithy-codegen-moonbit` | `moonrockz/smithy-codegen-moonbit` | MoonBit JSON-RPC peers on moonbitlang/async (plugin `moonbit-jsonrpc-codegen`) |
+| `pkgs/smithy-codegen-python` | `moonrockz/smithy-codegen-python` | Python JSON-RPC peers with Pydantic v2, asyncio and FastAPI (plugin `python-jsonrpc-codegen`) |
 
 | `pkgs/smithy-jsonschema` | `moonrockz/smithy-jsonschema` | Convert assembled value shapes to JSON Schema |
 | `pkgs/smithy-openapi` | `moonrockz/smithy-openapi` | Convert services to OpenAPI with REST JSON and RPC v2 JSON protocols |
@@ -177,6 +179,13 @@ mise run build:native          # native release build
 mise run clean
 mise run build:release         # 4 native binaries (zig), 2 wasm files, dist/ (needs the Windows exe: mise run build:windows)
 mise run test:native-zig       # native tests with zig as the C compiler
+mise run codegen:payment-terminal # regenerate the golden JSON-RPC peers (-- --check fails on drift)
+mise run runtime:embed         # copy runtimes/ into the JSON-RPC generators (validate checks the copy)
+mise run test:runtime:moonbit  # MoonBit JSON-RPC runtime, native
+mise run test:runtime:python   # Python JSON-RPC runtime: ruff, pyright --strict, pytest (uv)
+mise run test:generated:moonbit # check and test the generated MoonBit peers
+mise run test:generated:python # ruff, pyright --strict and pytest on the generated Python peers
+mise run test:payment-terminal # MoonBit POS to Python terminal over stdio, checked transcripts
 mise run release:status        # main, tags, GitHub release and mooncakes.io agree
 mise run smoke:fingerprint     # fingerprint of the smoke inputs (mise run smoke:inputs lists them)
 mise run hooks:install         # git hooks (lefthook)
@@ -209,6 +218,10 @@ smithy/
 ├── pkgs/smithy-ion-validation/ # Optional native Ion validation adapter
 ├── pkgs/smithy-build/         # build projections and plugins
 ├── pkgs/smithy-codegen/       # code generation core
+├── pkgs/smithy-codegen-jsonrpc/ # JSON-RPC contracts and peer settings for generators
+├── pkgs/smithy-codegen-moonbit/ # MoonBit JSON-RPC generator
+├── pkgs/smithy-codegen-python/ # Python JSON-RPC generator
+├── runtimes/                  # JSON-RPC runtimes that the generators copy (MoonBit, Python)
 ├── pkgs/smithy-diff/          # Model compatibility differences
 ├── pkgs/smithy-jsonschema/    # JSON Schema converter
 ├── pkgs/smithy-openapi/       # OpenAPI service converter and protocols

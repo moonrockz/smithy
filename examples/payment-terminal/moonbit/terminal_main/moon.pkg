@@ -1,0 +1,10 @@
+pkgtype(kind: "executable")
+
+import {
+  "example/payment-sample/sample",
+  "example/terminal" @gen_terminal,
+  "example/terminal/rpc" @terminal_rpc,
+  "moonbitlang/async",
+  "moonbitlang/core/env",
+  "moonbitlang/x/sys",
+}

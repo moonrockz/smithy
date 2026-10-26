@@ -4,3 +4,6 @@
 *.mbtx text eol=lf
 *.toml text eol=lf
 site/landing/sample/* text eol=lf
+# The JSON-RPC generators embed the runtimes and compare golden files byte for byte.
+runtimes/** text eol=lf
+examples/payment-terminal/generated/** text eol=lf
