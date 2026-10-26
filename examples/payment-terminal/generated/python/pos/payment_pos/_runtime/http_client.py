@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -26,12 +27,94 @@ from .json_codec import loads
 
 _LOG = logging.getLogger(__name__)
 
+MAX_EVENT_BYTES = 16 * 1024 * 1024
+"""The most bytes of one event-stream line, of the joined data of one event,
+and of one JSON response body. It is the input limit of the message validator,
+so a larger message could not pass a transcript check."""
+
+
+class StreamLimitError(ConnectionError):
+    """A response of the server is larger than the limit of the client."""
+
+
+async def read_events(
+    chunks: AsyncIterator[bytes], *, limit: int = MAX_EVENT_BYTES
+) -> AsyncIterator[str]:
+    """Give the data of each event of an event stream.
+
+    The reader keeps at most `limit` bytes of one line and of the data of one
+    event, so a server that holds an event open cannot grow the memory of the
+    client without bound.
+    """
+    data: list[str] = []
+    data_bytes = 0
+    pending = bytearray()
+
+    def handle(raw: bytes) -> str | None:
+        nonlocal data_bytes
+        line = raw.decode("utf-8", errors="replace").removesuffix("\r")
+        if line == "":
+            if not data:
+                return None
+            event = "\n".join(data)
+            data.clear()
+            data_bytes = 0
+            return event
+        if line.startswith(":"):
+            return None
+        name, _, value = line.partition(":")
+        if name == "data":
+            data_bytes += len(raw) + 1
+            if data_bytes > limit:
+                raise StreamLimitError(
+                    "I expected the data of one event-stream event to be at most "
+                    f"{limit} bytes, found more."
+                )
+            data.append(value.removeprefix(" "))
+        return None
+
+    async for chunk in chunks:
+        start = 0
+        while (end := chunk.find(b"\n", start)) >= 0:
+            pending += chunk[start:end]
+            event = handle(bytes(pending))
+            pending.clear()
+            if event is not None:
+                yield event
+            start = end + 1
+        pending += chunk[start:]
+        if len(pending) > limit:
+            raise StreamLimitError(
+                f"I expected an event-stream line of at most {limit} bytes, found more."
+            )
+    if pending:
+        event = handle(bytes(pending))
+        if event is not None:
+            yield event
+    if data:
+        yield "\n".join(data)
+
+
+async def read_body(chunks: AsyncIterator[bytes], *, limit: int = MAX_EVENT_BYTES) -> str:
+    """Read a JSON response body of at most `limit` bytes."""
+    body = bytearray()
+    async for chunk in chunks:
+        body += chunk
+        if len(body) > limit:
+            raise StreamLimitError(
+                f"I expected a JSON response body of at most {limit} bytes, found more."
+            )
+    return body.decode("utf-8")
+
 
 class HttpClientConnection:
     """A connection to a JSON-RPC peer at an HTTP endpoint."""
 
-    def __init__(self, url: str, client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self, url: str, client: httpx.AsyncClient | None = None, *, limit: int = MAX_EVENT_BYTES
+    ) -> None:
         self.url = url
+        self._limit = limit
         self.session_id: str | None = None
         self._client = (
             client
@@ -96,7 +179,7 @@ class HttpClientConnection:
                 task.add_done_callback(self._readers.discard)
                 return
             try:
-                body = (await response.aread()).decode("utf-8")
+                body = await read_body(response.aiter_bytes(), limit=self._limit)
             finally:
                 await response.aclose()
             if body.strip():
@@ -122,20 +205,10 @@ class HttpClientConnection:
             self._inbox.put_nowait(message)
 
         try:
-            async for raw in response.aiter_lines():
-                line = raw.rstrip("\r\n")
-                if line == "":
-                    if data:
-                        deliver()
-                    continue
-                if line.startswith(":"):
-                    continue
-                name, _, value = line.partition(":")
-                if name == "data":
-                    data.append(value.removeprefix(" "))
-            if data:
+            async for event in read_events(response.aiter_bytes(), limit=self._limit):
+                data.append(event)
                 deliver()
-        except httpx.HTTPError as error:
+        except (httpx.HTTPError, StreamLimitError) as error:
             problem = f"the stream failed: {error}"
         finally:
             await response.aclose()

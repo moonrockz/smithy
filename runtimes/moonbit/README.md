@@ -37,6 +37,9 @@ The task runs `moon check --deny-warn` and `moon test --target native` in `runti
 
 - `parse_json` accepts at most `max_json_depth` (1000) nested arrays and objects. The generated
   decoders recurse once for each level of a recursive shape, so this limit also bounds their stack.
+- The HTTP client reads at most `max_event_bytes` (16 MiB) of one event-stream line, of the joined
+  data of one event, and of one JSON response body. A larger response fails its call with a
+  `TransportError`, so a server that holds an event open cannot grow the memory of the client.
 - `required` fails only for an absent member. A null member is given to the decoder of its type: a
   Document member keeps `null`, and every other type rejects it. An optional member that is `null` is
   absent, so an optional Document member set to `Some(Json::null())` is written as `null` and read back

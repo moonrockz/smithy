@@ -270,28 +270,42 @@ let runtime_files : Array[(String, String)] = [
       #|}
       #|
       #|///|
+      #|/// The most bytes of one event-stream line, of the joined data of one event,
+      #|/// and of one JSON response body. It is the input limit of the message
+      #|/// validator, so a larger message could not pass a transcript check.
+      #|pub let max_event_bytes : Int32 = 16 * 1024 * 1024
+      #|
+      #|///|
       #|/// Reads the events of an SSE stream, and gives the data of each event to
-      #|/// `deliver`.
+      #|/// `deliver`. The reader keeps at most `limit` bytes of one line and of the
+      #|/// data of one event: a server that holds an event open cannot grow the
+      #|/// memory of the client without bound.
       #|async fn[R : @io.Reader] read_events(
       #|  reader : R,
       #|  deliver : async (String) -> Unit,
+      #|  limit~ : Int32 = max_event_bytes,
       #|) -> Unit {
       #|  let data : Array[String] = []
-      #|  while reader.read_until("\n") is Some(raw) {
-      #|    let line = if raw.has_suffix("\r") {
-      #|      raw[:raw.length() - 1].to_owned()
+      #|  let mut data_bytes = 0
+      #|  // The bytes of the line that has no newline yet.
+      #|  let pending = Buffer()
+      #|  let handle = async fn(raw : Bytes) {
+      #|    let line = @utf8.decode_lossy(raw)
+      #|    let line = if line.has_suffix("\r") {
+      #|      line[:line.length() - 1].to_owned()
       #|    } else {
-      #|      raw
+      #|      line
       #|    }
       #|    if line == "" {
       #|      if !data.is_empty() {
       #|        deliver(data.join("\n"))
       #|        data.clear()
+      #|        data_bytes = 0
       #|      }
-      #|      continue
+      #|      return
       #|    }
       #|    if line.has_prefix(":") {
-      #|      continue
+      #|      return
       #|    }
       #|    let (field, value) = match line.find(":") {
       #|      Some(i) => {
@@ -308,12 +322,57 @@ let runtime_files : Array[(String, String)] = [
       #|      None => (line, "")
       #|    }
       #|    if field == "data" {
+      #|      data_bytes += raw.length() + 1
+      #|      if data_bytes > limit {
+      #|        raise TransportError(
+      #|          "I expected the data of one event-stream event to be at most \{limit} bytes, found more.",
+      #|        )
+      #|      }
       #|      data.push(value)
       #|    }
+      #|  }
+      #|  while reader.read_some(max_len=65536) is Some(chunk) {
+      #|    let mut start = 0
+      #|    for i in 0..<chunk.length() {
+      #|      if chunk[i] == b'\n' {
+      #|        pending.write_bytesview(chunk[start:i])
+      #|        let raw = pending.to_bytes()
+      #|        pending.reset()
+      #|        handle(raw)
+      #|        start = i + 1
+      #|      }
+      #|    }
+      #|    pending.write_bytesview(chunk[start:])
+      #|    if pending.length() > limit {
+      #|      raise TransportError(
+      #|        "I expected an event-stream line of at most \{limit} bytes, found more.",
+      #|      )
+      #|    }
+      #|  }
+      #|  if pending.length() > 0 {
+      #|    handle(pending.to_bytes())
       #|  }
       #|  if !data.is_empty() {
       #|    deliver(data.join("\n"))
       #|  }
+      #|}
+      #|
+      #|///|
+      #|/// Reads a JSON response body of at most `limit` bytes.
+      #|async fn[R : @io.Reader] read_body(
+      #|  reader : R,
+      #|  limit~ : Int32 = max_event_bytes,
+      #|) -> String {
+      #|  let body = Buffer()
+      #|  while reader.read_some(max_len=65536) is Some(chunk) {
+      #|    body.write_bytes(chunk)
+      #|    if body.length() > limit {
+      #|      raise TransportError(
+      #|        "I expected a JSON response body of at most \{limit} bytes, found more.",
+      #|      )
+      #|    }
+      #|  }
+      #|  @utf8.decode_lossy(body.to_bytes())
       #|}
       #|
       #|///|
@@ -405,7 +464,7 @@ let runtime_files : Array[(String, String)] = [
       #|        }
       #|      })
       #|    200 => {
-      #|      let reply = client.read_all().text()
+      #|      let reply = read_body(client)
       #|      client.close()
       #|      if reply.trim().to_owned() != "" {
       #|        self.inbox.put(Frame(reply))

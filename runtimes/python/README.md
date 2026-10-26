@@ -50,3 +50,10 @@ mise run test:runtime:python
 
 The task runs `uv sync --locked`, `ruff format --check`, `ruff check`, `pyright` in strict mode and
 `pytest`. All dependency versions are pinned in `pyproject.toml` and locked in `uv.lock`.
+
+## Limits
+
+The HTTP client reads at most `MAX_EVENT_BYTES` (16 MiB) of one event-stream line, of the joined
+data of one event, and of one JSON response body. A larger response fails its call
+(`StreamLimitError`, a `ConnectionError`), so a server that holds an event open cannot grow the
+memory of the client. Pass `limit=` to `HttpClientConnection` for a different limit.
