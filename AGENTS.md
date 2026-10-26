@@ -96,17 +96,25 @@ enforce:
 
 ## JSON-RPC generators
 
-`pkgs/smithy-codegen-moonbit` and `pkgs/smithy-codegen-python` generate JSON-RPC peers (plugins
-`moonbit-jsonrpc-codegen` and `python-jsonrpc-codegen`). They read the prepared contracts of
-`pkgs/smithy-codegen-jsonrpc`; they do not read the RPC traits a second time.
+`pkgs/smithy-codegen-moonbit`, `pkgs/smithy-codegen-python` and `pkgs/smithy-codegen-go`
+generate JSON-RPC peers. Their plugins are `moonbit-jsonrpc-codegen`,
+`python-jsonrpc-codegen` and `go-jsonrpc-codegen`. They read the prepared contracts
+of `pkgs/smithy-codegen-jsonrpc`; they do not read the RPC traits a second time.
 
-- The runtimes are real code in `runtimes/moonbit` and `runtimes/python`, with their own tests
-  (`mise run test:runtime:moonbit`, `mise run test:runtime:python`). After a runtime change, run
-  `mise run runtime:embed`; `mise run validate` fails when an embedded copy differs.
-- `examples/payment-terminal/generated/` holds golden output. Regenerate it on purpose with
-  `mise run codegen:payment-terminal` and read the diff; CI runs it with `-- --check`.
-- Python uses the uv version in mise and locked dependencies (`uv.lock`); never add an unpinned
-  dependency to a generated `pyproject.toml`.
+- The runtimes are real code in `runtimes/moonbit`, `runtimes/python` and `runtimes/go`,
+  with their own tests. Use `mise run test:runtime:moonbit`, `mise run test:runtime:python`
+  and `mise run test:jsonrpc:go` for the language gates.
+- After a MoonBit or Python runtime change, run `mise run runtime:embed`. After a Go
+  runtime change, run `mise run jsonrpc:go:runtime`. `mise run validate` fails when an
+  embedded copy differs.
+- `examples/payment-terminal/generated/` holds golden output. Regenerate MoonBit and
+  Python with `mise run codegen:payment-terminal`, and Go with `mise run codegen:go`.
+  Read each diff. CI checks both tasks with `-- --check`.
+- Python uses the uv version in mise and locked dependencies. Go uses pinned `go.mod`
+  and `go.sum` files. Do not add unpinned generated dependencies.
+- The manual `jsonrpc-matrix.yml` workflow checks all 27 language and transport pairs.
+  Each pair runs all four scenarios and checks its logs. See
+  `examples/payment-terminal/INTEROPERABILITY.md` for commands and build provenance.
 
 ## Tour
 
@@ -154,7 +162,7 @@ Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every 
   - `smoke` (`.github/workflows/smoke.yml`, shared with CI) runs `smithy version` from each archive on a runner
     of its own OS. A release always smokes the bytes that it publishes.
   - `publish` (`release:credentials`, `release:publish`) publishes the modules in `scripts/publish.mbtx`:
-    `pkgs/artifact-resources`, `pkgs/jmespath`, `pkgs/smithy-syntax`, `pkgs/smithy`, `pkgs/smithy-validation`, `pkgs/smithy-ion-validation`, `pkgs/smithy-build`, `pkgs/smithy-codegen`, `pkgs/smithy-codegen-jsonrpc`, `pkgs/smithy-codegen-moonbit`, `pkgs/smithy-codegen-python`, `pkgs/smithy-diff`, `pkgs/smithy-jsonschema`, `pkgs/smithy-openapi`, `pkgs/smithy-openrpc`
+    `pkgs/artifact-resources`, `pkgs/jmespath`, `pkgs/smithy-syntax`, `pkgs/smithy`, `pkgs/smithy-validation`, `pkgs/smithy-ion-validation`, `pkgs/smithy-build`, `pkgs/smithy-codegen`, `pkgs/smithy-codegen-jsonrpc`, `pkgs/smithy-codegen-moonbit`, `pkgs/smithy-codegen-python`, `pkgs/smithy-codegen-go`, `pkgs/smithy-diff`, `pkgs/smithy-jsonschema`, `pkgs/smithy-openapi`, `pkgs/smithy-openrpc`
     and `apps/smithy`. It needs the `MOONCAKES_USER_TOKEN` org secret. It runs after
     `smoke`, because a mooncakes.io version is permanent.
   - `release` (`release:notes`, `release:github`) creates the tag and the GitHub release with the 8 assets.

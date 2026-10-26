@@ -1,0 +1,113 @@
+///|
+/// Generate the payment Go peers and check or update their golden files.
+/// Usage: mise run codegen:go [-- --check].
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+fn golden_peer_path(peer : String) -> String {
+  "examples/payment-terminal/generated/go/" + peer
+}
+
+///|
+test "each Go peer has its own golden directory" {
+  assert_eq(
+    golden_peer_path("pos"),
+    "examples/payment-terminal/generated/go/pos",
+  )
+  assert_eq(
+    golden_peer_path("terminal"),
+    "examples/payment-terminal/generated/go/terminal",
+  )
+}
+
+///|
+async fn checked(command : String, args : Array[String]) -> Unit {
+  let code = @process.run(
+    command,
+    args,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  if code != 0 {
+    @sys.exit(1)
+  }
+}
+
+///|
+/// List relative source paths with a stack. Do not include Go build caches.
+async fn source_files(root : String) -> Array[String] {
+  let files = []
+  let pending = [""]
+  while pending.pop() is Some(relative) {
+    for name in @fs.readdir(root + "/" + relative) {
+      let path = if relative.is_empty() { name } else { relative + "/" + name }
+      if @fs.kind(root + "/" + path) is Directory {
+        pending.push(path)
+      } else {
+        files.push(path)
+      }
+    }
+  }
+  files.sort_by((a, b) => a.lexical_compare(b))
+  files
+}
+
+///|
+async fn main {
+  let check = @env.args().contains("--check")
+  checked("moon", [
+    "run", "apps/smithy", "--target", "native", "--", "build", "--config", "examples/payment-terminal/go/smithy-build.json",
+  ])
+  let mut failed = false
+  for peer in ["pos", "terminal"] {
+    let source = ".dev/out/payment-terminal-go/source/" + peer
+    let target = golden_peer_path(peer)
+    let paths = source_files(source)
+    if !check && @fs.exists(target) {
+      @fs.rmdir(target, recursive=true)
+    }
+    if check && @fs.exists(target) {
+      let existing = source_files(target)
+      if existing != paths {
+        eprintln(
+          "I found a Go golden file list that differs for peer `" + peer + "`.",
+        )
+        failed = true
+      }
+    }
+    for path in paths {
+      let content = @fs.read_file(source + "/" + path).text()
+      if check {
+        if !@fs.exists(target + "/" + path) ||
+          @fs.read_file(target + "/" + path).text() != content {
+          eprintln(
+            "I found a Go golden file that differs: `" +
+            target +
+            "/" +
+            path +
+            "`.",
+          )
+          failed = true
+        }
+      } else {
+        let parts = (target + "/" + path)
+          .split("/")
+          .map(s => s.to_owned())
+          .to_array()
+        ignore(parts.pop())
+        @fs.mkdir(parts.join("/"), recursive=true, allow_exist=true)
+        @fs.write_file(target + "/" + path, content)
+      }
+    }
+  }
+  if failed {
+    @sys.exit(1)
+  }
+}

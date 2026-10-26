@@ -93,7 +93,7 @@ run = "moonx scripts/lint-yaml.mbtx"
 
 [tasks.validate]
 description = "Run all validation checks"
-depends = ["validate:packages", "validate:versions", "regex:vendor:check", "runtime:embed:check"]
+depends = ["validate:packages", "validate:versions", "regex:vendor:check", "runtime:embed:check", "jsonrpc:go:runtime:check"]
 
 [tasks."validate:packages"]
 description = "Verify the workspace package structure against moon.work"
@@ -368,3 +368,28 @@ run = "moonx scripts/codegen-payment-terminal.mbtx"
 description = "Run the MoonBit POS against the Python terminal over stdio and check each transcript"
 depends = ["sample:build:moonbit", "sample:build:python"]
 run = "moonx scripts/payment-terminal.mbtx"
+[tasks."jsonrpc:go:runtime"]
+description = "Embed the Go runtime source in the Go generator (use --check to check drift)"
+run = "moonx scripts/jsonrpc-go-runtime.mbtx"
+
+[tasks."codegen:go"]
+description = "Generate the payment Go golden files (use --check to check drift)"
+run = "moonx scripts/jsonrpc-go-golden.mbtx"
+
+[tasks."test:jsonrpc:go"]
+description = "Run gofmt, build, vet and tests on the Go runtime, generated peers and handlers"
+tools = { go = "1.27.3" }
+run = "moonx scripts/test-jsonrpc-go.mbtx"
+
+[tasks."test:jsonrpc:matrix"]
+description = "Run and validate all 27 generated-peer language and transport combinations"
+run = "moonx scripts/jsonrpc-matrix.mbtx"
+
+[tasks."sample:build:go"]
+description = "Build the Go payment POS and terminal once for sample runs"
+tools = { go = "1.27.3" }
+run = "moonx scripts/build-payment-go.mbtx"
+
+[tasks."jsonrpc:go:runtime:check"]
+description = "Check the embedded Go runtime against its tested source files"
+run = "moonx scripts/jsonrpc-go-runtime.mbtx --check"
