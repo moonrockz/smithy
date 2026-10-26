@@ -2835,8 +2835,10 @@ let runtime_files : Array[(String, String)] = [
       #|///|
       #|/// A child process as a connection: frames are written to its stdin and
       #|/// read from its stdout. Its stderr is the stderr of this process.
+      #|/// The caller owns `group` for `@process.spawn` and must keep that group
+      #|/// alive for peer I/O and for `wait`.
       #|struct ProcessConnection {
-      #|  pid : Int32
+      #|  process : @process.Process
       #|  reader : @process.ReadFromProcess
       #|  writer : @process.WriteToProcess
       #|  /// True after `close`: the stdin of the child is closed.
@@ -2846,9 +2848,13 @@ let runtime_files : Array[(String, String)] = [
       #|}
       #|
       #|///|
-      #|/// Starts `argv` as a child process and connects to its stdio. A command
-      #|/// without a `/` is searched in PATH; an absolute path is the safe choice.
-      #|pub async fn spawn_stdio(argv : Array[String]) -> ProcessConnection {
+      #|/// Starts `argv` as a child process in `group` and connects to its stdio.
+      #|/// A command without a `/` is searched in PATH; an absolute path is the safe
+      #|/// choice. `group` must outlive peer I/O and `ProcessConnection::wait`.
+      #|pub async fn[X] spawn_stdio(
+      #|  group : @async.TaskGroup[X],
+      #|  argv : Array[String],
+      #|) -> ProcessConnection {
       #|  guard argv.length() > 0 else {
       #|    raise TransportError(
       #|      "I expected a command to start, found an empty argument list.",
@@ -2856,25 +2862,27 @@ let runtime_files : Array[(String, String)] = [
       #|  }
       #|  let (child_in, writer) = @process.write_to_process()
       #|  let (reader, child_out) = @process.read_from_process()
-      #|  let pid = @process.spawn_orphan(
+      #|  let process = @process.spawn(
+      #|    group,
       #|    argv[0],
       #|    argv[1:],
       #|    stdin=child_in,
       #|    stdout=child_out,
       #|  )
-      #|  { pid, reader, writer, closed: false, ended: false, }
+      #|  { process, reader, writer, closed: false, ended: false, }
       #|}
       #|
       #|///|
       #|/// The process ID of the child.
       #|pub fn ProcessConnection::pid(self : ProcessConnection) -> Int32 {
-      #|  self.pid
+      #|  self.process.pid
       #|}
       #|
       #|///|
-      #|/// Waits until the child ends, and gives its exit code.
+      #|/// Waits until the child ends, and gives its exit code. Uses the retained
+      #|/// `@process.Process` handle, so a late wait after the child exits is safe.
       #|pub async fn ProcessConnection::wait(self : ProcessConnection) -> Int32 {
-      #|  @process.wait_pid(self.pid)
+      #|  self.process.wait()
       #|}
       #|
       #|///|
