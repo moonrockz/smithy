@@ -63,6 +63,33 @@ their output. Nothing in it is committed. This overrides the default location of
 - Never put a spec or plan under `docs/`, and never `git add` anything under `.dev/`. When a design is
   final and meant for readers, write it up on purpose in a committed location.
 
+## OpenSpec
+
+Use [OpenSpec](openspec/README.md) for spec-driven changes. Its versioned changes and capability specs live
+in `openspec/` and are committed. This is an explicit exception to the scratch-document rule above.
+Superpowers documents and other scratch work still belong in `.dev/`.
+
+- `openspec/config.yaml` selects the project-local `html-design` schema. Read the CLI's instructions for each
+  artifact and operation; they carry the HTML and beads rules to every agent.
+- A change has `proposal.md`, spec deltas, `design.html` and `tasks.md`. Keep the CLI-parsed files in Markdown.
+  Write designs as standalone HTML with inline CSS for light/dark mode and inline SVG where useful. Generated
+  skills may say `design.md`; use the schema's actual `design.html` path and CLI status instead.
+- Search beads before creating work. Each change has an epic bead linked with
+  `--spec-id openspec/changes/<name>` and named in the proposal's `## Beads` section. Reuse existing work where
+  possible; otherwise parent the epic under the relevant Smithy epic, defaulting to `smithy-2qe`.
+- Each numbered task group has one child task bead, named in its heading: `## 1. Setup (smithy-abcd.1)`.
+  Checkboxes do not each need a bead. Record group dependencies with `bd dep add <later> <earlier>`.
+- Claim work before starting. Verify before checking off tasks; close a group bead only when all its tasks
+  are complete, recording actual checks and any commit range. Report blockers in beads and leave tasks open.
+- After archive, relink the epic and all group beads to the archived path. Close the epic when all groups
+  are closed and the change is complete. Run `bd sync` at session end. These steps do not authorize a source
+  commit, push, merge or release.
+
+The generated `openspec-*` skills are installed for Codex and other `.agents` readers, Claude Code, Copilot,
+Cursor, Gemini CLI and OpenCode. Do not hand-edit them. Change the schema/config for project overrides;
+use the pinned CLI and `openspec update` to regenerate skills. Agents without skill discovery can read
+`.agents/skills/openspec-<workflow>/SKILL.md` directly after this file. See `openspec/README.md` for setup.
+
 ## Syntax module
 
 `pkgs/smithy-syntax` is the IDL syntax layer. Its design is

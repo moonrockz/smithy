@@ -158,6 +158,9 @@ mise run hooks:install
 
 The pre-commit hook checks formatting and runs `moon check`. The pre-push hook runs lint, validate and test.
 
+For spec-driven work with coding agents, see [OpenSpec setup and workflow](openspec/README.md).
+The shared schema uses standalone HTML designs and links changes and task groups to Smithy's beads tracker.
+
 ## Tasks
 
 Every task is a MoonBit script in `scripts/*.mbtx`, run with `moonx`, so one script works on every platform.
