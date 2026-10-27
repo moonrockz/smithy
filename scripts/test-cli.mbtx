@@ -433,7 +433,41 @@ async fn exercise_diff_jsonl(runner : Runner, root : String) -> Unit {
 }
 
 ///|
+async fn exercise_rpc_server_errors(runner : Runner, root : String) -> Unit {
+  let model = @fs.read_file(root + "/examples/json-rpc/server-errors.smithy").text()
+  let base = ["validate", "rpc", "--version", "2.0", "--service", "servererrors#Api", "--response", "server-reply.json", "--method", "initialize", "--diagnostics", "json", "server-errors.smithy"]
+  for (policy, status, findings) in [("accept", 0, 0), ("advisory", 0, 1), ("error", 1, 1), ("default", 0, 0)] {
+    let source = if policy == "default" {
+      model.replace_all(old=", undeclaredServerErrors: \"advisory\"", new="")
+    } else {
+      model.replace_all(old="\"advisory\"", new="\"\{policy}\"")
+    }
+    @fs.write_file(runner.dir + "/server-errors.smithy", source)
+    @fs.write_file(runner.dir + "/server-reply.json", "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32050,\"message\":\"failure\"}}")
+    let (out, _) = runner.command(base, status)
+    guard @json.parse(out) is { "findings": Array(actual), "valid": valid, .. } else { fail("Expected server error report") }
+    assert_eq(actual.length(), findings, msg=policy)
+    assert_eq(valid, Json::boolean(status == 0), msg=policy)
+    if findings == 1 {
+      assert_true(actual[0] is { "code": String("UnknownError"), "pointer": String("/error/code"), .. })
+      let severity = if policy == "advisory" { "advisory" } else { "error" }
+      assert_true(actual[0] is { "severity": String(found), .. } && found == severity)
+    }
+    for (data, expected) in [
+      (",\"data\":{\"hostVersions\":{},\"extensionVersions\":{}}", 0),
+      (",\"data\":{\"hostVersions\":{}}", 1),
+    ] {
+      @fs.write_file(runner.dir + "/server-reply.json", "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32011,\"message\":\"version mismatch\"" + data + "}}")
+      let (out, _) = runner.command(base, expected)
+      if expected == 1 {
+        assert_true(out.contains("RequiredMember") && out.contains("/error/data/extensionVersions"))
+      }
+    }
+  }
+}
+
 async fn exercise_rpc_responses(runner : Runner, root : String, skip_stdin : Bool) -> Unit {
+  exercise_rpc_server_errors(runner, root)
   let model = @fs.read_file(root + "/examples/json-rpc/responses.smithy").text()
   @fs.write_file(runner.dir + "/responses.smithy", model)
   let base = ["validate", "rpc", "--version", "2.0", "--service", "example#Replies", "--response", "reply.json", "responses.smithy", "--diagnostics", "json"]

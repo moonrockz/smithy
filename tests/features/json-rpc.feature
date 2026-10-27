@@ -1,6 +1,26 @@
 Feature: JSON-RPC requests notifications and batches
   A Smithy service defines the methods whose incoming JSON messages are checked.
 
+  Scenario: A declared service server error validates its structured data
+    Given the server error API prepared with policy "accept"
+    When I validate the initialize response "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32011,\"message\":\"version mismatch\",\"data\":{\"hostVersions\":{},\"extensionVersions\":{}}}}"
+    Then the RPC response has no findings
+    When I validate the initialize response "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32011,\"message\":\"version mismatch\",\"data\":{\"hostVersions\":{}}}}"
+    Then the RPC response finding is "RequiredMember" at "/error/data/extensionVersions"
+
+  Scenario: An undeclared server error follows the service policy
+    Given the server error API prepared with policy "accept"
+    When I validate the initialize response "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32050,\"message\":\"failure\"}}"
+    Then the RPC response has no findings
+    Given the server error API prepared with policy "advisory"
+    When I validate the initialize response "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32050,\"message\":\"failure\"}}"
+    Then the RPC response finding is "UnknownError" at "/error/code"
+    And the RPC response severity is "advisory"
+    Given the server error API prepared with policy "error"
+    When I validate the initialize response "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32050,\"message\":\"failure\"}}"
+    Then the RPC response finding is "UnknownError" at "/error/code"
+    And the RPC response severity is "error"
+
   Scenario: Version 2 positional calls use the explicit input order
     Given the calculator API prepared for JSON-RPC "2.0"
     When I validate the RPC message "{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,23],\"id\":1}"

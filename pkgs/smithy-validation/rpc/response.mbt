@@ -409,7 +409,7 @@ fn PreparedService::validate_response_checked(
       }
       let code_path = field("error").field("code") catch { _ => root }
       if response_code is Some(code) {
-        if code.is_reserved() {
+        if code.is_reserved() && !code.is_server() {
           kind = Some(ProtocolError)
           if !code.is_protocol() {
             emit(
@@ -419,22 +419,44 @@ fn PreparedService::validate_response_checked(
             )
           }
         } else {
-          kind = Some(ApplicationError)
+          let server = code.is_server()
+          let label = if server { "server" } else { "application" }
+          kind = Some(if server { ProtocolError } else { ApplicationError })
           if method_ is None && scope == RequestContext {
             emit(
               LimitedScope,
               field("error"),
-              "I could not check application error data without a modeled method for the original request.",
+              "I could not check \{label} error data without a modeled method for the original request.",
             )
           }
           if method_ is Some(method_) {
             match method_.errors.iter().find_first(e => e.code == code) {
-              None =>
-                emit(
-                  UnknownError,
-                  code_path,
-                  "I expected an application error code modeled for the selected operation.",
-                )
+              None => {
+                let severity = if server {
+                  match self.undeclared_server_errors {
+                    Accept => None
+                    Advisory => Some(@validation.Advisory)
+                    Error => Some(@validation.Error)
+                  }
+                } else {
+                  Some(@validation.Error)
+                }
+                if severity is Some(severity) {
+                  findings.push({
+                    code: UnknownError,
+                    path: code_path,
+                    message: if server {
+                      "I expected a server error code modeled for the selected operation."
+                    } else {
+                      "I expected an application error code modeled for the selected operation."
+                    },
+                    shape: operation.unwrap_or(self.service),
+                    operation,
+                    offset: None,
+                    severity,
+                  })
+                }
+              }
               Some(mapping) => {
                 let path = field("error").field("data") catch { _ => root }
                 match (mapping.data_validator, error_fields.get("data")) {
@@ -446,7 +468,7 @@ fn PreparedService::validate_response_checked(
                       operation,
                       offset: None,
                       severity: @validation.Error,
-                      message: "I expected absent data for the selected application error.",
+                      message: "I expected absent data for the selected \{label} error.",
                     })
                   (Some(validator), Some(data)) => {
                     let checked = validator.validate(
@@ -465,7 +487,7 @@ fn PreparedService::validate_response_checked(
                         operation,
                         offset: None,
                         severity: @validation.Error,
-                        message: "I expected data for the selected application error contract.",
+                        message: "I expected data for the selected \{label} error contract.",
                       })
                     }
                   (None, None) => ()

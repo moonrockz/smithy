@@ -38,11 +38,11 @@ fn ErrorCode::is_reserved(self : ErrorCode) -> Bool {
 fn ErrorCode::is_protocol(self : ErrorCode) -> Bool {
   ["-32700", "-32600", "-32601", "-32602", "-32603"]
   .iter()
-  .any(s => self == error_code(s)) ||
-  (
-    self.number.numeric_compare(@smithy.NodeNumber::parse("-32099").unwrap()) >=
-    0 &&
-    self.number.numeric_compare(@smithy.NodeNumber::parse("-32000").unwrap()) <=
-    0
-  )
+  .any(s => self == error_code(s))
+}
+
+///|
+fn ErrorCode::is_server(self : ErrorCode) -> Bool {
+  self.number.numeric_compare(@smithy.NodeNumber::parse("-32099").unwrap()) >= 0 &&
+  self.number.numeric_compare(@smithy.NodeNumber::parse("-32000").unwrap()) <= 0
 }

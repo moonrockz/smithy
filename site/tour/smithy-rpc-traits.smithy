@@ -1,7 +1,15 @@
 $version: "2"
 namespace smithy.rpc
 @trait(selector: "service")
-structure jsonRpc { @required versions: Versions }
+structure jsonRpc {
+  @required versions: Versions
+  undeclaredServerErrors: UndeclaredServerErrors
+}
+enum UndeclaredServerErrors {
+  ACCEPT = "accept"
+  ADVISORY = "advisory"
+  ERROR = "error"
+}
 @length(min: 1)
 list Versions { member: Version }
 enum Version {

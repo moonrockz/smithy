@@ -67,9 +67,9 @@ The opt-in `smithy.rpc` trait model supplies:
 
 | Trait | Contract |
 |---|---|
-| Service `jsonRpc` | Explicit supported versions. |
+| Service `jsonRpc` | Explicit supported versions; `undeclaredServerErrors` is `accept` (default), `advisory` or `error`. |
 | Operation `method` | Nonempty wire name, parameter mode named/positional/either, explicit positional input-member order, and result selection. |
-| Error `rpcError` | Integer application code and error-data selection. |
+| Error `rpcError` | Integer application or implementation server code and error-data selection. |
 
 Inputs and outputs remain Smithy structures. Result selection is OutputStructure, OutputMember or
 Null. `resultMember` selects a member contract so its wire result may be scalar, array, object or
@@ -79,7 +79,7 @@ explicit absent-data mode. A data member selector cannot coexist with absent-dat
 
 Request preparation rejects duplicate wire names, undeclared result member selectors, incomplete
 or repeated positional ordering and mappings incompatible with a declared protocol version.
-Preparation also rejects duplicate/reserved application codes and invalid error-data
+Preparation also rejects duplicate codes, standard/reserved future codes and invalid error-data
 selectors. Application methods cannot use reserved `rpc.` names. Supported system
 extensions require explicit preparation rather than automatic acceptance of a reserved name.
 
@@ -122,7 +122,7 @@ independently of whether a request is a notification.
 ## Message and exchange APIs
 
 PreparedService snapshots wire method names to operation IDs, input validators, result selections
-and the chosen version/profile, together with result validators and per-operation application error
+and the chosen version/profile, together with result validators and per-operation application/server error
 mappings including service errors. It returns findings; it does not invoke handlers or transmit
 protocol errors. Parameters, results and error data delegate to the generic value engine.
 
@@ -313,7 +313,7 @@ S = responses/errors, B = batches, E = exchanges, T = transport-only, C = explic
 | 2.0 §4 IDs | R/S/C | String/number/null only when present; exact identity; null/fractional recommendations stay advisories. |
 | 2.0 §4.1 notifications | R/E | Absent ID; no supplied response even within batches. Single messages cannot prove silence. |
 | 2.0 §5 responses | S/E | Version and ID required; exactly one result/error; contextual payload shape and ID correlation; null unknown ID for parse/invalid-request errors. |
-| 2.0 §5.1 errors | S/C | Integer code, string message, optional data; protocol/application separation. Reserve -32768 through -32000, including -32099..-32000 implementation server errors. No invented hard message-length limit. |
+| 2.0 §5.1 errors | S/C | Integer code, string message, optional data. Models may declare -32099..-32000 implementation server errors with the normal data contract. Undeclared server errors follow the service's accept/advisory/error policy, default accept. Standard and reserved future codes cannot be modeled. No invented hard message-length limit. |
 | 2.0 §6 batches | B/E | Nonempty request array, element checks, unordered exact-ID association and no scheduling claims. Invalid batch yields a single error object. |
 | 2.0 §6 notification handling | B/E | Invalid elements and mixed batches; all-notification batches have no response; empty response arrays are forbidden. |
 | 2.0 §7 subtract positional examples | R/S/E | Both argument orders, numeric results and original IDs. |
