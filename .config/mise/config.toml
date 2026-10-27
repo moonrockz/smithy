@@ -147,6 +147,10 @@ run = "moonx scripts/reference-tour.mbtx"
 description = "Vendor the pinned finos/morphir sources for the tour, hash-verified (args: checkout directory, default .dev/out/finos-morphir)"
 run = "moonx scripts/vendor-morphir.mbtx"
 
+[tasks."test:morphir-codecs"]
+description = "Check the Morphir v3/v4 codec bundles through the native CLI and the jsonCodec build plugin"
+run = "moonx scripts/test-morphir-codecs.mbtx"
+
 [tasks."morphir:codecs:vendor"]
 description = "Vendor the pinned Morphir v3/v4 codec conformance authorities into examples/morphir-codecs, hash-verified (args: --morphir DIR, --morphir-elm DIR; --check verifies offline, --check --remote also against the pinned trees)"
 run = "moonx scripts/vendor-morphir-codecs.mbtx"

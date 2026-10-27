@@ -59,6 +59,30 @@ runs every entry of `cases.json` (tests/bdd/morphir_codecs_world_wbtest.mbt) and
 tests/features/morphir-codecs.feature. A case with a `gap` must still fail, so a fixed gap must also be removed
 from `cases.json` and COVERAGE.md.
 
+## Command line and build
+
+From this directory, a full artifact is checked and canonicalized with its own release. The document's
+`formatVersion` selects the v3.0, v3.1 or v4 root; nothing converts a document to another release.
+
+```sh
+smithy validate value --bundle morphir --value upstream/finos-morphir/website/static/ir/examples/v3/greeting-example.json model/*.smithy
+smithy codec canonicalize --bundle morphir --value upstream/finos-morphir/website/static/ir/examples/v4/complete-example.json model/*.smithy
+smithy codec canonicalize --bundle morphir --output-profile morphir-v4-expanded --value upstream/finos-morphir/website/static/ir/examples/v4/complete-example.json model/*.smithy
+smithy validate value --shape morphir.ir.v4#Type --profile morphir-v4 --value type.json model/*.smithy
+```
+
+`smithy-build.json` runs the `jsonCodec` plugin: `check` checks every pinned artifact, `canonical` writes the
+canonical v3 greeting and v4 complete examples, and `expanded` writes the expanded v4 output.
+
+```sh
+mise run test:morphir-codecs
+```
+
+builds the native CLI and checks all of this: each artifact is valid, canonical output is stable and starts
+with its own release, expanded output reads back to the same canonical value, v2, 4.1.0 and malformed
+versions are refused, a v3 artifact with the `morphir-v4` profile is a `VersionConflict`, and the build
+output equals the CLI output.
+
 ## Licence
 
 Apache-2.0. See `LICENSE`, `NOTICE` and `upstream/finos-morphir-elm/NOTICE`.
