@@ -12,7 +12,7 @@ The selector `operation` matches each shape of [the type](https://smithy.io/2.0/
 
 The model also holds the shapes of the [prelude](https://smithy.io/2.0/spec/model.html#prelude). The query `string` gives `example#CityId`, `smithy.api#String` and the other string shapes of the prelude.
 
-> **Reference difference:** This tool loads the JSON-RPC trait definitions ([lesson 22](../22-json-rpc/lesson.md)) into every model. Their shapes are in the namespace `smithy.rpc`, and a selector can match them. The query `string` also gives `smithy.rpc#MethodName`, `smithy.rpc#MethodKind`, and `smithy.rpc#unknownMembers`. Standard Smithy does not have these shapes.
+> **Reference difference:** This tool loads the JSON-RPC trait definitions ([lesson 22](../22-json-rpc/lesson.md)) into every model. Their shapes are in the namespace `smithy.rpc`, and a selector can match them. The query `string` also gives `smithy.rpc#MethodName`, `smithy.rpc#MethodKind`, `smithy.rpc#UndeclaredServerErrors`, and `smithy.rpc#unknownMembers`. Standard Smithy does not have these shapes.
 
 The [`id` attribute](https://smithy.io/2.0/spec/selectors.html#id-attribute) keeps your own shapes. The query `string[id|namespace = example]` gives only `example#CityId`.
 

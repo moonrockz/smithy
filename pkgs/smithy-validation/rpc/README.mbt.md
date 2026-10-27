@@ -129,11 +129,21 @@ The `rpc.` namespace is reserved and this profile provides no system extensions.
 `resultMember` selects an output member contract; `nullResult: true` selects a null result.
 The default is the output structure. Preparation checks selectors and exposes them with
 `result_selection`. Result validators snapshot the effective selected member contract.
-Every modeled operation error and service error needs `rpcError` with an integer application
-code outside -32768 through -32000. Codes must be unique within each operation, including
-service errors. `dataMember` selects an effective error member contract, `absentData: true`
-requires absent data, and the default selects the whole error structure. Conflicting or
-undeclared selectors fail preparation.
+Every modeled operation error and service error needs `rpcError` with an integer code.
+Application codes are outside -32768 through -32000. Models may also declare implementation
+server codes in -32099 through -32000, such as `@rpcError(code: -32011)`. The five standard
+JSON-RPC codes and the reserved future range -32768 through -32100 remain forbidden in a
+modeled error. Codes must be unique within each operation, including service errors.
+`dataMember` selects an effective error member contract, `absentData: true` requires absent
+data, and the default selects the whole error structure. These data rules apply to both
+application and declared server errors. Conflicting or undeclared selectors fail preparation.
+
+`@jsonRpc(versions: ["2.0"], undeclaredServerErrors: "advisory")` reports an undeclared
+server code as an `UnknownError` advisory. The choices are `accept`, `advisory` and `error`.
+The default is `accept`: no finding is emitted for an undeclared server code. `error` emits
+an error finding and makes the response invalid. Declared server codes always validate their
+data, regardless of this policy. See `examples/json-rpc/server-errors.smithy` for a service
+error whose data requires `hostVersions` and `extensionVersions` maps.
 
 ## Responses
 
@@ -180,8 +190,9 @@ test {
 
 Version 2.0 requires the literal version, an ID of string/number/null, and exactly one of
 result or error. An error is an object with an exact integer code, string message and optional
-data. Defined protocol codes and -32099 through -32000 server errors bypass application data
-contracts. Unassigned reserved codes fail. Other codes must be modeled for the selected
+data. The five standard protocol codes bypass modeled data contracts. Declared server errors
+in -32099 through -32000 validate their modeled data; undeclared server errors follow the
+service policy. Unassigned reserved codes fail. Other codes must be modeled for the selected
 operation. Whole-structure data is required; selected member data may be absent when the member
 is optional. Explicit null always undergoes the member's value validation. No message-length
 limit is invented beyond the shared resource limits.

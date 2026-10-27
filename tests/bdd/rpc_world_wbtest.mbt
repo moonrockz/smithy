@@ -5,6 +5,7 @@ struct RpcWorld {
   mut batch_text : String?
   mut batch : @rpc.RequestBatchResult?
   mut replies : @rpc.ResponseBatchResult?
+  mut response : @rpc.ResponseResult?
 }
 
 ///|
@@ -15,11 +16,72 @@ fn RpcWorld::new() -> RpcWorld {
     batch_text: None,
     batch: None,
     replies: None,
+    response: None,
   }
 }
 
 ///|
 impl @moonspec.World for RpcWorld with fn configure(self, setup) {
+  setup.given1("the server error API prepared with policy {string}", fn(
+    policy : String,
+  ) raise {
+    let source = @xfs.read_file_to_string(
+      "../examples/json-rpc/server-errors.smithy",
+    )
+    let loaded = @rpc.loader()
+      .add_idl(
+        "server-errors.smithy",
+        source.replace(old="\"advisory\"", new="\"\{policy}\""),
+      )
+      .assemble()
+    self.prepared = Some(
+      @rpc.PreparedService::prepare(
+        loaded.model.unwrap(),
+        @smithy.ShapeId::parse("servererrors#Api").unwrap(),
+        @rpc.V2_0,
+      ),
+    )
+  })
+  setup.when1("I validate the initialize response {string}", fn(
+    message : String,
+  ) {
+    self.response = Some(
+      self.prepared
+      .unwrap()
+      .validate_response(
+        message,
+        context=Some(@rpc.Method(@rpc.MethodName::parse("initialize").unwrap())),
+      ),
+    )
+  })
+  setup.then0("the RPC response has no findings", fn() raise {
+    let result = self.response.unwrap()
+    assert_true(result.is_valid())
+    assert_eq(result.findings.length(), 0)
+  })
+  setup.then2("the RPC response finding is {string} at {string}", fn(
+    code : String,
+    path : String,
+  ) raise {
+    let result = self.response.unwrap()
+    assert_eq(result.findings.length(), 1)
+    assert_eq(result.findings[0].code.to_string(), code)
+    assert_eq(result.findings[0].path.pointer(), path)
+  })
+  setup.then1("the RPC response severity is {string}", fn(
+    severity : String,
+  ) raise {
+    let result = self.response.unwrap()
+    assert_eq(
+      result.findings[0].severity,
+      if severity == "advisory" {
+        @validation.Advisory
+      } else {
+        @validation.Error
+      },
+    )
+    assert_eq(result.is_valid(), severity == "advisory")
+  })
   setup.given1("the calculator API prepared for JSON-RPC {string}", fn(
     version : String,
   ) raise {

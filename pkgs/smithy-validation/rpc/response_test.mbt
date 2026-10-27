@@ -487,7 +487,7 @@ test "response parsing limits and isolated context failures remain incomplete" {
 test "error mappings reject reserved duplicate missing and conflicting selectors" {
   for
     mapping in [
-      "code: -32601", "code: -32768", "code: -32000", "code: 1001, dataMember: \"missing\"",
+      "code: -32601", "code: -32768", "code: -32100", "code: 1001, dataMember: \"missing\"",
       "code: 1001, dataMember: \"detail\", absentData: true",
     ] {
     let mut rejected = false

@@ -23,6 +23,13 @@ priv struct PreparedError {
 }
 
 ///|
+priv enum UndeclaredServerErrors {
+  Accept
+  Advisory
+  Error
+}
+
+///|
 pub struct PreparedService {
   priv service : @smithy.ShapeId
   priv version : ProtocolVersion
@@ -30,6 +37,7 @@ pub struct PreparedService {
   priv document : @validation.PreparedValidator
   priv finding_limit : Int32
   priv config : @validation.Config
+  priv undeclared_server_errors : UndeclaredServerErrors
 }
 
 ///|
@@ -90,6 +98,15 @@ pub fn PreparedService::prepare(
     invalid(
       service, "I expected the selected protocol version to be declared by the service.",
     )
+  }
+  let undeclared_server_errors = match profile.get("undeclaredServerErrors") {
+    None | Some(String("accept")) => Accept
+    Some(String("advisory")) => Advisory
+    Some(String("error")) => Error
+    _ =>
+      raise InvalidContract(
+        service, "I expected jsonRpc undeclaredServerErrors to be accept, advisory or error.",
+      )
   }
   let service_errors = match root.body {
     Service(errors~, ..) => errors
@@ -273,13 +290,13 @@ pub fn PreparedService::prepare(
           guard mapping.get("code") is Some(Number(number)) &&
             ErrorCode::from_number(number) is Some(code) else {
             raise InvalidContract(
-              error_id, "I expected an integer rpcError application code.",
+              error_id, "I expected an integer rpcError application or server error code.",
             )
           }
-          if code.is_reserved() ||
+          if (code.is_reserved() && !code.is_server()) ||
             prepared_errors.iter().any(e => e.code == code) {
             invalid(
-              error_id, "I expected a unique nonreserved application error code within the operation.",
+              error_id, "I expected a unique rpcError application or server error code within the operation.",
             )
           }
           let data_target = match
@@ -371,6 +388,7 @@ pub fn PreparedService::prepare(
     version,
     methods,
     finding_limit: config.limits.findings,
+    undeclared_server_errors,
     config,
     document: @validation.PreparedValidator::prepare(
       model,

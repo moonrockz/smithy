@@ -2,6 +2,14 @@
   {
     "case": "23-selectors/prelude",
     "kind": "selector",
+    "shape": "smithy.rpc#UndeclaredServerErrors",
+    "side": "ours",
+    "reason": "The core loads the smithy.rpc trait definitions into every model; Java does not.",
+    "issue": "smithy-2qe.34.15"
+  },
+  {
+    "case": "23-selectors/prelude",
+    "kind": "selector",
     "shape": "smithy.rpc#MethodKind",
     "side": "ours",
     "reason": "The core loads the smithy.rpc trait definitions into every model; Java does not.",

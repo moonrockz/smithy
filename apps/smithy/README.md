@@ -971,6 +971,12 @@ one complete stdout report with `scope`, `kind`, `operation`, exact ID and struc
 Version 1.0 errors remain opaque by default; `--legacy-errors code-message-data` opts into modeled
 application error data checks. Only one model/message/response/original-request input can use stdin.
 
+Models may declare server codes from -32099 through -32000 with `@rpcError`, and response mode
+checks their error data. `undeclaredServerErrors: "accept"` on `@jsonRpc` silently accepts
+undeclared server codes and is the default. Choose `advisory` to report them without failing, or `error` to
+reject them. The [server-error example](../../examples/json-rpc/server-errors.smithy) declares
+`-32011` with required `hostVersions` and `extensionVersions` data.
+
 Add `--batch` to `--message` for request arrays, or to `--response` for response arrays.
 `--batch --response replies.json --request calls.json` checks the complete batch association,
 including unordered exact IDs, modeled payloads, missing/duplicate/unsolicited responses and
