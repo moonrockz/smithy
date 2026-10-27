@@ -1,0 +1,178 @@
+{
+  "sources": [
+    {
+      "name": "finos-morphir",
+      "repository": "https://github.com/finos/morphir",
+      "commit": "5c5307d89f34d876e8f1ebf561ec55efbadf9fa0",
+      "files": [
+        {
+          "path": "LICENSE",
+          "gitBlob": "8dada3edaf50dbc082c9a125058f25def75e625a"
+        },
+        {
+          "path": "NOTICE",
+          "gitBlob": "ad14fb052bf0121ee088f7f0f12d178ba3249da1"
+        },
+        {
+          "path": "docs/spec/ir/fixtures/format-version-conformance.json",
+          "gitBlob": "54309a71a4a334899ee6d479d9b3d1aab2e80653"
+        },
+        {
+          "path": "docs/spec/ir/fixtures/naming-conformance.json",
+          "gitBlob": "5ebb77fb90d5a46d36454056ca9259e8606df72b"
+        },
+        {
+          "path": "docs/spec/ir/format-version.md",
+          "gitBlob": "1db62688d36d0ab5d511d5817516f2ea12f218b9"
+        },
+        {
+          "path": "docs/spec/ir/schemas/v3/whats-new.md",
+          "gitBlob": "3536d126bb2142b4bdd9cce74845e5cb109dcfad"
+        },
+        {
+          "path": "docs/spec/ir/schemas/v4/json-profile.md",
+          "gitBlob": "227c31faa8a73b79c748831d8b8575f55089b501"
+        },
+        {
+          "path": "docs/spec/ir/schemas/v4/semantic-model.md",
+          "gitBlob": "fb3463ac0638c07b380d99060ea9635295ea82c6"
+        },
+        {
+          "path": "spec/ir/mck/README.md",
+          "gitBlob": "c74a0318749877676d26d8346f1a4b3b2973ed5c"
+        },
+        {
+          "path": "spec/ir/mck/definitions.md",
+          "gitBlob": "a1da64df7444ed4e5b496ea0ef13fac44b33efb8"
+        },
+        {
+          "path": "spec/ir/mck/distributions.md",
+          "gitBlob": "3ba9a5e7c791680510fe68faf1bac1b391dd2ff1"
+        },
+        {
+          "path": "spec/ir/mck/names.md",
+          "gitBlob": "3184b57e8722397048834159c320ec4a0697d439"
+        },
+        {
+          "path": "spec/ir/mck/node-address-fixtures/v4-library.json",
+          "gitBlob": "95a8196f2d3f60c59a19ff1c8b2d2c79a6f11884"
+        },
+        {
+          "path": "spec/ir/mck/patterns-and-literals.md",
+          "gitBlob": "48da5b96a362cb11773df1f54a083e5e509e04f4"
+        },
+        {
+          "path": "spec/ir/mck/types.md",
+          "gitBlob": "3c7faf9cf05bcf386f4cb24f65bec08eb416e404"
+        },
+        {
+          "path": "spec/ir/mck/values.md",
+          "gitBlob": "c7b1e5029a522933dc531ef8a446199e4347a162"
+        },
+        {
+          "path": "spec/ir/mck/versions.md",
+          "gitBlob": "a8b340b8e7f3d764d1a49b9f2e3933b54da21795"
+        },
+        {
+          "path": "website/static/ir/examples/v3/direct-rules-example.json",
+          "gitBlob": "e5bc6973bf2ac2af744ff517fb6654cec28a5a2c"
+        },
+        {
+          "path": "website/static/ir/examples/v3/greeting-example.json",
+          "gitBlob": "3233304dcec5303efbc3d1168514e7dffe787723"
+        },
+        {
+          "path": "website/static/ir/examples/v3/rule-set-example.json",
+          "gitBlob": "4b51b16ac61270ba15d86c4509cf60f1fceb0e0a"
+        },
+        {
+          "path": "website/static/ir/examples/v4/books-and-records-example.json",
+          "gitBlob": "4549775bf28d38faad48153de6c3ca399c69b1e7"
+        },
+        {
+          "path": "website/static/ir/examples/v4/complete-example.json",
+          "gitBlob": "e5285a0c2369c0d51a6368274a3920e71f9797c9"
+        },
+        {
+          "path": "website/static/schemas/morphir-ir-v3.json",
+          "gitBlob": "e58c10cb6eabab802a338cec242bf50a69a7d4d5"
+        },
+        {
+          "path": "website/static/schemas/morphir-ir-v4.json",
+          "gitBlob": "c4cf98f59a2fd9ae121a451d8dc805301fcfea9d"
+        }
+      ]
+    },
+    {
+      "name": "finos-morphir-elm",
+      "repository": "https://github.com/finos/morphir-elm",
+      "commit": "bc99af69a8b24d391311fae3822a87eafef3c334",
+      "files": [
+        {
+          "path": "LICENSE",
+          "gitBlob": "2a95bde92ff13a23eaf62e6c8a6a2533d364166e"
+        },
+        {
+          "path": "NOTICE",
+          "gitBlob": "ad14fb052bf0121ee088f7f0f12d178ba3249da1"
+        },
+        {
+          "path": "src/Morphir/Codec.elm",
+          "gitBlob": "0e8c04968b238751b02e74081b21a50647c5a6dc"
+        },
+        {
+          "path": "src/Morphir/IR/AccessControlled/Codec.elm",
+          "gitBlob": "4cb4b31f1461def6962dea3c20e3f0eef5288eef"
+        },
+        {
+          "path": "src/Morphir/IR/Distribution/Codec.elm",
+          "gitBlob": "624ece7f36defb3c3320ab746b845be2e0836411"
+        },
+        {
+          "path": "src/Morphir/IR/Documented/Codec.elm",
+          "gitBlob": "721d33a64c9f219bd10462182d1e04c81d7c5afb"
+        },
+        {
+          "path": "src/Morphir/IR/FQName/Codec.elm",
+          "gitBlob": "c54a0ce553505f67e2f6ffa61c9d639b3392af11"
+        },
+        {
+          "path": "src/Morphir/IR/FormatVersion.elm",
+          "gitBlob": "4f4465f2619c3b2e1d78fb43b29b0e5cb53d8932"
+        },
+        {
+          "path": "src/Morphir/IR/FormatVersion/Codec.elm",
+          "gitBlob": "6f690f2b9a9d32a5f0d3bc017ee1fec69aa423db"
+        },
+        {
+          "path": "src/Morphir/IR/Literal/Codec.elm",
+          "gitBlob": "14a3e7b7f4c3aec3f8451847832883ee98fa6eaf"
+        },
+        {
+          "path": "src/Morphir/IR/Module/Codec.elm",
+          "gitBlob": "aa5e2c7c35cb47fda6d58c31ca680ae30e428de9"
+        },
+        {
+          "path": "src/Morphir/IR/Name/Codec.elm",
+          "gitBlob": "48fd21a895b95d4ed9392c03fecd75082b5f65b4"
+        },
+        {
+          "path": "src/Morphir/IR/Package/Codec.elm",
+          "gitBlob": "dfc69255aa34065bfb5703954291ac162b45a40d"
+        },
+        {
+          "path": "src/Morphir/IR/Path/Codec.elm",
+          "gitBlob": "2f014341a62684d60df335592f30598a8c95c5f9"
+        },
+        {
+          "path": "src/Morphir/IR/Type/Codec.elm",
+          "gitBlob": "43da95e5b532f2515dad0ec394bc74a6ea2072ac"
+        },
+        {
+          "path": "src/Morphir/IR/Value/Codec.elm",
+          "gitBlob": "545e756af87e3775f5bfdc138aa3ccff34fa95c0"
+        }
+      ]
+    }
+  ]
+}

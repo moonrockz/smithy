@@ -1,0 +1,12 @@
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-validation" @validation,
+  "moonrockz/smithy-codec/contract",
+}
+
+import {
+  "moonrockz/smithy-codec" @codec,
+  "moonrockz/smithy-codec/contract",
+  "moonrockz/smithy-validation" @validation,
+  "moonrockz/smithy",
+} for "test"

@@ -19,3 +19,5 @@ The SDK model has two more limits ([lesson 37](../37-morphir-sdk/lesson.md)):
 
 - A type variable is a `Document` member. Smithy checks its name, but not its value.
 - A Morphir function type has one parameter ([lesson 38](../38-morphir-values/lesson.md)). A Smithy operation takes [one input structure](https://smithy.io/2.0/spec/service-types.html#operation), so it cannot show a partly applied function, such as `add 1`.
+
+[Lesson 40](../40-morphir-profiles/lesson.md) reads these spellings with a serialization profile, and [lesson 41](../41-morphir-version-3/lesson.md) reads version 3.

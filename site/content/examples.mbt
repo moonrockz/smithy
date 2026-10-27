@@ -50,6 +50,7 @@ let summaries : Array[(String, String)] = [
   ("github-release", "Use model archives attached to a release."),
   ("json-rpc", "Peers, lifecycle and batch transcripts with expectations."),
   ("maven-repository", "Build with pinned JARs from a Maven repository."),
+  ("morphir-codecs", "Check and write Morphir IR v3 and v4 JSON with profiles."),
   ("npm-archive", "Build with models from local npm archives."),
   ("npm-registry", "Build with models from public npm packages."),
   ("openrpc", "Generate an OpenRPC 1.3.2 document from a service."),

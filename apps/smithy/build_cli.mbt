@@ -749,8 +749,8 @@ fn run_build(
   }
   let credentials = config.resolve_credentials(environment)
   // The build model and every projection that loads its model again resolve
-  // the bundled smithy.rpc traits.
-  let loader = @rpc.loader()
+  // the bundled smithy.rpc and smithy.serialization traits.
+  let loader = model_loader()
   let plugin_names = config.plugins.keys().to_array()
   for projection in config.projections {
     plugin_names.append(projection.plugins.keys().to_array())
@@ -765,14 +765,29 @@ fn run_build(
     }
     let _ = loader.add_defaults(protocols)
   }
-  let runner = @build.BuildRunner::new(config, loader=() => @rpc.loader())
-    .register_plugin("jsonSchema", json_schema_plugin)
-    .register_plugin("openapi", openapi_plugin)
-    .register_plugin("openrpc", openrpc_plugin)
+  let runner = @build.BuildRunner::new(config, loader=() => model_loader())
+    .register_plugin(
+      "jsonSchema",
+      refuse_profile("jsonSchema", json_schema_plugin),
+    )
+    .register_plugin("openapi", refuse_profile("openapi", openapi_plugin))
+    .register_plugin("openrpc", refuse_profile("openrpc", openrpc_plugin))
     .register_plugin("codegenFixture", @codegen_fixture.plugin)
-    .register_plugin("moonbit-jsonrpc-codegen", @codegen_moonbit.plugin)
-    .register_plugin("python-jsonrpc-codegen", @codegen_python.plugin)
-    .register_plugin("go-jsonrpc-codegen", @go_codegen.plugin)
+    .register_plugin(
+      "moonbit-jsonrpc-codegen",
+      refuse_profile("moonbit-jsonrpc-codegen", @codegen_moonbit.plugin),
+    )
+    .register_plugin(
+      "python-jsonrpc-codegen",
+      refuse_profile("python-jsonrpc-codegen", @codegen_python.plugin),
+    )
+    .register_plugin(
+      "go-jsonrpc-codegen",
+      refuse_profile("go-jsonrpc-codegen", @go_codegen.plugin),
+    )
+    .register_plugin("jsonCodec", (model, settings) => {
+      json_codec_plugin(base, model, settings)
+    })
   for input in config.sources {
     build_add_input(
       loader,

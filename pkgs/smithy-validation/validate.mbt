@@ -266,7 +266,39 @@ pub fn[V : ValueView] PreparedValidator::validate(
   value : V,
   base_path~ : InstancePath = InstancePath::root(),
 ) -> ValidationResult {
-  let budget = Budget::new(self.config.limits)
+  self.validate_with_budget(value, base_path, Budget::new(self.config.limits))
+}
+
+///|
+/// Validate with a request-scoped meter. The validation charges the meter's remaining work instead of
+/// a fresh allowance, and an incomplete result exhausts the meter. Depth and finding limits still come
+/// from the prepared configuration.
+pub fn[V : ValueView] PreparedValidator::validate_metered(
+  self : PreparedValidator,
+  value : V,
+  meter~ : WorkMeter,
+  base_path~ : InstancePath = InstancePath::root(),
+) -> ValidationResult {
+  let limits = { ..self.config.limits, work: meter.limit, }
+  let budget = Budget::new(limits, used=meter.used)
+  if meter.exhausted {
+    budget.stop(base_path, self.target, "work")
+  }
+  let result = self.validate_with_budget(value, base_path, budget)
+  meter.used = budget.used
+  if !result.complete {
+    meter.exhausted = true
+  }
+  result
+}
+
+///|
+fn[V : ValueView] PreparedValidator::validate_with_budget(
+  self : PreparedValidator,
+  value : V,
+  base_path : InstancePath,
+  budget : Budget,
+) -> ValidationResult {
   let stack : Array[Frame[V]] = [
     {
       source: Original(value),
@@ -279,6 +311,14 @@ pub fn[V : ValueView] PreparedValidator::validate(
     },
   ]
   while stack.pop() is Some(frame) {
+    let frame = match frame.source {
+      Original(value) =>
+        match value.source() {
+          Some(source) => { ..frame, path: base_path.append(source), }
+          None => frame
+        }
+      KeyText(_) => frame
+    }
     if !budget.charge(frame.path, frame.owner) {
       break
     }

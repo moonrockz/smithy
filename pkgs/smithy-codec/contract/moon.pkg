@@ -1,0 +1,7 @@
+import {
+  "moonrockz/smithy",
+}
+
+import {
+  "moonrockz/smithy-codec/contract",
+} for "test"

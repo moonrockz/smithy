@@ -45,6 +45,13 @@ and the [manual interoperability matrix](examples/payment-terminal/INTEROPERABIL
 native type profile. See [Ion validation](pkgs/smithy-ion-validation/README.mbt.md) and the
 [standalone consumer](examples/ion-validation-consumer/main.mbtx).
 
+`moonrockz/smithy-codec` checks, decodes and writes application JSON through serialization profiles
+that the model declares: tagged unions in object and array layouts, tuples, dictionaries, compact
+forms, host scalar adapters and versioned document bundles. `smithy validate value --profile` and
+`smithy codec canonicalize` select a profile from the command line. Morphir IR v3 and v4 are the first
+conformance target. See [JSON codecs](pkgs/smithy-codec/README.mbt.md) and
+[Morphir codecs](examples/morphir-codecs/README.md).
+
 The [protocol test suite API](pkgs/smithy/protocoltests/README.mbt.md) loads standard
 HTTP request/response test cases and compares messages produced by supplied
 protocol implementations. Validate case definitions with
@@ -59,6 +66,7 @@ protocol implementations. Validate case definitions with
 | `pkgs/smithy` | `moonrockz/smithy` | Semantic model and multi-file IDL/JSON loader |
 | `pkgs/smithy-validation` | `moonrockz/smithy-validation` | Validate application JSON values directly against Smithy data shapes |
 | `pkgs/smithy-ion-validation` | `moonrockz/smithy-ion-validation` | Validate native Ion values directly against Smithy data shapes |
+| `pkgs/smithy-codec` | `moonrockz/smithy-codec` | Check, decode and write application JSON through declared serialization profiles |
 | `pkgs/smithy-diff` | `moonrockz/smithy-diff` | Compare models and report compatibility changes |
 | `pkgs/smithy-build` | `moonrockz/smithy-build` | Build configuration, projections and plugins |
 | `pkgs/smithy-codegen` | `moonrockz/smithy-codegen` | Language-neutral core for code generators: symbols, code writer, delegator and director |
@@ -223,6 +231,7 @@ smithy/
 ├── pkgs/smithy/               # library (moonrockz/smithy)
 ├── pkgs/smithy-validation/    # Direct application value validation and typed findings
 ├── pkgs/smithy-ion-validation/ # Optional native Ion validation adapter
+├── pkgs/smithy-codec/         # Profile-aware JSON codecs, version dispatch and Morphir adapters
 ├── pkgs/smithy-build/         # build projections and plugins
 ├── pkgs/smithy-codegen/       # code generation core
 ├── pkgs/smithy-codegen-jsonrpc/ # JSON-RPC contracts and peer settings for generators

@@ -1,0 +1,35 @@
+{
+    "version": "1.0",
+    "outputDirectory": "build",
+    "sources": ["model"],
+    "plugins": {
+        "jsonCodec::check": {
+            "action": "check",
+            "bundle": "morphir",
+            "values": [
+                {"input": "upstream/finos-morphir/website/static/ir/examples/v3/greeting-example.json"},
+                {"input": "upstream/finos-morphir/website/static/ir/examples/v3/direct-rules-example.json"},
+                {"input": "upstream/finos-morphir/website/static/ir/examples/v3/rule-set-example.json"},
+                {"input": "upstream/finos-morphir/website/static/ir/examples/v4/complete-example.json"},
+                {"input": "upstream/finos-morphir/website/static/ir/examples/v4/books-and-records-example.json"},
+                {"input": "upstream/finos-morphir/spec/ir/mck/node-address-fixtures/v4-library.json"}
+            ]
+        },
+        "jsonCodec::canonical": {
+            "action": "canonicalize",
+            "bundle": "morphir",
+            "values": [
+                {"input": "upstream/finos-morphir/website/static/ir/examples/v3/greeting-example.json", "output": "greeting-v3.json"},
+                {"input": "upstream/finos-morphir/website/static/ir/examples/v4/complete-example.json", "output": "complete-v4.json"}
+            ]
+        },
+        "jsonCodec::expanded": {
+            "action": "canonicalize",
+            "bundle": "morphir",
+            "outputProfile": "morphir-v4-expanded",
+            "values": [
+                {"input": "upstream/finos-morphir/website/static/ir/examples/v4/complete-example.json", "output": "complete-v4-expanded.json"}
+            ]
+        }
+    }
+}

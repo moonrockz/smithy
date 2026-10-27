@@ -317,6 +317,23 @@ fn read_engine(
   }
   let shape = string_field(setup, "shape", "\{where_} \"value\"")
   let options = read_options(setup, where_)
+  // `profile` is `--profile` of `smithy validate value`. As on the command line, a profile declares the
+  // representation, so it cannot be combined with `unknown_members` or `member_names`.
+  let options = match optional_string_field(setup, "profile", where_) {
+    None => options
+    Some(profile) => {
+      if setup is Object(fields) &&
+        (fields.contains("unknown_members") || fields.contains("member_names")) {
+        fail(
+          "\{where_}: \"profile\" cannot be combined with \"unknown_members\" or \"member_names\"",
+        )
+      }
+      if profile.is_empty() {
+        fail("\{where_}: \"profile\" must not be empty")
+      }
+      { ..options, profile: Some(profile), }
+    }
+  }
   Value({ file, shape, options, })
 }
 
@@ -342,7 +359,7 @@ fn read_options(setup : Json, where_ : String) -> @samples.ValueOptions raise {
         "\{where_}: \"member_names\" must be \"smithy\" or \"json\", not \"\{other}\"",
       )
   }
-  { unknown_members, member_names, }
+  { unknown_members, member_names, profile: None, }
 }
 
 ///|
@@ -730,7 +747,7 @@ let lesson_keys : Array[String] = [
 ///|
 /// The keys of `value` in `lesson.json`.
 let value_keys : Array[String] = [
-  "file", "shape", "unknown_members", "member_names",
+  "file", "shape", "unknown_members", "member_names", "profile",
 ]
 
 ///|

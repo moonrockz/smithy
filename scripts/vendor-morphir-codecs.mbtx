@@ -1,0 +1,682 @@
+/// Vendor the pinned Morphir v3/v4 codec conformance authorities into examples/morphir-codecs, or check them.
+/// Each copied file is checked against the Git blob SHA in the pinned remote tree, so a git checkout and a
+/// snapshot have equal provenance. The bytes are hashed and copied as they are: number lexemes, duplicate
+/// object members and line endings are never changed.
+///
+/// Usage:
+///   moonx scripts/vendor-morphir-codecs.mbtx [--morphir DIR] [--morphir-elm DIR]
+///     Vendor from local checkouts (defaults .dev/out/morphir-codecs/finos-morphir and
+///     .dev/out/morphir-codecs/finos-morphir-elm), then run the offline check.
+///   moonx scripts/vendor-morphir-codecs.mbtx --check [--remote]
+///     Check the vendored files against inventory.json without network access, and check cases.json
+///     against the vendored files. With --remote, also compare the inventory with the pinned trees.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+/// One pinned upstream repository and the paths that are vendored from it.
+struct Source {
+  name : String
+  slug : String
+  commit : String
+  checkout : String
+  files : Array[String]
+}
+
+///|
+let target : String = "examples/morphir-codecs"
+
+///|
+/// The fixture authority (finos/morphir) and the historical v3 codec authority (finos/morphir-elm).
+/// The pins are those of openspec/changes/add-versioned-json-codecs/design.html. Paths are sorted.
+let sources : Array[Source] = [
+  {
+    name: "finos-morphir",
+    slug: "finos/morphir",
+    commit: "5c5307d89f34d876e8f1ebf561ec55efbadf9fa0",
+    checkout: ".dev/out/morphir-codecs/finos-morphir",
+    files: [
+      "LICENSE", "NOTICE", "docs/spec/ir/fixtures/format-version-conformance.json",
+      "docs/spec/ir/fixtures/naming-conformance.json", "docs/spec/ir/format-version.md",
+      "docs/spec/ir/schemas/v3/whats-new.md", "docs/spec/ir/schemas/v4/json-profile.md",
+      "docs/spec/ir/schemas/v4/semantic-model.md", "spec/ir/mck/README.md", "spec/ir/mck/definitions.md",
+      "spec/ir/mck/distributions.md", "spec/ir/mck/names.md", "spec/ir/mck/node-address-fixtures/v4-library.json",
+      "spec/ir/mck/patterns-and-literals.md", "spec/ir/mck/types.md", "spec/ir/mck/values.md",
+      "spec/ir/mck/versions.md", "website/static/ir/examples/v3/direct-rules-example.json",
+      "website/static/ir/examples/v3/greeting-example.json", "website/static/ir/examples/v3/rule-set-example.json",
+      "website/static/ir/examples/v4/books-and-records-example.json", "website/static/ir/examples/v4/complete-example.json",
+      "website/static/schemas/morphir-ir-v3.json", "website/static/schemas/morphir-ir-v4.json",
+    ],
+  },
+  {
+    name: "finos-morphir-elm",
+    slug: "finos/morphir-elm",
+    commit: "bc99af69a8b24d391311fae3822a87eafef3c334",
+    checkout: ".dev/out/morphir-codecs/finos-morphir-elm",
+    files: [
+      "LICENSE", "NOTICE", "src/Morphir/Codec.elm", "src/Morphir/IR/AccessControlled/Codec.elm",
+      "src/Morphir/IR/Distribution/Codec.elm", "src/Morphir/IR/Documented/Codec.elm",
+      "src/Morphir/IR/FQName/Codec.elm", "src/Morphir/IR/FormatVersion.elm", "src/Morphir/IR/FormatVersion/Codec.elm",
+      "src/Morphir/IR/Literal/Codec.elm", "src/Morphir/IR/Module/Codec.elm", "src/Morphir/IR/Name/Codec.elm",
+      "src/Morphir/IR/Package/Codec.elm", "src/Morphir/IR/Path/Codec.elm", "src/Morphir/IR/Type/Codec.elm",
+      "src/Morphir/IR/Value/Codec.elm",
+    ],
+  },
+]
+
+///|
+/// The Git blob identity of `content`: SHA-1 of "blob <length>\0" followed by the bytes.
+fn git_blob_hash(content : Bytes) -> String {
+  let header = @utf8.encode("blob " + content.length().to_string() + "\u{0000}")
+  let object_ = Bytes::from_array(header.to_array() + content.to_array())
+  @crypto.bytes_to_hex_string(@crypto.sha1(object_))
+}
+
+///|
+/// The path of a vendored file, relative to the repository root.
+fn vendored_path(source : Source, path : String) -> String {
+  target + "/" + upstream_path(source, path)
+}
+
+///|
+/// The path of a vendored file, relative to `target`. cases.json uses this form.
+fn upstream_path(source : Source, path : String) -> String {
+  "upstream/" + source.name + "/" + path
+}
+
+///|
+/// The text of inventory.json. `blobs` holds one array of blob SHAs per source, in `files` order.
+fn render_inventory(blobs : Array[Array[String]]) -> String {
+  Json::object({
+    "sources": Json::array(
+      sources.mapi((i, source) => {
+        Json::object({
+          "name": Json::string(source.name),
+          "repository": Json::string("https://github.com/" + source.slug),
+          "commit": Json::string(source.commit),
+          "files": Json::array(
+            source.files.mapi((j, path) => {
+              Json::object({
+                "path": Json::string(path),
+                "gitBlob": Json::string(blobs[i][j]),
+              })
+            }),
+          ),
+        })
+      }),
+    ),
+  }).stringify(indent=2) +
+  "\n"
+}
+
+///|
+/// The blob SHAs of an inventory, one array per source in `files` order. Reports each mismatch with the
+/// sources and their file lists through `fail`.
+fn read_inventory(
+  text : String,
+  fail : (String) -> Unit,
+) -> Array[Array[String]] {
+  let result : Array[Array[String]] = sources.map(_ => [])
+  let parsed = @json.parse(text) catch {
+    _ => {
+      fail("inventory.json is not valid JSON")
+      return result
+    }
+  }
+  guard parsed is { "sources": Array(entries), .. } &&
+    entries.length() == sources.length() else {
+    fail("inventory.json does not list exactly \{sources.length()} sources")
+    return result
+  }
+  for i, source in sources {
+    guard entries[i]
+      is {
+        "name": String(name),
+        "repository": String(repository),
+        "commit": String(commit),
+        "files": Array(files),
+        ..
+      } else {
+      fail("inventory.json: source \{i} is malformed")
+      continue
+    }
+    if name != source.name ||
+      repository != "https://github.com/" + source.slug ||
+      commit != source.commit {
+      fail(
+        "inventory.json: source \{i} names \{name} \{repository} at \{commit}, the script pins \{source.slug} at \{source.commit}",
+      )
+    }
+    if files.length() != source.files.length() {
+      fail(
+        "inventory.json: \{source.name} lists \{files.length()} files, the script lists \{source.files.length()}",
+      )
+    }
+    for j, path in source.files {
+      guard j < files.length() &&
+        files[j] is { "path": String(listed), "gitBlob": String(blob), .. } &&
+        listed == path else {
+        fail(
+          "inventory.json: \{source.name} does not list \{path} at position \{j}",
+        )
+        result[i].push("")
+        continue
+      }
+      result[i].push(blob)
+    }
+  }
+  result
+}
+
+///|
+async fn write_bytes(path : String, content : Bytes) -> Unit {
+  let parts = path.split("/").map(p => p.to_owned()).to_array()
+  ignore(parts.pop())
+  @fs.mkdir(parts.join("/"), recursive=true, allow_exist=true)
+  @fs.write_file(path, content)
+}
+
+///|
+async fn fetch(url : String) -> (Int32, String, String) {
+  let (code, out, err) = @process.collect_output("curl", ["-fsSL", url]) catch {
+    _ => return (1, "", "cannot start curl")
+  }
+  (code, out.text(), err.text())
+}
+
+///|
+/// The blob SHA of each path of the pinned tree of `source`. Tries 4 times, with waits of 5, 20 and 60 s.
+async fn fetch_tree(source : Source) -> Map[String, String] {
+  let url = "https://api.github.com/repos/" +
+    source.slug +
+    "/git/trees/" +
+    source.commit +
+    "?recursive=1"
+  let waits = [5000, 20000, 60000]
+  let mut last = ""
+  for attempt in 0..<4 {
+    if attempt > 0 {
+      eprintln(
+        "retry \{attempt + 1}/4: tree of \{source.slug} at \{source.commit}",
+      )
+      @async.sleep(waits[attempt - 1])
+    }
+    let (code, out, err) = fetch(url)
+    if code == 0 {
+      let tree = @json.parse(out) catch { _ => Json::null() }
+      guard tree
+        is {
+          "sha": String(sha),
+          "tree": Array(entries),
+          "truncated": False,
+          ..
+        } &&
+        sha == source.commit else {
+        eprintln(
+          "The pinned tree of \{source.slug} is missing, mismatched or truncated",
+        )
+        @sys.exit(1)
+        return Map([])
+      }
+      let blobs : Map[String, String] = Map([])
+      for entry in entries {
+        if entry
+          is {
+            "type": String("blob"),
+            "path": String(path),
+            "sha": String(blob),
+            ..
+          } {
+          blobs[path] = blob
+        }
+      }
+      return blobs
+    }
+    last = err
+  }
+  eprintln("Cannot read the pinned tree of \{source.slug}: " + last)
+  @sys.exit(1)
+  Map([])
+}
+
+///|
+/// The relative paths of the files below `root`, sorted.
+async fn files_below(root : String) -> Array[String] {
+  let found : Array[String] = []
+  guard @fs.exists(root) else { return found }
+  let stack = [""]
+  while stack.pop() is Some(relative) {
+    let dir = if relative.is_empty() { root } else { root + "/" + relative }
+    for entry in @fs.readdir(dir) {
+      let path = if relative.is_empty() {
+        entry
+      } else {
+        relative + "/" + entry
+      }
+      match @fs.kind(root + "/" + path) {
+        Directory => stack.push(path)
+        _ => found.push(path)
+      }
+    }
+  }
+  found.sort_by((a, b) => a.compare(b))
+  found
+}
+
+///|
+/// The value at a JSON pointer (RFC 6901), if any.
+fn resolve_pointer(document : Json, pointer : String) -> Json? {
+  if pointer.is_empty() {
+    return Some(document)
+  }
+  guard pointer.has_prefix("/") else { return None }
+  let mut current = document
+  for token in pointer[1:].split("/") {
+    let key = token
+      .to_owned()
+      .replace_all(old="~1", new="/")
+      .replace_all(old="~0", new="~")
+    match current {
+      Object(members) =>
+        match members.get(key) {
+          Some(value) => current = value
+          None => return None
+        }
+      Array(items) => {
+        guard !key.is_empty() && key.length() <= 9 else { return None }
+        let mut index = 0
+        for c in key {
+          guard c >= '0' && c <= '9' else { return None }
+          index = index * 10 + (c.to_int() - '0'.to_int())
+        }
+        guard index < items.length() else { return None }
+        current = items[index]
+      }
+      _ => return None
+    }
+  }
+  Some(current)
+}
+
+///|
+/// Check the entries of cases.json against the vendored files. `texts` maps a path relative to `target` to its
+/// text; `known` holds every inventory path, so a case of a changed file is skipped rather than reported again. A
+/// case names its file, and either a fence (`line`, `fence`, and the case ID `mck`, whose heading must precede the
+/// fence) or a JSON `pointer`. An optional `lexeme` must occur in the fence body, or in the file.
+fn check_cases(
+  text : String,
+  texts : Map[String, String],
+  known : Map[String, Bool],
+  fail : (String) -> Unit,
+) -> Int32 {
+  let parsed = @json.parse(text) catch {
+    _ => {
+      fail("cases.json is not valid JSON")
+      return 0
+    }
+  }
+  guard parsed is { "cases": Array(cases), .. } else {
+    fail("cases.json has no cases array")
+    return 0
+  }
+  let ids : Map[String, Bool] = Map([])
+  let lines_of : Map[String, Array[String]] = Map([])
+  let documents : Map[String, Json] = Map([])
+  for i, case_ in cases {
+    guard case_
+      is {
+        "id": String(id),
+        "file": String(file),
+        "expected": String(expected),
+        ..
+      } else {
+      fail("cases.json: case \{i} needs id, file and expected")
+      continue
+    }
+    if ids.contains(id) {
+      fail("cases.json: duplicate case ID \{id}")
+    }
+    ids[id] = true
+    if !["valid", "invalid", "other-node"].contains(expected) {
+      fail("cases.json: \{id}: unknown expected outcome \{expected}")
+    }
+    guard texts.get(file) is Some(content) else {
+      if !known.contains(file) {
+        fail("cases.json: \{id}: \{file} is not a vendored file")
+      }
+      continue
+    }
+    match case_ {
+      { "line": Number(n, ..), "fence": String(fence), "mck": String(mck), .. } => {
+        let lines = match lines_of.get(file) {
+          Some(lines) => lines
+          None => {
+            let lines = content.split("\n").map(l => l.to_owned()).to_array()
+            lines_of[file] = lines
+            lines
+          }
+        }
+        let line = n.to_int()
+        guard line >= 1 && line <= lines.length() && lines[line - 1] == fence else {
+          fail("cases.json: \{id}: line \{line} of \{file} is not `\{fence}`")
+          continue
+        }
+        let mut heading = ""
+        for k = line - 2; k >= 0; k = k - 1 {
+          if lines[k].has_prefix("## ") {
+            heading = lines[k]
+            break
+          }
+        }
+        if !heading.has_prefix("## " + mck + ":") {
+          fail(
+            "cases.json: \{id}: the fence at line \{line} belongs to `\{heading}`, not \{mck}",
+          )
+        }
+        if case_ is { "lexeme": String(lexeme), .. } {
+          let mut found = false
+          for k = line; k < lines.length() && lines[k] != "```"; k = k + 1 {
+            if lines[k].contains(lexeme) {
+              found = true
+            }
+          }
+          if !found {
+            fail(
+              "cases.json: \{id}: the fence at line \{line} lacks the lexeme \{lexeme}",
+            )
+          }
+        }
+      }
+      { "pointer": String(pointer), .. } => {
+        let document = match documents.get(file) {
+          Some(document) => document
+          None => {
+            let document = @json.parse(content) catch {
+              _ => {
+                fail("cases.json: \{id}: \{file} is not valid JSON")
+                continue
+              }
+            }
+            documents[file] = document
+            document
+          }
+        }
+        if resolve_pointer(document, pointer) is None {
+          fail("cases.json: \{id}: \{pointer} does not resolve in \{file}")
+        }
+        if case_ is { "lexeme": String(lexeme), .. } &&
+          !content.contains(lexeme) {
+          fail("cases.json: \{id}: \{file} lacks the lexeme \{lexeme}")
+        }
+      }
+      { "line": _, .. } | { "fence": _, .. } =>
+        fail("cases.json: \{id}: a fence case needs line, fence and mck")
+      _ =>
+        // A whole-file case, such as a full artifact.
+        if case_ is { "lexeme": String(lexeme), .. } &&
+          !content.contains(lexeme) {
+          fail("cases.json: \{id}: \{file} lacks the lexeme \{lexeme}")
+        }
+    }
+  }
+  cases.length()
+}
+
+///|
+/// Check the vendored files without network access. With `remote`, also compare the inventory with the
+/// pinned trees. Exits 1 on any difference.
+async fn check(remote~ : Bool) -> Unit {
+  let errors : Array[String] = []
+  let fail = (message : String) => errors.push(message)
+  guard @fs.exists(target + "/inventory.json") else {
+    eprintln(
+      "\{target}/inventory.json is missing; run the script without --check first",
+    )
+    @sys.exit(1)
+    return
+  }
+  let blobs = read_inventory(
+    @fs.read_file(target + "/inventory.json").text(),
+    fail,
+  )
+  let expected : Map[String, Bool] = Map([])
+  let texts : Map[String, String] = Map([])
+  let mut verified = 0
+  for i, source in sources {
+    let tree = if remote { Some(fetch_tree(source)) } else { None }
+    for j, path in source.files {
+      let relative = upstream_path(source, path)
+      expected[relative] = true
+      let blob = if j < blobs[i].length() { blobs[i][j] } else { "" }
+      if tree is Some(tree) && tree.get(path) != Some(blob) {
+        fail(
+          "\{source.slug}@\{source.commit}: \{path} has another blob than inventory.json",
+        )
+      }
+      guard @fs.exists(target + "/" + relative) else {
+        fail("missing: \{target}/\{relative}")
+        continue
+      }
+      let content = @fs.read_file(target + "/" + relative).binary()
+      if git_blob_hash(content) != blob {
+        fail("changed: \{target}/\{relative} does not match its blob \{blob}")
+        continue
+      }
+      texts[relative] = @utf8.decode_lossy(content)
+      verified += 1
+    }
+  }
+  for path in files_below(target + "/upstream") {
+    if !expected.contains("upstream/" + path) {
+      fail("not in inventory.json: \{target}/upstream/\{path}")
+    }
+  }
+  for name in ["LICENSE", "NOTICE"] {
+    let copy = target + "/" + name
+    let original = target + "/upstream/finos-morphir/" + name
+    guard @fs.exists(copy) && @fs.exists(original) else {
+      fail("missing: \{copy}")
+      continue
+    }
+    if @fs.read_file(copy).binary() != @fs.read_file(original).binary() {
+      fail("changed: \{copy} differs from \{original}")
+    }
+  }
+  let cases = if @fs.exists(target + "/cases.json") {
+    check_cases(
+      @fs.read_file(target + "/cases.json").text(),
+      texts,
+      expected,
+      fail,
+    )
+  } else {
+    fail("missing: \{target}/cases.json")
+    0
+  }
+  if !errors.is_empty() {
+    for message in errors {
+      eprintln(message)
+    }
+    eprintln("❌ \{errors.length()} differences in \{target}")
+    @sys.exit(1)
+  }
+  let where_ = if remote {
+    "inventory.json and the pinned trees"
+  } else {
+    "inventory.json"
+  }
+  println(
+    "✅ \{verified} vendored Morphir files match \{where_}; \{cases} cases resolve",
+  )
+}
+
+///|
+/// Vendor every file from the checkouts in `dirs` (one per source), after all of them are verified.
+async fn vendor(dirs : Array[String]) -> Unit {
+  let blobs : Array[Array[String]] = []
+  let contents : Array[Array[Bytes]] = []
+  for i, source in sources {
+    let tree = fetch_tree(source)
+    blobs.push([])
+    contents.push([])
+    for path in source.files {
+      guard tree.get(path) is Some(blob) else {
+        eprintln("Path not in the pinned tree of \{source.slug}: " + path)
+        @sys.exit(1)
+        return
+      }
+      let file = dirs[i] + "/" + path
+      guard @fs.exists(file) else {
+        eprintln("Missing in the checkout of \{source.slug}: " + file)
+        @sys.exit(1)
+        return
+      }
+      let content = @fs.read_file(file).binary()
+      if git_blob_hash(content) != blob {
+        eprintln("Blob mismatch (is \{dirs[i]} at \{source.commit}?): " + path)
+        @sys.exit(1)
+      }
+      blobs[i].push(blob)
+      contents[i].push(content)
+    }
+  }
+  // Every file is verified. Remove the old copy, so a path that left `files` leaves no orphan.
+  if @fs.exists(target + "/upstream") {
+    @fs.rmdir(target + "/upstream", recursive=true)
+  }
+  for i, source in sources {
+    for j, path in source.files {
+      write_bytes(vendored_path(source, path), contents[i][j])
+      if source.name == "finos-morphir" &&
+        (path == "LICENSE" || path == "NOTICE") {
+        write_bytes(target + "/" + path, contents[i][j])
+      }
+    }
+  }
+  @fs.write_file(target + "/inventory.json", render_inventory(blobs))
+  let count = blobs.fold(init=0, (n, b) => n + b.length())
+  println("Vendored \{count} verified Morphir files")
+}
+
+///|
+async fn main {
+  let args = @env.args()[1:].to_owned()
+  match args {
+    ["--check"] => check(remote=false)
+    ["--check", "--remote"] | ["--remote", "--check"] => check(remote=true)
+    _ => {
+      let dirs = sources.map(source => source.checkout)
+      let mut k = 0
+      while k < args.length() {
+        let index = match args[k] {
+          "--morphir" => 0
+          "--morphir-elm" => 1
+          _ => -1
+        }
+        guard index >= 0 && k + 1 < args.length() else {
+          eprintln(
+            "Usage: moonx scripts/vendor-morphir-codecs.mbtx [--morphir DIR] [--morphir-elm DIR] | --check [--remote]",
+          )
+          @sys.exit(2)
+          return
+        }
+        dirs[index] = args[k + 1]
+        k = k + 2
+      }
+      vendor(dirs)
+      check(remote=false)
+    }
+  }
+}
+
+///|
+test "Git blob identity includes the byte length and the final newline" {
+  assert_eq(
+    git_blob_hash(@utf8.encode("hello\n")),
+    "ce013625030ba8dba906f756967f9e9ca394464a",
+  )
+  assert_true(
+    git_blob_hash(@utf8.encode("hello")) !=
+    git_blob_hash(@utf8.encode("hello\n")),
+  )
+}
+
+///|
+/// Code-unit order: String::compare orders by length first.
+fn code_unit_less(a : String, b : String) -> Bool {
+  let n = if a.length() < b.length() { a.length() } else { b.length() }
+  for i in 0..<n {
+    if a[i] != b[i] {
+      return a[i] < b[i]
+    }
+  }
+  a.length() < b.length()
+}
+
+///|
+test "Each file list is sorted and has no duplicate, and the source names are distinct" {
+  for source in sources {
+    for i in 1..<source.files.length() {
+      assert_true(code_unit_less(source.files[i - 1], source.files[i]))
+    }
+    assert_true(
+      source.files.contains("LICENSE") && source.files.contains("NOTICE"),
+    )
+  }
+  assert_true(sources[0].name != sources[1].name)
+}
+
+///|
+test "The inventory round-trips through its reader" {
+  let blobs = sources.map(source => source.files.map(path => "blob-of-" + path))
+  let errors : Array[String] = []
+  let text = render_inventory(blobs)
+  assert_true(text.has_suffix("}\n"))
+  assert_eq(read_inventory(text, m => errors.push(m)), blobs)
+  assert_eq(errors, [])
+}
+
+///|
+test "The inventory reader reports another commit" {
+  let blobs = sources.map(source => source.files.map(_ => "x"))
+  let text = render_inventory(blobs).replace(old=sources[0].commit, new="0000")
+  let errors : Array[String] = []
+  ignore(read_inventory(text, m => errors.push(m)))
+  assert_eq(errors.length(), 1)
+}
+
+///|
+test "JSON pointers resolve object members, array indices and escapes" {
+  let document : Json = { "a/b": [10, { "~k": true }] }
+  assert_eq(resolve_pointer(document, "/a~1b/1/~0k"), Some(Json::boolean(true)))
+  assert_eq(resolve_pointer(document, "/a~1b/2"), None)
+  assert_eq(resolve_pointer(document, ""), Some(document))
+}
+
+///|
+test "A fence case must sit under its heading and hold its lexeme" {
+  let texts : Map[String, String] = {
+    "f.md": "# T\n\n## t-0001: One\n\n```json canonical\n{ \"a\": 0.10 }\n```\n\n## t-0002: Two\n",
+  }
+  let good =
+    #|{"cases": [{"id": "a", "file": "f.md", "expected": "valid", "mck": "t-0001", "line": 5,
+    #|  "fence": "```json canonical", "lexeme": "0.10"}]}
+  let errors : Array[String] = []
+  assert_eq(check_cases(good, texts, Map([]), m => errors.push(m)), 1)
+  assert_eq(errors, [])
+  let bad =
+    #|{"cases": [{"id": "a", "file": "f.md", "expected": "valid", "mck": "t-0002", "line": 5,
+    #|  "fence": "```json canonical", "lexeme": "0.1 "},
+    #|  {"id": "a", "file": "g.md", "expected": "maybe"}]}
+  ignore(check_cases(bad, texts, Map([]), m => errors.push(m)))
+  // Wrong heading, missing lexeme, duplicate ID, unknown outcome, unknown file.
+  assert_eq(errors.length(), 5)
+}

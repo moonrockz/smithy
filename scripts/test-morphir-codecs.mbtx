@@ -1,0 +1,121 @@
+///|
+/// Check the Morphir v3 and v4 conformance bundles through the native CLI and the jsonCodec build plugin:
+/// every pinned artifact is valid, canonical output is stable and keeps its release, the build agrees with
+/// the CLI, expanded output reads back to the same canonical value, and unsupported or conflicting versions
+/// are refused. Usage: moonx scripts/test-morphir-codecs.mbtx
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let example : String = "examples/morphir-codecs"
+
+///|
+let models : Array[String] = [
+  "model/morphir-bundle.smithy", "model/morphir-v3.smithy", "model/morphir-v4.smithy",
+]
+
+///|
+let artifacts : Array[(String, Int)] = [
+  ("upstream/finos-morphir/website/static/ir/examples/v3/greeting-example.json", 3),
+  ("upstream/finos-morphir/website/static/ir/examples/v3/direct-rules-example.json", 3),
+  ("upstream/finos-morphir/website/static/ir/examples/v3/rule-set-example.json", 3),
+  ("upstream/finos-morphir/website/static/ir/examples/v4/complete-example.json", 4),
+  ("upstream/finos-morphir/website/static/ir/examples/v4/books-and-records-example.json", 4),
+  ("upstream/finos-morphir/spec/ir/mck/node-address-fixtures/v4-library.json", 4),
+]
+
+///|
+let work : String = "../../.dev/out/morphir-codecs-test"
+
+///|
+async fn smithy(cli : String, args : Array[String], expected~ : Int = 0) -> String {
+  let (code, out, err) = @process.collect_output(cli, args, cwd=example)
+  if code != expected {
+    println("FAILED: smithy " + args.join(" "))
+    println("expected exit \{expected}, found \{code}\n" + out.text() + err.text())
+    @sys.exit(1)
+  }
+  out.text()
+}
+
+///|
+fn check(condition : Bool, message : String) -> Unit {
+  if !condition {
+    println("FAILED: " + message)
+    @sys.exit(1)
+  }
+}
+
+///|
+fn trimmed(text : String) -> String {
+  text.trim_end(chars="\n").to_owned()
+}
+
+///|
+async fn canonicalize(cli : String, file : String, extra~ : Array[String] = []) -> String {
+  trimmed(smithy(cli, ["codec", "canonicalize", "--bundle", "morphir", "--value", file] + extra + models))
+}
+
+///|
+async fn main {
+  let built = @process.run("moon", ["build", "apps/smithy", "--target", "native", "--release", "--deny-warn"])
+  check(built == 0, "the native CLI builds")
+  let cli = @fs.realpath("_build/native/release/build/moonrockz/smithy-cli/smithy-cli.exe")
+  @fs.mkdir(example + "/" + work, recursive=true, allow_exist=true)
+  let canonical : Map[String, String] = Map([])
+  for entry in artifacts {
+    let (file, major) = entry
+    ignore(smithy(cli, ["validate", "value", "--bundle", "morphir", "--value", file] + models))
+    let once = canonicalize(cli, file)
+    check(once.has_prefix("{\"formatVersion\":\{major},"), file + " keeps release \{major} first")
+    let copy = work + "/canonical.json"
+    @fs.write_file(example + "/" + copy, once)
+    check(canonicalize(cli, copy) == once, file + " canonical output is stable")
+    canonical[file] = once
+    println("ok \{file}")
+  }
+  // Explicit expanded output reads back to the same canonical value.
+  let complete = artifacts[3].0
+  let expanded = canonicalize(cli, complete, extra=["--output-profile", "morphir-v4-expanded"])
+  check(expanded != canonical[complete], "expanded output differs from compact output")
+  @fs.write_file(example + "/" + work + "/expanded.json", expanded)
+  check(canonicalize(cli, work + "/expanded.json") == canonical[complete], "expanded output reads back")
+  // Versions that the bundle does not support, and a selection that conflicts with the document.
+  let refusals = [
+    ("{\"formatVersion\":2,\"distribution\":[]}", [], "UnsupportedVersion", 1),
+    ("{\"formatVersion\":\"4.1.0\",\"distribution\":{}}", [], "UnsupportedVersion", 1),
+    ("{\"formatVersion\":\"3.x\",\"distribution\":[]}", [], "InvalidVersion", 1),
+  ]
+  for refusal in refusals {
+    let (text, extra, code, status) = refusal
+    @fs.write_file(example + "/" + work + "/refused.json", text)
+    let out = smithy(
+      cli,
+      ["validate", "value", "--bundle", "morphir", "--diagnostics", "json", "--value", work + "/refused.json"] + extra + models,
+      expected=status,
+    )
+    check(out.contains("\"code\":\"" + code + "\""), text + " is refused with " + code)
+  }
+  let conflict = smithy(
+    cli,
+    ["validate", "value", "--bundle", "morphir", "--profile", "morphir-v4", "--diagnostics", "json", "--value", artifacts[0].0] + models,
+    expected=1,
+  )
+  check(conflict.contains("\"code\":\"VersionConflict\""), "a v3 artifact with a v4 profile is a conflict")
+  ignore(smithy(cli, ["validate", "value", "--bundle", "nope", "--value", artifacts[0].0] + models, expected=2))
+  // The build plugin checks every artifact and agrees with the CLI.
+  ignore(smithy(cli, ["build", "--config", "smithy-build.json"]))
+  let base = example + "/build/source/"
+  check(@fs.exists(base + "check/json-codec-check.json"), "the check report exists")
+  check(trimmed(@fs.read_file(base + "canonical/greeting-v3.json").text()) == canonical[artifacts[0].0], "build and CLI agree on v3")
+  check(trimmed(@fs.read_file(base + "canonical/complete-v4.json").text()) == canonical[complete], "build and CLI agree on v4")
+  check(trimmed(@fs.read_file(base + "expanded/complete-v4-expanded.json").text()) == expanded, "build and CLI agree on expanded v4")
+  ignore(smithy(cli, ["clean", "--config", "smithy-build.json"]))
+  println("Morphir codec CLI and build checks passed")
+}

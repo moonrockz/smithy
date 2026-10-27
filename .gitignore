@@ -103,3 +103,6 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
+
+# Output of the Morphir codec example build.
+examples/morphir-codecs/build/

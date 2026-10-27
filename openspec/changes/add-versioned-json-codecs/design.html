@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add versioned JSON codecs: design</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Add versioned JSON codecs</h1>
+<p class="meta">OpenSpec change | Bead <code>smithy-2qe.53</code> | 2026-10-27 | Proposed; implementation not started</p>
+<p>A runtime-first JSON codec prepares one wire contract for checking, decoding and canonical encoding. Morphir v3 and v4 are the first acceptance target. See <a href="proposal.md">the proposal</a> for motivation and scope.</p>
+<nav class="toc" aria-label="Contents"><ul>
+<li><a href="#context">Context and evidence</a></li>
+<li><a href="#goals">Goals and non-goals</a></li>
+<li><a href="#decisions">Decisions</a></li>
+<li><a href="#risks">Risks and trade-offs</a></li>
+<li><a href="#migration">Delivery and compatibility</a></li>
+<li><a href="#verification">Verification</a></li>
+<li><a href="#sources">Sources and authority</a></li>
+</ul></nav>
+
+<h2 id="context">Context and evidence</h2>
+<ul>
+<li><code>pkgs/smithy-validation/prepare.mbt</code> snapshots reachable shapes, constraints and wire member names. Its validator assumes one-member object unions. <code>view.mbt</code> already exposes exact numbers and location-aware object fields, but synthetic array/scalar projections still need explicit source mapping.</li>
+<li><code>pkgs/smithy-codegen-jsonrpc/description.mbt</code> demonstrates prepared, detached contracts. The three language generators separately emit object-only union codecs. Their future integration must consume a contract, not re-read serialization traits.</li>
+<li><code>pkgs/smithy-jsonschema/converter.mbt</code> uses <code>unionStrategy</code> to choose schema rendering. That setting is not an application wire-format selector.</li>
+<li><code>site/tour/lessons/38-morphir-values</code> and <code>39-morphir-limits</code> cover the current expanded-object subset and demonstrate rejected compact/v3 inputs. Existing cases without a profile remain valid compatibility tests.</li>
+<li>Morphir's v3 reader uses tagged positional arrays; v4 adds compact scalar/list forms and expanded objects. Its versioned API keeps separate models and never migrates while reading. See <a href="#sources">the pinned authorities below</a>.</li>
+</ul>
+
+<h2 id="goals">Goals and non-goals</h2>
+<p>Keep logical shape and union-member identities independent of wire syntax. Prepare once, reuse bounded contracts, and preserve original JSON locations through projection. Make the supported representation language finite and testable. Behavioral requirements are in <a href="specs/json-codecs/spec.md">json-codecs</a> and <a href="specs/serialization-profiles/spec.md">serialization-profiles</a>.</p>
+<p>This delivery does not generate new MoonBit/Python/Go types, replace Morphir's type checker, migrate IR versions, implement v1/v2 or add YAML/Ion encoders. Existing RPC protocols, Smithy's model JSON AST and default value validation keep their current behavior. A trait declaration alone does not imply that an exporter or protocol supports it.</p>
+
+<h2 id="decisions">Decisions</h2>
+
+<h3 id="api-1">API-1. Prepare runtime codecs and expose detached contracts</h3>
+<p>Add <code>pkgs/smithy-codec</code> with a lightweight <code>/contract</code> package for profile definitions, typed encoding decisions and immutable contract snapshots. The runtime prepares a logical validator and wire plan together. Its public operations are conceptually <code>prepare(model, root, profile, registry)</code>, <code>check(text)</code>, <code>decode(text)</code> and <code>encode(value)</code>; exact MoonBit signatures follow the checked package documentation.</p>
+<p><code>ProfileId</code>, member positions, validated tag names, adapter IDs and version selectors have boundary constructors. <code>CodecValue</code> retains semantic root/model identity and selected union member; it is not just a relabeled JSON string. Values can be constructed through validated builders as well as decoding. A value may be re-encoded under another profile of the same semantic contract, but a different version-specific root requires explicit conversion.</p>
+<p>The module depends on <code>smithy</code> and <code>smithy-validation</code>. The validator must not import the codec module: composition, a location-aware view and minimal additive budget support prevent a module cycle. Detached contracts do not retain live mutable model maps. Alternative: generate language-specific codecs first. Rejected because it repeats interpretation across writers before the contract is proven.</p>
+<svg viewBox="0 0 820 320" role="img" aria-labelledby="flow-title flow-desc">
+<title id="flow-title">One prepared contract serves all runtime operations</title>
+<desc id="flow-desc">Model traits, profile selection and a host registry produce a prepared wire contract. Checking, decoding and encoding all use it. Explicit version dispatch selects a root and profile before payload processing.</desc>
+<defs><marker id="arrow" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="var(--link)"/></marker></defs>
+<g fill="var(--panel)" stroke="var(--line)" stroke-width="2">
+<rect x="20" y="15" width="245" height="65" rx="8"/><rect x="285" y="15" width="245" height="65" rx="8"/><rect x="550" y="15" width="245" height="65" rx="8"/>
+<rect x="240" y="130" width="340" height="65" rx="8"/>
+<rect x="60" y="250" width="190" height="55" rx="8"/><rect x="315" y="250" width="190" height="55" rx="8"/><rect x="570" y="250" width="190" height="55" rx="8"/>
+</g>
+<g fill="none" stroke="var(--link)" stroke-width="2" marker-end="url(#arrow)">
+<path d="M142 80 L142 105 L330 105 L330 130"/><path d="M408 80 L408 130"/><path d="M672 80 L672 105 L490 105 L490 130"/>
+<path d="M330 195 L330 222 L155 222 L155 250"/><path d="M410 195 L410 250"/><path d="M490 195 L490 222 L665 222 L665 250"/>
+</g>
+<g fill="var(--fg)" text-anchor="middle" font-family="system-ui, sans-serif" font-size="17">
+<text x="142" y="43">Smithy shapes</text><text x="142" y="66">and traits</text>
+<text x="408" y="43">Profile selection</text><text x="408" y="66">and version binding</text>
+<text x="672" y="43">Explicit host</text><text x="672" y="66">adapter registry</text>
+<text x="410" y="168">Prepared wire + value contract</text>
+<text x="155" y="284">Check JSON</text><text x="410" y="284">Decode value</text><text x="665" y="284">Encode canonical JSON</text>
+</g></svg>
+
+<h3 id="cfg-1">CFG-1. Put rules in model profiles; configuration selects them</h3>
+<p>Provide versioned trait definitions under the extension namespace <code>smithy.serialization</code>. The proposed declarations are <code>jsonProfiles</code> on a document/root declaration, <code>jsonEncoding</code> on data shapes/members, and <code>untagged</code> on unions. <code>jsonEncoding</code> contains an optional base rule and named profile-specific rules; <code>jsonProfiles</code> registers identifiers, defaults, supported capabilities and version bindings. A non-service document declaration is sufficient.</p>
+<p>Resolution is selected-profile shape/member rule, then selected-profile defaults, then applicable base serialization traits, then standard defaults. Same-precedence conflicts fail. A JSON plugin config selects <code>profile</code>, <code>target</code> or <code>bundle</code> and input/output locations; it cannot change tag layout or field positions. Supplemental Smithy files can attach traits with <code>apply</code>, so external model sources need not be rewritten. Persist profile definitions with the model, not in a generator-specific configuration file.</p>
+<p>Continue to honor <code>smithy.api#jsonName</code> for effective wire member names. Alloy demonstrates useful existing encodings, but its general untagged decoding permits a broader search than the decision on <code>smithy-2qe.34.22</code>. The first implementation therefore uses the explicitly narrower extension trait instead of claiming full Alloy semantics. No new third-party Alloy dependency is required. Alternative: a global <code>unionStrategy</code> switch. Rejected because it cannot represent per-shape exceptions, multiple versions or portable reader/writer contracts.</p>
+
+<h3 id="wire-1">WIRE-1. Use a finite representation vocabulary</h3>
+<table><thead><tr><th>Rule</th><th>Contract and preparation checks</th></tr></thead><tbody>
+<tr><td>External union</td><td>Exactly one effective tag property containing a payload. This remains the ordinary default.</td></tr>
+<tr><td>Internal union</td><td>Declared discriminator; object-compatible targets only; discriminator and member names cannot collide.</td></tr>
+<tr><td>Adjacent union</td><td>Distinct declared tag and content fields; payload may be scalar or composite.</td></tr>
+<tr><td>Tag-first array</td><td>Tag at index zero; explicit target tuple positions. A tuple payload is spliced after the tag; an ordinary payload occupies one slot. Unit can declare tag-only output.</td></tr>
+<tr><td>Untagged scalar union</td><td>Disjoint accepted JSON-kind sets after scalar policy is applied. Two numeric alternatives are rejected even when their ranges differ. This implements the runtime portion of the existing untagged decision.</td></tr>
+<tr><td>Structure tuple</td><td>Explicit member order and fixed arity, or a final rest-list member. Optional trailing fields need an explicit omission policy; ambiguous holes are refused.</td></tr>
+<tr><td>Dictionary</td><td>Object properties or two-element entry arrays. A declared key adapter preserves logical key identity and version-specific ordering. Duplicate normalized keys are rejected before map construction.</td></tr>
+</tbody></table>
+<p>All metadata is parsed into typed alternatives once. Duplicate tags, unresolved member references, missing required positions, invalid rest fields and unsupported scalar kinds fail preparation. A complete node is interpreted against one declared form, not assembled by retrying different version families.</p>
+
+<h3 id="form-1">FORM-1. Separate compatible readers from canonical writers</h3>
+<p>Each shape can declare accepted reader forms and writer cases. Restricted form rules bind a whole scalar to one member, map positional fields/rest lists, unwrap a named tag, or supply explicitly declared empty/absent fields. Reader guards use JSON kind and declared structural/naming markers. Writer guards use declared member presence or empty values. Ambiguous dispatch is rejected; it never means first declaration wins. There is no embedded script, unrestricted expression interpreter or implicit coercion.</p>
+<p>Morphir v4's bare name versus bare FQName uses explicit naming guards and the registered naming adapter. A bare array denotes Tuple; a Reference argument array remains inside its Reference wrapper. Empty attributes select compact output; nonempty attributes select the expanded payload. Reader-only aliases, such as <code>attrs</code>, never leak into canonical output. Supplying alias and canonical member together is an error. <code>morphir-v4-expanded</code> is an explicit output profile, not an inference from the input spelling.</p>
+<p>Canonical output is stable and follows declared object-member order where required, including <code>formatVersion</code> before <code>distribution</code>. Whitespace and numeric lexeme spelling are not preservation guarantees; exact numeric value and version-specific logical equality are. Alternative: remember the original JSON and replay it. Rejected because it avoids validation of caller-created values and cannot provide deterministic canonical output.</p>
+
+<h3 id="adapt-1">ADAPT-1. Keep domain normalization in registered adapters</h3>
+<p>Expose an explicit host registry keyed by validated adapter IDs. Adapters normalize logical scalar shapes from declared JSON kinds, write their canonical forms, report relative source paths, charge expansion/work and optionally provide canonical map-key ordering. This allows a logical Name/FQName to accept supported legacy arrays without pretending that it is an unrestricted union or parsing provenance from rendered strings.</p>
+<p>Provide a separate <code>smithy-codec/morphir</code> package for Morphir naming and version scalars. General codecs do not import it. The CLI/build host registers that known bundle's adapters explicitly when selected; other clients supply their registry through the library API. Model documents only name bindings already installed by their host. Missing bindings, invalid adapter output and normalized duplicate dictionary keys fail explicitly. Alternative: teach generic union code Morphir's separators and initialisms. Rejected because these are domain semantics.</p>
+<p>Registered adapters are trusted host code and must honor the budget/expansion contract; registration is not a sandbox for arbitrary callbacks. The model cannot install an adapter or widen its declared capabilities.</p>
+
+<h3 id="ver-1">VER-1. Dispatch once and retain exact version identity</h3>
+<p>A bundle pairs a version-field pointer and declared version scalar contract with nonoverlapping supported intervals, semantic root IDs and profile IDs. For Morphir, normalize integer baselines and strict three-component release strings according to its version contract. Initial bundle coverage follows the pinned MoonBit reference: <code>[3.0.0,3.2.0)</code> and <code>[4.0.0,4.1.0)</code>, including the v3.1 Specs extension. v1/v2 are deliberately unsupported here.</p>
+<p>The bounded, duplicate-aware text reader locates the version before interpreting the payload, regardless of object-field order. It does not assume the header is first, parse through binary64, or independently retry each version's decoder. An explicit selection must agree with an artifact's header. Individual node decoding instead uses an explicit root/profile and needs no envelope. Invalid syntax, unsupported release, missing version and family mismatch remain distinct.</p>
+<p>The result retains both version-specific semantic root and exact normalized release. Encoding preserves that release and uses its canonical header spelling. Converting between v3 and v4 is a separate operation outside this implementation. The same-root compact/expanded change is a representation choice, not a semantic migration. Alternative: decode every version into the newest model automatically. Rejected because new constructs can lose information in historical output.</p>
+<p>Use separate bindings for v3.0 and v3.1 where their allowed distributions differ: the pre-3.1 root must not accept the later Specs extension. Shared constituent shapes can be reused; selecting a broad v3 union and merely changing the version header is insufficient.</p>
+
+<h3 id="safe-1">SAFE-1. Preserve precision, source paths and one request budget</h3>
+<p>Use the existing exact <code>NodeNumber</code> and duplicate-aware input boundary as the baseline, retaining number tokens and object occurrences before any map conversion. Map each projected logical member or position back to its original <code>InstancePath</code>. Reuse <code>ValueView</code>/<code>LocatedObject</code> where sufficient; add only the minimal public view or source-map support necessary for synthetic arrays/scalars. A failed nested tuple member must report its wire index, not a fabricated logical field path.</p>
+<p>A request-scoped budget covers parsing, rule selection, adapter expansion, checking and output. Passing between phases transfers the remaining budget rather than resetting it. Preparation caches recursive shape contracts; walkers use explicit stacks. Decode returns no value on invalid or incomplete input. Encode validates root identity, shape constraints, representation guards and output bounds before returning bytes. File adapters publish only after success; a failed run leaves the destination intact.</p>
+<p>Reuse scalar and structural constraint validation rather than reproducing it in every encoding branch. Test the source mapping and cumulative budgets at the composition boundary; do not assume existing location-aware object views prove every new form correct. This preserves the bounded Morphir behavior tracked by <code>smithy-2qe.41.13</code>.</p>
+
+<h3 id="cli-1">CLI-1. Expose the same selection through CLI and build</h3>
+<p>Extend <code>smithy validate value</code> with explicit profile selection and a versioned-bundle mode. Add nested <code>smithy codec canonicalize</code> for decode/check/re-encode. Model and value inputs retain the CLI's existing stdin-once rule. A node uses <code>--target</code> and <code>--profile</code>; a full document uses <code>--bundle</code>, optionally constrained by an explicit profile. Incompatible selectors fail as usage errors.</p>
+<p>Register a <code>jsonCodec</code> build plugin in <code>apps/smithy/build_cli.mbt</code> with <code>check</code> and <code>canonicalize</code> actions. The shared selection parser accepts a declared profile or bundle plus explicit input/output locations. Inputs resolve relative to the build configuration using the existing resource/path boundaries; outputs use the artifact writer's validated relative names. Both actions invoke the runtime contract and the same approved adapter registry as the CLI.</p>
+<p>Valid complete checks exit 0; invalid values, malformed value input, incomplete work and I/O failure exit 1; invalid model preparation, configuration and unsupported selections exit 2. Structured diagnostics include validity, completeness, shape and original path. Canonical JSON is the only successful value output; diagnostics go to the selected diagnostic channel. Existing commands without profiles do not route through a new compatibility mode.</p>
+<p>Do not add alternate-profile support to current generators/exporters in this delivery. Explicit requests for unsupported profile-aware generation/export must fail; ordinary standard-mode use is unchanged. No interpretation of JSON Schema <code>unionStrategy</code> as a wire selector is permitted.</p>
+
+<h3 id="conf-1">CONF-1. Prove Morphir compatibility from pinned authorities</h3>
+<p>Add <code>examples/morphir-codecs/</code> with complete version-specific Smithy roots for representative single-file artifacts, profile declarations, coverage inventory, sources/NOTICE and conformance cases. Model v3 attributes, definitions, patterns, values, types and dictionaries in their own contract. Model v4 extensions explicitly, including compact/expanded nodes. A catch-all Document standing in for a modeled node does not count as coverage; open extension/document-literal fields remain Document only where the source contract permits it.</p>
+<p>Use the pinned v3 greeting artifact and v4 complete/books-and-records artifacts, plus naming, version and node cases. The newer authority pin below is independent of the tour's existing <code>ab8d5c9</code> corpus. Do not edit that vendored directory manually. Compare checked cases with the corresponding upstream codec/conformance rules; a disagreement needs an explicit decision and a tracked issue, not a newly blessed golden output. Record structural/schema coverage separately from semantic type-checking and name resolution, which remain outside this codec.</p>
+
+<h2 id="risks">Risks and trade-offs</h2>
+<table><thead><tr><th>Risk or cost</th><th>Mitigation</th></tr></thead><tbody>
+<tr><td>Compact forms become a general transformation language.</td><td>Use the finite vocabulary in WIRE-1 and FORM-1; domain algorithms are explicit registered adapters with bounded contracts.</td></tr>
+<tr><td>Trait, config and language-generator behavior diverge.</td><td>Resolve rules once, keep config selection-only, expose detached contracts, and reject unsupported consumers.</td></tr>
+<tr><td>Preparation works but recursive checking expands repeatedly.</td><td>Cache shape plans and test cumulative budgets/size ratios against the Morphir case underlying <code>smithy-2qe.41.13</code>.</td></tr>
+<tr><td>Projection erases duplicates, exact decimals or useful paths.</td><td>Retain raw input structure and explicit source mapping until checks finish; test normalized map-key collisions and values beyond binary64 precision.</td></tr>
+<tr><td>Historical schema prose disagrees with canonical codecs.</td><td>Pin the authority per version, preserve an inventory and expected outcomes, and track disagreements rather than infer canonical output from comments.</td></tr>
+<tr><td>A full representative Morphir bundle is more work than a union switch.</td><td>Deliver the generic object-codec vertical slice first; keep v3 and v4 bundle work in separate dependent task groups with their own tests and docs.</td></tr>
+<tr><td>Existing untagged issue is closed before generator work exists.</td><td>Record runtime coverage on <code>smithy-2qe.34.22</code>; leave its typed JSON-RPC generator acceptance open for follow-up.</td></tr>
+</tbody></table>
+
+<h2 id="migration">Delivery and compatibility</h2>
+<ol>
+<li>Introduce the optional codec module and trait loader with the current shared repository version. Register it in <code>moon.work</code>, module imports, version validation and publication inputs. Do not bump versions in this feature.</li>
+<li>Deliver object codecs with executable examples, then extend the same contract through additional representations, compact forms and adapters.</li>
+<li>Add version dispatch, CLI/build selection and the two Morphir acceptance bundles. Document all supported forms and intervals.</li>
+<li>Keep old validator invocations and default RPC output as regression baselines. Add opt-in passing Morphir tour cases without changing what default-profile failure cases mean.</li>
+<li>Enable use by selecting a profile. Roll back adoption by removing that selection and returning to the existing default API; no stored artifact is migrated automatically.</li>
+</ol>
+<p>Implementation follows <a href="tasks.md">the task groups</a>. Generator and profile-aware schema-export adoption can follow after the runtime contract and laws are stable; they are not prerequisites for this proposal's completion.</p>
+
+<h2 id="verification">Verification</h2>
+<ul>
+<li>Every representation group lands preparation refusal cases, valid/invalid wire cases and checked API documentation alongside its implementation.</li>
+<li>Check laws: successful complete check agrees with decode; decode after encode preserves logical value; canonicalize twice is stable; alternate-profile re-encoding preserves a compatible root; incompatible semantic roots refuse.</li>
+<li>Exercise duplicate decoded keys, alias collisions, normalized dictionary keys, exact numbers, malformed version headers, adapter failure and cumulative limit exhaustion.</li>
+<li>Run new library cases on wasm, wasm-gc, JS and native. Extend <code>tests/features/value-validation.feature</code> and add <code>tests/features/json-codecs.feature</code>; CLI console fences and build fixtures execute the documented commands.</li>
+<li>Use the pinned Morphir conformance inventory for full artifacts and recursive node families; report any gaps by case ID and bead.</li>
+<li>Integration gates are <code>mise run format</code>, <code>mise run lint</code>, <code>mise run validate</code>, <code>mise run test</code>, <code>mise run test:scripts</code>, <code>mise run test:bdd</code>, <code>mise run test:cli</code>, <code>mise run tour:check</code>, <code>mise run site:check</code> and <code>mise run build</code>. This planning step runs artifact checks only.</li>
+</ul>
+
+<h2 id="sources">Sources and authority</h2>
+<ul>
+<li><a href="https://smithy.io/2.0/spec/protocol-traits.html">Smithy protocol and serialization traits</a> define protocol-owned serialization and member naming.</li>
+<li><a href="https://serde.rs/enum-representations.html">Serde's enum representations</a> supplies the common representation vocabulary.</li>
+<li><a href="https://github.com/disneystreaming/alloy/blob/main/modules/docs/serialisation/json.md">Alloy JSON traits</a> are the compatibility comparison, not a claim of complete Alloy support.</li>
+<li><a href="https://morphir.finos.org/docs/spec/ir/schemas/v4/json-profile/">Morphir JSON profile</a> and <a href="https://morphir.finos.org/docs/spec/ir/format-version/">format-version contract</a> explain compatible reads, canonical writes and version syntax.</li>
+<li>Fixture authority: <a href="https://github.com/finos/morphir/tree/5c5307d89f34d876e8f1ebf561ec55efbadf9fa0">finos/morphir at <code>5c5307d89f34d876e8f1ebf561ec55efbadf9fa0</code></a>. Historical v3 codec authority: <a href="https://github.com/finos/morphir-elm/tree/bc99af69a8b24d391311fae3822a87eafef3c334">finos/morphir-elm at <code>bc99af69a8b24d391311fae3822a87eafef3c334</code></a>.</li>
+<li>Existing implementation comparison: <a href="https://github.com/finos/morphir-moonbit/blob/bd3adc52e6b8f6368fdaee50f76535799732f8d6/docs/adr/0001-versioned-ir-models.md">versioned-model decision</a> and <a href="https://github.com/finos/morphir-moonbit/blob/bd3adc52e6b8f6368fdaee50f76535799732f8d6/pkgs/morphir-ir/README.md">IR module coverage and pins</a>.</li>
+</ul>
+</main>
+</body>
+</html>

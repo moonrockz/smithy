@@ -3169,6 +3169,54 @@
         "39-morphir-limits/v3": {
             "digest": "52813d9d49ce7622ddf426dd338e829613ee17c0c0602b3f26ee80989202a408",
             "events": []
+        },
+        "40-morphir-profiles/legacy-field-name": {
+            "digest": "0f54972e67782376198176e83f188a11ae79387d2e314319c895c3a6f789cd26",
+            "events": []
+        },
+        "40-morphir-profiles/legacy-name": {
+            "digest": "e98139ce6663fb786d08aca8fbff79d788ea53f72c05de218db53a10a7c674df",
+            "events": []
+        },
+        "40-morphir-profiles/mixed-case": {
+            "digest": "49889e35d27d65c3baf98ae51bd8f7161d71da14244ac5aab0f4037a223ed58c",
+            "events": []
+        },
+        "40-morphir-profiles/reference-args": {
+            "digest": "9c1c59362a2e38af409f9e8b0523fd934f34f70cb603aa6aa520ad25f238dfe3",
+            "events": []
+        },
+        "40-morphir-profiles/reference-object": {
+            "digest": "9a7a57da111fc0ac72e1877f598bcf7d51075f4fe3589131406265003c37b263",
+            "events": []
+        },
+        "40-morphir-profiles/reference-string": {
+            "digest": "971e534d4376a52adb0b66f44989c0c92d16ed01c16c9ef502e88849df9f04c6",
+            "events": []
+        },
+        "40-morphir-profiles/start": {
+            "digest": "560a017506270356dece6c29ee6078a90d853fdfefbd70c50316a8d78b5434b2",
+            "events": []
+        },
+        "41-morphir-version-3/extra-position": {
+            "digest": "0245cb71cf28153241fba791e1a51ccede6612e70b38483dc939bb4c125b514c",
+            "events": []
+        },
+        "41-morphir-version-3/start": {
+            "digest": "7c290a3660771c16841ee85db012e46555bf7d0534c33fcbb259785950ef38e4",
+            "events": []
+        },
+        "41-morphir-version-3/unit": {
+            "digest": "d8b8f8ac0db04ddcbf7d7abb3df116d4c66da45b3a99095164812608cf14278e",
+            "events": []
+        },
+        "41-morphir-version-3/upper-word": {
+            "digest": "4e99fbe67ef3979ea975b284d10c19e4d133e8e35c2a2e6eb85505238fdfec5b",
+            "events": []
+        },
+        "41-morphir-version-3/version-4": {
+            "digest": "ddfff1314c1f5c29203c3eeaa831c67569fa55798e63335496856c1b3f2892b4",
+            "events": []
         }
     },
     "reference_sha": "30bdab593f0c2cdf96036782cc3ce15c43a711ef"

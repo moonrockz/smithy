@@ -189,6 +189,12 @@ jobs:
       - name: Run the task script tests
         run: mise run test:scripts
 
+      - name: Check the vendored Morphir codec authorities
+        run: mise run morphir:codecs:vendor -- --check
+
+      - name: Check the Morphir codec bundles through the CLI and build
+        run: mise run test:morphir-codecs
+
   # The task runs `moon -C site`, not in site/: a moon shim in site/ would read the untrusted site/mise.toml
   # (bun, Lightpanda), and this job installs neither.
   tour:

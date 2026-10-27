@@ -1,0 +1,17 @@
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-validation" @validation,
+  "moonrockz/smithy-codec" @codec,
+  "moonrockz/smithy-codec/contract",
+}
+
+import {
+  "moonrockz/smithy-validation" @validation,
+} for "wbtest"
+
+import {
+  "moonrockz/smithy",
+  "moonrockz/smithy-codec" @codec,
+  "moonrockz/smithy-codec/contract",
+  "moonrockz/smithy-codec/morphir",
+} for "test"

@@ -100,6 +100,9 @@ fn check_value(
     Ok(model) => model
     Err((reason, kind)) => return Blocked(seq~, reason~, kind~)
   }
+  if options.profile is Some(profile) {
+    return check_codec_value(seq, model, target, profile, value)
+  }
   let prepared = @validation.PreparedValidator::prepare(
     model,
     target,
@@ -257,4 +260,55 @@ fn check_message(
     }
   }
   DataChecked(seq~, valid~, findings=findings.map(rpc_found_of))
+}
+
+///|
+/// Check a JSON value with a declared serialization profile of the target, as
+/// `smithy validate value --profile` does (the node selection of `run_codec`
+/// in `apps/smithy/codec_cli.mbt`): the same adapters, the same preparation
+/// before the value is read, and the same codes and messages. A refused
+/// preparation names `--profile`, as the CLI prints it.
+fn check_codec_value(
+  seq : Int32,
+  model : @smithy.Model,
+  target : @smithy.ShapeId,
+  profile : String,
+  value : String,
+) -> Response {
+  let id = @codec_contract.ProfileId::parse(profile) catch {
+    _ =>
+      return blocked(
+        seq~,
+        reason="expected a profile identifier after --profile, but found '\{profile}'.",
+      )
+  }
+  let codec = @codec.PreparedCodec::prepare(
+    model,
+    target,
+    profile=Some(id),
+    adapters=@morphir.registry(),
+  ) catch {
+    error =>
+      return stopped(
+        seq,
+        error.code(),
+        error.message(),
+        source=Some("--profile"),
+      )
+  }
+  let result = codec.check(value)
+  DataChecked(
+    seq~,
+    valid=result.is_valid(),
+    findings=result.findings.map(finding => {
+      Found(
+        code=finding.code.to_string(),
+        severity="error",
+        path=finding.path.pointer(),
+        shape=finding.shape.to_string(),
+        message=finding.message,
+        offset=None,
+      )
+    }),
+  )
 }
