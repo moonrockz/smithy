@@ -68,6 +68,29 @@ Feature: Release tooling
       | next    | v0.3.0   | v0.2.0 | not a version: next                                                                                |
       | 0.2.0   | v0.3.0   | next   | the latest tag is not a version: next                                                              |
 
+  Scenario Outline: Prepare stops when the tag or the release branch already exists
+    When prepare checks "v0.7.0" with tag "<tag>", local branch "<local>" and remote branch "<remote>"
+    Then it fails with "<message>"
+
+    Examples:
+      | tag | local | remote | message                                                                                                                                                     |
+      | yes | no    | no     | tag v0.7.0 already exists                                                                                                                                   |
+      | no  | yes   | no     | branch release/v0.7.0 already exists; close its pull request, delete the branch (git branch -D release/v0.7.0 and git push origin --delete release/v0.7.0), then run prepare again |
+      | no  | no    | yes    | branch release/v0.7.0 already exists; close its pull request, delete the branch (git branch -D release/v0.7.0 and git push origin --delete release/v0.7.0), then run prepare again |
+      | yes | yes   | yes    | tag v0.7.0 already exists                                                                                                                                   |
+
+  Scenario: Prepare continues when neither the tag nor the release branch exists
+    When prepare checks "v0.7.0" with tag "no", local branch "no" and remote branch "no"
+    Then prepare can continue
+
+  Scenario Outline: Prepare goes back to where it started when it stops
+    Then going back to branch "<branch>" at commit "4d452dd" runs "git <command>"
+
+    Examples:
+      | branch                     | command                |
+      | DamianReeves/release-smithy | switch DamianReeves/release-smithy |
+      |                            | switch --detach 4d452dd |
+
 
   Scenario: Tidy a changelog after git cliff --prepend
     Given the text:

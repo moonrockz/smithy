@@ -149,6 +149,37 @@ fn release_version(
 }
 
 ///|
+/// Why `prepare` cannot release `tag`: the tag or the branch `release/<tag>` already exists, here or
+/// on origin. `None` when it can continue.
+fn prepare_conflict(
+  tag : String,
+  tag_exists~ : Bool,
+  local_branch~ : Bool,
+  remote_branch~ : Bool,
+) -> String? {
+  if tag_exists {
+    return Some("tag \{tag} already exists")
+  }
+  if local_branch || remote_branch {
+    let branch = "release/\{tag}"
+    return Some(
+      "branch \{branch} already exists; close its pull request, delete the branch (git branch -D \{branch} and git push origin --delete \{branch}), then run prepare again",
+    )
+  }
+  None
+}
+
+///|
+/// The `git` arguments that put the checkout back where `prepare` started: on `branch`, or detached
+/// at `commit` when it started detached.
+fn return_args(branch : String?, commit : String) -> Array[String] {
+  match branch {
+    Some(name) => ["switch", name]
+    None => ["switch", "--detach", commit]
+  }
+}
+
+///|
 /// The highest `vX.Y.Z` among tag names.
 fn latest_version(tags : Array[String]) -> Version? {
   let mut best : Version? = None
@@ -925,6 +956,22 @@ async fn breaking_commits_without_footer() -> Array[String] {
 }
 
 ///|
+/// Stop `prepare` before it makes the release branch: put the checkout back on `branch`, or at
+/// `commit` when it started detached, then fail with `message`.
+async fn stop_prepare(
+  branch : String?,
+  commit : String,
+  message : String,
+) -> Unit {
+  let args = return_args(branch, commit)
+  let (code, _) = output_of("git", args)
+  if code != 0 {
+    eprintln("warning: I could not go back with `git \{args.join(" ")}`")
+  }
+  fail_with(message)
+}
+
+///|
 async fn prepare(requested : String?, local_only : Bool) -> Unit {
   let (_, dirty) = stdout_of("git", ["status", "--porcelain"])
   if dirty.trim() != "" {
@@ -933,7 +980,18 @@ async fn prepare(requested : String?, local_only : Bool) -> Unit {
     )
   }
   run_or_fail("git", ["fetch", "--tags", "origin", "main"])
+  let (_, start_branch) = stdout_of("git", [
+    "symbolic-ref", "--quiet", "--short", "HEAD",
+  ])
+  let start = if start_branch.trim() == "" {
+    None
+  } else {
+    Some(start_branch.trim().to_owned())
+  }
+  let (_, start_commit) = stdout_of("git", ["rev-parse", "HEAD"])
+  let start_commit = start_commit.trim().to_owned()
   run_or_fail("git", ["switch", "--detach", "origin/main"])
+  // Until the release branch exists, a stop puts the checkout back where it started.
   let missing_footers = breaking_commits_without_footer()
   for subject in missing_footers {
     eprintln(
@@ -945,7 +1003,9 @@ async fn prepare(requested : String?, local_only : Bool) -> Unit {
     None => {
       let (code, out) = stdout_of("git", ["cliff", "--bumped-version"])
       if code != 0 || out.trim() == "" {
-        fail_with(
+        stop_prepare(
+          start,
+          start_commit,
           "git-cliff could not compute the next version; run `mise run release:prepare` so mise provides git-cliff",
         )
       }
@@ -955,18 +1015,38 @@ async fn prepare(requested : String?, local_only : Bool) -> Unit {
   let version = match release_version(requested, computed, latest_tag()) {
     Ok(v) => v
     Err(message) => {
-      fail_with(message)
+      stop_prepare(start, start_commit, message)
       return
     }
   }
   let tag = "v\{version}"
+  let branch = "release/\{tag}"
   let (tag_code, _) = stdout_of("git", [
     "rev-parse", "--quiet", "--verify", "refs/tags/\{tag}",
   ])
-  if tag_code == 0 {
-    fail_with("tag \{tag} already exists")
+  let (local_code, _) = stdout_of("git", [
+    "rev-parse", "--quiet", "--verify", "refs/heads/\{branch}",
+  ])
+  // `git ls-remote --exit-code` exits 2 when origin has no such branch.
+  let (remote_code, _) = stdout_of("git", [
+    "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/\{branch}",
+  ])
+  if remote_code != 0 && remote_code != 2 {
+    stop_prepare(
+      start,
+      start_commit,
+      "`git ls-remote origin` failed with exit code \{remote_code}; I cannot tell whether \{branch} exists on origin",
+    )
   }
-  let branch = "release/\{tag}"
+  let conflict = prepare_conflict(
+    tag,
+    tag_exists=tag_code == 0,
+    local_branch=local_code == 0,
+    remote_branch=remote_code == 0,
+  )
+  if conflict is Some(message) {
+    stop_prepare(start, start_commit, message)
+  }
   run_or_fail("git", ["switch", "-c", branch])
   run_or_fail("moonx", ["scripts/versions.mbtx", "set", "\{version}"])
   run_or_fail("moonx", ["scripts/versions.mbtx", "check", "\{version}"])
@@ -1580,6 +1660,32 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
         Ok(v) => Ok("\{v}")
         Err(message) => Err(message)
       }
+    },
+  )
+  setup.when4(
+    "prepare checks {string} with tag {string}, local branch {string} and remote branch {string}",
+    fn(tag : String, tag_exists : String, here : String, remote : String) {
+      let conflict = prepare_conflict(
+        tag,
+        tag_exists=yes(tag_exists),
+        local_branch=yes(here),
+        remote_branch=yes(remote),
+      )
+      self.result = match conflict {
+        Some(message) => Err(message)
+        None => Ok("")
+      }
+    },
+  )
+  setup.then0("prepare can continue", fn() raise {
+    @expect.expect(self.result).to_equal(Ok(""))
+  })
+  setup.then3(
+    "going back to branch {string} at commit {string} runs {string}",
+    fn(branch : String, commit : String, expected : String) raise {
+      let branch = if branch == "" { None } else { Some(branch) }
+      let args = ["git"] + return_args(branch, commit)
+      @expect.expect(args.join(" ")).to_equal(expected)
     },
   )
   setup.then1("the version is {string}", fn(expected : String) raise {

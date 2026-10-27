@@ -31,10 +31,17 @@ Fix: `mise install`, then run the task through mise.
 Cause: no commit since the last tag changes the version, or the version you passed is too low.
 Fix: if a release is still wanted, pass a version: `mise run release:prepare 0.0.2`.
 
-**`tag vX.Y.Z already exists`, or a branch `release/vX.Y.Z` already exists**
-Cause: an earlier `prepare` for the same version.
-Fix: for a branch, close its pull request, delete the branch (`git branch -D release/vX.Y.Z` and
+**`tag vX.Y.Z already exists`, or `branch release/vX.Y.Z already exists`**
+Cause: an earlier `prepare` for the same version. `prepare` checks the tag, the local branch and the
+branch on origin before it makes anything, and then puts the checkout back where it started.
+Fix: if you only want to continue the release, do not run `prepare` again: `git switch release/vX.Y.Z`.
+To start the release again, close its pull request, delete the branch (`git branch -D release/vX.Y.Z` and
 `git push origin --delete release/vX.Y.Z`), then run `prepare` again.
+
+**After a stopped `prepare`, HEAD is detached on `origin/main`**
+Cause: the `prepare` of v0.7.0 or earlier switched to `origin/main` before its checks, and did not go back
+when a check stopped it. The release branch is not changed.
+Fix: `git switch release/vX.Y.Z`, or `git switch <your branch>`.
 
 ## Release pull request
 
