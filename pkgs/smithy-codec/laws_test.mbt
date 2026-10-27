@@ -188,3 +188,43 @@ test "caller-built values follow the same laws" {
   assert_true(compact.decode(compact.encode(built)) == built)
   assert_true(expanded.decode(expanded.encode(built)) == built)
 }
+
+///|
+test "review regressions: empty members, accepted dictionary kinds and sparse nulls" {
+  // A present empty member without @emptyAsAbsent keeps the expanded form.
+  let compact = type_codec("compact")
+  let text = "{\"Reference\":{\"fqname\":\"x:y\",\"args\":[]}}"
+  let value = compact.decode(text)
+  assert_eq(compact.encode(value), text)
+  assert_true(compact.decode(compact.encode(value)) == value)
+  assert_eq(
+    compact.canonicalize("{\"Reference\":{\"fqname\":\"x:y\"}}"),
+    "\"x:y\"",
+  )
+  // An untagged union sees both layouts of a dictionary that accepts the other layout.
+  inspect(
+    refusal(
+      header +
+      "@jsonEncoding(base: {dictionary: {layout: \"object\", accept: [\"entries\"]}})\nmap D { key: String, value: String }\nlist L { member: String }\n@untagged union U { d: D, l: L }",
+      "example#U",
+      None,
+    ),
+    content="InvalidDeclaration: example#U: Untagged members d and l both accept JSON array values.",
+  )
+  // Null elements of sparse lists and maps are kept, whatever their target layout.
+  let model = load(
+    header +
+    "@sparse list Items { member: Dict }\nmap Dict { key: String, value: String }\n@sparse map Opts { key: String, value: U }\nunion U { a: String }\nstructure R { items: Items, opts: Opts }",
+  )
+  let codec = @codec.PreparedCodec::prepare(model, id("example#R"))
+  let sparse = "{\"items\":[null,{\"k\":\"v\"}],\"opts\":{\"x\":null,\"y\":{\"a\":\"b\"}}}"
+  assert_eq(codec.canonicalize(sparse), sparse)
+  let built = codec.value(Structure([("items", List([Null]))]))
+  assert_eq(codec.encode(built), "{\"items\":[null]}")
+  // A dense list still refuses null.
+  let dense = @codec.PreparedCodec::prepare(
+    load(header + "list L { member: String }\nstructure R { l: L }"),
+    id("example#R"),
+  )
+  assert_false(dense.check("{\"l\":[null]}").is_valid())
+}

@@ -158,7 +158,9 @@ fn guard_holds(
   shape : @contract.ShapeContract,
 ) -> Bool {
   let field = fn(i : Int32) { value.get(shape.members[i].name) }
-  guard_.empty.iter().all(i => field(i).map(v => v.is_empty()).unwrap_or(true)) &&
+  // An empty value counts as absent only through @emptyAsAbsent, which normalization applies first, so a
+  // present empty member keeps the declared layout instead of being dropped by a compact form.
+  guard_.empty.iter().all(i => field(i) is None) &&
   guard_.present
   .iter()
   .all(i => field(i).map(v => !v.is_empty()).unwrap_or(false))
@@ -430,6 +432,9 @@ fn Writer::value(
             joined(
               "[",
               items.mapi((i, v) => {
+                if shape.sparse && v is Null {
+                  return [WText("null")]
+                }
                 [
                   WValue(
                     v,
@@ -462,12 +467,16 @@ fn Writer::value(
       let m = shape.members[1]
       let items : Array[Array[WTask]] = []
       for field in fields {
-        let value_task = WValue(
-          field.1,
-          { shape: m.target, adapter: m.adapter, },
-          field_path(path, field.0),
-          depth + 1,
-        )
+        let value_task = if shape.sparse && field.1 is Null {
+          WText("null")
+        } else {
+          WValue(
+            field.1,
+            { shape: m.target, adapter: m.adapter, },
+            field_path(path, field.0),
+            depth + 1,
+          )
+        }
         let key = match layout.key_adapter {
           Some(id) =>
             match

@@ -10,6 +10,8 @@ priv enum NBuild {
 priv enum NTask {
   NVisit(LogicalValue, Target, @validation.InstancePath, Int32)
   NAssemble(NBuild)
+  /// A null element or value of a sparse list or map.
+  NNull
 }
 
 ///|
@@ -67,6 +69,7 @@ fn normalize(
       return None
     }
     match task {
+      NNull => out.push(Null)
       NAssemble(build) =>
         match build {
           NList(n) => out.push(List(take(n)))
@@ -126,6 +129,10 @@ fn normalize(
                 let m = shape.members[0]
                 tasks.push(NAssemble(NList(items.length())))
                 for i = items.length() - 1; i >= 0; i = i - 1 {
+                  if shape.sparse && items[i] is Null {
+                    tasks.push(NNull)
+                    continue
+                  }
                   tasks.push(
                     NVisit(
                       items[i],
@@ -159,6 +166,10 @@ fn normalize(
                   }
                   seen.add(field.0)
                   keys.push(field.0)
+                  if shape.sparse && field.1 is Null {
+                    visits.push(NNull)
+                    continue
+                  }
                   visits.push(
                     NVisit(
                       field.1,

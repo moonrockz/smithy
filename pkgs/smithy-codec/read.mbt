@@ -18,6 +18,8 @@ priv enum Task {
   Visit(Json, @validation.InstancePath, Target, Int32)
   Document(Json, @validation.InstancePath, Int32)
   Rest(Array[Json], Int32, @validation.InstancePath, Target, Int32)
+  /// A null element or value of a sparse list or map, kept without reading its target layout.
+  SparseNull(@validation.InstancePath)
   Assemble(Build)
 }
 
@@ -236,6 +238,10 @@ fn Reader::visit(
       let item = shape.members[0]
       self.tasks.push(Assemble(BList(path, items.length())))
       for i = items.length() - 1; i >= 0; i = i - 1 {
+        if shape.sparse && items[i] is Null {
+          self.tasks.push(SparseNull(index_path(path, i)))
+          continue
+        }
         self.tasks.push(
           Visit(
             items[i],
@@ -530,7 +536,11 @@ fn Reader::dictionary(
     }
     seen[key] = key_path
     keys.push(key)
-    visits.push(Visit(value, value_path, value_target, depth + 1))
+    if shape.sparse && value is Null {
+      visits.push(SparseNull(value_path))
+    } else {
+      visits.push(Visit(value, value_path, value_target, depth + 1))
+    }
   }
   let read_key = fn(key : Json, key_path) -> String? {
     match layout.key_adapter {
@@ -1143,6 +1153,7 @@ fn read_json(
           )
         }
       }
+      SparseNull(path) => reader.results.push({ kind: LNull, source: path, })
       Assemble(build) => reader.assemble(build)
     }
   }

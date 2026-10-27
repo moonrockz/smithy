@@ -211,6 +211,8 @@ pub struct ShapeContract {
   layout : ShapeLayout
   /// Reader-only alternative union layouts.
   accepts : Array[UnionLayout]
+  /// A sparse list or map: a null element or value is kept as null.
+  sparse : Bool
   forms : Array[Form]
 } derive(Debug)
 

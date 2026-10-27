@@ -155,7 +155,7 @@ tag, a position or a layout.
 | `union: {style: "tagArray"}` | `["Add", 1, 2]` | The tag is element 0. A payload structure with a tuple rule is spliced after the tag; another payload takes one element; a Unit member is `["Tag"]`, or `["Tag", {}]` with `unit: "slot"`. |
 | `union: {style: "untagged"}` | `1` or `"a"` | The JSON kinds that the members accept are disjoint, after adapters and timestamp formats. Two numeric members are refused even with different ranges. |
 | `tuple: {members: [...], rest, optional}` | `["a", 1]` | Explicit positions; every member has one. An optional position needs `optional: "omit"` or `"null"`; a required position after an omitted one is a hole and is refused. `rest` is a final list member. |
-| `dictionary: {layout: "object" or "entries", key, order}` | `{"k": v}` or `[[k, v]]` | A `key` adapter gives logical keys. Two entries with the same logical key are refused. `order` is `key` (code-unit order), `adapter` or `preserve`. |
+| `dictionary: {layout: "object" or "entries", key, order}` | `{"k": v}` or `[[k, v]]` | A `key` adapter gives logical keys. Two entries with the same logical key are refused. `order` is `key` (code-unit order), `adapter` or `preserve`. A `null` value of a `@sparse` map, like a `null` element of a `@sparse` list, stays `null`. |
 | `adapter` | any declared kind | A host adapter with the declared input and output kinds. |
 
 Member rules set `name` (the field name), `tag` (the union tag), `aliases` (reader-only names and tags),
@@ -217,7 +217,8 @@ binds members; it can also have a writer guard.
   form names its `member` and binds fields of that member's payload; without `bind` or `positions` it reads
   the whole value as the payload.
 - `write: {empty: [...], present: [...]}` selects the form for canonical output when every `empty` member is
-  absent or empty and every `present` member is present and not empty. Every member that the form does not
+  absent and every `present` member is present and not empty. A present empty value counts as absent only
+  for an `emptyAsAbsent` member, so a compact form never drops a present empty member. Every member that the form does not
   bind must be in `empty`, so the form never drops information.
 
 Preparation refuses a form that overlaps the shape's own layout or another form unless guards tell them

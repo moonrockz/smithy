@@ -91,6 +91,7 @@ priv struct Draft {
   members : Array[MemberContract]
   layout : ShapeLayout
   accepts : Array[UnionLayout]
+  sparse : Bool
   forms : Array[RawForm]
 }
 
@@ -385,6 +386,7 @@ pub fn WireContract::prepare(
         }
       }
     }
+    let sparse = annotation(shape, "smithy.api#sparse")
     let accepts : Array[UnionLayout] = []
     let layout = match kind {
       StructureKind =>
@@ -492,6 +494,7 @@ pub fn WireContract::prepare(
       members,
       layout,
       accepts,
+      sparse,
       forms: either(selected.forms, base.forms).unwrap_or([]),
     }
     order.push(id)
@@ -536,6 +539,7 @@ pub fn WireContract::prepare(
       members: draft.members,
       layout,
       accepts: draft.accepts,
+      sparse: draft.sparse,
       forms,
     }
   }
@@ -839,7 +843,12 @@ fn accepted_kinds(
   match draft.layout {
     ObjectStructure => add(ObjectKind)
     TupleStructure(_) | ListShape => add(ArrayKind)
-    Dictionary(d) => add(if d.entries { ArrayKind } else { ObjectKind })
+    Dictionary(d) => {
+      add(if d.entries { ArrayKind } else { ObjectKind })
+      if d.accept_other {
+        add(if d.entries { ObjectKind } else { ArrayKind })
+      }
+    }
     UnionShape(External | Internal(..) | Adjacent(..)) => add(ObjectKind)
     UnionShape(TagArray(..)) => add(ArrayKind)
     UnionShape(Untagged(_)) => {
@@ -941,7 +950,12 @@ fn layout_kinds(layout : ShapeLayout) -> Array[JsonKind] {
   match layout {
     ObjectStructure | UnionShape(External | Internal(..) | Adjacent(..)) =>
       [ObjectKind]
-    Dictionary(d) => [if d.entries { ArrayKind } else { ObjectKind }]
+    Dictionary(d) =>
+      if d.accept_other {
+        [ArrayKind, ObjectKind]
+      } else {
+        [if d.entries { ArrayKind } else { ObjectKind }]
+      }
     TupleStructure(_) | ListShape | UnionShape(TagArray(..)) => [ArrayKind]
     UnionShape(Untagged(kinds)) => kinds.map(entry => entry.0)
     Scalar(_) => []
