@@ -18,6 +18,7 @@ import {
   "moonrockz/artifact-resources@0.7.0",
   "moonrockz/smithy@0.7.0",
   "moonrockz/smithy-validation@0.7.0",
+  "moonrockz/smithy-codec@0.7.0",
   "moonrockz/smithy-ion-validation@0.7.0",
   "moonrockz/ion@0.6.0",
   "moonrockz/smithy-build@0.7.0",

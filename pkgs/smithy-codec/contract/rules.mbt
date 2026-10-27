@@ -26,6 +26,7 @@ priv struct RawUnion {
   tag : String?
   content : String?
   unit : String?
+  accept : Array[RawUnion]
 }
 
 ///|
@@ -40,6 +41,7 @@ priv struct RawDictionary {
   layout : String
   key : String?
   order : String?
+  accept : Array[String]
 }
 
 ///|
@@ -48,6 +50,7 @@ priv struct RawForm {
   kind : String
   adapter : String?
   field : String?
+  absent_field : String?
   bind : String?
   positions : Array[String]?
   rest : String?
@@ -64,6 +67,7 @@ priv struct RawRule {
   tag : String?
   aliases : Array[String]?
   absent : String?
+  flatten : Bool
   forms : Array[RawForm]?
 }
 
@@ -78,6 +82,7 @@ fn empty_rule() -> RawRule {
     tag: None,
     aliases: None,
     absent: None,
+    flatten: false,
     forms: None,
   }
 }
@@ -156,15 +161,36 @@ fn parse_union_rule(
   owner : @smithy.ShapeId,
   value : @smithy.NodeValue,
 ) -> RawUnion raise ContractError {
-  let f = fields(owner, value, "union rule", ["style", "tag", "content", "unit"])
+  let f = fields(owner, value, "union rule", [
+    "style", "tag", "content", "unit", "accept",
+  ])
   guard text_field(owner, f, "style", "union rule") is Some(style) else {
     raise InvalidDeclaration(owner, "I expected a union rule style.")
+  }
+  let accept : Array[RawUnion] = []
+  match f.get("accept") {
+    None => ()
+    Some(Array(items)) =>
+      for item in items {
+        let alternative = parse_union_rule(owner, item)
+        if !alternative.accept.is_empty() {
+          raise InvalidDeclaration(
+            owner, "An accepted union layout cannot accept further layouts.",
+          )
+        }
+        accept.push(alternative)
+      }
+    Some(_) =>
+      raise InvalidDeclaration(
+        owner, "I expected a list of accepted union layouts.",
+      )
   }
   {
     style,
     tag: text_field(owner, f, "tag", "union rule"),
     content: text_field(owner, f, "content", "union rule"),
     unit: text_field(owner, f, "unit", "union rule"),
+    accept,
   }
 }
 
@@ -173,7 +199,9 @@ fn parse_dictionary_rule(
   owner : @smithy.ShapeId,
   value : @smithy.NodeValue,
 ) -> RawDictionary raise ContractError {
-  let f = fields(owner, value, "dictionary rule", ["layout", "key", "order"])
+  let f = fields(owner, value, "dictionary rule", [
+    "layout", "key", "order", "accept",
+  ])
   guard text_field(owner, f, "layout", "dictionary rule") is Some(layout) else {
     raise InvalidDeclaration(owner, "I expected a dictionary layout.")
   }
@@ -181,6 +209,7 @@ fn parse_dictionary_rule(
     layout,
     key: text_field(owner, f, "key", "dictionary rule"),
     order: text_field(owner, f, "order", "dictionary rule"),
+    accept: texts_field(owner, f, "accept", "dictionary rule").unwrap_or([]),
   }
 }
 
@@ -191,7 +220,7 @@ fn parse_rule(
 ) -> RawRule raise ContractError {
   let f = fields(owner, value, "encoding rule", [
     "union", "tuple", "dictionary", "adapter", "name", "tag", "aliases", "absent",
-    "forms",
+    "flatten", "forms",
   ])
   let tuple = match f.get("tuple") {
     None => None
@@ -221,7 +250,7 @@ fn parse_rule(
           raise InvalidDeclaration(owner, "I expected a form reader guard.")
         }
         let r = fields(owner, read, "form reader guard", [
-          "kind", "adapter", "field",
+          "kind", "adapter", "field", "absent",
         ])
         guard text_field(owner, r, "kind", "form reader guard") is Some(kind) else {
           raise InvalidDeclaration(
@@ -246,6 +275,7 @@ fn parse_rule(
           kind,
           adapter: text_field(owner, r, "adapter", "form reader guard"),
           field: text_field(owner, r, "field", "form reader guard"),
+          absent_field: text_field(owner, r, "absent", "form reader guard"),
           bind: text_field(owner, g, "bind", "form"),
           positions: texts_field(owner, g, "positions", "form"),
           rest: text_field(owner, g, "rest", "form"),
@@ -271,6 +301,12 @@ fn parse_rule(
     tag: text_field(owner, f, "tag", "encoding rule"),
     aliases: texts_field(owner, f, "aliases", "encoding rule"),
     absent: text_field(owner, f, "absent", "encoding rule"),
+    flatten: match f.get("flatten") {
+      None | Some(Boolean(false)) => false
+      Some(Boolean(true)) => true
+      Some(_) =>
+        raise InvalidDeclaration(owner, "I expected flatten to be a boolean.")
+    },
     forms,
   }
 }

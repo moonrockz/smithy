@@ -155,7 +155,8 @@ fn scalar_node(scalar : ScalarValue) -> LKind {
 
 ///|
 fn expected(kind : @contract.JsonKind, found : Json) -> String {
-  "I expected a \{kind} value, but found \{@contract.JsonKind::of(found)}."
+  let article = if kind is (ArrayKind | ObjectKind) { "an" } else { "a" }
+  "I expected \{article} \{kind} value, but found \{@contract.JsonKind::of(found)}."
 }
 
 ///|
@@ -313,6 +314,8 @@ fn Reader::object_fields(
     None,
   )
   let mut failed = false
+  let flattened = shape.members.search_by(m => m.flatten)
+  let rest : Map[String, Json] = Map([])
   for name, value in fields {
     if skip is Some(tag) && tag.to_string() == name {
       continue
@@ -320,13 +323,17 @@ fn Reader::object_fields(
     let field = field_path(path, name)
     let mut found = None
     for i, m in shape.members {
-      if m.wire.to_string() == name ||
-        m.aliases.iter().any(a => a.to_string() == name) {
+      if !m.flatten &&
+        (
+          m.wire.to_string() == name ||
+          m.aliases.iter().any(a => a.to_string() == name)
+        ) {
         found = Some(i)
         break
       }
     }
     match found {
+      None if flattened is Some(_) => rest[name] = value
       None =>
         if self.contract.unknown_members == RejectUnknown {
           self.request.emit(
@@ -352,6 +359,9 @@ fn Reader::object_fields(
           None => slots[i] = Some((value, field, name))
         }
     }
+  }
+  if flattened is Some(f) && !rest.is_empty() {
+    slots[f] = Some((Json::object(rest), path, shape.members[f].name))
   }
   for i, m in shape.members {
     if m.required && slots[i] is None {
@@ -536,7 +546,12 @@ fn Reader::dictionary(
         }
     }
   }
-  if layout.entries {
+  let entries_layout = if layout.accept_other {
+    json is Array(_)
+  } else {
+    layout.entries
+  }
+  if entries_layout {
     guard json is Array(entries) else {
       self.fail(KindMismatch, path, shape.id, expected(ArrayKind, json))
       return
@@ -605,7 +620,8 @@ fn Reader::member_by_tag(
   path : @validation.InstancePath,
 ) -> Int32? {
   for i, m in shape.members {
-    if m.tag.to_string() == tag {
+    if m.tag.to_string() == tag ||
+      m.aliases.iter().any(a => a.to_string() == tag) {
       return Some(i)
     }
   }
@@ -634,6 +650,14 @@ fn Reader::union_(
   layout : @contract.UnionLayout,
   depth : Int32,
 ) -> Unit {
+  let layout = if shape.accepts.is_empty() {
+    layout
+  } else {
+    match self.accepted_layout(json, path, shape, layout) {
+      Some(l) => l
+      None => return
+    }
+  }
   match layout {
     External => {
       guard json is Object(fields) else {
@@ -881,6 +905,11 @@ fn Reader::apply_forms(
       !(json is Object(fields) && fields.contains(field.to_string())) {
       continue
     }
+    if form.reader.absent is Some(field) &&
+      json is Object(fields) &&
+      fields.contains(field.to_string()) {
+      continue
+    }
     if form.reader.adapter is Some(id) &&
       self.adapt(id, json, path, shape.id, quiet=true) is None {
       if !self.request.complete {
@@ -1113,4 +1142,59 @@ fn read_json(
     return None
   }
   reader.results.pop()
+}
+
+///|
+/// Choose among a union's own layout and its reader-only layouts for an object input. Internal and
+/// adjacent layouts apply when their tag field is present; an adjacent layout also needs its content
+/// field and then wins over an internal layout with the same tag. An external layout applies to an
+/// object with one field that names a member.
+fn Reader::accepted_layout(
+  self : Reader,
+  json : Json,
+  path : @validation.InstancePath,
+  shape : @contract.ShapeContract,
+  main : @contract.UnionLayout,
+) -> @contract.UnionLayout? {
+  guard json is Object(fields) else { return Some(main) }
+  let names_member = fn(name : String) {
+    shape.members
+    .iter()
+    .any(m => {
+      m.tag.to_string() == name ||
+      m.aliases.iter().any(a => a.to_string() == name)
+    })
+  }
+  let applies = fn(layout : @contract.UnionLayout) {
+    match layout {
+      External => fields.length() == 1 && fields.keys().iter().all(names_member)
+      Internal(tag~) => fields.contains(tag.to_string())
+      Adjacent(tag~, content~) =>
+        fields.contains(tag.to_string()) && fields.contains(content.to_string())
+      _ => false
+    }
+  }
+  let candidates = ([main] + shape.accepts).filter(applies)
+  let adjacent_tags = candidates.filter_map(l => {
+    match l {
+      Adjacent(tag~, ..) => Some(tag)
+      _ => None
+    }
+  })
+  let chosen = candidates.filter(l => {
+    !(l is Internal(tag~) && adjacent_tags.contains(tag))
+  })
+  match chosen {
+    [] => Some(main)
+    [one] => Some(one)
+    _ => {
+      self.fail(
+        AmbiguousForm,
+        path,
+        shape.id,
+        "I found \{chosen.length()} union layouts that read this object.",
+      )
+      None
+    }
+  }
 }

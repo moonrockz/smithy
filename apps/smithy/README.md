@@ -881,6 +881,122 @@ Findings include `nativeKind`, or null for an absent required member. Read the
 rules. The Ion adapter is a separate optional library module; ordinary JSON and JSON-RPC library
 consumers do not depend on Ion. `validate rpc` continues to accept JSON messages only.
 
+## Profile-aware JSON
+
+A model can declare JSON representations with the `smithy.serialization` traits and name each one with a
+profile. `--profile` selects a declared profile of the `--shape` root; `--bundle` selects a versioned
+document bundle, whose document version chooses the root. A selection names declared contracts only: no
+option changes a tag, a position or a layout. Without `--profile` or `--bundle`, `validate value` is
+unchanged. The [JSON codec library](../../pkgs/smithy-codec/README.mbt.md) describes the traits.
+
+<!-- tour:start codec-cli -->
+```smithy file=expr.smithy
+$version: "2"
+
+namespace example
+
+use smithy.serialization#jsonEncoding
+use smithy.serialization#jsonProfiles
+
+@jsonProfiles([
+    {id: "object"}
+    {id: "array", defaults: {union: {style: "tagArray"}}}
+])
+union Expr {
+    Num: Count
+    Add: Add
+}
+
+@range(min: 0, max: 100)
+integer Count
+
+@jsonEncoding(profiles: {array: {tuple: {members: ["left", "right"]}}})
+structure Add {
+    @required
+    left: Expr
+
+    @required
+    right: Expr
+}
+```
+
+```json file=expr.json
+["Add", ["Num", 1], ["Add", ["Num", 2], ["Num", 3]]]
+```
+
+```json file=expr-range.json
+["Add", ["Num", 1], ["Num", 101]]
+```
+
+```console
+$ smithy validate value --shape example#Expr --profile array --value expr.json expr.smithy
+$ smithy codec canonicalize --shape example#Expr --profile array --value expr.json expr.smithy
+["Add",["Num",1],["Add",["Num",2],["Num",3]]]
+```
+
+```console status=1
+$ smithy validate value --shape example#Expr --profile array --value expr-range.json expr.smithy
+expr-range.json/2/1: error[Range] example#Expr$Num: I expected the number to satisfy the modeled range.
+```
+
+```console status=1
+$ smithy validate value --shape example#Expr --profile object --value expr.json expr.smithy
+expr.json: error[KindMismatch] example#Expr: I expected an object value, but found array.
+```
+
+```console status=2
+$ smithy validate value --shape example#Expr --profile tree --value expr.json expr.smithy
+--profile: error[UnknownProfile]: I expected a declared serialization profile, but found no profile tree.
+```
+<!-- tour:end codec-cli -->
+
+The finding path is the original JSON location, here the second element of the payload array, not a
+member name that the input does not contain. `--diagnostics json` prints one result object with `valid`,
+`complete` and `findings` on stdout.
+
+`smithy codec canonicalize` checks the value first and then prints its canonical form, or writes it with
+`-o FILE`. An invalid value, an incompatible version or an exhausted limit exits 1 and leaves the output
+file as it was. With `--bundle`, `--output-profile` selects another declared profile of the same release,
+such as an expanded output; it never converts the document to another release.
+
+Exit 0 means complete and valid. Invalid or incomplete values and I/O failures exit 1. Invalid usage,
+an unknown profile or bundle, a missing adapter and a refused declaration exit 2. `--input-format`,
+`--ion-index`, `--unknown-members` and `--member-names` cannot be combined with `--profile` or
+`--bundle`, because the profile declares the representation. The command line trusts the scalar adapters
+of the Morphir IR; see [Morphir codecs](../../examples/morphir-codecs/README.md).
+
+### The jsonCodec build plugin
+
+The `jsonCodec` plugin uses the same selection. `action` is `check` or `canonicalize`; `shape` or
+`bundle`, `profile` and `outputProfile` select the contract; `values` lists value files relative to the
+configuration file. `check` writes `json-codec-check.json` and fails the build on an invalid value.
+`canonicalize` writes each value under its `output` name, by default the input's file name. Any other
+setting is refused, so a build cannot change a profile's rules. The JSON Schema, OpenAPI, OpenRPC and
+JSON-RPC generator plugins refuse a `profile` setting: they keep their standard contracts.
+
+<!-- tour:start codec-build -->
+```json file=codec-build.json
+{
+    "version": "1.0",
+    "outputDirectory": "codec-out",
+    "sources": ["expr.smithy"],
+    "plugins": {
+        "jsonCodec": {
+            "action": "canonicalize",
+            "shape": "example#Expr",
+            "profile": "array",
+            "values": [{"input": "expr.json", "output": "expr.canonical.json"}]
+        }
+    }
+}
+```
+
+```console
+$ smithy build --config codec-build.json
+$ smithy validate value --shape example#Expr --profile array --value codec-out/source/jsonCodec/expr.canonical.json expr.smithy
+```
+<!-- tour:end codec-build -->
+
 ## Validate JSON-RPC messages
 
 `smithy validate rpc` checks a JSON-RPC 1.0 or 2.0 request, notification or contextual response against a selected

@@ -90,6 +90,7 @@ priv struct Draft {
   kind : ShapeKind
   members : Array[MemberContract]
   layout : ShapeLayout
+  accepts : Array[UnionLayout]
   forms : Array[RawForm]
 }
 
@@ -358,6 +359,7 @@ pub fn WireContract::prepare(
         adapter,
         empty_as_absent,
         null_when_absent,
+        flatten: member_selected.flatten || member_base.flatten,
       })
       stack.push(target)
     }
@@ -366,7 +368,11 @@ pub fn WireContract::prepare(
       let names : Map[String, String] = Map([])
       for m in members {
         let spellings = [m.wire] + m.aliases
-        let seen = if kind == UnionKind { [m.tag] } else { spellings }
+        let seen = if kind == UnionKind {
+          [m.tag] + m.aliases
+        } else {
+          spellings
+        }
         for spelling in seen {
           let text = spelling.to_string()
           if names.get(text) is Some(other) {
@@ -379,6 +385,7 @@ pub fn WireContract::prepare(
         }
       }
     }
+    let accepts : Array[UnionLayout] = []
     let layout = match kind {
       StructureKind =>
         match either(selected.tuple, base.tuple) {
@@ -396,6 +403,7 @@ pub fn WireContract::prepare(
             tag: None,
             content: None,
             unit: None,
+            accept: [],
           })
         }
         let rule = match selected.union_ {
@@ -419,6 +427,19 @@ pub fn WireContract::prepare(
                   }
                 }
             }
+        }
+        match rule {
+          Some(r) =>
+            for alternative in r.accept {
+              let layout = union_layout(id, members, Some(alternative))
+              guard layout is (External | Internal(..) | Adjacent(..)) else {
+                raise InvalidDeclaration(
+                  id, "An accepted union layout must be external, internal or adjacent.",
+                )
+              }
+              accepts.push(layout)
+            }
+          None => ()
         }
         UnionShape(union_layout(id, members, rule))
       }
@@ -460,6 +481,7 @@ pub fn WireContract::prepare(
       kind,
       members,
       layout,
+      accepts,
       forms: either(selected.forms, base.forms).unwrap_or([]),
     }
     order.push(id)
@@ -468,30 +490,19 @@ pub fn WireContract::prepare(
   let shapes : Map[@smithy.ShapeId, ShapeContract] = Map([])
   for id in order {
     let draft = drafts.get(id).unwrap()
+    for alternative in draft.accepts {
+      if alternative is Internal(tag~) {
+        check_internal(id, draft, drafts, model, tag)
+      }
+    }
+    if draft.kind == StructureKind {
+      check_flatten(draft, drafts)
+    }
     let layout = match draft.layout {
       UnionShape(Untagged(_)) =>
         UnionShape(Untagged(untagged_kinds(draft, drafts, catalog, model)))
       UnionShape(Internal(tag~)) => {
-        for m in draft.members {
-          let target = drafts.get(m.target).unwrap()
-          if is_unit(model, m.target) {
-            continue
-          }
-          guard target.layout is ObjectStructure else {
-            raise InvalidDeclaration(
-              id,
-              "Internally tagged member \{m.name} needs an object structure payload.",
-            )
-          }
-          for field in target.members {
-            if field.wire == tag || field.aliases.contains(tag) {
-              raise InvalidDeclaration(
-                id,
-                "The discriminator \{tag} collides with field \{field.name} of member \{m.name}.",
-              )
-            }
-          }
-        }
+        check_internal(id, draft, drafts, model, tag)
         draft.layout
       }
       TupleStructure(t) => {
@@ -514,6 +525,7 @@ pub fn WireContract::prepare(
       kind: draft.kind,
       members: draft.members,
       layout,
+      accepts: draft.accepts,
       forms,
     }
   }
@@ -720,7 +732,12 @@ fn dictionary_layout(
     )
   }
   guard rule is Some(rule) else {
-    return { entries: false, key_adapter: None, order: LexicalKeys, }
+    return {
+      entries: false,
+      accept_other: false,
+      key_adapter: None,
+      order: LexicalKeys,
+    }
   }
   let entries = match rule.layout {
     "object" => false
@@ -729,6 +746,15 @@ fn dictionary_layout(
       raise UnsupportedDeclaration(
         id,
         "I do not implement the dictionary layout \{other.escape()}.",
+      )
+  }
+  let accept_other = match rule.accept {
+    [] => false
+    ["object"] if entries => true
+    ["entries"] if !entries => true
+    _ =>
+      raise InvalidDeclaration(
+        id, "A dictionary can accept only the other layout.",
       )
   }
   let key_adapter = rule.key.map(text => adapter_id(id, text))
@@ -751,7 +777,7 @@ fn dictionary_layout(
           "Key adapter \{adapter} must produce a string key.",
         )
       }
-      if !entries && !signature.inputs.contains(StringKind) {
+      if (!entries || accept_other) && !signature.inputs.contains(StringKind) {
         raise InvalidDeclaration(
           id,
           "Key adapter \{adapter} must read strings in an object dictionary.",
@@ -766,7 +792,7 @@ fn dictionary_layout(
         raise InvalidDeclaration(id, "Adapter key order needs a key adapter.")
       }
   }
-  { entries, key_adapter, order, }
+  { entries, accept_other, key_adapter, order, }
 }
 
 ///|
@@ -935,7 +961,8 @@ fn prepare_forms(
       }
     }
     let field = raw.field.map(text => wire_name(id, text))
-    if field is Some(_) && kind != ObjectKind {
+    let absent_field = raw.absent_field.map(text => wire_name(id, text))
+    if (field is Some(_) || absent_field is Some(_)) && kind != ObjectKind {
       raise InvalidDeclaration(id, "A field marker needs an object form.")
     }
     // The members that the form binds belong to the payload of a union member, or to the structure.
@@ -1024,7 +1051,7 @@ fn prepare_forms(
         Positional(fixed~, rest~)
       }
       (None, None) =>
-        if selected_member is Some(_) && payload.kind != StructureKind {
+        if selected_member is Some(_) {
           let accepted = accepted_kinds(
             payload.id,
             Some(draft.members[selected_member.unwrap()].member_id),
@@ -1048,7 +1075,12 @@ fn prepare_forms(
         }
     }
     let bound : Array[Int32] = match binding {
-      Whole(i) => if i >= 0 { [i] } else { [] }
+      Whole(i) =>
+        if i >= 0 {
+          [i]
+        } else {
+          Array::makei(payload.members.length(), i => i)
+        }
       Positional(fixed~, rest~) =>
         match rest {
           Some(r) => fixed + [r]
@@ -1086,14 +1118,16 @@ fn prepare_forms(
     }
     out.push({
       union_member: selected_member,
-      reader: { kind, adapter, field, },
+      reader: { kind, adapter, field, absent: absent_field, },
       binding,
       writer,
     })
   }
   // Reader rules must not overlap without a guard that can tell them apart.
   let guarded = fn(form : Form) {
-    form.reader.adapter is Some(_) || form.reader.field is Some(_)
+    form.reader.adapter is Some(_) ||
+    form.reader.field is Some(_) ||
+    form.reader.absent is Some(_)
   }
   for i, form in out {
     if layout_kinds(layout).contains(form.reader.kind) && !guarded(form) {
@@ -1110,7 +1144,8 @@ fn prepare_forms(
           !guarded(other) ||
           (
             other.reader.adapter == form.reader.adapter &&
-            other.reader.field == form.reader.field
+            other.reader.field == form.reader.field &&
+            other.reader.absent == form.reader.absent
           )
         ) {
         raise InvalidDeclaration(
@@ -1121,4 +1156,75 @@ fn prepare_forms(
     }
   }
   out
+}
+
+///|
+fn check_internal(
+  id : @smithy.ShapeId,
+  draft : Draft,
+  drafts : Map[@smithy.ShapeId, Draft],
+  model : @smithy.Model,
+  tag : WireName,
+) -> Unit raise ContractError {
+  for m in draft.members {
+    let target = drafts.get(m.target).unwrap()
+    if is_unit(model, m.target) {
+      continue
+    }
+    guard target.layout is ObjectStructure else {
+      raise InvalidDeclaration(
+        id,
+        "Internally tagged member \{m.name} needs an object structure payload.",
+      )
+    }
+    for field in target.members {
+      if field.wire == tag || field.aliases.contains(tag) {
+        raise InvalidDeclaration(
+          id,
+          "The discriminator \{tag} collides with field \{field.name} of member \{m.name}.",
+        )
+      }
+    }
+  }
+}
+
+///|
+/// A flattened member reads the fields that no sibling claims as one external union.
+fn check_flatten(
+  draft : Draft,
+  drafts : Map[@smithy.ShapeId, Draft],
+) -> Unit raise ContractError {
+  let flattened = draft.members.filter(m => m.flatten)
+  if flattened.is_empty() {
+    return
+  }
+  guard flattened.length() == 1 && draft.layout is ObjectStructure else {
+    raise InvalidDeclaration(
+      draft.id,
+      "An object structure can flatten at most one member.",
+    )
+  }
+  let m = flattened[0]
+  let target = drafts.get(m.target).unwrap()
+  guard target.layout is UnionShape(External) &&
+    target.forms.is_empty() &&
+    target.accepts.is_empty() else {
+    raise InvalidDeclaration(
+      draft.id,
+      "Flattened member \{m.name} needs an external union without forms or accepted layouts.",
+    )
+  }
+  for alternative in target.members {
+    for tag in [alternative.tag] + alternative.aliases {
+      for sibling in draft.members {
+        if !sibling.flatten &&
+          (sibling.wire == tag || sibling.aliases.contains(tag)) {
+          raise InvalidDeclaration(
+            draft.id,
+            "Flattened tag \{tag} collides with member \{sibling.name}.",
+          )
+        }
+      }
+    }
+  }
 }

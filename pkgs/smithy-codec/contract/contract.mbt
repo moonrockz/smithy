@@ -110,6 +110,8 @@ pub struct MemberContract {
   empty_as_absent : Bool
   /// Written as null when absent; a null input means absent.
   null_when_absent : Bool
+  /// The member's external union is read from the fields that no other member claims.
+  flatten : Bool
 } derive(Debug)
 
 ///|
@@ -140,6 +142,8 @@ pub(all) enum KeyOrder {
 ///|
 pub struct DictionaryLayout {
   entries : Bool
+  /// Readers also accept the other layout.
+  accept_other : Bool
   key_adapter : AdapterId?
   order : KeyOrder
 } derive(Debug)
@@ -156,6 +160,7 @@ pub struct ReaderGuard {
   kind : JsonKind
   adapter : AdapterId?
   field : WireName?
+  absent : WireName?
 } derive(Debug)
 
 ///|
@@ -204,6 +209,8 @@ pub struct ShapeContract {
   /// Structure and union members in declaration order; the member of a list; the key and value of a map.
   members : Array[MemberContract]
   layout : ShapeLayout
+  /// Reader-only alternative union layouts.
+  accepts : Array[UnionLayout]
   forms : Array[Form]
 } derive(Debug)
 

@@ -69,6 +69,8 @@ pub fn trait_definitions() -> String {
     #|    /// omit (default) or null: how an absent optional member is written. A reader treats null
     #|    /// as absence for a member with the null policy.
     #|    absent: RuleName
+    #|    /// Read the fields that no other member claims as this member's external union.
+    #|    flatten: Boolean
     #|    forms: FormRules
     #|}
     #|
@@ -80,6 +82,12 @@ pub fn trait_definitions() -> String {
     #|    content: WireName
     #|    /// tagArray: tagOnly (default) or slot.
     #|    unit: RuleName
+    #|    /// Reader-only alternative object layouts.
+    #|    accept: UnionRules
+    #|}
+    #|
+    #|list UnionRules {
+    #|    member: UnionRule
     #|}
     #|
     #|structure TupleRule {
@@ -97,6 +105,8 @@ pub fn trait_definitions() -> String {
     #|    key: AdapterId
     #|    /// key (default), adapter or preserve (the order of the input or of the caller's value).
     #|    order: RuleName
+    #|    /// The other layout, which readers also accept.
+    #|    accept: RuleNames
     #|}
     #|
     #|list FormRules {
@@ -118,7 +128,10 @@ pub fn trait_definitions() -> String {
     #|    @required
     #|    kind: RuleName
     #|    adapter: AdapterId
+    #|    /// The object must contain this field.
     #|    field: WireName
+    #|    /// The object must not contain this field.
+    #|    absent: WireName
     #|}
     #|
     #|structure WriteGuard {

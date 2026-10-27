@@ -1,5 +1,5 @@
 {
-  "description": "Expected outcomes of the pinned Morphir conformance cases for the v3 and v4 codec bundles. IDs are stable. \"root\" names the Smithy root shape a case checks; TODO entries are filled in by tasks 6.2 and 7.1. expected is valid (decode and re-encode to the canonical fence), invalid (refuse with the diagnostic) or other-node (decodes as expectNode, not as the case node). Only JSON and text fences are listed; YAML fences, document trees, support-table parsing and filesystem naming cases are out of scope. Run mise run morphir:codecs:vendor -- --check to verify every file, line, fence, pointer and lexeme.",
+  "description": "Expected outcomes of the pinned Morphir conformance cases for the v3 and v4 codec bundles. IDs are stable. \"root\" and \"profile\" name the Smithy root shape (model/*.smithy) and profile that check a case. \"input\" is a JSON pointer, relative to \"pointer\", to the input value when the case is a corpus entry. \"output\" names the expected canonical output: the case itself, another case, the file, or literal JSON text. \"gap\" names a COVERAGE.md gap for a case the bundle does not pass yet. expected is valid (decode and re-encode to the canonical fence), invalid (refuse with the diagnostic) or other-node (decodes as expectNode, not as the case node). Only JSON and text fences are listed; YAML fences, document trees, support-table parsing and filesystem naming cases are out of scope. Run mise run morphir:codecs:vendor -- --check to verify every file, line, fence, pointer and lexeme.",
   "sources": {
     "finos/morphir": "5c5307d89f34d876e8f1ebf561ec55efbadf9fa0",
     "finos/morphir-elm": "bc99af69a8b24d391311fae3822a87eafef3c334"
@@ -11,8 +11,12 @@
       "expected": "valid",
       "irVersion": 3,
       "node": "Document",
-      "root": "TODO:v3/Document",
+      "root": "morphir.ir.v3#IRFile30",
+      "profile": "morphir-v3",
       "notes": "Pinned v3 greeting artifact; integer 3; Elm-sorted dictionaries; FloatLiteral with integer lexeme 100.",
+      "output": {
+        "file": true
+      },
       "lexeme": "[\"FloatLiteral\",100]"
     },
     {
@@ -21,8 +25,12 @@
       "expected": "valid",
       "irVersion": 3,
       "node": "Document",
-      "root": "TODO:v3/Document",
-      "notes": "Additional v3 Library artifact (decision-table rules)."
+      "root": "morphir.ir.v3#IRFile30",
+      "profile": "morphir-v3",
+      "notes": "Additional v3 Library artifact (decision-table rules).",
+      "output": {
+        "file": true
+      }
     },
     {
       "id": "artifact/v3/rule-set",
@@ -30,8 +38,12 @@
       "expected": "valid",
       "irVersion": 3,
       "node": "Document",
-      "root": "TODO:v3/Document",
-      "notes": "Additional v3 Library artifact; adds List values."
+      "root": "morphir.ir.v3#IRFile30",
+      "profile": "morphir-v3",
+      "notes": "Additional v3 Library artifact; adds List values.",
+      "output": {
+        "file": true
+      }
     },
     {
       "id": "artifact/v4/complete",
@@ -39,8 +51,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Document",
-      "root": "TODO:v4/Document",
-      "notes": "Accepted (noncanonical) spelling of mck distributions-0004: \"4.0.0\", pretty-printed, flattened access and legacy module {access,value}."
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
+      "notes": "Accepted (noncanonical) spelling of mck distributions-0004: \"4.0.0\", pretty-printed, flattened access and legacy module {access,value}.",
+      "output": {
+        "case": "mck/distributions-0004/json-canonical"
+      }
     },
     {
       "id": "artifact/v4/books-and-records",
@@ -48,7 +64,8 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Document",
-      "root": "TODO:v4/Document",
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
       "notes": "v4 Library with custom types, tuples, Draft IncompleteBody; \"4.0.0\"."
     },
     {
@@ -57,7 +74,8 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Document",
-      "root": "TODO:v4/Document",
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
       "notes": "v4 Library used by the MCK node-address suite; Hole, NativeBody, IncompleteTypeDefinition, legacy module {access,value}."
     },
     {
@@ -70,7 +88,11 @@
       "node": "Name",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/names-0001/json-accepted-1",
@@ -82,7 +104,11 @@
       "node": "Name",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/names-0001/json-canonical"
+      }
     },
     {
       "id": "mck/names-0002/json-canonical",
@@ -94,7 +120,11 @@
       "node": "Name",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/names-0002/json-accepted-1",
@@ -106,7 +136,11 @@
       "node": "Name",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/names-0002/json-canonical"
+      }
     },
     {
       "id": "mck/names-0003/json-rejected-1",
@@ -119,7 +153,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/names-0003/json-rejected-2",
@@ -132,7 +167,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/names-0004/json-canonical",
@@ -144,7 +180,11 @@
       "node": "Path",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Path"
+      "root": "morphir.ir.v4#Path",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/names-0004/json-accepted-1",
@@ -156,7 +196,11 @@
       "node": "Path",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Path"
+      "root": "morphir.ir.v4#Path",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/names-0004/json-canonical"
+      }
     },
     {
       "id": "mck/names-0005/json-canonical",
@@ -168,7 +212,11 @@
       "node": "FQName",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/FQName"
+      "root": "morphir.ir.v4#FQName",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/names-0005/json-accepted-1",
@@ -180,7 +228,11 @@
       "node": "FQName",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/FQName"
+      "root": "morphir.ir.v4#FQName",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/names-0005/json-canonical"
+      }
     },
     {
       "id": "mck/names-0006/json-canonical",
@@ -192,7 +244,11 @@
       "node": "Path",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Path"
+      "root": "morphir.ir.v4#Path",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/names-0006/json-accepted-1",
@@ -204,7 +260,11 @@
       "node": "Path",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Path"
+      "root": "morphir.ir.v4#Path",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/names-0006/json-canonical"
+      }
     },
     {
       "id": "mck/names-0007/json-canonical",
@@ -216,7 +276,11 @@
       "node": "Name",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/names-0007/json-accepted-1",
@@ -228,7 +292,11 @@
       "node": "Name",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/names-0007/json-canonical"
+      }
     },
     {
       "id": "mck/names-0008/json-canonical",
@@ -240,7 +308,11 @@
       "node": "Name",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/names-0008/json-accepted-1",
@@ -252,7 +324,11 @@
       "node": "Name",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/names-0008/json-canonical"
+      }
     },
     {
       "id": "mck/types-0001/json-canonical",
@@ -264,7 +340,11 @@
       "node": "Type",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/types-0001/json-accepted-1",
@@ -276,7 +356,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0001/json-canonical"
+      }
     },
     {
       "id": "mck/types-0002/json-canonical",
@@ -288,7 +372,11 @@
       "node": "Type",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/types-0002/json-accepted-1",
@@ -300,7 +388,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0002/json-canonical"
+      }
     },
     {
       "id": "mck/types-0002/json-accepted-2",
@@ -312,7 +404,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0002/json-canonical"
+      }
     },
     {
       "id": "mck/types-0002/json-accepted-3",
@@ -324,7 +420,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0002/json-canonical"
+      }
     },
     {
       "id": "mck/types-0002/json-accepted-4",
@@ -336,7 +436,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0002/json-canonical"
+      }
     },
     {
       "id": "mck/types-0003/json-canonical",
@@ -348,7 +452,11 @@
       "node": "Type",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/types-0003/json-accepted-1",
@@ -360,7 +468,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0003/json-canonical"
+      }
     },
     {
       "id": "mck/types-0003/json-accepted-2",
@@ -372,7 +484,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0003/json-canonical"
+      }
     },
     {
       "id": "mck/types-0004/json-canonical",
@@ -384,7 +500,11 @@
       "node": "Type",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/types-0004/json-accepted-1",
@@ -396,7 +516,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0004/json-canonical"
+      }
     },
     {
       "id": "mck/types-0004/json-accepted-2",
@@ -408,7 +532,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0004/json-canonical"
+      }
     },
     {
       "id": "mck/types-0004/json-accepted-3",
@@ -420,7 +548,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0004/json-canonical"
+      }
     },
     {
       "id": "mck/types-0005/json-canonical",
@@ -432,7 +564,11 @@
       "node": "Type",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/types-0005/json-accepted-1",
@@ -444,7 +580,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0005/json-canonical"
+      }
     },
     {
       "id": "mck/types-0005/json-accepted-2",
@@ -457,7 +597,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0005/json-canonical"
+      }
     },
     {
       "id": "mck/types-0005/json-accepted-3",
@@ -470,7 +614,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0005/json-canonical"
+      }
     },
     {
       "id": "mck/types-0006/json-canonical",
@@ -482,7 +630,11 @@
       "node": "Type",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/types-0006/json-accepted-1",
@@ -494,7 +646,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0006/json-canonical"
+      }
     },
     {
       "id": "mck/types-0007/json-canonical",
@@ -506,7 +662,11 @@
       "node": "Type",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/types-0007/json-accepted-1",
@@ -518,7 +678,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0007/json-canonical"
+      }
     },
     {
       "id": "mck/types-0007/json-accepted-2",
@@ -531,7 +695,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0007/json-canonical"
+      }
     },
     {
       "id": "mck/types-0007/json-accepted-3",
@@ -544,7 +712,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0007/json-canonical"
+      }
     },
     {
       "id": "mck/types-0008/json-canonical",
@@ -556,7 +728,11 @@
       "node": "Type",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/types-0008/json-accepted-1",
@@ -568,7 +744,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0008/json-canonical"
+      }
     },
     {
       "id": "mck/types-0009/json-canonical",
@@ -580,7 +760,11 @@
       "node": "Type",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/types-0009/json-accepted-1",
@@ -592,7 +776,11 @@
       "node": "Type",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0009/json-canonical"
+      }
     },
     {
       "id": "mck/types-0009/json-accepted-2",
@@ -605,7 +793,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/types-0009/json-canonical"
+      }
     },
     {
       "id": "mck/types-0010/json-canonical",
@@ -618,7 +810,11 @@
       "role": "canonical",
       "expected": "valid",
       "compare": "attributes",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/types-0011/json-rejected-1",
@@ -631,7 +827,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unknown_node",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/types-0011/json-rejected-2",
@@ -644,7 +841,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unknown_node",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/types-0012/json-rejected-1",
@@ -657,7 +855,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_type",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/types-0012/json-rejected-2",
@@ -670,7 +869,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unknown_member",
-      "root": "TODO:v4/Type"
+      "root": "morphir.ir.v4#Type",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/values-0001/json-canonical",
@@ -682,7 +882,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0001/json-accepted-1",
@@ -694,7 +898,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0001/json-canonical"
+      }
     },
     {
       "id": "mck/values-0001/json-accepted-2",
@@ -706,7 +914,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0001/json-canonical"
+      }
     },
     {
       "id": "mck/values-0001/json-accepted-3",
@@ -718,7 +930,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0001/json-canonical"
+      }
     },
     {
       "id": "mck/values-0001/json-accepted-4",
@@ -730,7 +946,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0001/json-canonical"
+      }
     },
     {
       "id": "mck/values-0001/json-accepted-5",
@@ -742,7 +962,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0001/json-canonical"
+      }
     },
     {
       "id": "mck/values-0002/json-canonical",
@@ -754,7 +978,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0002/json-accepted-1",
@@ -766,7 +994,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0002/json-canonical"
+      }
     },
     {
       "id": "mck/values-0002/json-accepted-2",
@@ -778,7 +1010,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0002/json-canonical"
+      }
     },
     {
       "id": "mck/values-0003/json-canonical",
@@ -790,7 +1026,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0003/json-accepted-1",
@@ -802,7 +1042,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0003/json-canonical"
+      }
     },
     {
       "id": "mck/values-0003/json-accepted-2",
@@ -814,7 +1058,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0003/json-canonical"
+      }
     },
     {
       "id": "mck/values-0004/json-canonical",
@@ -826,7 +1074,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0004/json-accepted-1",
@@ -838,7 +1090,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0004/json-canonical"
+      }
     },
     {
       "id": "mck/values-0005/json-canonical",
@@ -850,7 +1106,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0005/json-accepted-1",
@@ -862,7 +1122,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0005/json-canonical"
+      }
     },
     {
       "id": "mck/values-0005/json-accepted-2",
@@ -875,7 +1139,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0005/json-canonical"
+      }
     },
     {
       "id": "mck/values-0006/json-canonical",
@@ -887,7 +1155,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0006/json-accepted-1",
@@ -899,7 +1171,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0006/json-canonical"
+      }
     },
     {
       "id": "mck/values-0006/json-accepted-2",
@@ -912,7 +1188,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0006/json-canonical"
+      }
     },
     {
       "id": "mck/values-0007/json-canonical",
@@ -924,7 +1204,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0007/json-accepted-1",
@@ -936,7 +1220,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0007/json-canonical"
+      }
     },
     {
       "id": "mck/values-0007/json-accepted-2",
@@ -948,7 +1236,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0007/json-canonical"
+      }
     },
     {
       "id": "mck/values-0007/json-rejected-1",
@@ -961,7 +1253,8 @@
       "role": "rejected",
       "expected": "other-node",
       "expectNode": "List",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/values-0008/json-canonical",
@@ -973,7 +1266,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0008/json-accepted-1",
@@ -985,7 +1282,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0008/json-canonical"
+      }
     },
     {
       "id": "mck/values-0008/json-accepted-2",
@@ -997,7 +1298,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0008/json-canonical"
+      }
     },
     {
       "id": "mck/values-0008/json-accepted-3",
@@ -1009,7 +1314,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0008/json-canonical"
+      }
     },
     {
       "id": "mck/values-0008/json-accepted-4",
@@ -1021,7 +1330,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0008/json-canonical"
+      }
     },
     {
       "id": "mck/values-0009/json-canonical",
@@ -1033,7 +1346,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0009/json-accepted-1",
@@ -1045,7 +1362,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0009/json-canonical"
+      }
     },
     {
       "id": "mck/values-0009/json-rejected-1",
@@ -1058,7 +1379,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unknown_node",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/values-0009/json-rejected-2",
@@ -1071,7 +1393,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unknown_node",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/values-0010/json-canonical",
@@ -1083,7 +1406,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0010/json-accepted-1",
@@ -1095,7 +1422,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0010/json-canonical"
+      }
     },
     {
       "id": "mck/values-0011/json-canonical",
@@ -1107,7 +1438,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0011/json-accepted-1",
@@ -1119,7 +1454,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0011/json-canonical"
+      }
     },
     {
       "id": "mck/values-0012/json-canonical",
@@ -1131,7 +1470,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value",
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      },
       "lexeme": "4.0"
     },
     {
@@ -1144,7 +1487,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value",
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0012/json-canonical"
+      },
       "lexeme": "4.0"
     },
     {
@@ -1157,7 +1504,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0013/json-accepted-1",
@@ -1169,7 +1520,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0013/json-canonical"
+      }
     },
     {
       "id": "mck/values-0013/json-accepted-2",
@@ -1182,7 +1537,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0013/json-canonical"
+      }
     },
     {
       "id": "mck/values-0013/json-accepted-3",
@@ -1195,7 +1554,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0013/json-canonical"
+      }
     },
     {
       "id": "mck/values-0014/json-canonical",
@@ -1207,7 +1570,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0014/json-accepted-1",
@@ -1219,7 +1586,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0014/json-canonical"
+      }
     },
     {
       "id": "mck/values-0015/json-canonical",
@@ -1231,7 +1602,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0015/json-accepted-1",
@@ -1243,7 +1618,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0015/json-canonical"
+      }
     },
     {
       "id": "mck/values-0016/json-canonical",
@@ -1255,7 +1634,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0016/json-accepted-1",
@@ -1267,7 +1650,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0016/json-canonical"
+      }
     },
     {
       "id": "mck/values-0017/json-canonical",
@@ -1279,7 +1666,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0017/json-accepted-1",
@@ -1291,7 +1682,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0017/json-canonical"
+      }
     },
     {
       "id": "mck/values-0017/json-accepted-2",
@@ -1304,7 +1699,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0017/json-canonical"
+      }
     },
     {
       "id": "mck/values-0018/json-canonical",
@@ -1316,7 +1715,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0018/json-accepted-1",
@@ -1328,7 +1731,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0018/json-canonical"
+      }
     },
     {
       "id": "mck/values-0019/json-canonical",
@@ -1340,7 +1747,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0019/json-accepted-1",
@@ -1352,7 +1763,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0019/json-canonical"
+      }
     },
     {
       "id": "mck/values-0020/json-canonical",
@@ -1364,7 +1779,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0020/json-accepted-1",
@@ -1376,7 +1795,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0020/json-canonical"
+      }
     },
     {
       "id": "mck/values-0021/json-canonical",
@@ -1388,7 +1811,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/values-0021/json-accepted-1",
@@ -1400,7 +1827,11 @@
       "node": "Value",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/values-0021/json-canonical"
+      }
     },
     {
       "id": "mck/values-0022/json-canonical",
@@ -1413,7 +1844,11 @@
       "role": "canonical",
       "expected": "valid",
       "compare": "attributes",
-      "root": "TODO:v4/Value"
+      "root": "morphir.ir.v4#Value",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0001/json-canonical",
@@ -1425,7 +1860,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0001/json-accepted-1",
@@ -1437,7 +1876,11 @@
       "node": "Literal",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/patterns-and-literals-0001/json-canonical"
+      }
     },
     {
       "id": "mck/patterns-and-literals-0001/json-accepted-2",
@@ -1449,7 +1892,11 @@
       "node": "Literal",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/patterns-and-literals-0001/json-canonical"
+      }
     },
     {
       "id": "mck/patterns-and-literals-0002/json-canonical",
@@ -1461,7 +1908,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Literal",
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      },
       "lexeme": "\"10.50\""
     },
     {
@@ -1474,7 +1925,11 @@
       "node": "Pattern",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0003/json-accepted-1",
@@ -1486,7 +1941,11 @@
       "node": "Pattern",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/patterns-and-literals-0003/json-canonical"
+      }
     },
     {
       "id": "mck/patterns-and-literals-0003/json-accepted-2",
@@ -1498,7 +1957,11 @@
       "node": "Pattern",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/patterns-and-literals-0003/json-canonical"
+      }
     },
     {
       "id": "mck/patterns-and-literals-0003/json-accepted-3",
@@ -1510,7 +1973,11 @@
       "node": "Pattern",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/patterns-and-literals-0003/json-canonical"
+      }
     },
     {
       "id": "mck/patterns-and-literals-0004/json-canonical",
@@ -1522,7 +1989,11 @@
       "node": "Pattern",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0004/json-accepted-1",
@@ -1534,7 +2005,11 @@
       "node": "Pattern",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/patterns-and-literals-0004/json-canonical"
+      }
     },
     {
       "id": "mck/patterns-and-literals-0004/json-accepted-2",
@@ -1546,7 +2021,11 @@
       "node": "Pattern",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/patterns-and-literals-0004/json-canonical"
+      }
     },
     {
       "id": "mck/patterns-and-literals-0005/json-canonical",
@@ -1558,7 +2037,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0006/json-canonical",
@@ -1570,7 +2053,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Literal",
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      },
       "lexeme": "9007199254740993",
       "notes": "Also carries the lexeme 0.10, which canonical output keeps."
     },
@@ -1585,7 +2072,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_literal",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/patterns-and-literals-0008/json-canonical",
@@ -1597,7 +2085,11 @@
       "node": "Pattern",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0008/json-accepted-1",
@@ -1609,7 +2101,11 @@
       "node": "Pattern",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/patterns-and-literals-0008/json-canonical"
+      }
     },
     {
       "id": "mck/patterns-and-literals-0009/json-canonical",
@@ -1621,7 +2117,11 @@
       "node": "Pattern",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0009/json-accepted-1",
@@ -1633,7 +2133,11 @@
       "node": "Pattern",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/patterns-and-literals-0009/json-canonical"
+      }
     },
     {
       "id": "mck/patterns-and-literals-0010/json-canonical",
@@ -1645,7 +2149,11 @@
       "node": "Pattern",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0010/json-accepted-1",
@@ -1657,7 +2165,11 @@
       "node": "Pattern",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/patterns-and-literals-0010/json-canonical"
+      }
     },
     {
       "id": "mck/patterns-and-literals-0011/json-canonical",
@@ -1669,7 +2181,11 @@
       "node": "Pattern",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0011/json-accepted-1",
@@ -1681,7 +2197,11 @@
       "node": "Pattern",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/patterns-and-literals-0011/json-canonical"
+      }
     },
     {
       "id": "mck/patterns-and-literals-0012/json-canonical",
@@ -1694,7 +2214,11 @@
       "role": "canonical",
       "expected": "valid",
       "compare": "attributes",
-      "root": "TODO:v4/Pattern"
+      "root": "morphir.ir.v4#Pattern",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0013/json-canonical",
@@ -1706,7 +2230,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0013/json-accepted-1",
@@ -1718,7 +2246,11 @@
       "node": "Literal",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/patterns-and-literals-0013/json-canonical"
+      }
     },
     {
       "id": "mck/patterns-and-literals-0013/json-rejected-1",
@@ -1731,7 +2263,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_literal",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/patterns-and-literals-0014/json-canonical",
@@ -1743,7 +2276,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0015/json-canonical",
@@ -1755,7 +2292,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0016/json-canonical",
@@ -1767,7 +2308,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Literal",
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      },
       "lexeme": "\"-0.00\""
     },
     {
@@ -1781,7 +2326,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_literal",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/patterns-and-literals-0016/json-rejected-2",
@@ -1794,7 +2340,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_literal",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/patterns-and-literals-0016/json-rejected-3",
@@ -1807,7 +2354,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_literal",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/patterns-and-literals-0016/json-rejected-4",
@@ -1820,7 +2368,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_literal",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/patterns-and-literals-0016/json-rejected-5",
@@ -1833,7 +2382,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_literal",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/patterns-and-literals-0017/json-canonical",
@@ -1845,7 +2395,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0018/json-canonical",
@@ -1857,7 +2411,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Literal"
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/patterns-and-literals-0019/json-canonical",
@@ -1869,7 +2427,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Literal",
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      },
       "lexeme": "18446744073709551616"
     },
     {
@@ -1882,7 +2444,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Literal",
+      "root": "morphir.ir.v4#Literal",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      },
       "lexeme": "-9223372036854775809"
     },
     {
@@ -1895,7 +2461,11 @@
       "node": "AccessControlledTypeDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0001/json-accepted-1",
@@ -1907,7 +2477,11 @@
       "node": "AccessControlledTypeDefinition",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0001/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0001/json-accepted-2",
@@ -1919,7 +2493,11 @@
       "node": "AccessControlledTypeDefinition",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0001/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0001/json-accepted-3",
@@ -1931,7 +2509,11 @@
       "node": "AccessControlledTypeDefinition",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0001/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0002/json-canonical",
@@ -1943,7 +2525,11 @@
       "node": "TypeSpecification",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/TypeSpecification"
+      "root": "morphir.ir.v4#TypeSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0002/json-accepted-1",
@@ -1955,7 +2541,11 @@
       "node": "TypeSpecification",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/TypeSpecification"
+      "root": "morphir.ir.v4#TypeSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0002/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0003/json-canonical",
@@ -1967,7 +2557,11 @@
       "node": "TypeDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/TypeDefinition"
+      "root": "morphir.ir.v4#TypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0004/json-canonical",
@@ -1979,7 +2573,11 @@
       "node": "ValueSpecification",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/ValueSpecification"
+      "root": "morphir.ir.v4#ValueSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0004/json-accepted-1",
@@ -1991,7 +2589,11 @@
       "node": "ValueSpecification",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/ValueSpecification"
+      "root": "morphir.ir.v4#ValueSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0004/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0005/json-canonical",
@@ -2003,7 +2605,11 @@
       "node": "ValueDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/ValueDefinition"
+      "root": "morphir.ir.v4#ValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0006/json-canonical",
@@ -2015,7 +2621,11 @@
       "node": "AccessControlledTypeDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0006/json-accepted-1",
@@ -2027,7 +2637,11 @@
       "node": "AccessControlledTypeDefinition",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0006/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0006/json-accepted-2",
@@ -2040,7 +2654,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0006/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0007/json-canonical",
@@ -2052,7 +2670,11 @@
       "node": "ValueDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/ValueDefinition"
+      "root": "morphir.ir.v4#ValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0007/json-accepted-1",
@@ -2065,7 +2687,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/ValueDefinition"
+      "root": "morphir.ir.v4#ValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0007/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0008/json-canonical",
@@ -2077,7 +2703,11 @@
       "node": "ValueDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/ValueDefinition"
+      "root": "morphir.ir.v4#ValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0008/json-rejected-1",
@@ -2090,7 +2720,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "duplicate_member",
-      "root": "TODO:v4/ValueDefinition"
+      "root": "morphir.ir.v4#ValueDefinition",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/definitions-0009/json-canonical",
@@ -2102,7 +2733,11 @@
       "node": "ValueDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/ValueDefinition"
+      "root": "morphir.ir.v4#ValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0010/json-canonical",
@@ -2114,7 +2749,11 @@
       "node": "ModuleSpecification",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/ModuleSpecification"
+      "root": "morphir.ir.v4#ModuleSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0010/json-accepted-1",
@@ -2127,7 +2766,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/ModuleSpecification"
+      "root": "morphir.ir.v4#ModuleSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0010/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0011/json-canonical",
@@ -2139,7 +2782,11 @@
       "node": "TypeSpecification",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/TypeSpecification"
+      "root": "morphir.ir.v4#TypeSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0012/json-canonical",
@@ -2151,7 +2798,11 @@
       "node": "TypeSpecification",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/TypeSpecification"
+      "root": "morphir.ir.v4#TypeSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0013/json-canonical",
@@ -2163,7 +2814,11 @@
       "node": "TypeSpecification",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/TypeSpecification"
+      "root": "morphir.ir.v4#TypeSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0014/json-canonical",
@@ -2175,7 +2830,11 @@
       "node": "TypeDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/TypeDefinition"
+      "root": "morphir.ir.v4#TypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0015/json-canonical",
@@ -2187,7 +2846,11 @@
       "node": "TypeDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/TypeDefinition"
+      "root": "morphir.ir.v4#TypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0016/json-canonical",
@@ -2199,7 +2862,11 @@
       "node": "ValueDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/ValueDefinition"
+      "root": "morphir.ir.v4#ValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0017/json-canonical",
@@ -2211,7 +2878,11 @@
       "node": "AccessControlledTypeDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0017/json-accepted-1",
@@ -2223,7 +2894,11 @@
       "node": "AccessControlledTypeDefinition",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0017/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0017/json-accepted-2",
@@ -2236,7 +2911,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0017/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0018/json-canonical",
@@ -2248,7 +2927,11 @@
       "node": "AccessControlledValueDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/AccessControlledValueDefinition"
+      "root": "morphir.ir.v4#AccessControlledValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0018/json-accepted-1",
@@ -2260,7 +2943,11 @@
       "node": "AccessControlledValueDefinition",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/AccessControlledValueDefinition"
+      "root": "morphir.ir.v4#AccessControlledValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0018/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0018/json-accepted-2",
@@ -2273,7 +2960,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/AccessControlledValueDefinition"
+      "root": "morphir.ir.v4#AccessControlledValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0018/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0019/json-canonical",
@@ -2285,7 +2976,11 @@
       "node": "AccessControlledValueDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/AccessControlledValueDefinition"
+      "root": "morphir.ir.v4#AccessControlledValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0019/json-accepted-1",
@@ -2297,7 +2992,11 @@
       "node": "AccessControlledValueDefinition",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/AccessControlledValueDefinition"
+      "root": "morphir.ir.v4#AccessControlledValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0019/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0019/json-accepted-2",
@@ -2310,7 +3009,11 @@
       "role": "accepted",
       "expected": "valid",
       "warning": "legacy_spelling",
-      "root": "TODO:v4/AccessControlledValueDefinition"
+      "root": "morphir.ir.v4#AccessControlledValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0019/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0020/json-canonical",
@@ -2322,7 +3025,11 @@
       "node": "TypeSpecification",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/TypeSpecification"
+      "root": "morphir.ir.v4#TypeSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0020/json-accepted-1",
@@ -2334,7 +3041,11 @@
       "node": "TypeSpecification",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/TypeSpecification"
+      "root": "morphir.ir.v4#TypeSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0020/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0021/json-canonical",
@@ -2346,7 +3057,11 @@
       "node": "ValueSpecification",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/ValueSpecification"
+      "root": "morphir.ir.v4#ValueSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0022/json-canonical",
@@ -2358,7 +3073,11 @@
       "node": "ModuleSpecification",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/ModuleSpecification"
+      "root": "morphir.ir.v4#ModuleSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0023/json-rejected-1",
@@ -2371,7 +3090,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unknown_member",
-      "root": "TODO:v4/TypeDefinition"
+      "root": "morphir.ir.v4#TypeDefinition",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/definitions-0024/json-canonical",
@@ -2383,7 +3103,11 @@
       "node": "TypeDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/TypeDefinition"
+      "root": "morphir.ir.v4#TypeDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0025/json-canonical",
@@ -2395,7 +3119,11 @@
       "node": "ValueDefinition",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/ValueDefinition"
+      "root": "morphir.ir.v4#ValueDefinition",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0026/json-rejected-1",
@@ -2408,7 +3136,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unknown_node",
-      "root": "TODO:v4/TypeDefinition"
+      "root": "morphir.ir.v4#TypeDefinition",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/definitions-0026/json-rejected-2",
@@ -2421,7 +3150,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_type",
-      "root": "TODO:v4/TypeDefinition"
+      "root": "morphir.ir.v4#TypeDefinition",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/definitions-0027/json-rejected-1",
@@ -2434,7 +3164,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unknown_node",
-      "root": "TODO:v4/ValueDefinition"
+      "root": "morphir.ir.v4#ValueDefinition",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/definitions-0028/json-rejected-1",
@@ -2447,7 +3178,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_type",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/definitions-0029/json-canonical",
@@ -2459,7 +3191,11 @@
       "node": "ValueSpecification",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/ValueSpecification"
+      "root": "morphir.ir.v4#ValueSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/definitions-0029/json-accepted-1",
@@ -2471,7 +3207,11 @@
       "node": "ValueSpecification",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/ValueSpecification"
+      "root": "morphir.ir.v4#ValueSpecification",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/definitions-0029/json-canonical"
+      }
     },
     {
       "id": "mck/definitions-0030/json-rejected-1",
@@ -2484,7 +3224,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "missing_member",
-      "root": "TODO:v4/ValueDefinition"
+      "root": "morphir.ir.v4#ValueDefinition",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/definitions-0031/json-rejected-1",
@@ -2497,7 +3238,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_access",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/definitions-0031/json-rejected-2",
@@ -2510,7 +3252,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_access",
-      "root": "TODO:v4/AccessControlledTypeDefinition"
+      "root": "morphir.ir.v4#AccessControlledTypeDefinition",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/distributions-0001/json-canonical",
@@ -2522,7 +3265,11 @@
       "node": "FormatVersion",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/FormatVersion"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/distributions-0001/json-accepted-1",
@@ -2534,7 +3281,11 @@
       "node": "FormatVersion",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/FormatVersion"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/distributions-0001/json-canonical"
+      }
     },
     {
       "id": "mck/distributions-0001/json-rejected-1",
@@ -2547,7 +3298,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_format_version_syntax",
-      "root": "TODO:v4/FormatVersion"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/distributions-0001/json-rejected-2",
@@ -2560,7 +3312,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unsupported_format_version_minor",
-      "root": "TODO:v4/FormatVersion"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/distributions-0002/json-canonical",
@@ -2572,7 +3325,11 @@
       "node": "Distribution",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/distributions-0002/json-accepted-1",
@@ -2584,7 +3341,11 @@
       "node": "Distribution",
       "role": "accepted",
       "expected": "valid",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/distributions-0002/json-canonical"
+      }
     },
     {
       "id": "mck/distributions-0003/json-rejected-1",
@@ -2597,7 +3358,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_distribution_shape",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/distributions-0004/text-accepted-1",
@@ -2610,7 +3372,11 @@
       "role": "accepted",
       "expected": "valid",
       "refersTo": "website/static/ir/examples/v4/complete-example.json",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
+      "output": {
+        "case": "mck/distributions-0004/json-canonical"
+      }
     },
     {
       "id": "mck/distributions-0004/json-canonical",
@@ -2622,7 +3388,11 @@
       "node": "Distribution",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Distribution",
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      },
       "lexeme": "0.0"
     },
     {
@@ -2637,7 +3407,8 @@
       "expected": "valid",
       "refersTo": "spec/ir/mck/documents/complete-example.yaml",
       "outOfScope": "yaml",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/distributions-0005/json-canonical",
@@ -2649,7 +3420,11 @@
       "node": "Distribution",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/distributions-0006/json-canonical",
@@ -2661,7 +3436,11 @@
       "node": "Distribution",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/distributions-0006/json-rejected-1",
@@ -2674,7 +3453,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unknown_member",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/distributions-0007/json-canonical",
@@ -2686,7 +3466,11 @@
       "node": "Distribution",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/distributions-0007/json-rejected-1",
@@ -2699,7 +3483,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unknown_member",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/distributions-0007/json-rejected-2",
@@ -2712,7 +3497,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "invalid_type",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/distributions-0008/json-canonical",
@@ -2724,7 +3510,11 @@
       "node": "FormatVersion",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/FormatVersion"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/distributions-0009/json-rejected-1",
@@ -2737,7 +3527,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unknown_member",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4"
     },
     {
       "id": "mck/distributions-0010/json-canonical",
@@ -2749,7 +3540,11 @@
       "node": "Distribution",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/distributions-0011/json-canonical",
@@ -2761,7 +3556,11 @@
       "node": "Distribution",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v3/Distribution"
+      "root": "morphir.ir.v3#IRFile31",
+      "profile": "morphir-v3",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/versions-0001/json-canonical",
@@ -2773,7 +3572,11 @@
       "node": "Value",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v3/Value"
+      "root": "morphir.ir.v3#Value",
+      "profile": "morphir-v3",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/versions-0004/json-canonical",
@@ -2785,7 +3588,11 @@
       "node": "Distribution",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/versions-0005/json-canonical",
@@ -2797,7 +3604,11 @@
       "node": "Distribution",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v4/Distribution"
+      "root": "morphir.ir.v4#IRFile",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/versions-0006/json-canonical",
@@ -2809,7 +3620,11 @@
       "node": "Literal",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v3/Literal",
+      "root": "morphir.ir.v3#Literal",
+      "profile": "morphir-v3",
+      "output": {
+        "self": true
+      },
       "lexeme": "\"10.50\""
     },
     {
@@ -2822,7 +3637,11 @@
       "node": "TypeSpecification",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v3/TypeSpecification"
+      "root": "morphir.ir.v3#TypeSpecification",
+      "profile": "morphir-v3",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/versions-0008/json-canonical",
@@ -2834,7 +3653,11 @@
       "node": "Type",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v3/Type"
+      "root": "morphir.ir.v3#Type",
+      "profile": "morphir-v3",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/versions-0009/json-canonical",
@@ -2846,7 +3669,11 @@
       "node": "FormatVersion",
       "role": "canonical",
       "expected": "valid",
-      "root": "TODO:v3/FormatVersion"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "output": {
+        "self": true
+      }
     },
     {
       "id": "mck/versions-0010/json-rejected-1",
@@ -2859,7 +3686,8 @@
       "role": "rejected",
       "expected": "invalid",
       "diagnostic": "unsupported_format_version_minor",
-      "root": "TODO:v3/FormatVersion"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4"
     },
     {
       "id": "format-version/scalar/00",
@@ -2867,7 +3695,9 @@
       "pointer": "/scalarCases/0",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "historical v1 integer",
       "diagnostic": "unsupported_format_version_major"
     },
@@ -2877,7 +3707,9 @@
       "pointer": "/scalarCases/1",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "historical v2 integer",
       "diagnostic": "unsupported_format_version_major"
     },
@@ -2887,8 +3719,13 @@
       "pointer": "/scalarCases/2",
       "expected": "valid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
-      "notes": "v3 integer alias"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
+      "notes": "v3 integer alias",
+      "output": {
+        "json": "3"
+      }
     },
     {
       "id": "format-version/scalar/03",
@@ -2896,8 +3733,13 @@
       "pointer": "/scalarCases/3",
       "expected": "valid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
-      "notes": "v3 baseline release string"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
+      "notes": "v3 baseline release string",
+      "output": {
+        "json": "3"
+      }
     },
     {
       "id": "format-version/scalar/04",
@@ -2905,8 +3747,13 @@
       "pointer": "/scalarCases/4",
       "expected": "valid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
-      "notes": "v3 later patch"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
+      "notes": "v3 later patch",
+      "output": {
+        "json": "\"3.0.1\""
+      }
     },
     {
       "id": "format-version/scalar/05",
@@ -2914,8 +3761,13 @@
       "pointer": "/scalarCases/5",
       "expected": "valid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
-      "notes": "v3.1 release"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
+      "notes": "v3.1 release",
+      "output": {
+        "json": "\"3.1.0\""
+      }
     },
     {
       "id": "format-version/scalar/06",
@@ -2923,7 +3775,9 @@
       "pointer": "/scalarCases/6",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "v3 later minor",
       "diagnostic": "unsupported_format_version_minor"
     },
@@ -2933,8 +3787,13 @@
       "pointer": "/scalarCases/7",
       "expected": "valid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
-      "notes": "v4 integer alias"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
+      "notes": "v4 integer alias",
+      "output": {
+        "json": "4"
+      }
     },
     {
       "id": "format-version/scalar/08",
@@ -2942,8 +3801,13 @@
       "pointer": "/scalarCases/8",
       "expected": "valid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
-      "notes": "v4 baseline release string"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
+      "notes": "v4 baseline release string",
+      "output": {
+        "json": "4"
+      }
     },
     {
       "id": "format-version/scalar/09",
@@ -2951,8 +3815,13 @@
       "pointer": "/scalarCases/9",
       "expected": "valid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
-      "notes": "v4 later patch"
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
+      "notes": "v4 later patch",
+      "output": {
+        "json": "\"4.0.1\""
+      }
     },
     {
       "id": "format-version/scalar/10",
@@ -2960,7 +3829,9 @@
       "pointer": "/scalarCases/10",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "v4 later minor",
       "diagnostic": "unsupported_format_version_minor"
     },
@@ -2970,7 +3841,9 @@
       "pointer": "/scalarCases/11",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "future v5 baseline release",
       "diagnostic": "unsupported_format_version_major"
     },
@@ -2980,7 +3853,9 @@
       "pointer": "/scalarCases/12",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "future v5 nonbaseline release",
       "diagnostic": "unsupported_format_version_major"
     },
@@ -2990,7 +3865,9 @@
       "pointer": "/scalarCases/13",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "future v5 integer alias",
       "diagnostic": "unsupported_format_version_major"
     },
@@ -3000,7 +3877,9 @@
       "pointer": "/scalarCases/14",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "maximum u32 integer family",
       "diagnostic": "unsupported_format_version_major"
     },
@@ -3010,7 +3889,9 @@
       "pointer": "/scalarCases/15",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "maximum u32 major release string",
       "diagnostic": "unsupported_format_version_major"
     },
@@ -3020,7 +3901,9 @@
       "pointer": "/scalarCases/16",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "major component u32 overflow",
       "diagnostic": "format_version_out_of_range"
     },
@@ -3030,7 +3913,9 @@
       "pointer": "/scalarCases/17",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "zero is not a format family",
       "diagnostic": "invalid_format_version_syntax"
     },
@@ -3040,7 +3925,9 @@
       "pointer": "/scalarCases/18",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "v1 release string is forbidden",
       "diagnostic": "invalid_format_version_syntax"
     },
@@ -3050,7 +3937,9 @@
       "pointer": "/scalarCases/19",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "v2 release string is forbidden",
       "diagnostic": "invalid_format_version_syntax"
     },
@@ -3060,7 +3949,9 @@
       "pointer": "/scalarCases/20",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "release missing patch component",
       "diagnostic": "invalid_format_version_syntax"
     },
@@ -3070,7 +3961,9 @@
       "pointer": "/scalarCases/21",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "release with extra component",
       "diagnostic": "invalid_format_version_syntax"
     },
@@ -3080,7 +3973,9 @@
       "pointer": "/scalarCases/22",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "release with plus-signed minor",
       "diagnostic": "invalid_format_version_syntax"
     },
@@ -3090,7 +3985,9 @@
       "pointer": "/scalarCases/23",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "release with minus-signed minor",
       "diagnostic": "invalid_format_version_syntax"
     },
@@ -3100,7 +3997,9 @@
       "pointer": "/scalarCases/24",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "release with surrounding whitespace",
       "diagnostic": "invalid_format_version_syntax"
     },
@@ -3110,7 +4009,9 @@
       "pointer": "/scalarCases/25",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "v3 release with leading-zero minor",
       "diagnostic": "invalid_format_version_syntax"
     },
@@ -3120,7 +4021,9 @@
       "pointer": "/scalarCases/26",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "v4 release with leading-zero patch",
       "diagnostic": "invalid_format_version_syntax"
     },
@@ -3130,7 +4033,9 @@
       "pointer": "/scalarCases/27",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "release with prerelease suffix",
       "diagnostic": "invalid_format_version_syntax"
     },
@@ -3140,7 +4045,9 @@
       "pointer": "/scalarCases/28",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "release with build metadata",
       "diagnostic": "invalid_format_version_syntax"
     },
@@ -3150,7 +4057,9 @@
       "pointer": "/scalarCases/29",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "integer u32 overflow",
       "diagnostic": "format_version_out_of_range"
     },
@@ -3160,7 +4069,9 @@
       "pointer": "/scalarCases/30",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "v3 minor component u32 overflow",
       "diagnostic": "format_version_out_of_range"
     },
@@ -3170,7 +4081,9 @@
       "pointer": "/scalarCases/31",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "v4 patch component u32 overflow",
       "diagnostic": "format_version_out_of_range"
     },
@@ -3180,7 +4093,9 @@
       "pointer": "/scalarCases/32",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "negative integer",
       "diagnostic": "invalid_format_version_type"
     },
@@ -3190,7 +4105,9 @@
       "pointer": "/scalarCases/33",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "floating-point number",
       "diagnostic": "invalid_format_version_type"
     },
@@ -3200,7 +4117,9 @@
       "pointer": "/scalarCases/34",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "boolean value",
       "diagnostic": "invalid_format_version_type"
     },
@@ -3210,7 +4129,9 @@
       "pointer": "/scalarCases/35",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "null value",
       "diagnostic": "invalid_format_version_type"
     },
@@ -3220,7 +4141,9 @@
       "pointer": "/scalarCases/36",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "array value",
       "diagnostic": "invalid_format_version_type"
     },
@@ -3230,7 +4153,9 @@
       "pointer": "/scalarCases/37",
       "expected": "invalid",
       "node": "FormatVersion",
-      "root": "TODO:FormatVersion",
+      "root": "morphir.ir#SupportedFormatVersion",
+      "profile": "morphir-v4",
+      "input": "/value",
       "notes": "object value",
       "diagnostic": "invalid_format_version_type"
     },
@@ -3241,7 +4166,12 @@
       "expected": "valid",
       "irVersion": 3,
       "node": "Document",
-      "root": "TODO:v3/Document",
+      "root": "morphir.ir.v3#IRFile30",
+      "profile": "morphir-v3",
+      "input": "/source",
+      "output": {
+        "json": "{\"formatVersion\":3,\"distribution\":[\"Library\",[[\"example\"]],[],{\"modules\":[]}]}"
+      },
       "notes": "canonical JSON header order"
     },
     {
@@ -3251,7 +4181,12 @@
       "expected": "valid",
       "irVersion": 3,
       "node": "Document",
-      "root": "TODO:v3/Document",
+      "root": "morphir.ir.v3#IRFile30",
+      "profile": "morphir-v3",
+      "input": "/source",
+      "output": {
+        "json": "{\"formatVersion\":3,\"distribution\":[\"Library\",[[\"example\"]],[],{\"modules\":[]}]}"
+      },
       "notes": "noncanonical JSON header order",
       "warning": "format_version_not_first"
     },
@@ -3263,7 +4198,9 @@
       "diagnostic": "missing_format_version",
       "irVersion": 3,
       "node": "Document",
-      "root": "TODO:v3/Document",
+      "root": "morphir.ir.v3#IRFile30",
+      "profile": "morphir-v3",
+      "input": "/source",
       "notes": "JSON root missing formatVersion"
     },
     {
@@ -3274,7 +4211,9 @@
       "diagnostic": "duplicate_format_version",
       "irVersion": 3,
       "node": "Document",
-      "root": "TODO:v3/Document",
+      "root": "morphir.ir.v3#IRFile30",
+      "profile": "morphir-v3",
+      "input": "/source",
       "notes": "JSON root with duplicate formatVersion",
       "duplicateKeys": true,
       "lexeme": "\\\"formatVersion\\\":3,\\\"formatVersion\\\":3"
@@ -3286,7 +4225,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"user-account\""
+      }
     },
     {
       "id": "naming/roundTripCases/01",
@@ -3295,7 +4239,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"value-in-USD\""
+      }
     },
     {
       "id": "naming/roundTripCases/02",
@@ -3304,7 +4253,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"in-usd\""
+      }
     },
     {
       "id": "naming/roundTripCases/03",
@@ -3313,7 +4267,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"get-HTML\""
+      }
     },
     {
       "id": "naming/roundTripCases/04",
@@ -3322,7 +4281,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"my-API-client\""
+      }
     },
     {
       "id": "naming/roundTripCases/05",
@@ -3331,7 +4295,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"user-ID\""
+      }
     },
     {
       "id": "naming/roundTripCases/06",
@@ -3340,7 +4309,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"IO-error\""
+      }
     },
     {
       "id": "naming/roundTripCases/07",
@@ -3349,7 +4323,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"HTML-parser\""
+      }
     },
     {
       "id": "naming/roundTripCases/08",
@@ -3358,7 +4337,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"a\""
+      }
     },
     {
       "id": "naming/roundTripCases/09",
@@ -3367,7 +4351,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"max-n\""
+      }
     },
     {
       "id": "naming/roundTripCases/10",
@@ -3376,7 +4365,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"2052\""
+      }
     },
     {
       "id": "naming/roundTripCases/11",
@@ -3385,7 +4379,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"FR2052A\""
+      }
     },
     {
       "id": "naming/roundTripCases/12",
@@ -3394,7 +4393,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"data-ID-tables\""
+      }
     },
     {
       "id": "naming/roundTripCases/13",
@@ -3403,7 +4407,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"aux\""
+      }
     },
     {
       "id": "naming/roundTripCases/14",
@@ -3412,7 +4421,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"CON\""
+      }
     },
     {
       "id": "naming/roundTripCases/15",
@@ -3421,7 +4435,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"nul-pointer\""
+      }
     },
     {
       "id": "naming/roundTripCases/16",
@@ -3430,7 +4449,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"com1\""
+      }
     },
     {
       "id": "naming/legacyDecodeCases/00",
@@ -3439,7 +4463,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/legacyArray",
+      "output": {
+        "json": "\"value-in-USD\""
+      }
     },
     {
       "id": "naming/legacyDecodeCases/01",
@@ -3448,7 +4477,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/legacyArray",
+      "output": {
+        "json": "\"a\""
+      }
     },
     {
       "id": "naming/legacyDecodeCases/02",
@@ -3457,7 +4491,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/legacyArray",
+      "output": {
+        "json": "\"morphir-SDK\""
+      }
     },
     {
       "id": "naming/legacyDecodeCases/03",
@@ -3466,7 +4505,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/legacyArray",
+      "output": {
+        "json": "\"point-XY\""
+      }
     },
     {
       "id": "naming/legacyDecodeCases/04",
@@ -3475,7 +4519,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/legacyArray",
+      "output": {
+        "json": "\"max-n\""
+      }
     },
     {
       "id": "naming/legacyDecodeCases/05",
@@ -3484,7 +4533,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/legacyArray",
+      "output": {
+        "json": "\"get-HTML\""
+      }
     },
     {
       "id": "naming/legacyDecodeCases/06",
@@ -3493,7 +4547,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/legacyArray",
+      "output": {
+        "json": "\"US\""
+      }
     },
     {
       "id": "naming/legacyDecodeCases/07",
@@ -3502,7 +4561,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/legacyArray",
+      "output": {
+        "json": "\"FR-2052-a\""
+      }
     },
     {
       "id": "naming/legacyDecodeCases/08",
@@ -3511,7 +4575,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/legacyArray",
+      "output": {
+        "json": "\"1-2\""
+      }
     },
     {
       "id": "naming/legacyDecodeCases/09",
@@ -3520,7 +4589,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/legacyArray",
+      "output": {
+        "json": "\"u-1\""
+      }
     },
     {
       "id": "naming/legacyDecodeCases/10",
@@ -3529,7 +4603,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/legacyArray",
+      "output": {
+        "json": "\"v-2-api\""
+      }
     },
     {
       "id": "naming/rejectCases/00",
@@ -3538,7 +4617,9 @@
       "expected": "invalid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input"
     },
     {
       "id": "naming/rejectCases/01",
@@ -3547,7 +4628,9 @@
       "expected": "invalid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input"
     },
     {
       "id": "naming/rejectCases/02",
@@ -3556,7 +4639,9 @@
       "expected": "invalid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input"
     },
     {
       "id": "naming/rejectCases/03",
@@ -3565,7 +4650,9 @@
       "expected": "invalid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input"
     },
     {
       "id": "naming/rejectCases/04",
@@ -3574,7 +4661,9 @@
       "expected": "invalid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input"
     },
     {
       "id": "naming/rejectCases/05",
@@ -3583,7 +4672,9 @@
       "expected": "invalid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input"
     },
     {
       "id": "naming/rejectCases/06",
@@ -3592,7 +4683,9 @@
       "expected": "invalid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input"
     },
     {
       "id": "naming/rejectCases/07",
@@ -3601,7 +4694,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input",
+      "output": {
+        "json": "\"value-in-USD\""
+      }
     },
     {
       "id": "naming/rejectCases/08",
@@ -3610,7 +4708,9 @@
       "expected": "invalid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input"
     },
     {
       "id": "naming/rejectCases/09",
@@ -3619,7 +4719,9 @@
       "expected": "invalid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input"
     },
     {
       "id": "naming/rejectCases/10",
@@ -3628,7 +4730,9 @@
       "expected": "invalid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input"
     },
     {
       "id": "naming/rejectCases/11",
@@ -3637,7 +4741,9 @@
       "expected": "invalid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input"
     },
     {
       "id": "naming/rejectCases/12",
@@ -3646,7 +4752,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input",
+      "output": {
+        "json": "\"USD-usd\""
+      }
     },
     {
       "id": "naming/rejectCases/13",
@@ -3655,7 +4766,9 @@
       "expected": "invalid",
       "irVersion": 4,
       "node": "Name",
-      "root": "TODO:v4/Name"
+      "root": "morphir.ir.v4#Name",
+      "profile": "morphir-v4",
+      "input": "/input"
     },
     {
       "id": "naming/pathCases/00",
@@ -3664,7 +4777,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Path",
-      "root": "TODO:v4/Path"
+      "root": "morphir.ir.v4#Path",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"morphir/SDK\""
+      }
     },
     {
       "id": "naming/pathCases/01",
@@ -3673,7 +4791,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Path",
-      "root": "TODO:v4/Path"
+      "root": "morphir.ir.v4#Path",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"US/FR2052A/data-tables\""
+      }
     },
     {
       "id": "naming/pathCases/02",
@@ -3682,7 +4805,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "Path",
-      "root": "TODO:v4/Path"
+      "root": "morphir.ir.v4#Path",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"my-org/domain/users\""
+      }
     },
     {
       "id": "naming/fqNameCases/00",
@@ -3691,7 +4819,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "FQName",
-      "root": "TODO:v4/FQName"
+      "root": "morphir.ir.v4#FQName",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"morphir/SDK:list#map\""
+      }
     },
     {
       "id": "naming/fqNameCases/01",
@@ -3700,7 +4833,12 @@
       "expected": "valid",
       "irVersion": 4,
       "node": "FQName",
-      "root": "TODO:v4/FQName"
+      "root": "morphir.ir.v4#FQName",
+      "profile": "morphir-v4",
+      "input": "/canonical/uppercase",
+      "output": {
+        "json": "\"my-org:domain#value-in-USD\""
+      }
     }
   ]
 }

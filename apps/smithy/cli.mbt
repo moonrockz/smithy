@@ -84,13 +84,20 @@ fn command_line() -> @argparse.Command {
             options=[
               @argparse.OptionArg(
                 "shape",
-                about="Absolute Smithy data shape or member ID.",
-                required=true,
+                about="Absolute Smithy data shape or member ID. Required unless --bundle selects a document bundle.",
               ),
               @argparse.OptionArg(
                 "value",
                 about="Value file, or '-' for stdin.",
                 required=true,
+              ),
+              @argparse.OptionArg(
+                "profile",
+                about="Check JSON with a declared serialization profile of the --shape root, or constrain --bundle.",
+              ),
+              @argparse.OptionArg(
+                "bundle",
+                about="Check a versioned JSON document with a declared bundle; the document version selects its root.",
               ),
               @argparse.OptionArg(
                 "input-format",
@@ -179,6 +186,45 @@ fn command_line() -> @argparse.Command {
                 "envelope-only",
                 about="Check response envelope only; no modeled payload or ID correlation.",
               ),
+            ],
+          ),
+        ],
+      ),
+      @argparse.Command(
+        "codec",
+        about="Read and write application JSON with declared serialization profiles.",
+        subcommand_required=true,
+        subcommands=[
+          input_command(
+            "canonicalize",
+            "Check a JSON value and print it in its profile's canonical form.",
+            options=[
+              @argparse.OptionArg(
+                "shape",
+                about="Absolute Smithy root shape ID.",
+              ),
+              @argparse.OptionArg(
+                "bundle",
+                about="A declared document bundle; the document version selects its root.",
+              ),
+              @argparse.OptionArg(
+                "profile",
+                about="A declared profile of the --shape root, or the reading profile of --bundle.",
+              ),
+              @argparse.OptionArg(
+                "output-profile",
+                about="With --bundle, the profile that writes the output; default the reading profile.",
+              ),
+              @argparse.OptionArg(
+                "value",
+                about="Value file, or '-' for stdin.",
+                required=true,
+              ),
+              @argparse.OptionArg(
+                "diagnostics",
+                about="Findings format: text or json; default text.",
+              ),
+              output,
             ],
           ),
         ],
@@ -295,6 +341,7 @@ struct Options {
   new_model : String?
   diff_format : DiffFormat
   value_validation : ValueOptions?
+  codec : CodecOptions?
   rpc_version : @rpc.ProtocolVersion?
   protocol_tests : Bool
   rpc_options : RpcOptions?
@@ -325,6 +372,7 @@ fn options(args : Array[String]) -> Options raise CliError {
     is Some(("rpc", { subcommand: Some(("transcript", _)), .. }))
   let rpc_mode = validation_command is Some(("rpc", _)) && !transcript_mode
   let value_mode = validation_command is Some(("value", _))
+  let canonicalize_mode = command == "codec"
   // Model inputs belong to the selected validation command's argparse scope.
   if validation_command is Some((name, _)) &&
     (
@@ -337,6 +385,10 @@ fn options(args : Array[String]) -> Options raise CliError {
   let matches = match validation_command {
     Some((_, nested)) => nested
     None => matches
+  }
+  let matches = match matches.subcommand {
+    Some(("canonicalize", nested)) if canonicalize_mode => nested
+    _ => matches
   }
   let matches = match matches.subcommand {
     Some(("transcript", nested)) if transcript_mode => {
@@ -380,6 +432,65 @@ fn options(args : Array[String]) -> Options raise CliError {
   }
   if command == "validate" && files.is_empty() {
     raise CliError("validate requires model inputs; use validate --help", 2)
+  }
+  if canonicalize_mode && files.is_empty() {
+    raise CliError("codec canonicalize requires model inputs", 2)
+  }
+  // A profile or bundle selects the profile-aware codec. Without one, validate value is unchanged.
+  let codec_mode = canonicalize_mode ||
+    (value_mode && (value("profile") is Some(_) || value("bundle") is Some(_)))
+  let codec = if codec_mode {
+    for name in ["input-format", "ion-index", "unknown-members", "member-names"] {
+      if value(name) is Some(_) {
+        raise CliError(
+          "--" +
+          name +
+          " cannot be combined with --profile or --bundle; the profile declares the representation",
+          2,
+        )
+      }
+    }
+    let file = value("value").unwrap()
+    if file == "-" && files.contains("-") {
+      raise CliError(
+        "stdin '-' may only be read once across model and value inputs", 2,
+      )
+    }
+    if value("output") is Some(path) && (path == file || files.contains(path)) {
+      raise CliError("--output must not name an input file", 2)
+    }
+    Some(CodecOptions::{
+      selection: codec_selection(
+        value("shape"),
+        value("bundle"),
+        value("profile"),
+      ),
+      canonicalize: canonicalize_mode,
+      output_profile: match value("output-profile") {
+        None => None
+        Some(text) =>
+          Some(
+            @codec_contract.ProfileId::parse(text) catch {
+              _ =>
+                raise CliError(
+                  "expected a profile identifier after --output-profile", 2,
+                )
+            },
+          )
+      },
+      file,
+      output: value("output"),
+      diagnostics: match value("diagnostics").unwrap_or("text") {
+        "text" => TextFindings
+        "json" => JsonFindings
+        _ => raise CliError("expected text or json after --diagnostics", 2)
+      },
+    })
+  } else {
+    None
+  }
+  if value_mode && !codec_mode && value("shape") is None {
+    raise CliError("validate value requires --shape", 2)
   }
   let from = value("from")
   let to = value("to")
@@ -480,7 +591,9 @@ fn options(args : Array[String]) -> Options raise CliError {
   } else {
     None
   }
-  let value_validation = if value_mode || rpc_mode || transcript_mode {
+  let value_validation = if (value_mode && !codec_mode) ||
+    rpc_mode ||
+    transcript_mode {
     let selector = if rpc_mode {
       "service"
     } else if transcript_mode {
@@ -598,6 +711,7 @@ fn options(args : Array[String]) -> Options raise CliError {
     new_model: value("new"),
     diff_format,
     value_validation,
+    codec,
     rpc_version,
     protocol_tests: matches.flags.get("protocol-tests") == Some(true),
     rpc_options,
@@ -730,8 +844,8 @@ fn run(args : Array[String]) -> Int32 raise {
       error => raise error
     }
   }
-  // Every model command resolves the bundled smithy.rpc traits.
-  let loader = @rpc.loader(protocol_tests=opts.protocol_tests)
+  // Every model command resolves the bundled smithy.rpc and smithy.serialization traits.
+  let loader = model_loader(protocol_tests=opts.protocol_tests)
   let inputs : Map[String, String] = Map([])
   let formatted : Array[(String, String)] = []
   let mut failed = false
@@ -795,6 +909,9 @@ fn run(args : Array[String]) -> Int32 raise {
     return if failed { 1 } else { 0 }
   }
   let result = loader.assemble()
+  if opts.codec is Some(codec_opts) {
+    return run_codec(codec_opts, result)
+  }
   if opts.value_validation is Some(value_opts) {
     if opts.transcript is Some(transcript) {
       return run_transcript_validation(value_opts, transcript, result)

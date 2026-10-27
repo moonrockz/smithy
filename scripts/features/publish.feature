@@ -40,4 +40,4 @@ Feature: Publish to mooncakes.io
     Then the publish list is the one in release.mbtx
 
   Scenario: Smithy publishes its own modules after the tool migration
-    Then the published modules are "moonrockz/artifact-resources, moonrockz/jmespath, moonrockz/smithy-syntax, moonrockz/smithy, moonrockz/smithy-validation, moonrockz/smithy-ion-validation, moonrockz/smithy-build, moonrockz/smithy-codegen, moonrockz/smithy-codegen-jsonrpc, moonrockz/smithy-codegen-moonbit, moonrockz/smithy-codegen-python, moonrockz/smithy-codegen-go, moonrockz/smithy-diff, moonrockz/smithy-jsonschema, moonrockz/smithy-openapi, moonrockz/smithy-openrpc, moonrockz/smithy-cli"
+    Then the published modules are "moonrockz/artifact-resources, moonrockz/jmespath, moonrockz/smithy-syntax, moonrockz/smithy, moonrockz/smithy-validation, moonrockz/smithy-ion-validation, moonrockz/smithy-codec, moonrockz/smithy-build, moonrockz/smithy-codegen, moonrockz/smithy-codegen-jsonrpc, moonrockz/smithy-codegen-moonbit, moonrockz/smithy-codegen-python, moonrockz/smithy-codegen-go, moonrockz/smithy-diff, moonrockz/smithy-jsonschema, moonrockz/smithy-openapi, moonrockz/smithy-openrpc, moonrockz/smithy-cli"

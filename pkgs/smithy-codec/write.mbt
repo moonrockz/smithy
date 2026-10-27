@@ -339,7 +339,7 @@ fn Writer::choose(
 
 ///|
 fn Writer::object_fields(
-  _self : Writer,
+  self : Writer,
   value : LogicalValue,
   shape : @contract.ShapeContract,
   path : @validation.InstancePath,
@@ -348,6 +348,30 @@ fn Writer::object_fields(
   let items : Array[Array[WTask]] = []
   for m in shape.members {
     match value.get(m.name) {
+      Some(Union(name, payload)) if m.flatten => {
+        let union_shape = self.contract.shapes.get(m.target).unwrap()
+        match union_shape.member_index(name) {
+          Some(i) => {
+            let alternative = union_shape.members[i]
+            items.push([
+              WText(json_string(alternative.tag.to_string()) + ":"),
+              WValue(
+                payload,
+                { shape: alternative.target, adapter: alternative.adapter, },
+                field_path(field_path(path, m.name), name),
+                depth + 1,
+              ),
+            ])
+          }
+          None =>
+            self.fail(
+              UnknownTag,
+              field_path(path, m.name),
+              union_shape.id,
+              "I expected a declared union member.",
+            )
+        }
+      }
       Some(v) =>
         items.push([
           WText(json_string(m.wire.to_string()) + ":"),
