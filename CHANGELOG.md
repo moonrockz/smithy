@@ -8,7 +8,7 @@ is 0.x, a minor release can contain breaking changes.
 
 ## [0.7.0] - 2026-10-27
 
-<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+This release adds code generation. The new `smithy-codegen` module is a language-neutral core for Smithy code generators, and the `moonbit-jsonrpc-codegen`, `python-jsonrpc-codegen` and `go-jsonrpc-codegen` build plugins generate JSON-RPC peers in MoonBit, Python and Go, with tested runtimes and a payment terminal example. RPC validation now checks the error data of declared server errors, and a service can accept, report or reject a server error code that it does not declare (accept is the default). The model check now evaluates contract conditions on default values, trait values, examples and metadata as the Java Smithy reference does, and the project site has a Smithy language tour with tested examples. Two changes break existing use: suppressions and tests that name SM-MODEL-015, SM-MODEL-016 or SM-MODEL-017 must use the Smithy event IDs (ConditionsTrait, Model, TraitValue, TraitTarget), and a model whose values break a contract condition now gets an error event.
 
 ### ⚠️ Breaking changes
 
