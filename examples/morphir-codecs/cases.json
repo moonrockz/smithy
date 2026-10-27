@@ -2545,8 +2545,7 @@
       "profile": "morphir-v4",
       "output": {
         "case": "mck/definitions-0002/json-canonical"
-      },
-      "gap": "G1"
+      }
     },
     {
       "id": "mck/definitions-0003/json-canonical",
@@ -2659,8 +2658,7 @@
       "profile": "morphir-v4",
       "output": {
         "case": "mck/definitions-0006/json-canonical"
-      },
-      "gap": "G2"
+      }
     },
     {
       "id": "mck/definitions-0007/json-canonical",
@@ -2920,8 +2918,7 @@
       "profile": "morphir-v4",
       "output": {
         "case": "mck/definitions-0017/json-canonical"
-      },
-      "gap": "G2"
+      }
     },
     {
       "id": "mck/definitions-0018/json-canonical",
@@ -2970,8 +2967,7 @@
       "profile": "morphir-v4",
       "output": {
         "case": "mck/definitions-0018/json-canonical"
-      },
-      "gap": "G2"
+      }
     },
     {
       "id": "mck/definitions-0019/json-canonical",
@@ -3020,8 +3016,7 @@
       "profile": "morphir-v4",
       "output": {
         "case": "mck/definitions-0019/json-canonical"
-      },
-      "gap": "G2"
+      }
     },
     {
       "id": "mck/definitions-0020/json-canonical",

@@ -75,6 +75,8 @@ Feature: Morphir v3 and v4 codec bundles
         | id                                             |
         | mck/definitions-0001/json-accepted-1           |
         | mck/definitions-0001/json-accepted-3           |
+        | mck/definitions-0002/json-accepted-1           |
+        | mck/definitions-0018/json-accepted-2           |
         | mck/definitions-0004/json-accepted-1           |
         | mck/definitions-0006/json-accepted-1           |
         | mck/definitions-0020/json-accepted-1           |
@@ -96,7 +98,7 @@ Feature: Morphir v3 and v4 codec bundles
 
       Examples: recorded gaps fail as recorded
         | id                                   |
-        | mck/definitions-0002/json-accepted-1 |
+        | mck/definitions-0007/json-accepted-1 |
         | mck/definitions-0008/json-rejected-1 |
 
   Rule: The expanded writer is an output choice, not another semantic value
@@ -146,6 +148,8 @@ Feature: Morphir v3 and v4 codec bundles
         | Value                           | {"IfThenElse":{"condition":true,"then":1,"thenBranch":1,"else":2}}                                                             | MemberCollision |
         | AccessControlledTypeDefinition  | {"Public":{"TypeAliasDefinition":{"typeParams":[],"typeExp":"a"},"CustomTypeDefinition":{"typeParams":[],"constructors":{}}}} | Arity           |
         | AccessControlledTypeDefinition  | {"Public":{"doc":"no definition"}}                                                                                             | MissingMember   |
+        | AccessControlledTypeDefinition  | {"Public":{"value":{"TypeAliasDefinition":{"typeParams":[],"typeExp":"a"}},"TypeAliasDefinition":{"typeParams":[],"typeExp":"a"}}} | MemberCollision |
+        | TypeSpecification               | ["TypeAliasSpecification",[],"a"]                                                                                              | Arity           |
 
       Examples: name, literal and version spellings
         | root    | input                                   | code            |

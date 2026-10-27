@@ -328,13 +328,13 @@ union AccessControlledValueDefinition {
     Private: DocumentedValueDefinition
 }
 
-/// `doc` first, beside the definition variant (decision 0010). The nested legacy {"doc", "value"} wrapper is
-/// not read (COVERAGE.md gap G3).
+/// `doc` first, beside the definition variant (decision 0010). The nested legacy {"doc", "value": {...}}
+/// wrapper is a reader alias of the flattened member; supplying both spellings is a collision.
 structure DocumentedTypeDefinition {
     doc: Doc
 
     @required
-    @jsonEncoding(base: { flatten: true })
+    @jsonEncoding(base: { flatten: true, aliases: ["value"] })
     definition: TypeDefinition
 }
 
@@ -342,7 +342,7 @@ structure DocumentedValueDefinition {
     doc: Doc
 
     @required
-    @jsonEncoding(base: { flatten: true })
+    @jsonEncoding(base: { flatten: true, aliases: ["value"] })
     definition: ValueDefinition
 }
 
@@ -350,7 +350,7 @@ structure DocumentedTypeSpecification {
     doc: Doc
 
     @required
-    @jsonEncoding(base: { flatten: true })
+    @jsonEncoding(base: { flatten: true, aliases: ["value"] })
     specification: TypeSpecification
 }
 
@@ -650,6 +650,19 @@ structure UnitType {
 
 // ---- Type specifications and definitions (MCK definitions.md) -------------------------------------------
 
+/// The schema also reads the v3-style tagged array (D2); MCK pins ["OpaqueTypeSpecification", []]
+/// (definitions-0002). The array is a reader-only layout; a variant whose payload has more than one position,
+/// such as ["TypeAliasSpecification", params, type], is not read in that spelling.
+@jsonEncoding(
+    base: {
+        union: {
+            style: "external"
+            accept: [
+                { style: "tagArray" }
+            ]
+        }
+    }
+)
 union TypeSpecification {
     TypeAliasSpecification: TypeAliasSpecification
     OpaqueTypeSpecification: OpaqueTypeSpecification
@@ -668,7 +681,18 @@ structure TypeAliasSpecification {
     typeExp: Type
 }
 
-/// {"OpaqueTypeSpecification": {}} when it has no parameters (definitions-0002).
+/// {"OpaqueTypeSpecification": {}} when it has no parameters (definitions-0002). The parameter array alone is the
+/// payload of the legacy tagged array ["OpaqueTypeSpecification", ["a"]].
+@jsonEncoding(
+    base: {
+        forms: [
+            {
+                read: { kind: "array" }
+                bind: "typeParams"
+            }
+        ]
+    }
+)
 structure OpaqueTypeSpecification {
     @emptyAsAbsent
     annotations: Annotations

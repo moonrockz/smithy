@@ -55,10 +55,10 @@ and the scenarios of tests/features/morphir-codecs.feature.
 | Group | Cases | Pass | Recorded gaps | Out of scope |
 | --- | --- | --- | --- | --- |
 | Full artifacts (v3 greeting, direct-rules, rule-set; v4 complete, books-and-records, MCK library) | 6 | 6 | 0 | 0 |
-| MCK JSON and text fences | 228 | 219 | 8 | 1 (YAML file) |
+| MCK JSON and text fences | 228 | 224 | 3 | 1 (YAML file) |
 | Format-version corpus (scalars, JSON header order, JSON root diagnostics) | 42 | 42 | 0 | 0 |
 | Naming corpus (uppercase style) | 47 | 47 | 0 | 0 |
-| **Total** | **323** | **314** | **8** | **1** |
+| **Total** | **323** | **319** | **3** | **1** |
 
 A valid case passes when it decodes, its canonical output equals the expected canonical JSON byte for byte
 (whitespace removed from the expected fence), and canonicalizing that output again gives the same text. An
@@ -73,12 +73,13 @@ attributes, Specs before 3.1, unsupported and invalid releases, and a payload of
 ## Recorded gaps
 
 A case with a `gap` in `cases.json` must still fail; the harness reports an unexpected pass, so this list cannot
-go stale.
+go stale. Former gap G1 (the tagged-array type specification) and most of G2 (the nested `{"doc", "value"}`
+definition wrapper of definitions-0006, 0017, 0018 and 0019) are closed by reader-only tag-array layouts and
+flattened-member aliases.
 
 | Gap | Cases | Reason | What would close it |
 | --- | --- | --- | --- |
-| G1 | mck/definitions-0002/json-accepted-1 | v4 also reads the v3-style tagged array `["OpaqueTypeSpecification", []]` (D2). A union form cannot check a tag at position 0. | A union rule that accepts a tag-array reader layout beside its main layout. |
-| G2 | mck/definitions-0006, 0017, 0018, 0019 json-accepted-2; mck/definitions-0010/json-accepted-1 | The nested legacy wrapper `{"doc": ..., "value": {...}}` (decision 0010 window). The definition is a flattened union member, which has no named-field alternative. | A reader alias for a flattened member (`value` holding the flattened union), and for a value specification nested under `value`. |
+| G2 | mck/definitions-0010/json-accepted-1 | A value specification nested under `value` beside its `doc` (decision 0010 window). A value specification is a structure, not a flattened union, so the flattened-member alias that reads the nested definition wrapper (definitions-0006, 0017-0019) does not apply. | A structure form that reads a nested copy of the structure under a named field and merges the sibling fields. |
 | G3 | mck/definitions-0007/json-accepted-1 | The legacy ExternalBody with one top-level `externalName` and `targetPlatform` instead of `externals`. Two fields form one list element. | A structure form that builds a one-element list from sibling fields. |
 | G4 | mck/definitions-0008/json-rejected-1 | `targetPlatform` must be unique within `externals`. Smithy `@uniqueItems` compares whole items, not one field. | A keyed-uniqueness constraint, or a model of `externals` as a map with a list-of-objects layout. |
 
@@ -93,7 +94,7 @@ models cite them as D-numbers.
 | # | Decision |
 | --- | --- |
 | D1 | v4 Reference with arguments: the array `{"Reference": ["fq", ...]}` is canonical (MCK types-0003); the object form is read. |
-| D2 | v4 does not read v3 tagged-array distributions (MCK distributions-0003); see G1 for type specifications. |
+| D2 | v4 does not read v3 tagged-array distributions (MCK distributions-0003). A v4 type specification is also read as a one-payload tagged array, `["OpaqueTypeSpecification", []]` (definitions-0002); multi-position variants such as `["TypeAliasSpecification", params, type]` are not read in that spelling, and MCK has no case for them. |
 | D3 | v4 literals are written typed, `{"Literal": {"IntegerLiteral": 42}}` (MCK), not in the most compact spelling. |
 | D4 | A module's `doc` is written last; a definition's or value specification's `doc` first (MCK). |
 | D5 | Number tokens are kept and written unchanged (MCK byte equality), for literals and document literals. |

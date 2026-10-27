@@ -27,3 +27,21 @@ The version of the API-description format, independent of the described service'
 
 **Schema dialect**:
 The JSON Schema version that defines the meaning of exported parameter and result schemas.
+
+**Serialization profile**:
+A named set of JSON representation rules that a model declares. Configuration selects a profile; it cannot change the profile's rules.
+
+**Wire contract**:
+The detached, prepared decisions of one root under one profile: layouts, tags, positions, forms and adapters.
+
+**Semantic root**:
+The identity of a logical contract: a root shape and the fingerprint of the shapes reachable from it. Profiles of one model and root share it; another version of a model does not.
+
+**Compact form**:
+A declared alternative spelling of a value, with a reader guard and an optional writer guard. Readers accept every declared form; writers emit one canonical form.
+
+**Scalar adapter**:
+Trusted host code, named by a model, that reads domain spellings of a scalar into one logical value and writes its canonical spelling.
+
+**Document bundle**:
+A set of version-specific roots and profiles. A document's version selects one root before the payload is read; no document changes version.
