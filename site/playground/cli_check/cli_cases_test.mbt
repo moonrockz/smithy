@@ -195,6 +195,7 @@ fn value_request_of(
     CheckValue(seq=1, files=models, shape~, value=file_of(files, value), options={
       unknown_members,
       member_names,
+      profile: None,
     }),
     value,
   )
@@ -289,7 +290,7 @@ fn rpc_request_of(
       version~,
       message=file_of(files, file),
       kind~,
-      options={ unknown_members, member_names: Smithy, },
+      options={ unknown_members, member_names: Smithy, profile: None, },
     ),
     file,
   )

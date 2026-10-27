@@ -37,6 +37,20 @@ pub let quotes : Array[Quote] = [
     source: "website/static/ir/examples/v3/greeting-example.json",
     at: "/distribution/3/modules/0/1/value/values/2/1/value/value/body/3/2/1/2/0/1/2/2/1",
   },
+  {
+    lesson: "40-morphir-profiles",
+    case_: "start",
+    file: "deal.json",
+    source: "website/static/ir/examples/v4/books-and-records-example.json",
+    at: "/distribution/Library/def/modules/books-and-records/Public/types/deal/Public/TypeAliasDefinition/typeExp",
+  },
+  {
+    lesson: "41-morphir-version-3",
+    case_: "start",
+    file: "append.json",
+    source: "website/static/ir/examples/v3/greeting-example.json",
+    at: "/distribution/3/modules/0/1/value/values/2/1/value/value/body/3/2/1/2/0/1/2/2/1",
+  },
 ]
 
 ///|

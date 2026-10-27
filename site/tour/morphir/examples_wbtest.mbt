@@ -85,13 +85,11 @@ test "naming examples have the verdicts of the corpus" {
 }
 
 ///|
-test "quotes name the two lesson 39 values" {
-  assert_eq(quotes.map(fn(q) { q.case_ }), ["start", "v3"])
-  assert_true(
-    quotes.all(fn(q) {
-      q.lesson == "39-morphir-limits" && q.file == "deal.json"
-    }),
-  )
+test "quotes name the two lesson 39 values and the start values of lessons 40 and 41" {
+  assert_eq(quotes.map(fn(q) { q.lesson + "/" + q.case_ + "/" + q.file }), [
+    "39-morphir-limits/start/deal.json", "39-morphir-limits/v3/deal.json", "40-morphir-profiles/start/deal.json",
+    "41-morphir-version-3/start/append.json",
+  ])
 }
 
 ///|

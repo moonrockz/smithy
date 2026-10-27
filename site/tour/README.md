@@ -133,6 +133,11 @@ from `site/tour/smithy-rpc-traits.smithy`. A test of `reference_test.mbt` requir
 case also covers the definitions, as the file `<smithy-rpc-traits>`, so a change of the definitions makes its
 reference result stale. The digest of another case covers the case files only.
 
+The playground core adds the `smithy.serialization` trait definitions only for files that name the namespace,
+and so does the harness. It reads them from `site/tour/smithy-serialization-traits.smithy`, a copy of
+`@codec_contract.trait_definitions()` that a test of `reference_test.mbt` compares. The digest of such a case also
+covers the definitions, as the file `<smithy-serialization-traits>`.
+
 The contract traits (`smithy.contracts#conditions`) are standard Smithy. The harness compiles `smithy-model-jmespath`
 and `smithy-contract-traits` and sets the case member `smithy_contracts` when a file contains `smithy.contracts#`.
 It then loads `META-INF/smithy/contracts.smithy` from the compiled module. The digest does not cover these
@@ -242,6 +247,12 @@ A lesson has at most one of `output`, `value`, `transcript`, `message` and `diff
   value is the member, so its pointer is empty (the root of the value).
 - `unknown_members` (`reject` or `ignore`) and `member_names` (`smithy` or
   `json`) are optional. The defaults are the defaults of the CLI.
+- `profile` is optional: a serialization profile that the lesson model declares
+  with `smithy.serialization#jsonProfiles`, as `--profile` of
+  `smithy validate value`. The check then reads the value with the JSON codec
+  of moonrockz/smithy-codec and the Morphir scalar adapters, as the CLI does.
+  As on the command line, `profile` cannot be combined with `unknown_members`
+  or `member_names`. A value lesson without `profile` runs the plain check.
 - Other keys are an error.
 
 File rules, for every lesson: each file in `files/` and in a case must end in
@@ -439,7 +450,10 @@ lesson unless a test runs it.
 
 ## The Morphir case study
 
-Lessons 34 to 39 model a part of the Morphir IR, version 4, in Smithy. Each Morphir claim of a lesson links to a
+Lessons 34 to 41 model a part of the Morphir IR in Smithy. Lessons 34 to 39 use the plain value check on version 4.
+Lessons 40 and 41 are value lessons with a `profile`: lesson 40 reads the compact version 4 spellings with
+`morphir-v4`, and lesson 41 reads the version 3 tagged arrays with `morphir-v3`. Their models are small subsets with
+`smithy.serialization` traits; `examples/morphir-codecs` has the complete models. Each Morphir claim of a lesson links to a
 line of a pinned Morphir commit. A test checks the lesson model against the examples of the Morphir sources.
 
 ### The vendored sources
@@ -500,8 +514,9 @@ compact `VariableType` pattern.
 ### The quotes
 
 `quotes` in `morphir/examples.mbt` names each lesson value that quotes a Morphir example. The value must equal the
-node at the JSON pointer of the upstream file. The start value of lesson 39 is the type `deal` of the
-books-and-records example. Its case `v3` is the type of `append` from the v3 greeting example.
+node at the JSON pointer of the upstream file. The start values of lessons 39 and 40 are the type `deal` of the
+books-and-records example. The case `v3` of lesson 39 and the start value of lesson 41 are the type of `append` from
+the v3 greeting example.
 
 ### Review
 

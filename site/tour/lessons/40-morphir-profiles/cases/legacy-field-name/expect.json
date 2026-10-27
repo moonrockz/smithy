@@ -1,0 +1,1 @@
+{"events": [], "findings": ["AdapterFailure|error|/Record/fields/Price|morphir.ir.v4#FieldMap$key"], "output_contains": ["Price"]}

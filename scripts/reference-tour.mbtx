@@ -34,11 +34,18 @@ let scratch : String = ".dev/out/reference-tour"
 let smithy_rpc_path : String = "site/tour/smithy-rpc-traits.smithy"
 
 ///|
+/// The smithy.serialization trait definitions, the text of `@codec_contract.trait_definitions()`.
+/// site/tour/check/reference_test.mbt compares the two.
+let smithy_serialization_path : String = "site/tour/smithy-serialization-traits.smithy"
+
+///|
 /// Reads the cases (`[{"id", "json_schema", "json_ast", "http_protocols", "smithy_rpc", "smithy_contracts", "diff",
 /// "load": [names], "files": [{"name", "text"}], "openapi"?, "selector"?}]`) from args[0] and writes the results to args[1], with args[2] as the reference SHA. A case with `smithy_rpc` also
-/// loads the smithy.rpc trait definitions from args[3]. The digest is SHA-256 over the files sorted by name of
+/// loads the smithy.rpc trait definitions from args[3], and a case with `smithy_serialization` the
+/// smithy.serialization trait definitions from args[4]. The digest is SHA-256 over the files sorted by name of
 /// name + NUL + text + NUL, in UTF-8: the case files and, for a `smithy_rpc` case, the definitions as the file
-/// `<smithy-rpc-traits>` (`reference_digest` in site/tour/check/reference_test.mbt), so that a change of the
+/// `<smithy-rpc-traits>` and the definitions as `<smithy-serialization-traits>` (`reference_digest` in
+/// site/tour/check/reference_test.mbt), so that a change of the
 /// definitions makes the result stale. A `diff` case has the files `old/<name>` and `new/<name>`: each side is
 /// assembled alone (with the smithy.rpc and contract definitions when the case uses them), `events` are the events of
 /// both sides, and, when neither side has an ERROR or a DANGER, `diff` holds the sorted keys `id|SEVERITY|shape` of
@@ -76,13 +83,16 @@ let harness : String =
   #|    for (ObjectNode file : files) {
   #|      String name = file.expectStringMember("name").getValue();
   #|      String text = file.expectStringMember("text").getValue();
-  #|      boolean definitions = name.equals("<smithy-rpc-traits>");
+  #|      boolean rpc = name.equals("<smithy-rpc-traits>");
+  #|      boolean serialization = name.equals("<smithy-serialization-traits>");
+  #|      boolean definitions = rpc || serialization;
   #|      if (!definitions && !name.startsWith(prefix)) continue;
   #|      if (name.endsWith(".selector")) continue;
   #|      // A data file of a value lesson is not in `load`: it is in the digest but not in the model.
   #|      if (!definitions && !load.contains(name)) continue;
   #|      // A lesson file name ends in .smithy; the definitions load as IDL under such a name.
-  #|      assembler.addUnparsedModel(definitions ? "smithy-rpc-traits.smithy" : name, text);
+  #|      assembler.addUnparsedModel(
+  #|          rpc ? "smithy-rpc-traits.smithy" : serialization ? "smithy-serialization-traits.smithy" : name, text);
   #|    }
   #|    if (test.expectBooleanMember("smithy_contracts").getValue()) {
   #|      try (InputStream in = ReferenceTour.class.getResourceAsStream("/META-INF/smithy/contracts.smithy")) {
@@ -103,6 +113,10 @@ let harness : String =
   #|      if (test.expectBooleanMember("smithy_rpc").getValue()) {
   #|        files.add(Node.objectNodeBuilder().withMember("name", "<smithy-rpc-traits>")
   #|            .withMember("text", Files.readString(Path.of(args[3]))).build());
+  #|      }
+  #|      if (test.expectBooleanMember("smithy_serialization").getValue()) {
+  #|        files.add(Node.objectNodeBuilder().withMember("name", "<smithy-serialization-traits>")
+  #|            .withMember("text", Files.readString(Path.of(args[4]))).build());
   #|      }
   #|      files.sort(Comparator.comparing(file -> file.expectStringMember("name").getValue()));
   #|      MessageDigest sha = MessageDigest.getInstance("SHA-256");
@@ -363,6 +377,13 @@ fn uses_smithy_rpc(files : Array[(String, String)]) -> Bool {
 }
 
 ///|
+/// Whether a case uses the smithy.serialization traits: a file names the namespace. The playground core and the
+/// harness load their definitions only for these cases.
+fn uses_smithy_serialization(files : Array[(String, String)]) -> Bool {
+  files.iter().any(file => file.1.contains("smithy.serialization#"))
+}
+
+///|
 /// Whether a case uses the contract traits: a file names the namespace. The harness loads `contracts.smithy` from
 /// the compiled `smithy-contract-traits` module only for these cases.
 fn uses_smithy_contracts(files : Array[(String, String)]) -> Bool {
@@ -434,6 +455,7 @@ async fn lesson_cases(root : String) -> Array[Json] {
         "http_protocols": Json::boolean(flags.http_protocols),
         "smithy_rpc": Json::boolean(uses_smithy_rpc(files)),
         "smithy_contracts": Json::boolean(uses_smithy_contracts(files)),
+        "smithy_serialization": Json::boolean(uses_smithy_serialization(files)),
         "diff": Json::boolean(diff),
         "load": Json::array(files.filter(f => !data.contains(f.0)).map(f => Json::string(f.0))),
         "files": Json::array(files.map(f => Json::object({ "name": Json::string(f.0), "text": Json::string(f.1) }))),
@@ -522,7 +544,7 @@ async fn main {
   let input = scratch + "/cases.json"
   @fs.write_file(input, Json::array(lesson_cases(lessons_root)).stringify(indent=2) + "\n")
   let output = scratch + "/reference-events.json"
-  println(checked("java", ["-cp", classes, "ReferenceTour", input, output, reference_sha, smithy_rpc_path]).trim_end())
+  println(checked("java", ["-cp", classes, "ReferenceTour", input, output, reference_sha, smithy_rpc_path, smithy_serialization_path]).trim_end())
   let actual = @fs.read_file(output).text()
   if options.check {
     let committed = if @fs.exists(results_path) { @fs.read_file(results_path).text() } else { "" }
@@ -594,6 +616,8 @@ test "a case uses smithy.rpc when a file names the namespace" {
 
 ///|
 test "a case uses the contract traits when a file names the namespace" {
+  assert_true(uses_smithy_serialization([("a.smithy", "use smithy.serialization#jsonEncoding")]))
+  assert_false(uses_smithy_serialization([("a.smithy", "namespace example")]))
   assert_true(uses_smithy_contracts([("a.smithy", "use smithy.contracts#conditions")]))
   assert_false(uses_smithy_contracts([("a.smithy", "namespace example")]))
 }

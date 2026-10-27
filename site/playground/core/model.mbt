@@ -7,7 +7,16 @@ const MODEL_FILE : String = "model.smithy"
 /// Load the model files, as (name, text), with the `smithy.rpc` traits, as the
 /// CLI does.
 fn load(files : Array[(String, String)]) -> @smithy.LoadResult {
-  let loader = @rpc.loader()
+  let mut loader = @rpc.loader()
+  // The CLI always resolves the bundled smithy.serialization traits. The core adds them only for files that
+  // name the namespace, so that the model, the JSON AST and the selections of every other file stay as they
+  // were. A file can use a serialization trait only by naming the namespace, so the two agree.
+  if files.iter().any(file => file.1.contains("smithy.serialization#")) {
+    loader = loader.add_builtin_idl(
+      @codec_contract.trait_source,
+      @codec_contract.trait_definitions(),
+    )
+  }
   for file in files {
     ignore(loader.add_idl(file.0, file.1))
   }

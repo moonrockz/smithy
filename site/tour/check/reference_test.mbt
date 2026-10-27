@@ -43,13 +43,28 @@ let smithy_rpc_source : String = "<smithy-rpc-traits>"
 fn reference_digest(
   files : Array[@model.LessonFile],
   definitions : String,
+  serialization~ : String = "",
 ) -> String {
+  let extra : Array[@model.LessonFile] = []
   if files.any(f => f.text.contains("smithy.rpc#")) {
-    @model.digest(files + [{ name: smithy_rpc_source, text: definitions, }])
-  } else {
-    @model.digest(files)
+    extra.push({ name: smithy_rpc_source, text: definitions, })
   }
+  if files.any(f => f.text.contains("smithy.serialization#")) {
+    extra.push({ name: smithy_serialization_source, text: serialization, })
+  }
+  @model.digest(files + extra)
 }
+
+///|
+/// The smithy.serialization trait definitions that `scripts/reference-tour.mbtx`
+/// adds to a Java case whose files name the namespace, as the playground core
+/// adds them for such files.
+let smithy_serialization_path : String = "tour/smithy-serialization-traits.smithy"
+
+///|
+/// The name of the smithy.serialization definitions in the digest of a case
+/// that uses them.
+let smithy_serialization_source : String = "<smithy-serialization-traits>"
 
 ///|
 /// The line that a lesson with a known difference must contain.
@@ -1036,6 +1051,7 @@ fn compare_all(
 test "every lesson case has a fresh reference result" {
   let (tour, reference, _) = inputs()
   let definitions = read_text(smithy_rpc_path)
+  let serialization = read_text(smithy_serialization_path)
   let known : Array[@model.CaseId] = []
   for lesson in tour.lessons {
     for case in lesson.cases {
@@ -1045,7 +1061,7 @@ test "every lesson case has a fresh reference result" {
       check_fresh(
         case_id.to_string(),
         entry,
-        reference_digest(lesson.case_files(case), definitions),
+        reference_digest(lesson.case_files(case), definitions, serialization~),
         lesson.output,
         lesson.engine,
       )
@@ -1157,6 +1173,29 @@ test "the reference results use the commit of the vendored prelude" {
 ///|
 test "the reference loads the smithy.rpc definitions that the core loads" {
   assert_eq(read_text(smithy_rpc_path), @rpc.trait_definitions())
+}
+
+///|
+test "the reference loads the smithy.serialization definitions that the core loads" {
+  assert_eq(
+    read_text(smithy_serialization_path),
+    @codec_contract.trait_definitions(),
+  )
+}
+
+///|
+test "the digest of a smithy.serialization case covers its definitions" {
+  let codec : Array[@model.LessonFile] = [
+    { name: "model.smithy", text: "use smithy.serialization#jsonEncoding", },
+  ]
+  assert_true(
+    reference_digest(codec, "", serialization="a") !=
+    reference_digest(codec, "", serialization="b"),
+  )
+  assert_eq(
+    reference_digest(codec, "", serialization="a"),
+    @model.digest(codec + [{ name: smithy_serialization_source, text: "a", }]),
+  )
 }
 
 ///|

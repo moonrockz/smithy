@@ -230,7 +230,7 @@ test "a value lesson reads its setup and the findings of a case" {
     Value({
       file: "order.json",
       shape: "example#Order",
-      options: { unknown_members: Ignore, member_names: Smithy, },
+      options: { unknown_members: Ignore, member_names: Smithy, profile: None, },
     }),
   )
   assert_eq(lesson.output, None)
@@ -264,7 +264,7 @@ test "a message lesson reads its setup and the findings of a case" {
         context=Some(RequestFile("call.json")),
         legacy_errors=CodeMessageData,
       ),
-      options: { unknown_members: Ignore, member_names: Smithy, },
+      options: { unknown_members: Ignore, member_names: Smithy, profile: None, },
     }),
   )
   assert_eq(lesson.output, None)
@@ -358,6 +358,33 @@ test "a value setup with an unknown key" {
 ///|
 test "a value setup with an unknown option" {
   expect_err("value-bad-option", ["01-a", "member_names", "camel"])
+}
+
+///|
+test "a value lesson can select a serialization profile" {
+  let tour = match read("value-profile") {
+    Ok(t) => t
+    Err(msg) => fail(msg)
+  }
+  assert_eq(
+    tour.lessons[0].engine,
+    Value({
+      file: "order.json",
+      shape: "example#Order",
+      options: {
+        unknown_members: Reject,
+        member_names: Smithy,
+        profile: Some("compact"),
+      },
+    }),
+  )
+}
+
+///|
+test "a profile cannot be combined with the plain value options" {
+  expect_err("value-profile-conflict", [
+    "01-a", "\"profile\" cannot be combined",
+  ])
 }
 
 ///|

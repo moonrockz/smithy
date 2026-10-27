@@ -5,6 +5,7 @@ members = [
   "../pkgs/smithy-syntax",
   "../pkgs/smithy",
   "../pkgs/smithy-validation",
+  "../pkgs/smithy-codec",
   "../pkgs/smithy-diff",
   "../pkgs/smithy-jsonschema",
   "../pkgs/smithy-openapi",

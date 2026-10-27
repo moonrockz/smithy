@@ -131,7 +131,11 @@ test "the unknown-members option is applied" {
       "I expected UnknownMember at /extra, but found \{@json.to_json(finding).stringify()}",
     )
   }
-  let ignore : ValueOptions = { unknown_members: Ignore, member_names: Smithy, }
+  let ignore : ValueOptions = {
+    unknown_members: Ignore,
+    member_names: Smithy,
+    profile: None,
+  }
   assert_true(check(value, options=ignore) is DataChecked(valid=true, ..))
 }
 
@@ -146,6 +150,7 @@ test "the member-names option is applied" {
   let json_names : ValueOptions = {
     unknown_members: Reject,
     member_names: JsonName,
+    profile: None,
   }
   assert_true(valid_of(check(value, model~, options=json_names)))
 }
@@ -632,4 +637,80 @@ test "a bad shape ID is blocked before the model loads" {
     blocked_reason(response),
     "I expected an absolute shape ID for the shape, but found 'Input'.",
   )
+}
+
+///|
+/// A model with a serialization profile and a Morphir name adapter.
+let profile_model : String =
+  #|$version: "2"
+  #|namespace example
+  #|use smithy.serialization#jsonEncoding
+  #|use smithy.serialization#jsonProfiles
+  #|@jsonProfiles([{id: "array", defaults: {union: {style: "tagArray"}}}])
+  #|union Expr {
+  #|  Name: Name
+  #|  Count: Integer
+  #|}
+  #|@jsonEncoding(base: {adapter: "morphir.v4.name"})
+  #|string Name
+
+///|
+fn with_profile(profile : String) -> ValueOptions {
+  { ..ValueOptions::default(), profile: Some(profile), }
+}
+
+///|
+test "a profile reads the value with the declared representation and the Morphir adapters" {
+  let shape = "example#Expr"
+  assert_true(
+    valid_of(
+      check(
+        "[\"Name\", [\"value\", \"in\", \"u\", \"s\", \"d\"]]",
+        shape~,
+        model=profile_model,
+        options=with_profile("array"),
+      ),
+    ),
+  )
+  let refused = findings_of(
+    check(
+      "[\"Name\", \"value-in-Usd\"]",
+      shape~,
+      model=profile_model,
+      options=with_profile("array"),
+    ),
+  )
+  assert_eq(refused.length(), 1)
+  assert_true(
+    refused[0]
+    is Found(code="AdapterFailure", path="/1", shape="example#Name", ..),
+  )
+  // Without a profile, the plain value check reads the object layout.
+  assert_false(valid_of(check("[\"Count\", 1]", shape~, model=profile_model)))
+}
+
+///|
+test "an unknown profile stops the check at --profile" {
+  let findings = findings_of(
+    check(
+      "[\"Count\", 1]",
+      shape="example#Expr",
+      model=profile_model,
+      options=with_profile("tree"),
+    ),
+  )
+  assert_true(
+    findings is [Stopped(code="UnknownProfile", source=Some("--profile"), ..)],
+  )
+}
+
+///|
+test "options without a profile keep their JSON" {
+  assert_eq(
+    @json.to_json(ValueOptions::default()).stringify(),
+    "{\"unknown_members\":\"Reject\",\"member_names\":\"Smithy\"}",
+  )
+  let options = with_profile("array")
+  let back : ValueOptions = @json.from_json(@json.to_json(options))
+  assert_eq(back, options)
 }

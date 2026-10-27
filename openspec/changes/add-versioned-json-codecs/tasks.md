@@ -1,6 +1,6 @@
 # Tasks
 
-Implementation is in progress. The planning task `smithy-2qe.53.1` is separate from these implementation groups. Claim a group's bead before work, check off tasks only after verification, and close the bead only when every checkbox in that group is complete.
+Implementation is complete. The planning task `smithy-2qe.53.1` is separate from these implementation groups. Claim a group's bead before work, check off tasks only after verification, and close the bead only when every checkbox in that group is complete.
 
 The behavioral contracts are [json-codecs](specs/json-codecs/spec.md) and [serialization-profiles](specs/serialization-profiles/spec.md). [design.html](design.html) records the architecture and authority pins. Dependencies below are also recorded in beads.
 
@@ -54,26 +54,26 @@ Depends on group 4.
 Depends on group 5.
 
 - [x] 6.1 Vendor the selected v3/v4 conformance authorities under `examples/morphir-codecs/` with immutable pins, blob inventory, LICENSE/NOTICE and expected case IDs; add a MoonBit refresh/check task and verify unchanged input number lexemes and duplicate-key negative fixtures are preserved.
-- [ ] 6.2 Model the v3 single-file roots and recursive type/value/pattern/definition/distribution families, including separate v3.0/v3.1 bindings and entry dictionaries; verify greeting/family fixtures, refuse Specs before v3.1, and avoid replacing modeled nodes with catch-all Document values.
-- [ ] 6.3 Add the optional `smithy-codec/morphir` adapter package and v3 profile bindings for historical names, fully qualified names, dictionary ordering and version scalars; verify upstream naming/version cases and normalized-key collision failures.
-- [ ] 6.4 Add v3 runtime, CLI and build examples plus a coverage inventory; verify supported v3 release intervals, semantic round-trips, unchanged version identity and explicit refusal of v1/v2, unsupported minors and v4-only values.
+- [x] 6.2 Model the v3 single-file roots and recursive type/value/pattern/definition/distribution families, including separate v3.0/v3.1 bindings and entry dictionaries; verify greeting/family fixtures, refuse Specs before v3.1, and avoid replacing modeled nodes with catch-all Document values.
+- [x] 6.3 Add the optional `smithy-codec/morphir` adapter package and v3 profile bindings for historical names, fully qualified names, dictionary ordering and version scalars; verify upstream naming/version cases and normalized-key collision failures.
+- [x] 6.4 Add v3 runtime, CLI and build examples plus a coverage inventory; verify supported v3 release intervals, semantic round-trips, unchanged version identity and explicit refusal of v1/v2, unsupported minors and v4-only values.
 
 ## 7. Deliver the Morphir v4 conformance bundle (smithy-2qe.53.8)
 
 Depends on group 6.
 
-- [ ] 7.1 Model the v4 root and recursive node families with `morphir-v4` and `morphir-v4-expanded` profiles; verify complete/books-and-records artifacts and family fixtures against the pinned schema/specification authorities.
-- [ ] 7.2 Complete v4 naming bindings, bare reference/variable rules, Tuple shorthand, wrapped Reference argument arrays, attribute-sensitive writers and documented legacy aliases; verify equivalent forms, ambiguous/colliding inputs and canonical output against upstream cases.
-- [ ] 7.3 Verify full v4 document read/write behavior through runtime, CLI and build fixtures, including baseline/exact version spellings, header order, exact numbers and no implicit v3 migration; record any authority disagreement with a bead rather than blessing a conflicting golden.
-- [ ] 7.4 Publish the v4 coverage inventory and checked examples, then extend the Morphir tour with opt-in profile-aware cases while preserving existing default-profile results; verify `mise run tour:check` and `mise run site:check` and review the documented limitations.
+- [x] 7.1 Model the v4 root and recursive node families with `morphir-v4` and `morphir-v4-expanded` profiles; verify complete/books-and-records artifacts and family fixtures against the pinned schema/specification authorities.
+- [x] 7.2 Complete v4 naming bindings, bare reference/variable rules, Tuple shorthand, wrapped Reference argument arrays, attribute-sensitive writers and documented legacy aliases; verify equivalent forms, ambiguous/colliding inputs and canonical output against upstream cases.
+- [x] 7.3 Verify full v4 document read/write behavior through runtime, CLI and build fixtures, including baseline/exact version spellings, header order, exact numbers and no implicit v3 migration; record any authority disagreement with a bead rather than blessing a conflicting golden.
+- [x] 7.4 Publish the v4 coverage inventory and checked examples, then extend the Morphir tour with opt-in profile-aware cases while preserving existing default-profile results; verify `mise run tour:check` and `mise run site:check` and review the documented limitations.
 
 ## 8. Verify integrated codec laws, limits and compatibility (smithy-2qe.53.9)
 
 Depends on group 7.
 
-- [ ] 8.1 Run integrated check/decode agreement, semantic encode/decode, canonicalization idempotence and same-root cross-profile laws across every representation and both Morphir bundles; verify the integrated suite passes on wasm, wasm-gc, JS and native.
-- [ ] 8.2 Exercise whole-request limits and recursive/wide Morphir workloads across version parsing, adapters, projection, constraints and output; verify bounded refusal, original source diagnostics, stable near-linear scaling and no successful partial output using recorded commands and measurements.
-- [ ] 8.3 Run `mise run format`, `mise run check`, `mise run test:scripts`, `mise run test:bdd`, `mise run test:cli`, `mise run tour:check` and `mise run site:check`; review workspace/version/publication metadata, default validator/RPC/export regressions and the final diff, and record the actual results on the group bead.
+- [x] 8.1 Run integrated check/decode agreement, semantic encode/decode, canonicalization idempotence and same-root cross-profile laws across every representation and both Morphir bundles; verify the integrated suite passes on wasm, wasm-gc, JS and native.
+- [x] 8.2 Exercise whole-request limits and recursive/wide Morphir workloads across version parsing, adapters, projection, constraints and output; verify bounded refusal, original source diagnostics, stable near-linear scaling and no successful partial output using recorded commands and measurements.
+- [x] 8.3 Run `mise run format`, `mise run check`, `mise run test:scripts`, `mise run test:bdd`, `mise run test:cli`, `mise run tour:check` and `mise run site:check`; review workspace/version/publication metadata, default validator/RPC/export regressions and the final diff, and record the actual results on the group bead.
 
 ## Workflow follow-up
 
