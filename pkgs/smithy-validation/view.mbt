@@ -5,11 +5,19 @@ pub(open) trait ValueView {
   /// Non-allocating count of immediate wrappers or annotations inspect may expand.
   /// Adapters that allocate per child override this before exposing wide values.
   fn expansion_size(Self) -> Int32 = _
+  /// The value's own source path relative to the validation base path. A projected view returns the
+  /// original location of a synthetic node, such as a tuple position; the default derives it from the parent.
+  fn source(Self) -> InstancePath? = _
 }
 
 ///|
 impl ValueView with fn expansion_size(_self) {
   0
+}
+
+///|
+impl ValueView with fn source(_self) {
+  None
 }
 
 ///|

@@ -1,0 +1,4 @@
+# The vendored files are checked byte for byte against Git blob SHAs. Never convert their line endings.
+upstream/** -text
+LICENSE -text
+NOTICE -text
