@@ -75,7 +75,7 @@ attributes, Specs before 3.1, unsupported and invalid releases, and a payload of
 A case with a `gap` in `cases.json` must still fail; the harness reports an unexpected pass, so this list cannot
 go stale. Former gap G1 (the tagged-array type specification) and most of G2 (the nested `{"doc", "value"}`
 definition wrapper of definitions-0006, 0017, 0018 and 0019) are closed by reader-only tag-array layouts and
-flattened-member aliases.
+flattened-member aliases. The remaining gaps are tracked by bead `smithy-2qe.55`.
 
 | Gap | Cases | Reason | What would close it |
 | --- | --- | --- | --- |
@@ -87,6 +87,8 @@ The single out-of-scope case is mck/distributions-0004/text-canonical, which nam
 complete example.
 
 ## Authority decisions
+
+The open disagreements between these authorities are tracked by bead `smithy-2qe.54`.
 
 The wire reference (`.dev/out/morphir-wire-reference.md` during development) records these decisions; the
 models cite them as D-numbers.

@@ -91,7 +91,7 @@ pub impl ToJson for CodecResult with fn to_json(self) {
   Json::object({
     "valid": Json::boolean(self.is_valid()),
     "complete": Json::boolean(self.complete),
-    "findings": Json::array(self.findings.map(f => f.to_json())),
+    "findings": Json::array(self.findings.map(f => ToJson::to_json(f))),
   })
 }
 
