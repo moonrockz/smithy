@@ -1,0 +1,8 @@
+---
+description: Smithy repository instructions and OpenSpec workflow
+alwaysApply: true
+---
+
+Read and follow AGENTS.md at the repository root for all repository instructions, including OpenSpec,
+HTML designs and beads. OpenSpec skills are in .cursor/skills/openspec-*/SKILL.md; project overrides are
+in openspec/.

@@ -1,0 +1,32 @@
+schema: html-design
+githubCopilot:
+  cloudAgent: false
+
+context: |
+  Read AGENTS.md for Smithy's working rules and beads tracker setup.
+  OpenSpec changes and specs are committed under openspec/. Scratch work stays in .dev/.
+  The html-design schema generates design.html, even when a generated skill says design.md.
+  Designs are standalone HTML with inline CSS for light/dark mode and inline SVG diagrams.
+  proposal.md, tasks.md and specs/**/*.md stay Markdown because the CLI parses them.
+  Each change has an owning epic bead; each numbered task group has a child task bead.
+  Beads records ownership, dependencies and status; tasks.md records checkbox progress.
+
+operations:
+  apply:
+    guidance:
+      - >-
+        Read the proposal's Beads section and task-group bead IDs. Claim each group before
+        starting it. Mark checkboxes after verification, and close its bead only when every
+        checkbox in the group is complete. Record actual checks and any commit range.
+      - Run bd sync at the end of the session, as AGENTS.md requires.
+  archive:
+    guidance:
+      - >-
+        Before archiving, verify the task checkboxes and group beads agree. Close verified,
+        completed groups; leave incomplete groups open and report them. Archive only under
+        the active user's authorization and the archive workflow's completion checks.
+      - >-
+        After archiving, update the epic and every group bead's spec id to
+        openspec/changes/archive/<date>-<name> with bd update <id> --spec-id <path>.
+        Close the epic only when every group bead is closed and the change is complete.
+        Run bd sync. design.html is self-contained, so its styles need no path rewrite.
