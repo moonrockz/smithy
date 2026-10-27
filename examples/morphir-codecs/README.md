@@ -1,7 +1,22 @@
 # Morphir codec conformance sources
 
-These files are the pinned authorities for the Morphir v3 and v4 codec bundles of the
+This directory holds the Smithy models of the Morphir IR v3 and v4 JSON representations and the pinned
+authorities that they are checked against, for the
 [versioned JSON codecs change](../../openspec/changes/add-versioned-json-codecs/design.html) (decision CONF-1).
+[COVERAGE.md](COVERAGE.md) lists the supported releases, what the bundles check, the case results and the
+recorded gaps.
+
+## Models
+
+- `model/morphir-v3.smithy` (`morphir.ir.v3`): the v3.0 root `IRFile30`, the v3.1 root `IRFile31` (adds Specs),
+  every v3 node family and the `morphir-v3` profile (tag-first arrays, entry-array dictionaries in Elm order).
+- `model/morphir-v4.smithy` (`morphir.ir.v4`): the root `IRFile`, every v4 node family and the profiles
+  `morphir-v4` (compact canonical writer) and `morphir-v4-expanded` (expanded writer).
+- `model/morphir-bundle.smithy` (`morphir.ir`): the `morphir` jsonBundle with the releases
+  `[3.0.0,3.1.0)`, `[3.1.0,3.2.0)` and `[4.0.0,4.1.0)`, and `SupportedFormatVersion`.
+
+The models name the scalar adapters of the `moonrockz/smithy-codec/morphir` package; a host registers them with
+`@morphir.registry()`. Load the models with `@contract.loader()` (it knows the `smithy.serialization` traits).
 
 | Directory | Repository | Commit | Role |
 | --- | --- | --- | --- |
@@ -20,8 +35,9 @@ This pin is independent of the tour corpus in `site/tour/morphir`, which uses an
   - finos/morphir-elm: the v3 codec modules (`src/Morphir/**/Codec.elm`) and `FormatVersion.elm`.
 - `inventory.json` gives the repository, the commit and the Git blob SHA of each vendored file.
 - `cases.json` gives the expected outcome of each conformance case: a stable case ID, the file, the location
-  (fence line, or JSON pointer), `valid`, `invalid` (with the upstream diagnostic) or `other-node`, and the
-  Smithy root that checks it. Root names that are `TODO:` are set by tasks 6.2 and 7.1.
+  (fence line, or JSON pointer and `input` pointer), `valid`, `invalid` (with the upstream diagnostic) or
+  `other-node`, the Smithy `root` and `profile` that check it, the expected canonical `output`, and the `gap` of
+  a case that the bundles do not pass yet (see COVERAGE.md).
 - `LICENSE` and `NOTICE` are copies of the finos/morphir files. The finos/morphir-elm files are in
   `upstream/finos-morphir-elm/`.
 
@@ -32,6 +48,16 @@ duplicate member below the root, is written separately and does not go in `upstr
 The only upstream JSON fixture with a duplicate object member is
 `format-version/root/1`: a root with two `formatVersion` members. It is a JSON string inside the
 format-version corpus, so its bytes stay as written.
+
+## Conformance run
+
+```sh
+mise run test:bdd
+```
+
+runs every entry of `cases.json` (tests/bdd/morphir_codecs_world_wbtest.mbt) and the scenarios of
+tests/features/morphir-codecs.feature. A case with a `gap` must still fail, so a fixed gap must also be removed
+from `cases.json` and COVERAGE.md.
 
 ## Licence
 

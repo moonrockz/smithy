@@ -432,9 +432,19 @@ pub fn WireContract::prepare(
           Some(r) =>
             for alternative in r.accept {
               let layout = union_layout(id, members, Some(alternative))
-              guard layout is (External | Internal(..) | Adjacent(..)) else {
+              guard layout
+                is (External | Internal(..) | Adjacent(..) | TagArray(..)) else {
                 raise InvalidDeclaration(
-                  id, "An accepted union layout must be external, internal or adjacent.",
+                  id, "An accepted union layout must be external, internal, adjacent or a tag array.",
+                )
+              }
+              if layout is TagArray(..) &&
+                (
+                  r.style == "tagArray" ||
+                  accepts.iter().any(a => a is TagArray(..))
+                ) {
+                raise InvalidDeclaration(
+                  id, "A union can read only one tag-array layout.",
                 )
               }
               accepts.push(layout)
@@ -879,6 +889,11 @@ fn accepted_kinds(
           }
       }
   }
+  for alternative in draft.accepts {
+    for kind in layout_kinds(UnionShape(alternative)) {
+      add(kind)
+    }
+  }
   out
 }
 
@@ -1130,7 +1145,11 @@ fn prepare_forms(
     form.reader.absent is Some(_)
   }
   for i, form in out {
-    if layout_kinds(layout).contains(form.reader.kind) && !guarded(form) {
+    if (layout_kinds(layout) +
+      draft.accepts.map(a => layout_kinds(UnionShape(a))).flatten()).contains(
+        form.reader.kind,
+      ) &&
+      !guarded(form) {
       raise InvalidDeclaration(
         id,
         "A \{form.reader.kind} form overlaps the shape's own \{form.reader.kind} layout without a guard.",
@@ -1206,12 +1225,10 @@ fn check_flatten(
   }
   let m = flattened[0]
   let target = drafts.get(m.target).unwrap()
-  guard target.layout is UnionShape(External) &&
-    target.forms.is_empty() &&
-    target.accepts.is_empty() else {
+  guard target.layout is UnionShape(External) && target.forms.is_empty() else {
     raise InvalidDeclaration(
       draft.id,
-      "Flattened member \{m.name} needs an external union without forms or accepted layouts.",
+      "Flattened member \{m.name} needs an external union without forms.",
     )
   }
   for alternative in target.members {

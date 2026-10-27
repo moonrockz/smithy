@@ -2545,7 +2545,8 @@
       "profile": "morphir-v4",
       "output": {
         "case": "mck/definitions-0002/json-canonical"
-      }
+      },
+      "gap": "G1"
     },
     {
       "id": "mck/definitions-0003/json-canonical",
@@ -2658,7 +2659,8 @@
       "profile": "morphir-v4",
       "output": {
         "case": "mck/definitions-0006/json-canonical"
-      }
+      },
+      "gap": "G2"
     },
     {
       "id": "mck/definitions-0007/json-canonical",
@@ -2691,7 +2693,8 @@
       "profile": "morphir-v4",
       "output": {
         "case": "mck/definitions-0007/json-canonical"
-      }
+      },
+      "gap": "G3"
     },
     {
       "id": "mck/definitions-0008/json-canonical",
@@ -2721,7 +2724,8 @@
       "expected": "invalid",
       "diagnostic": "duplicate_member",
       "root": "morphir.ir.v4#ValueDefinition",
-      "profile": "morphir-v4"
+      "profile": "morphir-v4",
+      "gap": "G4"
     },
     {
       "id": "mck/definitions-0009/json-canonical",
@@ -2770,7 +2774,8 @@
       "profile": "morphir-v4",
       "output": {
         "case": "mck/definitions-0010/json-canonical"
-      }
+      },
+      "gap": "G2"
     },
     {
       "id": "mck/definitions-0011/json-canonical",
@@ -2915,7 +2920,8 @@
       "profile": "morphir-v4",
       "output": {
         "case": "mck/definitions-0017/json-canonical"
-      }
+      },
+      "gap": "G2"
     },
     {
       "id": "mck/definitions-0018/json-canonical",
@@ -2964,7 +2970,8 @@
       "profile": "morphir-v4",
       "output": {
         "case": "mck/definitions-0018/json-canonical"
-      }
+      },
+      "gap": "G2"
     },
     {
       "id": "mck/definitions-0019/json-canonical",
@@ -3013,7 +3020,8 @@
       "profile": "morphir-v4",
       "output": {
         "case": "mck/definitions-0019/json-canonical"
-      }
+      },
+      "gap": "G2"
     },
     {
       "id": "mck/definitions-0020/json-canonical",

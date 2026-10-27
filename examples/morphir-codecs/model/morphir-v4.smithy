@@ -16,6 +16,7 @@ namespace morphir.ir.v4
 use smithy.serialization#emptyAsAbsent
 use smithy.serialization#jsonEncoding
 use smithy.serialization#jsonProfiles
+use smithy.serialization#untagged
 
 /// A v4 single-file artifact. Readers accept formatVersion before or after distribution; writers put it first.
 @jsonProfiles([

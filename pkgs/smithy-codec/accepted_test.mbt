@@ -18,10 +18,11 @@ let access_model : String =
   #|structure Documented {
   #|  doc: String
   #|  @required
-  #|  @jsonEncoding(base: {flatten: true})
+  #|  @jsonEncoding(base: {flatten: true, aliases: ["value"]})
   #|  definition: Definition
   #|}
   #|
+  #|@jsonEncoding(base: {union: {style: "external", accept: [{style: "tagArray"}]}})
   #|union Definition {
   #|  Alias: Integer
   #|  Opaque: Unit
@@ -112,10 +113,10 @@ test "reader-only declarations are checked" {
   inspect(
     refusal(
       header +
-      "@jsonEncoding(base: {union: {style: \"external\", accept: [{style: \"tagArray\"}]}})\nunion U { x: Integer }",
+      "@jsonEncoding(base: {union: {style: \"tagArray\", accept: [{style: \"tagArray\", unit: \"slot\"}]}})\nunion U { x: Integer }",
       "example#U",
       None,
     ),
-    content="InvalidDeclaration: example#U: An accepted union layout must be external, internal or adjacent.",
+    content="InvalidDeclaration: example#U: A union can read only one tag-array layout.",
   )
 }

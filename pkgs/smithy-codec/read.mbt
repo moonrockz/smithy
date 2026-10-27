@@ -323,11 +323,8 @@ fn Reader::object_fields(
     let field = field_path(path, name)
     let mut found = None
     for i, m in shape.members {
-      if !m.flatten &&
-        (
-          m.wire.to_string() == name ||
-          m.aliases.iter().any(a => a.to_string() == name)
-        ) {
+      if (!m.flatten && m.wire.to_string() == name) ||
+        m.aliases.iter().any(a => a.to_string() == name) {
         found = Some(i)
         break
       }
@@ -361,7 +358,18 @@ fn Reader::object_fields(
     }
   }
   if flattened is Some(f) && !rest.is_empty() {
-    slots[f] = Some((Json::object(rest), path, shape.members[f].name))
+    match slots[f] {
+      Some((_, _, field_name)) => {
+        self.request.emit(
+          MemberCollision,
+          path,
+          shape.members[f].member_id,
+          "Field \{field_name.escape()} and flattened fields both supply member \{shape.members[f].name}.",
+        )
+        failed = true
+      }
+      None => slots[f] = Some((Json::object(rest), path, shape.members[f].name))
+    }
   }
   for i, m in shape.members {
     if m.required && slots[i] is None {
@@ -1156,7 +1164,16 @@ fn Reader::accepted_layout(
   shape : @contract.ShapeContract,
   main : @contract.UnionLayout,
 ) -> @contract.UnionLayout? {
-  guard json is Object(fields) else { return Some(main) }
+  guard json is Object(fields) else {
+    if json is Array(_) && !(main is TagArray(..)) {
+      for alternative in shape.accepts {
+        if alternative is TagArray(..) {
+          return Some(alternative)
+        }
+      }
+    }
+    return Some(main)
+  }
   let names_member = fn(name : String) {
     shape.members
     .iter()

@@ -956,7 +956,26 @@ member name that the input does not contain. `--diagnostics json` prints one res
 
 `smithy codec canonicalize` checks the value first and then prints its canonical form, or writes it with
 `-o FILE`. An invalid value, an incompatible version or an exhausted limit exits 1 and leaves the output
-file as it was. With `--bundle`, `--output-profile` selects another declared profile of the same release,
+file as it was. Here the second command fails, and `expr.out.json` still holds the first output:
+
+```console
+$ smithy codec canonicalize --shape example#Expr --profile array --value expr.json -o expr.out.json expr.smithy
+```
+
+```console status=1
+$ smithy codec canonicalize --shape example#Expr --profile array --value expr-range.json -o expr.out.json expr.smithy
+expr-range.json/2/1: error[Range] example#Expr$Num: I expected the number to satisfy the modeled range.
+```
+
+```console
+$ smithy validate value --shape example#Expr --profile array --value expr.out.json expr.smithy
+```
+
+```console status=2
+$ smithy codec canonicalize --shape example#Expr --bundle docs --value expr.json expr.smithy
+smithy: use either --shape or --bundle, not both
+```
+ With `--bundle`, `--output-profile` selects another declared profile of the same release,
 such as an expanded output; it never converts the document to another release.
 
 Exit 0 means complete and valid. Invalid or incomplete values and I/O failures exit 1. Invalid usage,

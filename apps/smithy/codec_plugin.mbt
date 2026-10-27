@@ -26,6 +26,7 @@ fn json_codec_plugin(
   base : String,
   model : @smithy.Model,
   settings : Json,
+  read~ : (String) -> String raise = path => @fs.read_file_to_string(path),
 ) -> Map[String, String] raise @build.BuildError {
   guard settings is Object(fields) else {
     raise codec_build_error("settings must be an object")
@@ -155,7 +156,7 @@ fn json_codec_plugin(
   let failures : Array[String] = []
   for entry in values {
     let (input, output) = entry
-    let content = @fs.read_file_to_string(build_path(base, input)) catch {
+    let content = read(build_path(base, input)) catch {
       _ => raise codec_build_error("cannot read value `\{input}`")
     }
     match run(content) {
