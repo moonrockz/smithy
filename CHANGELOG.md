@@ -6,6 +6,49 @@ is 0.x, a minor release can contain breaking changes.
 
 <!-- git-cliff: end of header -->
 
+## [0.7.0] - 2026-10-27
+
+This release adds code generation. The new `smithy-codegen` module is a language-neutral core for Smithy code generators, and the `moonbit-jsonrpc-codegen`, `python-jsonrpc-codegen` and `go-jsonrpc-codegen` build plugins generate JSON-RPC peers in MoonBit, Python and Go, with tested runtimes and a payment terminal example. RPC validation now checks the error data of declared server errors, and a service can accept, report or reject a server error code that it does not declare (accept is the default). The model check now evaluates contract conditions on default values, trait values, examples and metadata as the Java Smithy reference does, and the project site has a Smithy language tour with tested examples. Two changes break existing use: suppressions and tests that name SM-MODEL-015, SM-MODEL-016 or SM-MODEL-017 must use the Smithy event IDs (ConditionsTrait, Model, TraitValue, TraitTarget), and a model whose values break a contract condition now gets an error event.
+
+### ⚠️ Breaking changes
+
+- Contract findings use the event IDs of Smithy (ConditionsTrait, Model, TraitValue, TraitTarget) in place of SM-MODEL-015/016/017, and three loader events change their IDs. Suppressions and tests that name an old ID must use the new one. ModelDiagnostic has a new field `report : DiagnosticReport`. A @pattern with a braced \u{...} escape now fails preparation, as in Smithy. ([#67](https://github.com/moonrockz/smithy/pull/67))
+- *(smithy)* A model whose values break a contract condition now gets an error event. In pkgs/jmespath, to_number follows Java (null for a string that Java does not parse), number literals print as their source token, -0.0 == 0 is false as in Java, and strings order by UTF-16 code unit. ([#69](https://github.com/moonrockz/smithy/pull/69))
+
+### 🚀 Features
+
+- *(site)* Add the smithy.mbt logo, favicon and app icons ([#65](https://github.com/moonrockz/smithy/pull/65)) by @DamianReeves
+- *(site)* Add the Smithy language tour with its first twelve lessons ([#68](https://github.com/moonrockz/smithy/pull/68)) by @DamianReeves
+- *(site)* Add the tour sections Traits and Services with tested CLI and API blocks ([#70](https://github.com/moonrockz/smithy/pull/70)) by @DamianReeves
+- *(smithy)* [**breaking**] Check model values against contract conditions and compare JMESPath numbers as Smithy does ([#69](https://github.com/moonrockz/smithy/pull/69)) by @DamianReeves
+- *(site)* Add the tour sections on querying, validating data and evolving models ([#71](https://github.com/moonrockz/smithy/pull/71)) by @DamianReeves
+- *(site)* Add the tour case study on a Smithy DSL for the Morphir IR ([#72](https://github.com/moonrockz/smithy/pull/72)) by @DamianReeves
+- *(codegen)* Add the smithy-codegen core and the codegenFixture build plugin ([#73](https://github.com/moonrockz/smithy/pull/73)) by @DamianReeves
+- *(jsonrpc)* Add payment terminal model and codegen contracts ([#76](https://github.com/moonrockz/smithy/pull/76)) by @DamianReeves
+- *(codegen)* Add the MoonBit and Python JSON-RPC generators and runtimes ([#77](https://github.com/moonrockz/smithy/pull/77)) by @DamianReeves
+- *(jsonrpc)* Add Go peers and interop matrix ([#78](https://github.com/moonrockz/smithy/pull/78)) by @DamianReeves
+- *(rpc)* Validate declared server error codes and data ([#83](https://github.com/moonrockz/smithy/pull/83)) by @DamianReeves
+
+### 🐛 Bug fixes
+
+- [**breaking**] Match the Smithy reference for patterns, model events and rpcv2Json OpenAPI ([#67](https://github.com/moonrockz/smithy/pull/67)) by @DamianReeves
+- Correct pattern and JMESPath validation ([#74](https://github.com/moonrockz/smithy/pull/74)) by @DamianReeves
+- *(syntax)* Match Smithy member and doc parsing ([#75](https://github.com/moonrockz/smithy/pull/75)) by @DamianReeves
+- *(runtime)* Bound the event-stream lines, events and JSON bodies that the HTTP clients read ([#79](https://github.com/moonrockz/smithy/pull/79)) by @DamianReeves
+- *(runtime)* Close MoonBit WebSockets gracefully ([#80](https://github.com/moonrockz/smithy/pull/80)) by @DamianReeves
+- *(runtime)* Retain Process handle for MoonBit stdio wait on Windows ([#81](https://github.com/moonrockz/smithy/pull/81)) by @DamianReeves
+
+### 📚 Documentation
+
+- *(brand)* Keep the logo variants that were not chosen ([#66](https://github.com/moonrockz/smithy/pull/66)) by @DamianReeves
+
+### 🏗️ Build and CI
+
+- *(release)* Wait up to 18 minutes for the published CLI asset ([#64](https://github.com/moonrockz/smithy/pull/64)) by @DamianReeves
+- *(jsonrpc)* Verify Python JSON-RPC peers on native Windows ([#82](https://github.com/moonrockz/smithy/pull/82)) by @DamianReeves
+
+**Full changelog**: https://github.com/moonrockz/smithy/compare/v0.6.0...v0.7.0
+
 ## [0.6.0] - 2026-10-24
 
 This release adds JSON-RPC support. `smithy validate rpc` checks requests, responses, batches and whole transcripts against a Smithy model, `smithy validate value` checks JSON and native Ion values, and the OpenRPC transform exports Smithy JSON-RPC services. Model validation time is now linear in the shape count: a model of 4,000 shapes validates in less than a second, not in minutes. The new project site has docs, examples and an in-browser playground that validates, transforms and checks transcripts with no server. Two changes break existing use: replace `smithy validate-value` with `smithy validate value`, and add `kind` to code that builds a `SourceLocation` with a struct literal, or use `SourceLocation::new`.
