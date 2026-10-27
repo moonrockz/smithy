@@ -1,7 +1,7 @@
 /// Validate JSON-RPC requests and responses with the standalone library.
 import {
-  "moonrockz/smithy@0.6.0",
-  "moonrockz/smithy-validation@0.6.0/rpc",
+  "moonrockz/smithy@0.7.0",
+  "moonrockz/smithy-validation@0.7.0/rpc",
 }
 
 ///|

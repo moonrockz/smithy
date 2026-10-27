@@ -1,6 +1,6 @@
 name = "moonrockz/smithy-openrpc"
 
-version = "0.6.0"
+version = "0.7.0"
 
 description = "Convert Smithy JSON-RPC services to OpenRPC"
 
@@ -15,8 +15,8 @@ readme = "README.mbt.md"
 warnings = "-implicit_impl_as_method"
 
 import {
-  "moonrockz/smithy@0.6.0",
-  "moonrockz/smithy-validation@0.6.0",
-  "moonrockz/smithy-jsonschema@0.6.0",
+  "moonrockz/smithy@0.7.0",
+  "moonrockz/smithy-validation@0.7.0",
+  "moonrockz/smithy-jsonschema@0.7.0",
   "moonrockz/openrpc@0.2.0",
 }
