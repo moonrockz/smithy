@@ -29,11 +29,9 @@
      satisfy validation. -->
 - `<existing-capability-path>`: <what requirement is changing>
 
-## Beads
+## Tracking
 
-<!-- The epic bead that owns this change, and other related beads with the relation. -->
-- **Tracked by**: `<epic-id>`
-- **Related**: `<bead-id>` (<relation>), or None found
+<!-- Follow AGENTS.md for repository-local tracking. Link existing work; do not invent IDs. -->
 
 ## Impact
 

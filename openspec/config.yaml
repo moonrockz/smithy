@@ -30,3 +30,11 @@ operations:
         openspec/changes/archive/<date>-<name> with bd update <id> --spec-id <path>.
         Close the epic only when every group bead is closed and the change is complete.
         Run bd sync. design.html is self-contained, so its styles need no path rewrite.
+
+rules:
+  proposal:
+    - Include a Beads section with the owning epic and related issues. Follow AGENTS.md for epic reuse and parenting.
+  design:
+    - Include the owning epic in the metadata line.
+  tasks:
+    - Each numbered group has one child task bead, with the ID at the end of the heading.

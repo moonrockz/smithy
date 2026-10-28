@@ -245,3 +245,14 @@ when the clone has no Dolt data yet.
 - `bd update <id> --claim` before starting, `bd close <id> --reason "..."` when done.
 - `bd sync` publishes issue changes. Run it at the end of a session; it needs no commit.
 - The top epic is `smithy-2qe`, one child epic per sub-project.
+
+## Shared OpenSpec configuration
+
+Use the shared `html-design` schema for new changes. Read `openspec/README.md`
+and `openspec/config.yaml`; repository-local tracking and approval rules still apply.
+The files under `openspec/schemas/html-design/` and `scripts/openspec-ext.mbtx`
+are managed by Mission Control's openspec-ext bundle. Change the shared source
+and reinstall instead of editing these snapshots. Run `mise run openspec:check`
+and `mise exec -- openspec validate --all --strict` after configuration changes.
+OpenSpec artifacts are committed project documentation; existing scratch-document
+rules continue to apply to local notes. Existing changes retain their own schema.
