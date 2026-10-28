@@ -229,6 +229,16 @@ Fix: use the updated reader, which joins formatter-wrapped tuples before parsing
 
 ## CLI checks
 
+**Local checks use a newer MoonBit than the repository pin**
+Cause: a user PATH entry such as `~/.moon/bin` precedes mise's tool directories. A direct
+`mise exec -- moon version --all` can select the pin while nested tasks still launch the other binary.
+Fix: verify the child-shell selection with `mise exec -- /bin/sh -c 'command -v moon; moon version --all'`.
+Run `MISE_ACTIVATE_AGGRESSIVE=true mise run check` to put the pinned tools first. For a persistent local
+fix, add `[settings]` with `activate_aggressive = true` to the gitignored `.config/mise/config.local.toml`.
+If `MOON_HOME` is set, it must name the install directory printed by `mise where http:moonbit`.
+Check the child-shell version again before rerunning the failed gate. Do not change source code to
+accommodate an accidental compiler upgrade.
+
 **`test:cli -- wasm-gc` cannot find `model.json` on Windows**
 Cause: an older stdin guard also skipped file fixtures and conversion checks.
 Fix: use the updated script. Only the stdin pipe check is skipped; file checks still run.
