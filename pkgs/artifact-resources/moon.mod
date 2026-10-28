@@ -1,6 +1,6 @@
 name = "moonrockz/artifact-resources"
 
-version = "0.7.0"
+version = "0.8.0"
 
 description = "Portable artifact entry trees and declared resource loading"
 

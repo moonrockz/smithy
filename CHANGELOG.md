@@ -6,6 +6,24 @@ is 0.x, a minor release can contain breaking changes.
 
 <!-- git-cliff: end of header -->
 
+## [0.8.0] - 2026-10-28
+
+This release adds `moonrockz/smithy-codec` for checking, decoding and encoding application JSON with model-declared serialization profiles and versioned document bundles. Use `smithy validate value --profile` or `--bundle` to check these representations, `smithy codec canonicalize` to write canonical JSON, and the `jsonCodec` build plugin to check or canonicalize files during a build. The Morphir examples and tour lessons cover version 3 and version 4 IR representations, while existing validation keeps its behavior when no profile or bundle is selected. Release preparation now checks for an existing release branch before changing the checkout, and the repository includes an OpenSpec workflow with HTML designs and beads tracking.
+
+### 🚀 Features
+
+- *(codec)* Add versioned JSON codecs and serialization profiles ([#87](https://github.com/moonrockz/smithy/pull/87)) by @DamianReeves
+
+### 🐛 Bug fixes
+
+- *(release)* Check the release branch before prepare changes the checkout ([#85](https://github.com/moonrockz/smithy/pull/85)) by @DamianReeves
+
+### ⚙️ Maintenance
+
+- Add OpenSpec HTML and beads workflow ([#86](https://github.com/moonrockz/smithy/pull/86)) by @DamianReeves
+
+**Full changelog**: https://github.com/moonrockz/smithy/compare/v0.7.0...v0.8.0
+
 ## [0.7.0] - 2026-10-27
 
 This release adds code generation. The new `smithy-codegen` module is a language-neutral core for Smithy code generators, and the `moonbit-jsonrpc-codegen`, `python-jsonrpc-codegen` and `go-jsonrpc-codegen` build plugins generate JSON-RPC peers in MoonBit, Python and Go, with tested runtimes and a payment terminal example. RPC validation now checks the error data of declared server errors, and a service can accept, report or reject a server error code that it does not declare (accept is the default). The model check now evaluates contract conditions on default values, trait values, examples and metadata as the Java Smithy reference does, and the project site has a Smithy language tour with tested examples. Two changes break existing use: suppressions and tests that name SM-MODEL-015, SM-MODEL-016 or SM-MODEL-017 must use the Smithy event IDs (ConditionsTrait, Model, TraitValue, TraitTarget), and a model whose values break a contract condition now gets an error event.

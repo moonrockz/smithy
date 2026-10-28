@@ -1,6 +1,6 @@
 name = "moonrockz/smithy-codegen"
 
-version = "0.7.0"
+version = "0.8.0"
 
 description = "Language-neutral Smithy code generation core"
 
@@ -15,6 +15,6 @@ readme = "README.mbt.md"
 warnings = "-implicit_impl_as_method"
 
 import {
-  "moonrockz/smithy@0.7.0",
-  "moonrockz/smithy-build@0.7.0",
+  "moonrockz/smithy@0.8.0",
+  "moonrockz/smithy-build@0.8.0",
 }

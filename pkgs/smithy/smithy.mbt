@@ -5,5 +5,5 @@ pub const SMITHY_VERSION : String = "2.0"
 ///|
 /// The version of this library.
 pub fn version() -> String {
-  "0.7.0"
+  "0.8.0"
 }

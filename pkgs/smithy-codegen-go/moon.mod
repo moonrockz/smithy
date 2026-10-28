@@ -1,6 +1,6 @@
 name = "moonrockz/smithy-codegen-go"
 
-version = "0.7.0"
+version = "0.8.0"
 
 description = "Go JSON-RPC peers from prepared Smithy contracts"
 
@@ -13,9 +13,9 @@ readme = "README.mbt.md"
 warnings = "-implicit_impl_as_method"
 
 import {
-  "moonrockz/smithy@0.7.0",
-  "moonrockz/smithy-build@0.7.0",
-  "moonrockz/smithy-codegen@0.7.0",
-  "moonrockz/smithy-codegen-jsonrpc@0.7.0",
-  "moonrockz/smithy-validation@0.7.0",
+  "moonrockz/smithy@0.8.0",
+  "moonrockz/smithy-build@0.8.0",
+  "moonrockz/smithy-codegen@0.8.0",
+  "moonrockz/smithy-codegen-jsonrpc@0.8.0",
+  "moonrockz/smithy-validation@0.8.0",
 }

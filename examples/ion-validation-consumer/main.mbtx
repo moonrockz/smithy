@@ -1,8 +1,8 @@
 ///|
 /// Validate Ion with the published optional adapter, independently of the workspace.
 import {
-  "moonrockz/smithy@0.7.0",
-  "moonrockz/smithy-ion-validation@0.7.0" @validation,
+  "moonrockz/smithy@0.8.0",
+  "moonrockz/smithy-ion-validation@0.8.0" @validation,
   "moonrockz/ion@0.6.0/ion",
 }
 
