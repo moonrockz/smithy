@@ -230,6 +230,22 @@ The mise tasks run that launcher with `moonx`; a separate clone of the tool is u
 To cross-build selected targets, run `mise run build:cross -- linux-x64 darwin-arm64 -- apps/smithy`.
 Windows release binaries are built natively on Windows because MoonBit resolves OS-specific code from the host.
 
+CI and Release share `release-build.yml`. Windows builds and acquisition/CLI qualification run in parallel
+with the four non-Windows native builds and two Wasm builds. A packaging job joins their same-run artifacts
+and creates `dist/` without recompiling. The narrow producer artifacts and `dist` are retained for 30 days;
+failed-job retries reuse successful producers and the exact smoke-tested `dist` before publication.
+
+CI owns PR artifacts and preview smoke. `scripts/ci-plan.mbtx` preserves release-file selection, including
+the shared workflow and planner; unrelated PRs keep the existing build/test coverage without preview smoke.
+Selected preview smoke runs only when no trusted fingerprint evidence exists. PRs record no trusted evidence.
+Release owns actual publication, nightly qualification and manual rehearsals, and always smokes the bytes it
+publishes. Its required validation and publication dependencies are unchanged. `ci-ok` rejects failed,
+cancelled, missing or unexpectedly skipped required categories and selected smoke.
+
+For local artifact transfer, `moonx scripts/dist.mbtx stage` copies only the six built non-Windows files
+into `.dev/out/release-inputs`. Add the qualified Windows binary as `windows-x64.exe`, then run
+`moonx scripts/dist.mbtx pack .dev/out/release-inputs`. Missing inputs fail before replacing `dist/`.
+
 ## Layout
 
 ```

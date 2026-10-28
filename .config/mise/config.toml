@@ -238,6 +238,14 @@ run = "moonx scripts/release.mbtx notes"
 description = "Decide what the Release workflow does (reads GITHUB_EVENT_NAME, GITHUB_REF_TYPE, GITHUB_REF_NAME, DRY_RUN; writes GITHUB_OUTPUT)"
 run = "moonx scripts/release.mbtx plan"
 
+[tasks."ci:plan"]
+description = "Select CI smoke for the event, PR paths and trusted evidence (writes GITHUB_OUTPUT)"
+run = "moonx scripts/ci-plan.mbtx plan"
+
+[tasks."ci:gate"]
+description = "Require every selected CI category to succeed (reads NEEDS and SMOKE_SELECTED)"
+run = "moonx scripts/ci-plan.mbtx gate"
+
 [tasks."smoke:fingerprint"]
 description = "Print the fingerprint of the smoke inputs at HEAD and the version (writes GITHUB_OUTPUT)"
 run = "moonx scripts/smoke.mbtx fingerprint"

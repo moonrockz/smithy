@@ -1,0 +1,130 @@
+# Same-run release producers. Windows qualification and non-Windows compilation
+# run independently; only packaging joins them. Never look up another run's artifacts.
+name: Release artifacts
+
+on:
+  workflow_call:
+    inputs:
+      retention-days:
+        description: Artifact retention, including the failed-job retry window
+        type: number
+        default: 30
+
+permissions:
+  contents: read
+
+env:
+  MISE_EXPERIMENTAL: 'true'
+
+jobs:
+  build-windows:
+    name: Build (windows-x64)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install the pinned MoonBit toolchain
+        uses: hustcer/setup-moonbit@v1
+        with:
+          version: '0.10.15+943464bfa'
+          core-version: '0.10.15+943464bfa'
+
+      - name: Update the registry
+        run: moon update
+
+      - name: Build smithy natively for Windows
+        run: moon build apps/smithy --target native --release
+
+      # Keep this version aligned with the Node pin in .config/mise/config.toml.
+      - name: Install Node for Windows acquisition fixtures
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.14.1'
+          package-manager-cache: false
+
+      - name: Test public and authenticated acquisition on Windows
+        run: moonx scripts/test-public-http.mbtx native js
+
+      - name: Test CLI behavior on Windows
+        run: moonx scripts/test-cli.mbtx native js
+
+      - name: Upload the executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-exe
+          path: _build/native/release/build/moonrockz/smithy-cli/smithy-cli.exe
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention-days }}
+          overwrite: true
+
+  cross-build:
+    name: Cross-build binaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build non-Windows release binaries
+        run: moonx scripts/dist.mbtx build
+
+      - name: Stage the six release inputs
+        run: moonx scripts/dist.mbtx stage
+
+      - name: Upload non-Windows release inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-inputs
+          path: .dev/out/release-inputs/
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
+          retention-days: ${{ inputs.retention-days }}
+
+  package:
+    name: Package release outputs
+    runs-on: ubuntu-latest
+    needs: [build-windows, cross-build]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install mise and the pinned toolchain
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download non-Windows release inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: release-inputs
+          path: .dev/out/release-inputs
+
+      - name: Download the qualified Windows executable
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-x64-exe
+          path: .dev/out/windows-input
+
+      - name: Put the Windows executable with the other inputs
+        run: moonx scripts/dist.mbtx stage-windows
+
+      - name: Pack the existing binaries without compilation
+        run: moonx scripts/dist.mbtx pack .dev/out/release-inputs
+
+      - name: Upload dist/
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: ${{ inputs.retention-days }}

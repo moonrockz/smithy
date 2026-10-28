@@ -102,6 +102,13 @@ Not an error: the script reports the module as already published and goes on.
 Cause: the job lacks `contents: write`.
 Fix: check the `permissions` of the `release` job in `release.yml`.
 
+**PR preview has no separate Release run**
+Cause: CI owns the PR artifact build and selected preview smoke. Release starts for actual releases,
+schedules and manual requests. This removes the duplicate PR producer chain.
+Fix: inspect CI's `Release artifacts` category and `Smoke` jobs. Missing or failed selected work makes
+`ci-ok` fail. For a missing producer artifact, rerun failed jobs in the original run. Successful producers
+and `dist` remain available for 30 days; do not rebuild already smoke-tested bytes after partial publication.
+
 ## zig cross-build
 
 The tool is maintained in [moonx-tools](https://github.com/moonrockz/moonx-tools/tree/main/apps/zig-cross).
@@ -140,7 +147,7 @@ Record the cause in the zig-cross README there.
 **The `smoke` leg for windows-x64 prints the usage text for `smithy.exe version`**
 Cause: the archive holds a cross-built Windows binary. Moon resolves the `platform` setting of `core` from the
 host OS, so a Windows binary built on Linux or macOS reads its arguments wrongly.
-Fix: build `windows-x64` on a Windows runner (job `build-windows`). Check that `build` downloaded the artifact
+Fix: build `windows-x64` on a Windows runner (shared builder job `build-windows`). Check that `package` downloaded the artifact
 `windows-x64-exe` into `_build/cross/windows-x64/native/release/build/moonrockz/smithy-cli/` before it packed.
 
 **One `smoke` leg fails, the others pass**
@@ -176,8 +183,9 @@ Cause: the calling job lacks a permission. The report reads the jobs (`actions: 
 Fix: give the job that calls `smoke.yml` in `ci.yml` or `release.yml` these permissions, then re-run the failed
 jobs.
 
-**A pull request or the nightly run skipped build and smoke**
-Cause: a trusted run already smoked the same inputs. `plan` (or CI `smoke-plan`) found the cache key
+**A pull request skipped preview smoke, or the nightly run skipped build and smoke**
+Cause: a PR may be outside the release-file selector in `scripts/ci-plan.mbtx`. Otherwise, a trusted run
+already smoked the same inputs. `plan` (or CI `smoke-plan`) found the cache key
 `smoke-evidence-<fingerprint>`. This is expected.
 Fix: none. To see the evidence, run `gh cache list --key smoke-evidence-` and open the run in the step summary of
 `Record smoke evidence`. To smoke on demand, run the Release workflow with `dry_run`. To list the inputs, run

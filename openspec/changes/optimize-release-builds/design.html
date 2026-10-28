@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optimize release builds</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Optimize release builds</h1>
+<p class="meta">Bead <code>smithy-2qe.58</code> | 2026-10-27 | Implementation authorized by user goal</p>
+<nav class="toc" aria-label="Contents"><a href="#context">Context</a> · <a href="#goals">Goals</a> · <a href="#decisions">Decisions</a> · <a href="#risks">Risks</a> · <a href="#migration">Migration</a> · <a href="#assessment">Assessment</a></nav>
+<h2 id="context">Context</h2><p>See <a href="proposal.md">proposal</a>. PR #91 final-head runs CI 40627681727 and Release 40627681732 are the comparison baseline. The existing dist script already separates build and pack. Windows qualification proves a different host contract from Zig cross-compilation.</p>
+<h2 id="goals">Goals and non-goals</h2><p>Reduce duplicated producer work and critical-path serialization. Preserve all backend builds, tests, Windows acquisition/CLI qualification, benchmark, tour, JSON-RPC, script tests, five-platform smoke, evidence trust and publication order. Do not deduplicate independent compiler checks or weaken executable Markdown contracts.</p>
+<h2 id="decisions">Decisions</h2>
+<h3 id="bld-1">BLD-1. One artifact owner per PR</h3><p>CI owns PR dist and selected preview smoke. Remove Release's PR trigger. A shared category workflow runs once per caller and produces a same-run dist artifact. Release still calls it for release, nightly and manual execution. This avoids polling another workflow, foreign-run artifacts, token privilege changes and latest-successful lookup. Cross-workflow artifact discovery was rejected because it adds candidate and retry ambiguity for no required consumer.</p>
+<h3 id="bld-2">BLD-2. Parallel producers then packaging</h3><p>Windows and Ubuntu cross/wasm jobs start independently. Ubuntu stages only six raw outputs, Windows uploads its qualified executable, and a short Ubuntu pack job downloads both. Pack never compiles. Same-run checkout identity and named immutable artifacts bind inputs; no cache supplies release binaries. Required producers must succeed before packing. All input and dist artifacts retain 30 days in Release and CI to support retries.</p>
+<svg viewBox="0 0 700 140" role="img" aria-label="Windows and non-Windows producers run in parallel then packaging and smoke"><g fill="none" stroke="currentColor"><rect x="5" y="5" width="210" height="45"/><rect x="5" y="85" width="210" height="45"/><path d="M215 28 L280 65 M215 108 L280 65 L320 65"/><rect x="320" y="40" width="130" height="50"/><path d="M450 65 H510"/><rect x="510" y="40" width="180" height="50"/></g><g fill="currentColor" font-size="16"><text x="20" y="33">Windows + qualification</text><text x="20" y="113">Cross + Wasm builds</text><text x="340" y="70">Package</text><text x="530" y="70">Platform smoke</text></g></svg>
+<h3 id="bld-3">BLD-3. Explicit selection and required results</h3><p>A MoonBit CI planner compares the PR merge-base with its head using a full checkout and NUL-delimited paths, including deletions and both sides of renames. It preserves the old Release file set and includes the new build workflow and planner. Invalid/missing refs fail planning. Main/manual smoke still uses fingerprint evidence; merge-group smoke remains intentionally skipped. CI aggregate requires all core categories and the planner to succeed, and smoke to succeed exactly when selected. Intentional skips cannot hide required work.</p>
+<h3 id="bld-4">BLD-4. Retry the tested bytes</h3><p>Keep successful producer and dist artifacts on failed-job retries. Use overwrite for retried producers that uploaded before a later failure. Publish and GitHub release continue consuming the same run's dist after smoke; releases always smoke regardless of cached evidence. PR smoke neither records evidence nor files breach issues.</p>
+<h2 id="risks">Risks and trade-offs</h2><table><tr><th>Risk</th><th>Mitigation</th></tr><tr><td>Selector or aggregate accidentally skips required work</td><td>Focused decision tables cover relevant/unrelated paths, missing evidence, all event classes, required failure/cancel/skip/missing, and intentional skip.</td></tr><tr><td>Artifact transfer loses paths or raw binaries</td><td>Stage fixed filenames, reject missing inputs, package after successful producers, inspect all eight outputs and checksums, execute five platform smokes.</td></tr><tr><td>Extra packaging setup and transfers</td><td>Measure separately; expected cheaper than serial Windows qualification, but timing savings remain unknown until CI.</td></tr><tr><td>Changing event ownership hides preview failures</td><td>Smoke becomes a direct dependency of ci-ok; read-only PR token, no privileged workflow_run handoff.</td></tr></table>
+<h2 id="migration">Migration plan</h2><p>Land workflow and script changes atomically. Existing production runs retain their original job graph and artifacts. Roll back the source change to restore both workflows. Validate a real PR preview; validate the shared builder and existing Release planning tests without publishing a new version. Archive only in a separate requested workflow.</p>
+<h2 id="assessment">Assessment</h2><p>Build/release artifact errors have high impact and must be caught before merge and promotion. Owner is Smithy maintainers, categories are CI and Release. No assurance moves to a later cadence. Hard requirements are provisionally satisfied by this design; artifact transfer, selectors and recovery need verification before adoption.</p><table><tr><th>Criterion</th><th>Weight</th><th>Current</th><th>Proposed</th><th>Evidence / confidence</th></tr><tr><td>Risk and coverage fit</td><td>25</td><td>3</td><td>U</td><td>Existing categories mapped; changed boundaries await tests</td></tr><tr><td>Feedback and placement</td><td>20</td><td>2</td><td>U</td><td>Serial chains measured; new critical path pending</td></tr><tr><td>Release evidence and trust</td><td>20</td><td>4</td><td>U</td><td>Current exact-byte smoke verified; new transfer pending</td></tr><tr><td>Execution efficiency</td><td>15</td><td>1</td><td>U</td><td>Duplicate chains verified, high confidence</td></tr><tr><td>Ownership and structure</td><td>10</td><td>2</td><td>U</td><td>Duplicate PR owners; new ownership awaiting CI</td></tr><tr><td>Operability and recovery</td><td>10</td><td>3</td><td>U</td><td>Prior failed-job retry proven; new boundaries pending</td></tr></table><p>Current score 65/100. Proposed total withheld, unknown weight 100. Adopt only after selected gates, artifact inspection and measured execution. No universal minute target is imposed; compare with the same repository's recent runs and disclose sample limits.</p>
+</main>
+</body>
+</html>

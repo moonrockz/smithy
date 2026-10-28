@@ -41,7 +41,7 @@ let schema : String = "smoke-evidence v1"
 let input_files : Array[String] = [
   "moon.mod", "moon.work", ".config/mise/config.toml", "scripts/dist.mbtx", "scripts/zig-cross.mbtx",
   "scripts/smoke.mbtx", ".github/workflows/ci.yml", ".github/workflows/release.yml",
-  ".github/workflows/smoke.yml",
+  ".github/workflows/smoke.yml", ".github/workflows/release-build.yml", "scripts/ci-plan.mbtx",
 ]
 
 ///|
@@ -105,7 +105,7 @@ fn tree_entries(listing : String) -> Array[Entry] {
 }
 
 ///|
-fn compare_lexical(a : String, b : String) -> Int {
+fn compare_lexical(a : String, b : String) -> Int32 {
   let n = if a.length() < b.length() { a.length() } else { b.length() }
   for i in 0..<n {
     let c = a.code_unit_at(i).compare(b.code_unit_at(i))
@@ -204,7 +204,7 @@ fn run_url() -> String {
 }
 
 ///|
-async fn output_of(cmd : String, args : Array[String]) -> (Int, String) {
+async fn output_of(cmd : String, args : Array[String]) -> (Int32, String) {
   let (code, out, err) = @process.collect_output(cmd, args) catch {
     _ => return (1, "cannot start \{cmd}")
   }
@@ -216,7 +216,9 @@ async fn output_of(cmd : String, args : Array[String]) -> (Int, String) {
 
 ///|
 async fn head_entries() -> Array[Entry] {
-  let (code, out) = output_of("git", ["ls-tree", "-r", "-z", "--full-tree", "HEAD"])
+  let (code, out) = output_of("git", [
+    "ls-tree", "-r", "-z", "--full-tree", "HEAD",
+  ])
   if code != 0 {
     fail_with("`git ls-tree -r -z --full-tree HEAD` failed: \{out.trim()}")
   }
@@ -231,10 +233,14 @@ fn mod_version(moon_mod : String) -> String? {
     let rest = line.view(start_offset=7).trim_start()
     guard rest.has_prefix("=") else { continue }
     let value = rest.view(start_offset=1).trim()
-    guard value.length() >= 2 && value.has_prefix("\"") && value.has_suffix("\"") else {
+    guard value.length() >= 2 &&
+      value.has_prefix("\"") &&
+      value.has_suffix("\"") else {
       continue
     }
-    return Some(value.view(start_offset=1, end_offset=value.length() - 1).to_owned())
+    return Some(
+      value.view(start_offset=1, end_offset=value.length() - 1).to_owned(),
+    )
   }
   None
 }
@@ -327,7 +333,7 @@ struct SmokeWorld {
 
 ///|
 fn SmokeWorld::new() -> SmokeWorld {
-  { tree: Map([]), taken: "", entries: [] }
+  { tree: Map([]), taken: "", entries: [], }
 }
 
 ///|
@@ -353,7 +359,7 @@ impl @moonspec.World for SmokeWorld with fn configure(self, setup) {
     object : String,
     path : String,
   ) {
-    self.tree[path] = { mode, object, path }
+    self.tree[path] = { mode, object, path, }
   })
   setup.given0("the tree is empty", fn() { self.tree.clear() })
   setup.when0("I take the fingerprint", fn() {
@@ -370,13 +376,15 @@ impl @moonspec.World for SmokeWorld with fn configure(self, setup) {
       doc.content + "\n",
     )
   })
-  setup.then1("the fingerprint has {int} hex digits", fn(n : Int) raise {
+  setup.then1("the fingerprint has {int} hex digits", fn(n : Int32) raise {
     let fp = fingerprint(self.current())
     @expect.expect(fp.length()).to_equal(n)
     @expect.expect(fp.to_lower() == fp).to_equal(true)
   })
   setup.when1("I read the ls-tree records {string}", fn(records : String) {
-    self.entries = tree_entries(records.replace_all(old="|", new="\u{0}") + "\u{0}")
+    self.entries = tree_entries(
+      records.replace_all(old="|", new="\u{0}") + "\u{0}",
+    )
   })
   setup.then1("the entries are {string}", fn(expected : String) raise {
     @expect.expect(

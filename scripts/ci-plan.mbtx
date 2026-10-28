@@ -1,0 +1,231 @@
+///|
+/// Plan CI smoke and enforce selected CI results. PRs use the former Release path
+/// selector. Artifacts remain in the current workflow run; no foreign-run lookup.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let preview_files : Array[String] = [
+  ".github/workflows/release.yml", ".github/workflows/release-build.yml", ".github/workflows/smoke.yml",
+  ".github/workflows/ci.yml", "scripts/ci-plan.mbtx", "scripts/release.mbtx", "scripts/publish.mbtx",
+  "scripts/dist.mbtx", "scripts/versions.mbtx", "scripts/credentials.mbtx", "scripts/zig-cross.mbtx",
+  "scripts/smoke.mbtx", ".config/mise/config.toml", "moon.mod", "CHANGELOG.md",
+]
+
+///|
+fn preview_path(path : String) -> Bool {
+  preview_files.contains(path) || path.has_prefix(".github/actions/setup/")
+}
+
+///|
+struct SmokePlan {
+  run : Bool
+  record : Bool
+} derive(Eq, Debug)
+
+///|
+fn smoke_plan(
+  event : String,
+  evidence : Bool,
+  paths : Array[String],
+) -> SmokePlan {
+  match event {
+    "push" | "workflow_dispatch" => { run: !evidence, record: true, }
+    "pull_request" =>
+      { run: !evidence && paths.any(preview_path), record: false, }
+    _ => { run: false, record: false, }
+  }
+}
+
+///|
+let required_jobs : Array[String] = [
+  "lint", "build", "test", "release-build", "test-native-zig", "test-scripts", "tour",
+  "jsonrpc", "smoke-plan",
+]
+
+///|
+fn gate_failures(results : Map[String, String], smoke : Bool) -> Array[String] {
+  let errors = []
+  for job in required_jobs {
+    if results.get(job) != Some("success") {
+      errors.push("\{job}: \{results.get(job).unwrap_or("missing")}")
+    }
+  }
+  // Future categories added to needs must also fail closed, even before they
+  // are added to the mandatory presence list above.
+  for job, result in results {
+    if job != "smoke" && !required_jobs.contains(job) && result != "success" {
+      errors.push("\{job}: \{result}")
+    }
+  }
+  let expected = if smoke { "success" } else { "skipped" }
+  if results.get("smoke") != Some(expected) {
+    errors.push(
+      "smoke: \{results.get("smoke").unwrap_or("missing")}, expected \{expected}",
+    )
+  }
+  errors
+}
+
+///|
+fn fail(message : String) -> Unit {
+  eprintln(message)
+  @sys.exit(1)
+}
+
+///|
+fn env(name : String) -> String {
+  @env.get_env_var(name).unwrap_or("")
+}
+
+///|
+fn valid_sha(sha : String) -> Bool {
+  sha.length() == 40 &&
+  sha.iter().all(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))
+}
+
+///|
+async fn changed_paths(base : String, head : String) -> Array[String] {
+  if !valid_sha(base) || !valid_sha(head) {
+    fail("PR_BASE and PR_HEAD must be complete Git object IDs")
+  }
+  let (code, out, err) = @process.collect_output("git", [
+    "diff",
+    "--no-renames",
+    "--name-only",
+    "-z",
+    "\{base}...\{head}",
+    "--",
+  ])
+  if code != 0 {
+    fail("Cannot determine PR paths: \{err.text()}")
+  }
+  out
+  .text()
+  .split("\u{0}")
+  .filter(p => p != "")
+  .map(p => p.to_owned())
+  .collect()
+}
+
+///|
+async fn main {
+  match @env.args()[1:] {
+    ["plan"] => {
+      let event = env("GITHUB_EVENT_NAME")
+      let paths = if event == "pull_request" {
+        changed_paths(env("PR_BASE"), env("PR_HEAD"))
+      } else {
+        []
+      }
+      let plan = smoke_plan(event, env("EVIDENCE") == "true", paths)
+      let text = "smoke=\{plan.run}\nrecord=\{plan.record}\n"
+      println(text)
+      let summary = env("GITHUB_STEP_SUMMARY")
+      if summary != "" {
+        @fs.write_file(
+          summary,
+          "Smoke selected: \{plan.run}. Event: \{event}. Trusted fingerprint evidence: \{env("EVIDENCE") == "true"}. Matching PR release paths: \{paths.filter(preview_path).length()}. Record trusted evidence: \{plan.record}.\n",
+          append=true,
+        )
+      }
+      let output = env("GITHUB_OUTPUT")
+      if output != "" {
+        @fs.write_file(output, text, append=true)
+      }
+    }
+    ["gate"] => {
+      if env("SMOKE_SELECTED") != "true" && env("SMOKE_SELECTED") != "false" {
+        fail("The smoke planner did not produce a valid selection")
+      }
+      let needs = @json.parse(env("NEEDS"))
+      let results : Map[String, String] = Map([])
+      guard needs is Object(jobs) else {
+        fail("NEEDS must be a job result object")
+        return
+      }
+      for job, data in jobs {
+        results[job] = match data {
+          { "result": String(result), .. } => result
+          _ => "missing result"
+        }
+      }
+      let errors = gate_failures(results, env("SMOKE_SELECTED") == "true")
+      if !errors.is_empty() {
+        fail(errors.join("\n"))
+      }
+      println("Every required CI category and selected smoke passed.")
+    }
+    _ => fail("Usage: ci-plan.mbtx plan | gate")
+  }
+}
+
+///|
+test "preview smoke preserves event, path and evidence selection" {
+  for path in preview_files + [".github/actions/setup/action.yml"] {
+    assert_eq(smoke_plan("pull_request", false, [path]), {
+      run: true,
+      record: false,
+    })
+    assert_eq(smoke_plan("pull_request", true, [path]).run, false)
+  }
+  for
+    path in [
+      "README.md", "apps/smithy/README.md", "pkgs/smithy/model.mbt", "scripts/test.mbtx",
+    ] {
+    assert_eq(smoke_plan("pull_request", false, [path]).run, false)
+  }
+  for event in ["push", "workflow_dispatch"] {
+    assert_eq(smoke_plan(event, false, []), { run: true, record: true, })
+    assert_eq(smoke_plan(event, true, []).run, false)
+  }
+  assert_eq(smoke_plan("merge_group", false, preview_files), {
+    run: false,
+    record: false,
+  })
+}
+
+///|
+test "aggregate rejects absent, failed, cancelled or skipped required work" {
+  let results : Map[String, String] = Map([])
+  for job in required_jobs {
+    results[job] = "success"
+  }
+  results["smoke"] = "success"
+  assert_eq(gate_failures(results, true), [])
+  for job in required_jobs + ["smoke"] {
+    for result in ["failure", "cancelled", "skipped", "pending", ""] {
+      results[job] = result
+      assert_true(!gate_failures(results, true).is_empty())
+    }
+    results.remove(job)
+    assert_true(!gate_failures(results, true).is_empty())
+    results[job] = "success"
+  }
+  assert_true(!gate_failures(results, false).is_empty())
+  results["smoke"] = "skipped"
+  assert_eq(gate_failures(results, false), [])
+  results["future-category"] = "success"
+  assert_eq(gate_failures(results, false), [])
+  for result in ["failure", "cancelled", "skipped", "missing result"] {
+    results["future-category"] = result
+    assert_true(!gate_failures(results, false).is_empty())
+  }
+}
+
+///|
+test "PR refs must be object IDs" {
+  assert_true(valid_sha("511d341a2026f44f199567e4adf4f433a135baa5"))
+  for
+    revision in [
+      "", "main", "--help", "511d341", "z11d341a2026f44f199567e4adf4f433a135baa5",
+    ] {
+    assert_false(valid_sha(revision))
+  }
+}
