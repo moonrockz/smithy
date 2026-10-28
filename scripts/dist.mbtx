@@ -7,7 +7,7 @@
 /// `pack` needs all five binaries. It writes the eight release files to `dist/`: five archives, `smithy.wasm`, `smithy-gc.wasm`
 /// and `checksums.txt`. With no argument, the script runs `build` and then `pack`.
 ///
-/// Usage: `mise run build:release`, `mise run release:assets`, or `moonx scripts/dist.mbtx [build|build-windows|pack]`.
+/// Usage: `mise run build:release`, `mise run release:assets`, or `moonx scripts/dist.mbtx [build|build-windows|stage|stage-windows|pack [inputs]]`.
 /// The script exits with a non-zero code on failure.
 import {
   "moonbitlang/async@0.22.5",
@@ -28,7 +28,7 @@ import {
 }
 
 ///|
-let usage : String = "Usage: dist.mbtx [build | build-windows | pack]"
+let usage : String = "Usage: dist.mbtx [build | build-windows | stage | stage-windows | pack [inputs]]"
 
 ///|
 /// The MoonBit package that holds the command-line application.
@@ -120,7 +120,7 @@ fn missing_outputs(
 
 ///|
 /// Compare strings by code unit (`String::compare` compares length first).
-fn compare_lexical(a : String, b : String) -> Int {
+fn compare_lexical(a : String, b : String) -> Int32 {
   let n = if a.length() < b.length() { a.length() } else { b.length() }
   for i in 0..<n {
     let c = a.code_unit_at(i).compare(b.code_unit_at(i))
@@ -150,7 +150,7 @@ fn checksums_text(files : Array[(String, Bytes)]) -> String {
 
 ///|
 /// `n` in octal, left-padded with zeros to `width` digits.
-fn octal(n : Int, width : Int) -> String {
+fn octal(n : Int32, width : Int32) -> String {
   let digits = StringBuilder()
   let mut rest = n
   let reversed : Array[Char] = []
@@ -158,7 +158,7 @@ fn octal(n : Int, width : Int) -> String {
     reversed.push('0')
   }
   while rest > 0 {
-    reversed.push(Int::unsafe_to_char(48 + rest % 8))
+    reversed.push(Int32::unsafe_to_char(48 + rest % 8))
     rest = rest / 8
   }
   for _ in reversed.length()..<width {
@@ -172,7 +172,7 @@ fn octal(n : Int, width : Int) -> String {
 
 ///|
 /// Write ASCII `text` into `block` at `offset`.
-fn put_text(block : FixedArray[Byte], offset : Int, text : String) -> Unit {
+fn put_text(block : FixedArray[Byte], offset : Int32, text : String) -> Unit {
   for i in 0..<text.length() {
     block[offset + i] = text.code_unit_at(i).to_int().to_byte()
   }
@@ -280,8 +280,7 @@ async fn build() -> Unit {
 
 ///|
 /// Where `moon build --target native --release` writes the executable on the host.
-let native_exe_pattern : String =
-  "_build/native/release/build/**/\{exe_stem}.exe"
+let native_exe_pattern : String = "_build/native/release/build/**/\{exe_stem}.exe"
 
 ///|
 /// True when the OS variable names Windows (Windows sets `OS=Windows_NT`).
@@ -318,19 +317,69 @@ async fn wasm_output(backend : String) -> String {
 }
 
 ///|
-async fn pack() -> Unit {
+/// Stage only the six non-Windows outputs for transfer to the packaging job.
+let staged_dir : String = ".dev/out/release-inputs"
+
+///|
+fn raw_native_name(target : String) -> String {
+  "\{target}.exe"
+}
+
+///|
+fn staged_names() -> Array[String] {
+  let names = targets.map(raw_native_name)
+  names.push(wasm_name)
+  names.push(wasm_gc_name)
+  names
+}
+
+///|
+async fn stage() -> Unit {
+  // Collect all outputs before writing, so a missing build cannot produce a partial artifact.
+  let files : Array[(String, Bytes)] = []
+  for target in cross_targets {
+    files.push(
+      (raw_native_name(target), read_bytes(single_match(cross_pattern(target)))),
+    )
+  }
+  files.push((wasm_name, read_bytes(wasm_output("wasm"))))
+  files.push((wasm_gc_name, read_bytes(wasm_output("wasm-gc"))))
+  if @fs.exists(staged_dir) {
+    @fs.rmdir(staged_dir, recursive=true)
+  }
+  @fs.mkdir(staged_dir, recursive=true)
+  for (name, data) in files {
+    @fs.write_file("\{staged_dir}/\{name}", data)
+  }
+}
+
+///|
+async fn pack(inputs? : String) -> Unit {
+  if inputs is Some(dir) {
+    let missing = missing_outputs(staged_names(), @fs.readdir(dir))
+    if !missing.is_empty() {
+      fail_with("Release inputs lack: \{missing.join(", ")}")
+    }
+  }
   if @fs.exists(dist_dir) {
     @fs.rmdir(dist_dir, recursive=true)
   }
   @fs.mkdir(dist_dir, recursive=true)
   let written : Array[(String, Bytes)] = []
   for target in targets {
-    if target == windows_target && @shell.glob(cross_pattern(target)).is_empty() {
+    if inputs is None &&
+      target == windows_target &&
+      @shell.glob(cross_pattern(target)).is_empty() {
       fail_with(
         "I found no binary for \{target}. Build it on Windows with `mise run build:windows`, or download the windows-x64-exe artifact of the Release workflow.",
       )
     }
-    let exe = read_bytes(single_match(cross_pattern(target)))
+    let exe = read_bytes(
+      match inputs {
+        Some(dir) => "\{dir}/\{raw_native_name(target)}"
+        None => single_match(cross_pattern(target))
+      },
+    )
     let name = binary_name(target)
     let archive = if is_windows(target) {
       zip_file(name, exe) catch {
@@ -344,16 +393,24 @@ async fn pack() -> Unit {
     }
     written.push((archive_name(target), archive))
   }
-  written.push((wasm_name, read_bytes(wasm_output("wasm"))))
-  written.push((wasm_gc_name, read_bytes(wasm_output("wasm-gc"))))
+  for (backend, name) in [("wasm", wasm_name), ("wasm-gc", wasm_gc_name)] {
+    written.push(
+      (
+        name,
+        read_bytes(
+          match inputs {
+            Some(dir) => "\{dir}/\{name}"
+            None => wasm_output(backend)
+          },
+        ),
+      ),
+    )
+  }
   for file in written {
     @fs.write_file("\{dist_dir}/\{file.0}", file.1)
   }
   @fs.write_file("\{dist_dir}/\{checksums_name}", checksums_text(written))
-  let missing = missing_outputs(
-    expected_outputs(),
-    @fs.readdir(dist_dir),
-  )
+  let missing = missing_outputs(expected_outputs(), @fs.readdir(dist_dir))
   if !missing.is_empty() {
     fail_with("dist/ lacks: \{missing.join(", ")}")
   }
@@ -370,7 +427,14 @@ async fn main {
     }
     ["build"] => build()
     ["build-windows"] => build_windows()
+    ["stage"] => stage()
+    ["stage-windows"] =>
+      @fs.write_file(
+        "\{staged_dir}/\{raw_native_name(windows_target)}",
+        read_bytes(".dev/out/windows-input/\{exe_stem}.exe"),
+      )
     ["pack"] => pack()
+    ["pack", dir] => pack(inputs=dir)
     _ => fail_with(usage)
   }
 }
@@ -388,15 +452,15 @@ struct DistWorld {
 
 ///|
 fn DistWorld::new() -> DistWorld {
-  { target: "", os: None, files: [], expected: [], present: [], tar: b"" }
+  { target: "", os: None, files: [], expected: [], present: [], tar: b"", }
 }
 
 ///|
-fn text_of(tar : Bytes, offset : Int, len : Int) -> String {
+fn text_of(tar : Bytes, offset : Int32, len : Int32) -> String {
   let buf = StringBuilder()
   for i = offset; i < offset + len; i = i + 1 {
     if tar[i] != b'\x00' {
-      buf.write_char(Int::unsafe_to_char(tar[i].to_int()))
+      buf.write_char(Int32::unsafe_to_char(tar[i].to_int()))
     }
   }
   buf.to_string()
@@ -428,7 +492,11 @@ impl @moonspec.World for DistWorld with fn configure(self, setup) {
   })
   setup.then1("the host is Windows: {string}", fn(answer : String) raise {
     @expect.expect(is_windows_host(self.os).to_string()).to_equal(
-      if answer == "yes" { "true" } else { "false" },
+      if answer == "yes" {
+        "true"
+      } else {
+        "false"
+      },
     )
   })
   setup.then1("the cross-built targets are {string}", fn(names : String) raise {
@@ -453,12 +521,12 @@ impl @moonspec.World for DistWorld with fn configure(self, setup) {
   })
   setup.when2("I write a tar of the file {string} with {int} content bytes", fn(
     name : String,
-    size : Int,
+    size : Int32,
   ) {
     self.tar = ustar_file(name, Bytes::from_array(FixedArray::make(size, b'x')))
   })
   setup.then2("the header field at {int} is {string}", fn(
-    offset : Int,
+    offset : Int32,
     expected : String,
   ) raise {
     @expect.expect(text_of(self.tar, offset, expected.length())).to_equal(
@@ -470,7 +538,7 @@ impl @moonspec.World for DistWorld with fn configure(self, setup) {
     @expect.expect(self.tar[154]).to_equal(b'\x00')
     @expect.expect(self.tar[155]).to_equal(b' ')
   })
-  setup.then1("the tar is {int} bytes long", fn(length : Int) raise {
+  setup.then1("the tar is {int} bytes long", fn(length : Int32) raise {
     @expect.expect(self.tar.length()).to_equal(length)
   })
   setup.then0("the last 1024 bytes are zero", fn() raise {
@@ -490,4 +558,20 @@ async test "dist feature" {
     ]),
   )
   |> ignore
+}
+
+///|
+test "staged packaging requires every producer output" {
+  let non_windows = [
+    "linux-x64.exe", "linux-arm64.exe", "darwin-arm64.exe", "darwin-x64.exe", "smithy.wasm",
+    "smithy-gc.wasm",
+  ]
+  assert_eq(missing_outputs(staged_names(), non_windows), ["windows-x64.exe"])
+  for name in staged_names() {
+    assert_eq(
+      missing_outputs(staged_names(), staged_names().filter(n => n != name)),
+      [name],
+    )
+  }
+  assert_eq(missing_outputs(staged_names(), staged_names()), [])
 }

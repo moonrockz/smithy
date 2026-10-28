@@ -181,12 +181,12 @@ Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every 
     section with its highlights. It fails when the section is missing or has the placeholder. It also writes
     `validate`, `build` and `record`, which select the jobs of the run (see below).
   - `validate` runs `mise run check`, `mise run test:scripts` and the version check.
-  - `build-windows` builds `smithy.exe` natively on a Windows runner (`mise run build:windows` does the same on
-    Windows). A cross-built Windows binary reads its arguments wrongly, because moon resolves the `platform`
-    setting of `core` from the host OS. It uploads the artifact `windows-x64-exe`.
-  - `build` (`mise run build:release`) cross-builds four native binaries with zig on one Ubuntu runner, builds
-    `smithy.wasm` and `smithy-gc.wasm`, adds the Windows executable from `windows-x64-exe`, and packs `dist/`
-    (`mise run release:assets`). It needs `build-windows`.
+  - `build` calls `.github/workflows/release-build.yml`. Its independent Windows job builds `smithy.exe`
+    natively and runs the Windows acquisition and CLI checks. Its Ubuntu job cross-builds four native
+    binaries with Zig and the two Wasm files, then stages only those six outputs. The package job waits
+    for both producers, downloads their same-run artifacts and packs `dist/` without recompiling.
+    A cross-built Windows binary reads arguments wrongly because MoonBit resolves core platform settings
+    from the host OS. `mise run build:windows` remains the local Windows build command.
   - `smoke` (`.github/workflows/smoke.yml`, shared with CI) runs `smithy version` from each archive on a runner
     of its own OS. A release always smokes the bytes that it publishes.
   - `publish` (`release:credentials`, `release:publish`) publishes the modules in `scripts/publish.mbtx`:
@@ -195,19 +195,20 @@ Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every 
     `smoke`, because a mooncakes.io version is permanent.
   - `release` (`release:notes`, `release:github`) creates the tag and the GitHub release with the 8 assets.
 - Runs that do not release never publish and never create a release:
-  - A pull request that changes a release file (the `pull_request` paths in `release.yml`) runs `plan`, and
-    `build-windows`, `build` and `smoke` only when no smoke evidence exists for its inputs. CI owns `validate`.
-    A feature pull request does not start the Release workflow.
+  - CI owns all PR validation and release artifacts. A PR touching a release file selected by
+    `scripts/ci-plan.mbtx` also smokes that same-run `dist` when no trusted evidence exists. PRs never
+    start a second Release build, record trusted evidence or file smoke-breach issues. The CI aggregate
+    requires every core category and all selected smoke tests to succeed; only unselected smoke may skip.
   - The nightly schedule does the same on main, and records the evidence.
-  - A manual run with `dry_run` is a full rehearsal: `validate`, `build-windows`, `build` and `smoke`. Use it to
+  - A manual run with `dry_run` is a full rehearsal: `validate`, the shared `build` and `smoke`. Use it to
     smoke again on demand.
 - **Smoke evidence.** `mise run smoke:fingerprint` hashes the `git ls-tree` entries of the smoke inputs at HEAD:
   `apps/smithy` and `pkgs` without test files and Markdown, `moon.mod`, `moon.work`, the toolchain pins, the
-  build, dist, zig-cross and smoke scripts, the CI, Release and Smoke workflows and the setup action
+  build, dist, zig-cross and smoke scripts, the CI, Release, shared release-build and Smoke workflows, the CI planner and the setup action
   (`mise run smoke:inputs` lists them). After all smoke platforms pass, a trusted run (a push to main, the
   schedule, a release or a manual run) saves `evidence.json` in the GitHub Actions cache under
   `smoke-evidence-<fingerprint>`. A pull request run is not trusted and records nothing. CI smokes after each
-  push to main, on the `dist` artifact of `cross-build`, only when the fingerprint has no evidence. A change
+  push to main, on the `dist` artifact of the shared builder, only when the fingerprint has no evidence. A change
   outside the inputs, such as docs or tests, carries the evidence forward. The evidence never replaces the smoke
   of a release: the builds are not proven reproducible. GitHub removes a cache entry after 7 days without
   access; the next run then smokes again.
@@ -219,7 +220,7 @@ Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every 
   run, `record` closes the open issue (`mise run smoke:resolve`). Pull requests never file an issue.
 - **Re-run failed jobs.** After a transient failure, use "Re-run failed jobs" on the run (or
   `gh run rerun <run-id> --failed`). GitHub runs the failed job again, and the jobs after it. The jobs that passed
-  keep their outputs and the `dist` artifact (30 days), so the retry ships the bytes that `smoke` checked.
+  keep their outputs and the producer artifacts and `dist` artifact (30 days), so the retry ships the bytes that `smoke` checked.
   `publish` skips a version that is already published. `release` uploads only the missing assets. A retry after a
   partial run therefore continues where it stopped. Network calls also retry 3 times (waits of 5, 20 and 60 s).
   They do not retry after a 401, 403 or 409. For any other failure, run `mise run release:status` first.

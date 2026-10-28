@@ -45,8 +45,8 @@ Copy this checklist and tick it off:
    sentences: what a user can now do, what breaks and how to migrate. Commit as
    `chore(release): highlights for vX.Y.Z` and push. Run `mise run release:refresh`. Check the text with
    `mise run release:notes X.Y.Z`. Ask the user to review it.
-   The release pull request changes `moon.mod`, so the Release workflow builds and smokes it as a dry run
-   (no validate: CI checks the pull request). Wait for both before the merge.
+   The release pull request changes `moon.mod`, so CI builds the release artifacts once and owns its
+   selected five-platform preview smoke. Wait for all CI and site checks before the merge.
 5. **Merge.** Get the user's approval. The merge publishes to mooncakes.io, and a published version is
    permanent. Make sure no other pull request merged after `prepare`. Then `gh pr merge <n> --squash`.
 6. **Watch.** `gh run list --workflow release.yml --limit 1`, then `gh run watch <run-id> --exit-status`. The
