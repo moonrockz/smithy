@@ -132,7 +132,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [plan]
     if: needs.plan.outputs.validate == 'true'
-    timeout-minutes: 30
+    # v0.8.0 used the full 30 minutes for check, script tests and cleanup.
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
