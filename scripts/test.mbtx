@@ -3,6 +3,7 @@
 ///
 /// Usage: `mise run test [-- <target>...]`, or `moonx scripts/test.mbtx <target>...`.
 /// With no target, it tests wasm, wasm-gc, js and native.
+/// `--enable-coverage` instruments this run; `--target-dir DIR` isolates its build output.
 ///
 /// `moon test <path>` tests only the package at exactly that path, not its
 /// sub-packages, so packages are discovered from `moon.work` recursively.
@@ -18,6 +19,47 @@ import {
 
 ///|
 let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]
+
+///|
+struct TestOptions {
+  targets : Array[String]
+  coverage : Bool
+  target_dir : String?
+} derive(Debug, Eq)
+
+///|
+fn test_options(args : ArrayView[String]) -> Result[TestOptions, String] {
+  let targets = []
+  let mut coverage = false
+  let mut target_dir = None
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--enable-coverage" {
+      coverage = true
+    } else if arg == "--target-dir" {
+      i += 1
+      if i >= args.length() || args[i].is_empty() || args[i].has_prefix("--") {
+        return Err("--target-dir needs a directory")
+      }
+      target_dir = Some(args[i])
+    } else if all_targets.contains(arg) {
+      targets.push(arg)
+    } else {
+      return Err("Unknown test argument: \{arg}")
+    }
+    i += 1
+  }
+  Ok({
+    targets: if targets.is_empty() {
+      all_targets
+    } else {
+      targets
+    },
+    coverage,
+    target_dir,
+  })
+}
 
 ///|
 /// Active workspace members, excluding the package-less workspace root.
@@ -73,20 +115,35 @@ async fn packages(dir : String, target : String, out : Array[String]) -> Unit {
 }
 
 ///|
-async fn moon_test(paths : Array[String], target : String) -> Int32 {
+async fn moon_test(
+  paths : Array[String],
+  target : String,
+  options : TestOptions,
+) -> Int32 {
   let args = ["test"]
   args.append(paths)
   args.push("--target")
   args.push(target)
+  if options.coverage {
+    args.push("--enable-coverage")
+  }
+  if options.target_dir is Some(dir) {
+    args.append(["--target-dir", dir])
+  }
   @process.run("moon", args, stdout=@stdio.stdout, stderr=@stdio.stderr)
 }
 
 ///|
 async fn main {
-  let args = @env.args()[1:]
-  let targets = args.filter(fn(arg) { !arg.has_prefix("--") })
-  let targets = if targets.is_empty() { all_targets } else { targets }
-  for target in targets {
+  let options = match test_options(@env.args()[1:]) {
+    Ok(options) => options
+    Err(message) => {
+      eprintln(message)
+      @sys.exit(2)
+      return
+    }
+  }
+  for target in options.targets {
     println("🧪 Testing for \{target}...")
     let paths = []
     for module_path in members(@fs.read_file("moon.work").text()) {
@@ -100,7 +157,11 @@ async fn main {
       println("No test packages for \{target}")
       @sys.exit(1)
     }
-    let code = moon_test(paths, target)
+    let start = @async.now()
+    let code = moon_test(paths, target, options)
+    println(
+      "Test/build elapsed for \{target}: \{(@async.now() - start).to_double() / 1000.0} s",
+    )
     if code != 0 {
       println("❌ Tests failed for \{target}")
       @sys.exit(if code > 0 { code } else { 1 })
@@ -123,4 +184,25 @@ test "package target restrictions preserve native and wasm only" {
   assert_true(supports("supported_targets = \"native+wasm\"", "wasm"))
   assert_false(supports("supported_targets = \"native+wasm\"", "wasm-gc"))
   assert_true(supports("", "js"))
+}
+
+///|
+test "coverage flags and build directory are not mistaken for test targets" {
+  assert_eq(
+    test_options(
+      ["js", "--enable-coverage", "--target-dir", ".dev/out/coverage/build"][:],
+    ),
+    Ok({
+      targets: ["js"],
+      coverage: true,
+      target_dir: Some(".dev/out/coverage/build"),
+    }),
+  )
+  assert_eq(
+    test_options([][:]),
+    Ok({ targets: all_targets, coverage: false, target_dir: None, }),
+  )
+  assert_true(test_options(["--target-dir"][:]) is Err(_))
+  assert_true(test_options(["--target-dir", "--enable-coverage"][:]) is Err(_))
+  assert_true(test_options(["--enable-coverge"][:]) is Err(_))
 }

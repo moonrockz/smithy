@@ -75,6 +75,10 @@ run = "moonx scripts/zig-cross.mbtx build"
 description = "Run tests for all workspace members (args: targets; default: wasm wasm-gc js native)"
 run = "moonx scripts/test.mbtx"
 
+[tasks."test:coverage"]
+description = "Run JS workspace tests once with coverage; write HTML, XML, JSON and provenance to .dev/out/coverage/report"
+run = "moonx scripts/coverage.mbtx"
+
 [tasks.format]
 description = "Format MoonBit code"
 run = "moonx scripts/format.mbtx"
