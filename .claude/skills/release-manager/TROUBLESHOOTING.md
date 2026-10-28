@@ -77,6 +77,15 @@ Fix: read the failed step. For a version error, run `moonx scripts/versions.mbtx
 then `moonx scripts/versions.mbtx set X.Y.Z`. Fix other errors on main with a normal pull request. Then run
 `gh workflow run release.yml --ref main`.
 
+**`validate` is cancelled with `maximum execution time of 30m0s`**
+Cause: the full check and task-script suite can use the entire job budget. In v0.8.0 all 38 script tests
+and the version check passed, but GitHub cancelled the job during cleanup at the 30-minute deadline.
+Fix: inspect the completed job log and its annotations before treating cancellation as a test failure.
+Retry only failed jobs on the original run to retain the built and smoke-tested `dist` artifact.
+The validation job now allows 45 minutes, giving the observed 30-minute run headroom without removing
+checks. An older run keeps its original workflow budget on retry; if it times out again, qualify and
+run the corrected workflow on main before publishing. Never bypass validation to publish manually.
+
 **`publish`: `401` or `403`**
 Cause: the `MOONCAKES_USER_TOKEN` org secret is missing or expired. The job fails at once and does not retry.
 Fix: ask the user to renew the secret, then "Re-run failed jobs".
