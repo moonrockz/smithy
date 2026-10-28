@@ -247,7 +247,7 @@ jobs:
           EVIDENCE: ${{ steps.evidence.outputs.cache-hit }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
-        run: moonx scripts/ci-plan.mbtx plan
+        run: mise run ci:plan
 
   smoke:
     name: Smoke
@@ -288,4 +288,4 @@ jobs:
         env:
           NEEDS: ${{ toJSON(needs) }}
           SMOKE_SELECTED: ${{ needs.smoke-plan.outputs.selected }}
-        run: moonx scripts/ci-plan.mbtx gate
+        run: mise run ci:gate

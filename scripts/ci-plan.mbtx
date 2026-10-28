@@ -57,6 +57,13 @@ fn gate_failures(results : Map[String, String], smoke : Bool) -> Array[String] {
       errors.push("\{job}: \{results.get(job).unwrap_or("missing")}")
     }
   }
+  // Future categories added to needs must also fail closed, even before they
+  // are added to the mandatory presence list above.
+  for job, result in results {
+    if job != "smoke" && !required_jobs.contains(job) && result != "success" {
+      errors.push("\{job}: \{result}")
+    }
+  }
   let expected = if smoke { "success" } else { "skipped" }
   if results.get("smoke") != Some(expected) {
     errors.push(
@@ -139,10 +146,14 @@ async fn main {
       }
       let needs = @json.parse(env("NEEDS"))
       let results : Map[String, String] = Map([])
-      for job in required_jobs + ["smoke"] {
-        if needs is Object(jobs) &&
-          jobs.get(job) is Some({ "result": String(result), .. }) {
-          results[job] = result
+      guard needs is Object(jobs) else {
+        fail("NEEDS must be a job result object")
+        return
+      }
+      for job, data in jobs {
+        results[job] = match data {
+          { "result": String(result), .. } => result
+          _ => "missing result"
         }
       }
       let errors = gate_failures(results, env("SMOKE_SELECTED") == "true")
@@ -200,6 +211,12 @@ test "aggregate rejects absent, failed, cancelled or skipped required work" {
   assert_true(!gate_failures(results, false).is_empty())
   results["smoke"] = "skipped"
   assert_eq(gate_failures(results, false), [])
+  results["future-category"] = "success"
+  assert_eq(gate_failures(results, false), [])
+  for result in ["failure", "cancelled", "skipped", "missing result"] {
+    results["future-category"] = result
+    assert_true(!gate_failures(results, false).is_empty())
+  }
 }
 
 ///|
