@@ -6,6 +6,7 @@
 # Local overrides go in .config/mise/config.local.toml (gitignored); see config.local.toml.example.
 
 [tools]
+"npm:@fission-ai/openspec" = "1.14.3"
 # Node.js runs the js target in `moon test --target js` and `moon run --target js`.
 node = "24.14.1"
 
@@ -413,3 +414,11 @@ run = "moonx scripts/build-payment-go.mbtx"
 [tasks."jsonrpc:go:runtime:check"]
 description = "Check the embedded Go runtime against its tested source files"
 run = "moonx scripts/jsonrpc-go-runtime.mbtx --check"
+
+[tasks."openspec:check"]
+description = "Shared OpenSpec check"
+run = "moon run --target wasm scripts/openspec-ext.mbtx -- check"
+
+[tasks."openspec:setup"]
+description = "Shared OpenSpec setup"
+run = "moon run --target wasm scripts/openspec-ext.mbtx -- setup"
