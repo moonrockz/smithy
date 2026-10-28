@@ -1,0 +1,273 @@
+///|
+/// Capture the main workspace's JS test coverage without a second test execution.
+/// `mise run test:coverage` starts with fresh task-owned data under .dev/out/coverage.
+/// Reports use explicit source maps and traces: the reporter must never scan the checkout.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let output_root : String = ".dev/out/coverage"
+
+///|
+struct CoverageInputs {
+  sources : Array[String]
+  traces : Array[String]
+}
+
+///|
+struct CoverageTotals {
+  covered : Int32
+  total : Int32
+} derive(Debug, Eq)
+
+///|
+fn CoverageTotals::percentage(self : CoverageTotals) -> String {
+  let scaled = (self.covered.to_int64() * 10000L + self.total.to_int64() / 2L) /
+    self.total.to_int64()
+  let fraction = (scaled % 100L).to_string()
+  "\{scaled / 100L}.\{if fraction.length() == 1 { "0" + fraction } else { fraction }}%"
+}
+
+///|
+fn coverage_totals(summary : String) -> CoverageTotals? {
+  for line in summary.split("\n") {
+    guard line.has_prefix("Total: ") else { continue }
+    let parts = line[7:].split("/").to_array()
+    guard parts.length() == 2 else { return None }
+    let covered = @string.parse_int(parts[0].trim()) catch { _ => return None }
+    let total = @string.parse_int(parts[1].trim()) catch { _ => return None }
+    guard total > 0 && covered >= 0 && covered <= total else { return None }
+    return Some({ covered, total, })
+  }
+  None
+}
+
+///|
+/// Scan only the fresh build directory, and never follow a symlink.
+async fn coverage_inputs(dir : String, inputs : CoverageInputs) -> Unit {
+  for name in @fs.readdir(dir, sort=true) {
+    let path = dir + "/" + name
+    match @fs.kind(path, follow_symlink=false) {
+      Directory => coverage_inputs(path, inputs)
+      Regular => {
+        if name.has_suffix(".trace.source") {
+          inputs.sources.push(path)
+        }
+        if name.has_prefix("moonbit_coverage_") && name.has_suffix(".txt") {
+          inputs.traces.push(path)
+        }
+      }
+      _ => ()
+    }
+  }
+}
+
+///|
+fn reporter_args(
+  inputs : CoverageInputs,
+  format : String,
+  output : String?,
+) -> Array[String] {
+  let args = ["coverage", "report"] + inputs.sources
+  for trace in inputs.traces {
+    args.append(["-t", trace])
+  }
+  args.append(["-f", format])
+  if output is Some(path) {
+    args.append(["-o", path])
+  }
+  args
+}
+
+///|
+/// A reporting failure must never hide the test process's original failure.
+fn coverage_exit(test_code : Int32, report_code : Int32) -> Int32 {
+  if test_code != 0 {
+    test_code
+  } else {
+    report_code
+  }
+}
+
+///|
+async fn command_text(command : String, args : Array[String]) -> String {
+  let (code, out, err) = @process.collect_output(command, args)
+  if code != 0 {
+    eprintln(err.text())
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+  out.text().trim().to_owned()
+}
+
+///|
+async fn report(inputs : CoverageInputs, dir : String) -> CoverageTotals? {
+  if inputs.sources.is_empty() || inputs.traces.is_empty() {
+    eprintln(
+      "Coverage capture has no source maps or execution traces; I cannot report coverage.",
+    )
+    return None
+  }
+  let (code, out, err) = @process.collect_output(
+    "moon",
+    reporter_args(inputs, "summary", None),
+  )
+  @fs.write_file(dir + "/summary.txt", out)
+  println(out.text().trim_end())
+  if code != 0 {
+    eprintln(err.text())
+    return None
+  }
+  guard coverage_totals(out.text()) is Some(totals) else {
+    eprintln("Coverage capture has no valid, non-empty coverage total.")
+    return None
+  }
+  for
+    (format, file) in [
+      ("html", "html"),
+      ("cobertura", "cobertura.xml"),
+      ("coveralls", "coveralls.json"),
+    ] {
+    let code = @process.run(
+      "moon",
+      reporter_args(inputs, format, Some(dir + "/" + file)),
+      stdout=@stdio.stdout,
+      stderr=@stdio.stderr,
+    )
+    if code != 0 {
+      return None
+    }
+  }
+  if !@fs.exists(dir + "/html/index.html") ||
+    !@fs.exists(dir + "/cobertura.xml") ||
+    !@fs.exists(dir + "/coveralls.json") {
+    eprintln("The coverage reporter did not create every requested report.")
+    return None
+  }
+  Some(totals)
+}
+
+///|
+async fn main {
+  let build = output_root + "/build"
+  let reports = output_root + "/report"
+  // This fixed directory belongs to this task. Never merge old traces into a new run.
+  if @fs.exists(output_root) {
+    if @fs.kind(output_root, follow_symlink=false) != Directory {
+      eprintln(
+        "The coverage output directory must be a task-owned directory, not a symlink or file.",
+      )
+      @sys.exit(2)
+      return
+    }
+    @fs.rmdir(output_root, recursive=true)
+  }
+  @fs.mkdir(reports, recursive=true)
+  let revision = command_text("git", ["rev-parse", "HEAD"])
+  let dirty = command_text("git", ["status", "--porcelain"]) != ""
+  let toolchain = command_text("moon", ["version", "--all"])
+  let start = @async.now()
+  let test_code = @process.run(
+    "moonx",
+    ["scripts/test.mbtx", "js", "--enable-coverage", "--target-dir", build],
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  let test_ms = @async.now() - start
+  let inputs = CoverageInputs::{ sources: [], traces: [], }
+  let report_start = @async.now()
+  let totals = try {
+    if @fs.exists(build) {
+      coverage_inputs(build, inputs)
+    }
+    report(inputs, reports)
+  } catch {
+    error => {
+      eprintln("Coverage reporting failed: \{error}")
+      None
+    }
+  }
+  let report_ms = @async.now() - report_start
+  let manifest : Json = {
+    "schemaVersion": 1,
+    "revision": Json::string(revision),
+    "workingTreeDirty": Json::boolean(dirty),
+    "target": "js",
+    "scope": "Main MoonBit workspace, including its vendored regex engine. JS-supported packages only, measured in instrumented test processes. Excludes the separate site, standalone task scripts, language runtimes and separate CLI subprocess checks.",
+    "metric": "MoonBit coverage points (branch starts); converted line reports are provided separately.",
+    "toolchain": Json::string(toolchain),
+    "testExitCode": Json::number(test_code.to_double()),
+    "complete": Json::boolean(test_code == 0 && totals is Some(_)),
+    "testAndBuildMilliseconds": Json::number(test_ms.to_double()),
+    "reportMilliseconds": Json::number(report_ms.to_double()),
+    "sourceMapCount": Json::number(inputs.sources.length().to_double()),
+    "traceCount": Json::number(inputs.traces.length().to_double()),
+    "coveredPoints": match totals {
+      Some(t) => Json::number(t.covered.to_double())
+      None => Json::null()
+    },
+    "totalPoints": match totals {
+      Some(t) => Json::number(t.total.to_double())
+      None => Json::null()
+    },
+  }
+  @fs.write_file(
+    reports + "/manifest.json",
+    manifest.stringify(indent=2) + "\n",
+  )
+  let result = match totals {
+    Some(t) =>
+      "**\{t.percentage()}** (\{t.covered}/\{t.total} coverage points).\n\n"
+    None => "**No valid coverage total.**\n\n"
+  }
+  let summary = "## MoonBit workspace coverage (JS)\n\n" +
+    result +
+    "Revision: `" +
+    revision +
+    "`. Complete: **" +
+    (test_code == 0 && totals is Some(_)).to_string() +
+    "**.\n\n" +
+    "Build/tests: \{test_ms.to_double() / 1000.0} s. Reports: \{report_ms.to_double() / 1000.0} s.\n\n" +
+    "Coverage points are branch starts, not a proof of test quality. Includes vendored regex; excludes site, standalone scripts, language runtimes and separate CLI subprocess checks. Provenance is in `manifest.json`.\n\n<details><summary>Per-file coverage points</summary>\n\n```text\n" +
+    (if @fs.exists(reports + "/summary.txt") {
+      @fs.read_file(reports + "/summary.txt").text()
+    } else {
+      "No coverage data.\n"
+    }) +
+    "```\n\n</details>\n"
+  @fs.write_file(reports + "/summary.md", summary)
+  if @env.get_env_var("GITHUB_STEP_SUMMARY") is Some(path) {
+    @fs.write_file(path, summary, append=true)
+  }
+  let code = coverage_exit(test_code, if totals is Some(_) { 0 } else { 1 })
+  if code != 0 {
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+}
+
+///|
+test "missing, zero or impossible totals are not a successful baseline" {
+  assert_eq(
+    coverage_totals("file.mbt: 2/3\nTotal: 2/3\n"),
+    Some({ covered: 2, total: 3, }),
+  )
+  for
+    bad in [
+      "", "Total: 0/0", "Total: 4/3", "Total: -1/3", "Total: 1/nope", "Total: 1/2/3",
+    ] {
+    assert_eq(coverage_totals(bad), None)
+  }
+}
+
+///|
+test "a failed test run stays failed even when reporting succeeds or fails" {
+  assert_eq(coverage_exit(7, 0), 7)
+  assert_eq(coverage_exit(7, 1), 7)
+  assert_eq(coverage_exit(0, 1), 1)
+}

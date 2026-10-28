@@ -80,7 +80,22 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Test ${{ matrix.target }}
+        if: matrix.target != 'js'
         run: mise run test -- ${{ matrix.target }}
+
+      - name: Test JS and capture coverage
+        if: matrix.target == 'js'
+        run: mise run test:coverage
+
+      - name: Upload workspace coverage
+        if: always() && matrix.target == 'js'
+        uses: actions/upload-artifact@v4
+        with:
+          name: moonbit-workspace-coverage
+          path: .dev/out/coverage/report
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
 
   build-windows:
     name: Build (windows-x64)

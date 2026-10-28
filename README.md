@@ -181,6 +181,7 @@ mise run format                # moon fmt
 mise run validate              # package structure against moon.work
 mise run test                  # all targets; the tests module runs on js and native only
 mise run test -- js native     # some targets
+mise run test:coverage         # the JS workspace tests once, with coverage reports in .dev/out/coverage/report
 mise run test:cli              # built CLI behavior on native, wasm, js and wasm-gc
 mise run test:validation-consumer # isolated JSON/RPC consumers without Ion or WIT
 mise run test:ion-consumer     # isolated native Ion consumer without WIT, all targets
@@ -207,6 +208,16 @@ mise run hooks:install         # git hooks (lefthook)
 ```
 
 Without mise: `moonx scripts/<name>.mbtx [args]`.
+
+CI captures coverage in its existing JS test job. Download `moonbit-workspace-coverage` for browsable
+HTML, Cobertura XML, Coveralls JSON, a per-file summary and a manifest with the revision, toolchain,
+timings and completion status. Every run starts with fresh coverage data. The primary metric counts
+MoonBit coverage points, which mark branch starts; converted line reports are also available.
+The baseline covers the main workspace's JS-supported packages, including the vendored regex engine.
+It excludes the separate site, standalone task scripts and language runtimes. No percentage threshold
+is enforced until the baseline and uncovered paths have been reviewed. Coverage shows execution, not
+whether assertions detect incorrect behavior. Separate CLI subprocess checks are not instrumented by
+this JS test run, so a low CLI figure does not mean that its acceptance tests never execute that code.
 
 The cookbook in `docs/cookbook` is a workspace member; `moon test` runs its articles.
 
