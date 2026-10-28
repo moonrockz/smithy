@@ -197,6 +197,14 @@ async fn main {
   let manifest : Json = {
     "schemaVersion": 1,
     "revision": Json::string(revision),
+    "githubRunId": match @env.get_env_var("GITHUB_RUN_ID") {
+      Some(value) => Json::string(value)
+      None => Json::null()
+    },
+    "githubRunAttempt": match @env.get_env_var("GITHUB_RUN_ATTEMPT") {
+      Some(value) => Json::string(value)
+      None => Json::null()
+    },
     "workingTreeDirty": Json::boolean(dirty),
     "target": "js",
     "scope": "Main MoonBit workspace, including its vendored regex engine. JS-supported packages only, measured in instrumented test processes. Excludes the separate site, standalone task scripts, language runtimes and separate CLI subprocess checks.",

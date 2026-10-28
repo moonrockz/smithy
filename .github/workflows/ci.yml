@@ -94,6 +94,7 @@ jobs:
           name: moonbit-workspace-coverage
           path: .dev/out/coverage/report
           include-hidden-files: true
+          overwrite: true
           if-no-files-found: error
           retention-days: 14
 

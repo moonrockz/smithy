@@ -218,6 +218,8 @@ It excludes the separate site, standalone task scripts and language runtimes. No
 is enforced until the baseline and uncovered paths have been reviewed. Coverage shows execution, not
 whether assertions detect incorrect behavior. Separate CLI subprocess checks are not instrumented by
 this JS test run, so a low CLI figure does not mean that its acceptance tests never execute that code.
+Retrying a workflow job replaces that run's previous coverage artifact; the manifest records the
+workflow run and attempt so a partial report can be distinguished from a successful retry.
 
 The cookbook in `docs/cookbook` is a workspace member; `moon test` runs its articles.
 
