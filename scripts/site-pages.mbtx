@@ -215,6 +215,17 @@ fn core_install(toolchain : Toolchain) -> Command {
 }
 
 ///|
+/// The command that updates the registry index of the toolchain of `release_dir`. The index is in
+/// `MOON_HOME`, and the setup action updates only the index of this checkout's toolchain.
+fn registry_update(release_dir : String) -> Command {
+  {
+    command: "mise",
+    args: ["exec", "-C", release_dir, "--", "moon", "update"],
+    cwd: None,
+  }
+}
+
+///|
 /// The command and arguments that run `moonx` with `args` for `build`. A build of a worktree runs in that
 /// worktree's toolchain: `mise exec` there puts its pinned tools first on `PATH`.
 fn moonx_command(
@@ -399,6 +410,13 @@ async fn steps(out_root : String, release_dir : String) -> Int32 {
           eprintln("site:pages: the MoonBit core of \{tag} did not install")
           return 1
         }
+      }
+      let update = registry_update(release_dir)
+      if run(update.command, update.args, extra_env={ "MOON_HOME": home }) != 0 {
+        eprintln(
+          "site:pages: the registry index of MoonBit \{version} did not update",
+        )
+        return 1
       }
       println("site:pages: \{tag} builds with MoonBit \{version}")
       Some(toolchain)
@@ -596,6 +614,9 @@ test "the toolchain of a tag is installed from the worktree and its core complet
     args: ["install", "http:moonbit"],
     cwd: Some("/w/release"),
   })
+  assert_eq(registry_update("/w/release").args, [
+    "exec", "-C", "/w/release", "--", "moon", "update",
+  ])
   let core = core_install({ home: "/t/0.10.15", version: "0.10.15+943464bfa", })
   assert_eq(core.command, "bash")
   assert_eq(core.args[core.args.length() - 2:].to_owned(), [
