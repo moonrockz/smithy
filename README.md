@@ -151,8 +151,10 @@ mise trust
 mise install
 ```
 
-The mise binary archive of MoonBit omits the core library and `moonx`. If `moon version --all` does not show `moonc`,
-complete the toolchain into the mise install directory:
+The mise binary archive of MoonBit omits the core library and `moonx`. The postinstall hook of `http:moonbit` adds
+them into the mise install directory during `mise install`: the official installer on Linux and macOS, and
+`tools/bootstrap-moonbit-windows.ps1` on Windows. If `moon version --all` does not show `moonc` (for example, after an
+install that stopped), complete the toolchain by hand:
 
 ```shell
 curl -fsSL https://cli.moonbitlang.com/install/unix.sh | MOON_HOME="$(mise where http:moonbit)" bash -s -- "$(mise current http:moonbit)"
