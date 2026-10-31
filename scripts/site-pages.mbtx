@@ -176,8 +176,79 @@ fn trust_commands(release_dir : String, has_site_mise : Bool) -> Array[Command] 
 }
 
 ///|
+/// The MoonBit toolchain of a release tag. The release channel is built with the toolchain that its tag
+/// pins, not with the toolchain of this checkout: a newer compiler can reject the sources of an older
+/// tag (MoonBit 0.10.18 rejects a match of v0.8.0 that misses a new `@json.ParseError` case).
+struct Toolchain {
+  /// The mise install directory of `http:moonbit` for the tag.
+  home : String
+  /// The pinned MoonBit version.
+  version : String
+} derive(Eq, Debug)
+
+///|
+/// The command that installs the MoonBit toolchain of the worktree `release_dir`, as its mise config pins it.
+fn toolchain_install(release_dir : String) -> Command {
+  {
+    command: "mise",
+    args: ["install", "http:moonbit"],
+    cwd: Some(release_dir),
+  }
+}
+
+///|
+/// The command that completes a toolchain without its core library. A tag pinned before MoonBit 0.10.18 has
+/// no postinstall hook that adds the core, so the official installer adds it, as the setup action of
+/// those tags did. The site workflow runs on Linux.
+fn core_install(toolchain : Toolchain) -> Command {
+  {
+    command: "bash",
+    args: [
+      "-c",
+      "set -euo pipefail; curl -fsSL https://cli.moonbitlang.com/install/unix.sh | MOON_HOME=\"$1\" bash -s -- \"$2\"",
+      "core-install",
+      toolchain.home,
+      toolchain.version,
+    ],
+    cwd: None,
+  }
+}
+
+///|
+/// The command and arguments that run `moonx` with `args` for `build`. A build of a worktree runs in that
+/// worktree's toolchain: `mise exec` there puts its pinned tools first on `PATH`.
+fn moonx_command(
+  build : Build,
+  args : Array[String],
+) -> (String, Array[String]) {
+  match build.checkout {
+    Some(dir) => {
+      let full = ["exec", "-C", dir, "--", "moonx"]
+      full.append(args)
+      ("mise", full)
+    }
+    None => ("moonx", args)
+  }
+}
+
+///|
+/// The environment of a build: a worktree build gets `MOON_HOME` of its own toolchain, because the setup
+/// action exports `MOON_HOME` of this checkout.
+fn build_env(build : Build, toolchain : Toolchain?) -> Map[String, String] {
+  match (build.checkout, toolchain) {
+    (Some(_), Some(t)) => { "MOON_HOME": t.home }
+    _ => {}
+  }
+}
+
+///|
 /// Run a command; return its exit code, 1 for a command that did not run.
-async fn run(command : String, args : Array[String], cwd? : String) -> Int32 {
+async fn run(
+  command : String,
+  args : Array[String],
+  cwd? : String,
+  extra_env~ : Map[String, String] = {},
+) -> Int32 {
   let dir : StringView? = match cwd {
     Some(d) => Some(d[:])
     None => None
@@ -186,6 +257,7 @@ async fn run(command : String, args : Array[String], cwd? : String) -> Int32 {
     command,
     args,
     cwd?=dir,
+    extra_env~,
     stdout=@stdio.stdout,
     stderr=@stdio.stderr,
   ) catch {
@@ -203,8 +275,16 @@ async fn run(command : String, args : Array[String], cwd? : String) -> Int32 {
 
 ///|
 /// The output of a command, trimmed; `None` when it failed.
-async fn capture(command : String, args : Array[String]) -> String? {
-  let (code, output, _) = @process.collect_output(command, args)
+async fn capture(
+  command : String,
+  args : Array[String],
+  cwd? : String,
+) -> String? {
+  let dir : StringView? = match cwd {
+    Some(d) => Some(d[:])
+    None => None
+  }
+  let (code, output, _) = @process.collect_output(command, args, cwd?=dir)
   if code == 0 {
     Some(output.text().trim().to_owned())
   } else {
@@ -214,7 +294,11 @@ async fn capture(command : String, args : Array[String]) -> String? {
 
 ///|
 /// Build and check every build of the plan; return the first non-zero code.
-async fn execute(builds : Array[Build], out_root : String) -> Int32 {
+async fn execute(
+  builds : Array[Build],
+  out_root : String,
+  toolchain : Toolchain?,
+) -> Int32 {
   for build in builds {
     let out = if build.sub.is_empty() {
       out_root
@@ -223,7 +307,8 @@ async fn execute(builds : Array[Build], out_root : String) -> Int32 {
     }
     @fs.mkdir(out, recursive=true, allow_exist=true)
     let cwd = build.checkout
-    let code = run("moonx", build_args(build, out), cwd?)
+    let (command, args) = moonx_command(build, build_args(build, out))
+    let code = run(command, args, cwd?, extra_env=build_env(build, toolchain))
     if code != 0 {
       return code
     }
@@ -234,7 +319,13 @@ async fn execute(builds : Array[Build], out_root : String) -> Int32 {
     } else {
       out_root + "/" + build.sub
     }
-    let code = run("moonx", linkcheck_args(build, out), cwd?=build.checkout)
+    let (command, args) = moonx_command(build, linkcheck_args(build, out))
+    let code = run(
+      command,
+      args,
+      cwd?=build.checkout,
+      extra_env=build_env(build, toolchain),
+    )
     if code != 0 {
       return code
     }
@@ -264,7 +355,7 @@ async fn steps(out_root : String, release_dir : String) -> Int32 {
       capture("git", ["cat-file", "-e", tag + ":site/moon.mod"]) is Some(_)
     None => false
   }
-  match tag {
+  let toolchain : Toolchain? = match tag {
     Some(tag) if has_site => {
       println(
         "site:pages: \{tag} has site/: the root is the release build of \{tag}",
@@ -286,13 +377,40 @@ async fn steps(out_root : String, release_dir : String) -> Int32 {
           return code
         }
       }
+      let install = toolchain_install(release_dir)
+      if run(install.command, install.args, cwd?=install.cwd) != 0 {
+        eprintln("site:pages: the MoonBit toolchain of \{tag} did not install")
+        return 1
+      }
+      let where_ = capture("mise", ["where", "http:moonbit"], cwd=release_dir)
+      let current = capture(
+        "mise",
+        ["current", "http:moonbit"],
+        cwd=release_dir,
+      )
+      guard where_ is Some(home) && current is Some(version) else {
+        eprintln("site:pages: cannot find the MoonBit toolchain of \{tag}")
+        return 1
+      }
+      let toolchain = { home, version, }
+      if !@fs.exists(home + "/lib/core/moon.mod") {
+        let core = core_install(toolchain)
+        if run(core.command, core.args) != 0 {
+          eprintln("site:pages: the MoonBit core of \{tag} did not install")
+          return 1
+        }
+      }
+      println("site:pages: \{tag} builds with MoonBit \{version}")
+      Some(toolchain)
     }
-    _ =>
+    _ => {
       println(
         "site:pages: no stable tag contains site/: the root is main (unreleased)",
       )
+      None
+    }
   }
-  execute(plan(tag, has_site, head, release_dir), out_root)
+  execute(plan(tag, has_site, head, release_dir), out_root, toolchain)
 }
 
 ///|
@@ -452,5 +570,35 @@ test "the release worktree trusts its mise config, and its site tools when it pi
     { command: "mise", args: ["trust", "/w"], cwd: None, },
     { command: "mise", args: ["trust", "/w/site"], cwd: None, },
     { command: "mise", args: ["install"], cwd: Some("/w/site"), },
+  ])
+}
+
+///|
+test "a worktree build runs moonx in the toolchain of its tag" {
+  let builds = plan(Some("v1.2.0"), true, "abc", "/w/release")
+  let toolchain = Some({ home: "/t/0.10.15", version: "0.10.15+943464bfa", })
+  assert_eq(
+    moonx_command(builds[0], ["scripts/a.mbtx"]),
+    ("mise", ["exec", "-C", "/w/release", "--", "moonx", "scripts/a.mbtx"]),
+  )
+  assert_eq(build_env(builds[0], toolchain), { "MOON_HOME": "/t/0.10.15" })
+  assert_eq(
+    moonx_command(builds[1], ["scripts/a.mbtx"]),
+    ("moonx", ["scripts/a.mbtx"]),
+  )
+  assert_eq(build_env(builds[1], toolchain), {})
+}
+
+///|
+test "the toolchain of a tag is installed from the worktree and its core completed" {
+  assert_eq(toolchain_install("/w/release"), {
+    command: "mise",
+    args: ["install", "http:moonbit"],
+    cwd: Some("/w/release"),
+  })
+  let core = core_install({ home: "/t/0.10.15", version: "0.10.15+943464bfa", })
+  assert_eq(core.command, "bash")
+  assert_eq(core.args[core.args.length() - 2:].to_owned(), [
+    "/t/0.10.15", "0.10.15+943464bfa",
   ])
 }
