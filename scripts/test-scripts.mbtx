@@ -1,3 +1,13 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Run the tests of the task scripts.
 ///
@@ -7,13 +17,6 @@
 /// `.mbtx` file. It stops at the first failure.
 ///
 /// Usage: `mise run test:scripts`, or `moonx scripts/test-scripts.mbtx`.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let scripts_dir : String = "scripts"

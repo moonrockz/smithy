@@ -1,17 +1,20 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Check the links, the routes and the search index of a built site.
 ///
 /// Usage: `mise run site:linkcheck -- --dist <dir> --base /smithy/ [--ignore /smithy/next/]`, or
 /// `moonx scripts/site-linkcheck.mbtx <the same>`. The check runs inside `site/`, so the script makes
 /// the `--dist` path absolute first.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 /// The value after the last `--dist`, or `None` when the flag is missing or has no value.

@@ -1,3 +1,14 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/core/env",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Test the site packages, build both channels of the site, and check their links.
 ///
@@ -5,14 +16,6 @@
 /// `--no-build` runs the package tests only. The Pages workflow uses it, because it builds both channels itself.
 /// The builds are the ones the Pages workflow makes (`scripts/site-pages.mbtx`): each channel is a full
 /// build of its own checkout. The output goes to a temporary directory, which the script removes at the end.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/core/env",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 /// The commands that test the site packages, run inside `site/`.

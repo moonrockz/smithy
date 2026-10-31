@@ -1,3 +1,14 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Check the Python JSON-RPC runtime and the generated Python peers.
 ///
@@ -22,14 +33,6 @@
 ///
 /// Usage: `moonx scripts/runtime-python.mbtx test` or `... generated`.
 /// It stops at the first step that fails, and exits with the code of that step.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let runtime_dir : String = "runtimes/python"

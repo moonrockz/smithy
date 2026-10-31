@@ -1,14 +1,17 @@
-///|
-/// Run the Go quality gates on the runtime and generated payment peers.
-/// Usage: mise run test:jsonrpc:go [-- --runtime-only].
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/stdio",
   "moonbitlang/core/env",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Run the Go quality gates on the runtime and generated payment peers.
+/// Usage: mise run test:jsonrpc:go [-- --runtime-only].
 
 ///|
 fn go_paths(runtime_only : Bool) -> Array[String] {

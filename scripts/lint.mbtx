@@ -1,13 +1,16 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Run every lint task: YAML, then MoonBit formatting and type checking.
 ///
 /// Usage: `mise run lint`, or `moonx scripts/lint.mbtx`.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 async fn main {

@@ -1,14 +1,17 @@
-///|
-/// Plan CI smoke and enforce selected CI results. PRs use the former Release path
-/// selector. Artifacts remain in the current workflow run; no foreign-run lookup.
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Plan CI smoke and enforce selected CI results. PRs use the former Release path
+/// selector. Artifacts remain in the current workflow run; no foreign-run lookup.
 
 ///|
 let preview_files : Array[String] = [

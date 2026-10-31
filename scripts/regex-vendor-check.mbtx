@@ -1,3 +1,13 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Check the regex engine that smithy-validation copies from MoonBit core
 /// (`pkgs/smithy-validation/internal/regex`) against the core of the pinned toolchain.
@@ -10,18 +20,18 @@
 /// - A file with budget hooks (`hooked`) may differ; `--diff` prints how.
 /// - Every other copied file must be equal to the formatted core file.
 /// - Every core file must have a copy, and every other vendored file must be one that the copy adds.
-/// - The core must be the version that `internal/regex/README.md` names.
+/// - The core must be a git checkout at `core_commit`, and `internal/regex/README.md` and `NOTICE`
+///   must name that commit.
+///
+/// The copy is pinned to one core commit, not to the core of the pinned toolchain. MoonBit 0.10.18
+/// replaced the core regex engine (a DFA and an NFA in place of the `automata` package), so the
+/// budget hooks cannot be applied to it without a new cost model. Until then the copy stays on the
+/// engine of 0.10.15 and a toolchain bump does not change it (bead smithy-2qe.60).
 ///
 /// Usage: `mise run regex:vendor:check [-- --diff] [-- CORE_DIRECTORY]`, or
-/// `moonx scripts/regex-vendor-check.mbtx`. The default core is `$(mise where http:moonbit)/lib/core`.
+/// `moonx scripts/regex-vendor-check.mbtx`. The default core is a shallow fetch of `core_commit` from
+/// GitHub into `_build/regex-vendor-core`. A CORE_DIRECTORY must be a git checkout at `core_commit`.
 /// It exits with 0 when the copy matches, else with 1.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let vendored : String = "pkgs/smithy-validation/internal/regex"
@@ -30,8 +40,12 @@ let vendored : String = "pkgs/smithy-validation/internal/regex"
 let import_base : String = "moonrockz/smithy-validation/internal/regex"
 
 ///|
-/// The core version whose bundled core the copy comes from.
-let core_version : String = "0.10.15+943464bfa"
+/// The moonbitlang/core commit that the copy comes from: the core bundled with moonc
+/// 0.10.15+943464bfa. The check fetches the core by this commit, so no other digest is needed.
+let core_commit : String = "d3c49d103fbe7bcfe86a2299250bdfe52654e70d"
+
+///|
+let core_repository : String = "https://github.com/moonbitlang/core"
 
 ///|
 /// Core package directories and their place in the copy.
@@ -161,13 +175,40 @@ async fn vendored_files(dir : String, prefix : String) -> Array[String] {
 }
 
 ///|
-async fn default_core() -> String {
-  let (code, out, err) = @process.collect_output("mise", ["where", "http:moonbit"])
+/// The commit that the git checkout `dir` is at, or `None` when it is not a checkout.
+async fn checkout_commit(dir : String) -> String? {
+  let (code, out, _) = @process.collect_output("git", ["-C", dir, "rev-parse", "HEAD"])
   if code != 0 {
-    eprintln("❌ ERROR: mise where http:moonbit failed: \{err.text()}")
-    @sys.exit(1)
+    return None
   }
-  out.text().trim(chars=" \r\n").to_owned() + "/lib/core"
+  Some(out.text().trim(chars=" \r\n").to_owned())
+}
+
+///|
+/// A checkout of `core_commit` under `_build/`. A checkout that is already at the commit is used again.
+async fn default_core() -> String {
+  let dir = "_build/regex-vendor-core"
+  if @fs.exists(dir) && checkout_commit(dir) == Some(core_commit) {
+    return dir
+  }
+  if @fs.exists(dir) {
+    @fs.rmdir(dir, recursive=true)
+  }
+  @fs.mkdir(dir, recursive=true)
+  let steps = [
+    ["init", "--quiet"],
+    ["fetch", "--quiet", "--depth", "1", core_repository, core_commit],
+    ["-c", "advice.detachedHead=false", "checkout", "--quiet", "FETCH_HEAD"],
+  ]
+  for step in steps {
+    let args = ["-C", dir]
+    args.append(step)
+    if @process.run("git", args) != 0 {
+      eprintln("❌ ERROR: git \{step.join(" ")} failed for \{core_repository} at \{core_commit}")
+      @sys.exit(1)
+    }
+  }
+  dir
 }
 
 ///|
@@ -181,9 +222,15 @@ async fn main {
     println("❌ ERROR: \{message}")
     errors += 1
   }
-  let manifest = read_text("\{core}/moon.mod")
-  if !manifest.contains("version = \"\{core_version}\"") {
-    error("\{core}/moon.mod is not core \{core_version}")
+  match checkout_commit(core) {
+    Some(commit) if commit == core_commit => ()
+    Some(commit) => error("\{core} is at core commit \{commit}, not \{core_commit}")
+    None => error("\{core} is not a git checkout of core \{core_commit}")
+  }
+  for doc in ["README.md", "NOTICE"] {
+    if !read_text("\{vendored}/\{doc}").contains(core_commit) {
+      error("\{vendored}/\{doc} does not name core commit \{core_commit}")
+    }
   }
   // A scratch module that `moon fmt` formats as the repository formats the copy.
   let scratch = "_build/regex-vendor-check"
@@ -250,10 +297,10 @@ async fn main {
     }
   }
   if errors > 0 {
-    println("❌ The vendored regex engine does not match core \{core_version}.")
+    println("❌ The vendored regex engine does not match core \{core_commit}.")
     @sys.exit(1)
   }
   println(
-    "✅ The vendored regex engine matches core \{core_version}: \{equal} files equal, \{hooked.length()} with budget hooks, \{added.length()} added.",
+    "✅ The vendored regex engine matches core \{core_commit}: \{equal} files equal, \{hooked.length()} with budget hooks, \{added.length()} added.",
   )
 }

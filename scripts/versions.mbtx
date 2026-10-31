@@ -1,3 +1,14 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+  "moonrockz/moonspec@0.11.0",
+  "moonrockz/expect@0.6.1",
+}
+----
+
 ///|
 /// Check or set one version across the workspace.
 ///
@@ -12,14 +23,6 @@
 ///
 /// Usage: `mise run validate:versions`, or `moonx scripts/versions.mbtx check [X.Y.Z]`
 /// or `moonx scripts/versions.mbtx set X.Y.Z`. The script exits with a non-zero code on failure.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-  "moonrockz/moonspec@0.11.0",
-  "moonrockz/expect@0.6.1",
-}
 
 ///|
 let usage : String = "Usage: versions.mbtx check [X.Y.Z] | set X.Y.Z"

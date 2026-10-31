@@ -1,3 +1,13 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Regenerate the golden generated peers of `examples/payment-terminal`, or
 /// check that they are current.
@@ -10,13 +20,6 @@
 /// `mise run codegen:payment-terminal -- --check` exits with 1 when a golden
 /// file is missing, extra or different. `--smithy PATH` uses a built CLI
 /// instead of `moon run apps/smithy`.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let build_config : String = "examples/payment-terminal/smithy-build.json"

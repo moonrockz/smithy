@@ -1,13 +1,16 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Lint every YAML file in the repository with yamllint.
 ///
 /// Usage: `mise run lint:yaml`, or `moonx scripts/lint-yaml.mbtx`. The ignore list is in `.yamllint.yml`.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 async fn main {

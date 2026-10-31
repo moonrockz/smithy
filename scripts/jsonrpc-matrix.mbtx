@@ -1,16 +1,19 @@
-///|
-/// Run the generated payment peers for every language and transport pair.
-/// Build each language once before this task. Command arrays are in
-/// .dev/out/payment-terminal/commands/<language>.json.
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/socket",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/socket",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Run the generated payment peers for every language and transport pair.
+/// Build each language once before this task. Command arrays are in
+/// .dev/out/payment-terminal/commands/<language>.json.
 
 ///|
 enum Language {

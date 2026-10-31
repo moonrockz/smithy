@@ -1,13 +1,16 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Print the newest stable release tag (`vX.Y.Z`, prereleases ignored), or print nothing when there is none.
 ///
 /// Usage: `mise run site:latest-tag`, or `moonx scripts/site-latest-tag.mbtx`.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 /// `[major, minor, patch]` of a tag that is exactly `vX.Y.Z`, or `None`.

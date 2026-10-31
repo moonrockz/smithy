@@ -1,8 +1,11 @@
-/// Validate JSON-RPC requests and responses with the standalone library.
+----
 import {
   "moonrockz/smithy@0.8.0",
   "moonrockz/smithy-validation@0.8.0/rpc",
 }
+----
+
+/// Validate JSON-RPC requests and responses with the standalone library.
 
 ///|
 fn main raise {
