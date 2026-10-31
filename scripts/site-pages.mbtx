@@ -226,6 +226,22 @@ fn registry_update(release_dir : String) -> Command {
 }
 
 ///|
+/// The warren package that bundles the site. Keep it equal to the pin in `.github/workflows/site.yml` and
+/// `scripts/site-build.mbtx`.
+let warren_package : String = "moonbit-community/warren@0.4.5"
+
+///|
+/// The command that installs warren into the toolchain of `release_dir`. `moon install` puts it in
+/// `MOON_HOME/bin`, and the site workflow installs it only for this checkout's toolchain.
+fn warren_install(release_dir : String) -> Command {
+  {
+    command: "mise",
+    args: ["exec", "-C", release_dir, "--", "moon", "install", warren_package],
+    cwd: None,
+  }
+}
+
+///|
 /// The command and arguments that run `moonx` with `args` for `build`. A build of a worktree runs in that
 /// worktree's toolchain: `mise exec` there puts its pinned tools first on `PATH`.
 fn moonx_command(
@@ -417,6 +433,16 @@ async fn steps(out_root : String, release_dir : String) -> Int32 {
           "site:pages: the registry index of MoonBit \{version} did not update",
         )
         return 1
+      }
+      if !@fs.exists(home + "/bin/warren") {
+        let warren = warren_install(release_dir)
+        if run(warren.command, warren.args, extra_env={ "MOON_HOME": home }) !=
+          0 {
+          eprintln(
+            "site:pages: \{warren_package} did not install for MoonBit \{version}",
+          )
+          return 1
+        }
       }
       println("site:pages: \{tag} builds with MoonBit \{version}")
       Some(toolchain)
@@ -614,6 +640,9 @@ test "the toolchain of a tag is installed from the worktree and its core complet
     args: ["install", "http:moonbit"],
     cwd: Some("/w/release"),
   })
+  assert_eq(warren_install("/w/release").args, [
+    "exec", "-C", "/w/release", "--", "moon", "install", "moonbit-community/warren@0.4.5",
+  ])
   assert_eq(registry_update("/w/release").args, [
     "exec", "-C", "/w/release", "--", "moon", "update",
   ])
