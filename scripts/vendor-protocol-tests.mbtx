@@ -1,17 +1,20 @@
-/// Vendor immutable protocol-test traits and fixtures from an upstream snapshot.
-/// Each copied file is checked against the Git blob SHA in the pinned remote
-/// tree. A git checkout and a codeload snapshot therefore have equal provenance.
-/// Usage: moonx scripts/vendor-protocol-tests.mbtx [UPSTREAM_DIRECTORY]
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/x@0.5.5/crypto",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+/// Vendor immutable protocol-test traits and fixtures from an upstream snapshot.
+/// Each copied file is checked against the Git blob SHA in the pinned remote
+/// tree. A git checkout and a codeload snapshot therefore have equal provenance.
+/// Usage: moonx scripts/vendor-protocol-tests.mbtx [UPSTREAM_DIRECTORY]
 
 ///|
 let reference_sha : String = "30bdab593f0c2cdf96036782cc3ce15c43a711ef"

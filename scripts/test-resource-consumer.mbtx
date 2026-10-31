@@ -1,15 +1,18 @@
-/// Test the unchanged pinned consumer against a private, local package cache.
-/// Uses `moon package` bytes and ordinary inclusion rules, without publishing.
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/io",
-  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/io",
+  "moonbitlang/async@0.22.7/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/x@0.5.5/crypto",
   "moonbit-community/zipc@0.2.2",
 }
+----
+
+/// Test the unchanged pinned consumer against a private, local package cache.
+/// Uses `moon package` bytes and ordinary inclusion rules, without publishing.
 
 ///|
 async fn write(path : String, bytes : &@io.Data) -> Unit {

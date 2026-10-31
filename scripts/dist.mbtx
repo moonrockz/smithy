@@ -1,3 +1,23 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/gzip",
+  "moonbitlang/async@0.22.7/io",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/shell",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/core/encoding/hex",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/sys",
+  "moonbit-community/zipc@0.2.2",
+  "moonrockz/moonspec@0.11.0",
+  "moonrockz/expect@0.6.1",
+}
+----
+
 ///|
 /// Build the release outputs and pack them into `dist/`.
 ///
@@ -9,23 +29,6 @@
 ///
 /// Usage: `mise run build:release`, `mise run release:assets`, or `moonx scripts/dist.mbtx [build|build-windows|stage|stage-windows|pack [inputs]]`.
 /// The script exits with a non-zero code on failure.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/gzip",
-  "moonbitlang/async@0.22.5/io",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/shell",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/env",
-  "moonbitlang/core/encoding/hex",
-  "moonbitlang/core/encoding/utf8",
-  "moonbitlang/x@0.5.5/crypto",
-  "moonbitlang/x@0.5.5/sys",
-  "moonbit-community/zipc@0.2.2",
-  "moonrockz/moonspec@0.11.0",
-  "moonrockz/expect@0.6.1",
-}
 
 ///|
 let usage : String = "Usage: dist.mbtx [build | build-windows | stage | stage-windows | pack [inputs]]"

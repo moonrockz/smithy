@@ -1,3 +1,14 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Time `smithy validate` on generated models of growing size, and fail when
 /// validation is too slow or grows faster than the bounds allow.
@@ -19,14 +30,6 @@
 /// - `--no-build`: use the CLI that is built, do not build it first.
 ///
 /// It exits with 0 when every run passes and the bounds hold, else with 1.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/core/env",
-  "moonbitlang/core/string",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let cli : String = "_build/native/release/build/moonrockz/smithy-cli/smithy-cli.exe"

@@ -1,16 +1,19 @@
-///|
-/// Capture the main workspace's JS test coverage without a second test execution.
-/// `mise run test:coverage` starts with fresh task-owned data under .dev/out/coverage.
-/// Reports use explicit source maps and traces: the reporter must never scan the checkout.
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
   "moonbitlang/core/env",
   "moonbitlang/core/string",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Capture the main workspace's JS test coverage without a second test execution.
+/// `mise run test:coverage` starts with fresh task-owned data under .dev/out/coverage.
+/// Reports use explicit source maps and traces: the reporter must never scan the checkout.
 
 ///|
 let output_root : String = ".dev/out/coverage"

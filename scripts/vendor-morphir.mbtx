@@ -1,17 +1,20 @@
-/// Vendor the pinned finos/morphir sources for the Smithy language tour from a local checkout.
-/// Each copied file is checked against the Git blob SHA in the pinned remote tree, so a git checkout
-/// and a snapshot have equal provenance. The bytes are hashed and copied as they are.
-/// Usage: moonx scripts/vendor-morphir.mbtx [CHECKOUT]   (default .dev/out/finos-morphir)
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/x@0.5.5/crypto",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+/// Vendor the pinned finos/morphir sources for the Smithy language tour from a local checkout.
+/// Each copied file is checked against the Git blob SHA in the pinned remote tree, so a git checkout
+/// and a snapshot have equal provenance. The bytes are hashed and copied as they are.
+/// Usage: moonx scripts/vendor-morphir.mbtx [CHECKOUT]   (default .dev/out/finos-morphir)
 
 ///|
 let morphir_sha : String = "ab8d5c9198c0f1ac8a3cabfd11b9ab59a468c409"

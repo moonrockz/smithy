@@ -1016,7 +1016,7 @@ fn Model::http_endpoints_conflict(
       let excludes = match pattern {
         Some(pattern) =>
           try {
-            let regex = @string.Regex::Regex(pattern)
+            let regex = @string.Regex::Regex(core_pattern(pattern))
             regex.execute(literal) is None
           } catch {
             _ => false

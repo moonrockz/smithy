@@ -1,11 +1,14 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+}
+----
+
 ///|
 /// Render a synthetic wrapped breaking-change footer through the real template.
 /// Run from the repository root: mise run test:changelog.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-}
 
 ///|
 async fn verify(root : String) -> Unit {

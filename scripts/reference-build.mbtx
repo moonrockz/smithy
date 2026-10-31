@@ -1,3 +1,13 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Regenerate Java-reference build projection or validation goldens.
 ///
@@ -6,13 +16,6 @@
 /// recorded SHA. Requires a JDK with javac/java on PATH. No Gradle or JUnit
 /// is needed: utils, jmespath, model and build main sources compile together.
 /// All generated classes and Java source remain under .dev/.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let reference_sha : String = "30bdab593f0c2cdf96036782cc3ce15c43a711ef"

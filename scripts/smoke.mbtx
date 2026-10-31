@@ -1,3 +1,20 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/core/encoding/hex",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/sys",
+  "moonrockz/moonspec@0.11.0",
+  "moonrockz/expect@0.6.1",
+}
+----
+
 ///|
 /// Smoke evidence. The smoke job runs each release binary on a runner of its own OS. Its result
 /// depends on the inputs of the binaries and of the check, not on the whole tree. The fingerprint
@@ -13,20 +30,6 @@
 /// `record` needs FINGERPRINT and the GitHub run variables. It fails when HEAD has another
 /// fingerprint. `scripts/smoke-breach.mbtx` files the issues for a failed smoke. The script exits with a
 /// non-zero code on failure.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/env",
-  "moonbitlang/core/encoding/hex",
-  "moonbitlang/core/encoding/utf8",
-  "moonbitlang/core/json",
-  "moonbitlang/x@0.5.5/crypto",
-  "moonbitlang/x@0.5.5/sys",
-  "moonrockz/moonspec@0.11.0",
-  "moonrockz/expect@0.6.1",
-}
 
 ///|
 let usage : String = "Usage: smoke.mbtx fingerprint | inputs | record <dist> <out>"

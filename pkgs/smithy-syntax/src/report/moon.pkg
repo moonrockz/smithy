@@ -11,5 +11,4 @@ import {
   "moonrockz/smithy-syntax/internal/lawkit",
   "moonrockz/expect",
   "moonbitlang/core/quickcheck",
-  "moonbitlang/core/buffer",
 } for "test"

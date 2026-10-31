@@ -1,5 +1,5 @@
 ///|
-/// The words that MoonBit 0.10.15 refuses or reserves as identifiers. I found
+/// The words that MoonBit 0.10.18 refuses or reserves as identifiers. I found
 /// them with the compiler: each is an error or a `reserved_keyword` warning.
 let moonbit_keywords : Array[String] = [
   "abstract", "alias", "and", "as", "assert", "async", "await", "break", "catch",

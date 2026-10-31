@@ -106,3 +106,8 @@ __pycache__/
 
 # Output of the Morphir codec example build.
 examples/morphir-codecs/build/
+
+# Interface files. Since MoonBit 0.10.18, `moon check` writes `pkg.generated.mbti` for the packages
+# whose preferred backend it checks, as `moon info` does. Only the eight site packages that already
+# commit theirs keep them in git; git does not ignore a tracked file.
+pkg.generated.mbti

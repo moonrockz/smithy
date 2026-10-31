@@ -29,19 +29,34 @@ zig = "0.17.0"
 # MoonBit toolchain, pinned. mise cannot resolve "latest" for an http: tool, and a pinned version
 # keeps CI and every machine on the same compiler. To move to a newer release, change the version
 # here and in each URL (with "+" written as "%2B"), taken from
-# https://cli.moonbitlang.com/binaries/<version>/.
+# https://cli.moonbitlang.com/binaries/<version>/. This block is copied from finos/morphir-moonbit main.
 #
-# The binary archive omits the core library. CI (and a fresh machine) completes it with
-# `curl -fsSL https://cli.moonbitlang.com/install/unix.sh | MOON_HOME=$(mise where http:moonbit) bash -s -- <version>`.
+# The archive alone has no core or moonx. Complete Unix installs the same way
+# locally and in CI, using the upstream installer and the exact mise version.
+# The upstream Unix installer supports Linux x64/ARM64 and Apple Silicon.
+# Windows runs tools/bootstrap-moonbit-windows.ps1, which checks the core archive against
+# tools/moonbit-core-pin.json. A version bump updates that file from finos/morphir-moonbit.
 
 [tools."http:moonbit"]
-version = "0.10.15+943464bfa"
+version = "0.10.18+6c83a7f62"
 bin_path = "bin"
+# The "-" markers remove the newlines around each command. Windows runs the hook
+# with `cmd /s /c`, which stops at the first newline: a leading newline runs nothing.
+postinstall = """
+{%- if os() != "windows" -%}
+bash -c 'set -euo pipefail; export PATH="$MISE_TOOL_INSTALL_PATH/bin:$PATH"; curl -fsSL https://cli.moonbitlang.com/install/unix.sh | MOON_HOME="$MISE_TOOL_INSTALL_PATH" bash -s -- "$MISE_TOOL_VERSION"'
+{%- else -%}
+pwsh -NoProfile -File "{{config_root}}/tools/bootstrap-moonbit-windows.ps1"
+{%- endif -%}
+"""
 
 [tools."http:moonbit".platforms]
-linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.15%2B943464bfa/moonbit-linux-x86_64.tar.gz" }
-macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.15%2B943464bfa/moonbit-darwin-aarch64.tar.gz" }
-windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.15%2B943464bfa/moonbit-windows-x86_64.zip", format = "zip" }
+linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-linux-x86_64.tar.gz" }
+linux-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-linux-aarch64.tar.gz" }
+macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-darwin-aarch64.tar.gz" }
+windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-windows-x86_64.zip", format = "zip" }
+# No Windows arm64 build is published; Windows on Arm runs the x64 build under emulation.
+windows-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-windows-x86_64.zip", format = "zip" }
 
 [env]
 _.path = ["./node_modules/.bin"]

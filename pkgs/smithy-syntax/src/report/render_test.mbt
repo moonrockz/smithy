@@ -188,9 +188,17 @@ test "a primary and a secondary label on the same line each sit under their colu
 }
 
 ///|
-// `@buffer.Buffer` is a `&Logger`, but its impl is deprecated (UTF-16LE
-// bytes); this test proves `render_terminal_to` still accepts it.
-#warnings("-deprecated")
+/// A caller's own `Logger`: it keeps each view that it receives.
+priv struct Pieces(Array[String])
+
+///|
+impl Logger for Pieces with fn write_view(self, value) {
+  self.0.push(value.to_owned())
+}
+
+///|
+// `render_terminal_to` accepts any `&Logger`: a core `StringBuilder` and a
+// caller's own sink give the same text.
 test "render_terminal_to writes into any Logger" {
   let (d, source) = first_error(
     (
@@ -200,10 +208,10 @@ test "render_terminal_to writes into any Logger" {
   )
   let sb = StringBuilder()
   @report.render_terminal_to(d, source, sb, color=false)
-  let buf = @buffer.Buffer()
-  @report.render_terminal_to(d, source, buf, color=false)
+  let pieces = Pieces([])
+  @report.render_terminal_to(d, source, pieces, color=false)
   inspect(sb.to_string() == @report.render_plain(d, source), content="true")
-  inspect(buf.to_string() == @report.render_plain(d, source), content="true")
+  inspect(pieces.0.join("") == @report.render_plain(d, source), content="true")
 }
 
 ///|

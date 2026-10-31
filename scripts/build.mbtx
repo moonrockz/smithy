@@ -1,15 +1,18 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Build every workspace member for one or more targets.
 ///
 /// Usage: `mise run build [-- <target>... [--release]]`, or `moonx scripts/build.mbtx <target>...`.
 /// With no target, it builds wasm, wasm-gc, js and native. The native target is always a release build.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]

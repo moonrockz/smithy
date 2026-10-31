@@ -10,13 +10,15 @@ import {
 // Values
 pub fn classify(String) -> (@route.Route, Group)?
 
+pub fn doc_route(String) -> @route.Route?
+
 pub fn example_summary(String) -> String
 
 pub fn fixed_sources() -> Array[String]
 
 pub fn is_excluded(String) -> Bool
 
-pub fn lex_compare(String, String) -> Int
+pub fn lex_compare(String, String) -> Int32
 
 pub fn normalize_path(String) -> String
 
@@ -28,6 +30,7 @@ pub(all) struct Example {
   title : String
   summary : String
   files : Array[String]
+  playground : String?
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn Example::build(Array[ExampleDir]) -> Array[Self]
 pub fn Example::equal(Self, Self) -> Bool

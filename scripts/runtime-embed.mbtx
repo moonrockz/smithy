@@ -1,3 +1,12 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Copy the JSON-RPC runtime sources into the generators, or check the copies.
 ///
@@ -8,12 +17,6 @@
 /// Usage: `moonx scripts/runtime-embed.mbtx write` (`mise run runtime:embed`)
 /// or `moonx scripts/runtime-embed.mbtx check` (`mise run runtime:embed:check`).
 /// `check` exits with 1 when an embedded copy differs from its source.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 /// One embedded runtime: its name, the source directory, the generated file and

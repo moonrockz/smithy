@@ -1,3 +1,14 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Run the MoonBit POS against the Python terminal over stdio, for each
 /// scenario, and check both recorded transcripts with `smithy validate rpc
@@ -11,14 +22,6 @@
 /// Usage: `mise run test:payment-terminal` (all scenarios), or
 /// `mise run test:payment-terminal -- payment refusals`.
 /// It exits with 1 when a scenario or a transcript check fails.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/core/env",
-  "moonbitlang/core/json",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let scenarios : Array[String] = ["payment", "errors", "cancellation", "refusals"]

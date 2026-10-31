@@ -1,3 +1,18 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/encoding/hex",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/sys",
+  "moonrockz/moonspec@0.11.0",
+  "moonrockz/expect@0.6.1",
+}
+----
+
 ///|
 /// Smoke breach issues. A breach is a failed smoke in a trusted run on main or on a release tag. The
 /// report keeps one GitHub issue per breach, with the label `smoke-breach`. A hidden marker in the body
@@ -20,18 +35,6 @@
 /// after 5, 20 and 60 seconds. A retry of `report` reads the issues again and decides again, so a write
 /// that worked before its answer was lost is not done twice. The script exits with a non-zero code on
 /// failure.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/core/env",
-  "moonbitlang/core/encoding/hex",
-  "moonbitlang/core/encoding/utf8",
-  "moonbitlang/core/json",
-  "moonbitlang/x@0.5.5/crypto",
-  "moonbitlang/x@0.5.5/sys",
-  "moonrockz/moonspec@0.11.0",
-  "moonrockz/expect@0.6.1",
-}
 
 ///|
 let usage : String = "Usage: smoke-breach.mbtx report | resolve"

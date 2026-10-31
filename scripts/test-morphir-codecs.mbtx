@@ -1,16 +1,19 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Check the Morphir v3 and v4 conformance bundles through the native CLI and the jsonCodec build plugin:
 /// every pinned artifact is valid, canonical output is stable and keeps its release, the build agrees with
 /// the CLI, expanded output reads back to the same canonical value, and unsupported or conflicting versions
 /// are refused. Usage: moonx scripts/test-morphir-codecs.mbtx
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/json",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let example : String = "examples/morphir-codecs"

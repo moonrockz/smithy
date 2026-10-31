@@ -1,16 +1,19 @@
-/// Verify or regenerate OpenAPI expectations using hash-verified Java sources.
-/// Requires a JDK with javac/java; generated code/classes stay under .dev/.
-/// Usage: moonx scripts/reference-openapi.mbtx [UPSTREAM_DIRECTORY] [--check]
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/x@0.5.5/crypto",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+/// Verify or regenerate OpenAPI expectations using hash-verified Java sources.
+/// Requires a JDK with javac/java; generated code/classes stay under .dev/.
+/// Usage: moonx scripts/reference-openapi.mbtx [UPSTREAM_DIRECTORY] [--check]
 
 ///|
 let reference_sha : String = "30bdab593f0c2cdf96036782cc3ce15c43a711ef"

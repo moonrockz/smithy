@@ -1,13 +1,16 @@
-///|
-/// Build the Go sample once and write command arrays for the manual matrix.
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
   "moonbitlang/x@0.5.5/path",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Build the Go sample once and write command arrays for the manual matrix.
 
 ///|
 fn peer_binary(root : String, role : String) -> String {
