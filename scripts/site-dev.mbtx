@@ -1,3 +1,17 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/http",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/socket",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Build the site at base `/` and serve it on http://localhost:8080.
 ///
@@ -9,17 +23,6 @@
 /// `--serve <dir>` serves a directory that is already built and does no build, and `--base <path>`
 /// serves it below that path. The browser tests serve the output of `site:pages` with
 /// `--serve _site --base /smithy/`, as GitHub Pages serves it; a path outside the base gives 404.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/http",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/socket",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/encoding/utf8",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 /// The directory that the build writes and the server serves when `--serve` is not given.

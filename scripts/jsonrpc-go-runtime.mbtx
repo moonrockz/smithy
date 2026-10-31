@@ -1,13 +1,16 @@
-///|
-/// Embed the Go runtime source files in the portable Go generator.
-/// Run without arguments to write the copy. Use --check to check for drift.
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Embed the Go runtime source files in the portable Go generator.
+/// Run without arguments to write the copy. Use --check to check for drift.
 
 ///|
 fn render_runtime(files : Array[(String, String)]) -> String {

@@ -89,8 +89,8 @@ jobs:
       - name: Install the pinned MoonBit toolchain
         uses: hustcer/setup-moonbit@v1
         with:
-          version: '0.10.15+943464bfa'
-          core-version: '0.10.15+943464bfa'
+          version: '0.10.18+6c83a7f62'
+          core-version: '0.10.18+6c83a7f62'
 
       # Keep this version aligned with the uv pin in .config/mise/config.toml.
       # runtime-python.mbtx stops when uv --version differs from that pin.

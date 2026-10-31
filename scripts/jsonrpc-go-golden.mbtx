@@ -1,14 +1,17 @@
-///|
-/// Generate the payment Go peers and check or update their golden files.
-/// Usage: mise run codegen:go [-- --check].
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
   "moonbitlang/core/env",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Generate the payment Go peers and check or update their golden files.
+/// Usage: mise run codegen:go [-- --check].
 
 ///|
 fn golden_peer_path(peer : String) -> String {

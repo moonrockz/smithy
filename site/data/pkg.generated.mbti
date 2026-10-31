@@ -18,6 +18,8 @@ pub let github_repo : String
 
 pub fn link_context(SiteConfig, @content.Manifest, Array[@content.Example], String) -> @markdown.LinkContext
 
+pub let playground_source : String
+
 // Errors
 
 // Types and methods

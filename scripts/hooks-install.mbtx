@@ -1,3 +1,14 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Install the git hooks with lefthook. The hooks are defined in `lefthook.yml`.
 ///
@@ -9,14 +20,6 @@
 /// not touch it: it stops and says how to migrate deliberately. A pre-push hook that the old
 /// `setup:hooks` task wrote is removed, because lefthook would otherwise keep it beside its own
 /// hook as `pre-push.old`.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 /// The marker line of the hook that the retired `setup:hooks` task wrote.

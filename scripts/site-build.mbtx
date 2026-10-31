@@ -1,3 +1,14 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Build one version of the site: the warren bundle, the playground bundles and the pre-rendered pages.
 ///
@@ -11,14 +22,6 @@
 /// and `worker.js` (the Smithy library in a Web Worker). The tour is one more, `<out>/tour/ui.js` (CodeMirror and
 /// the MoonBit lesson script); its lessons use the playground Worker. `moon build` compiles the MoonBit packages,
 /// and `bun build` bundles them with the npm packages that `site/bun.lock` pins.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let default_out : String = "site/dist"

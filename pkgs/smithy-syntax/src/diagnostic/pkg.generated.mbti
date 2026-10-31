@@ -1,0 +1,44 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/smithy-syntax/diagnostic"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/smithy-syntax/span",
+}
+
+// Values
+pub fn codes() -> ArrayView[String]
+
+pub fn description(String) -> String?
+
+// Errors
+
+// Types and methods
+pub(all) struct Diagnostic {
+  code : String
+  severity : Severity
+  title : String
+  message : String
+  span : @span.Span
+  labels : ArrayView[Label]
+  notes : ArrayView[String]
+  hint : String?
+  example : String?
+} derive(Eq, @debug.Debug)
+pub fn Diagnostic::is_error(Self) -> Bool
+pub fn Diagnostic::new(code~ : String, severity~ : Severity, title~ : String, message~ : String, span~ : @span.Span, labels? : Array[Label], notes? : Array[String], hint? : String, example? : String) -> Self
+pub fn Diagnostic::with_context(Self, Label, String) -> Self
+
+pub(all) struct Label {
+  span : @span.Span
+  text : String
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Severity {
+  Error
+  Warning
+} derive(Eq, Hash, @debug.Debug)
+
+// Type aliases
+
+// Traits

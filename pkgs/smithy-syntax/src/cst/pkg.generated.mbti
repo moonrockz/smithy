@@ -1,0 +1,47 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/smithy-syntax/cst"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/smithy-syntax/ast",
+  "moonrockz/smithy-syntax/scanner",
+  "moonrockz/smithy-syntax/span",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) struct IdlCst {
+  tokens : ArrayView[@scanner.Token]
+  trivia : ArrayView[@scanner.Trivia]
+  statements : ArrayView[StatementCst]
+} derive(Eq, @debug.Debug)
+pub fn IdlCst::new(@scanner.TokenStream, Array[StatementCst]) -> Self
+pub fn IdlCst::skipped(Self) -> Array[StatementCst]
+pub fn IdlCst::to_source(Self) -> String
+
+pub(all) struct StatementCst {
+  kind : StatementKind
+  name : String?
+  tokens : ArrayView[@scanner.Token]
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+pub fn StatementCst::new(kind~ : StatementKind, name~ : String?, tokens~ : ArrayView[@scanner.Token]) -> Self
+pub fn StatementCst::to_source(Self) -> String
+
+pub(all) enum StatementKind {
+  Control
+  Metadata
+  Namespace
+  Use
+  Shape(@ast.ShapeKind)
+  Apply
+  Skipped
+} derive(Eq, @debug.Debug)
+pub impl Show for StatementKind
+
+// Type aliases
+
+// Traits

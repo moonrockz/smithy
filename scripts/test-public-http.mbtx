@@ -1,12 +1,10 @@
-///|
-/// Controlled HTTP fixtures for the public archive provider and built CLI.
-/// No live public services. Usage: moonx scripts/test-public-http.mbtx [targets]
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/http",
-  "moonbitlang/async@0.22.5/socket",
-  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/http",
+  "moonbitlang/async@0.22.7/socket",
+  "moonbitlang/async@0.22.7/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
@@ -15,6 +13,11 @@ import {
   "moonbit-community/zipc@0.2.2",
   "moonbit-community/flate@0.2.0/gzip",
 }
+----
+
+///|
+/// Controlled HTTP fixtures for the public archive provider and built CLI.
+/// No live public services. Usage: moonx scripts/test-public-http.mbtx [targets]
 
 ///|
 async fn command(

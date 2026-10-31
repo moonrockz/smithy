@@ -1,3 +1,14 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Tasks of the MoonBit JSON-RPC runtime in `runtimes/moonbit`.
 ///
@@ -11,14 +22,6 @@
 ///
 /// Usage: `mise run test:runtime:moonbit`, or `moonx scripts/runtime-moonbit.mbtx test`.
 /// It exits with 0 when each step passes, else with 1.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let runtime_dir : String = "runtimes/moonbit"

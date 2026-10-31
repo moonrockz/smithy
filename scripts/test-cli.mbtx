@@ -1,11 +1,8 @@
-///|
-/// Exercise the built CLI, including real stdin pipes, diagnostics, file writes
-/// and conversions. Scratch inputs stay under .dev/out/cli-tests/.
-/// Usage: mise run test:cli -- [native wasm js wasm-gc]
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/core/string",
@@ -16,6 +13,12 @@ import {
   "moonbit-community/flate@0.2.0/gzip",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Exercise the built CLI, including real stdin pipes, diagnostics, file writes
+/// and conversions. Scratch inputs stay under .dev/out/cli-tests/.
+/// Usage: mise run test:cli -- [native wasm js wasm-gc]
 
 ///|
 struct Runner {

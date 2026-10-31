@@ -1,0 +1,28 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/smithy-syntax/report"
+
+import {
+  "moonrockz/smithy-syntax/diagnostic",
+  "moonrockz/smithy-syntax/span",
+}
+
+// Values
+pub fn render_all(ArrayView[@diagnostic.Diagnostic], @span.SourceText, color? : Bool) -> String
+
+pub fn render_all_to(ArrayView[@diagnostic.Diagnostic], @span.SourceText, &Logger, color? : Bool) -> Unit
+
+pub fn render_plain(@diagnostic.Diagnostic, @span.SourceText) -> String
+
+pub fn render_short(@diagnostic.Diagnostic, @span.SourceText) -> String
+
+pub fn render_terminal(@diagnostic.Diagnostic, @span.SourceText, color? : Bool) -> String
+
+pub fn render_terminal_to(@diagnostic.Diagnostic, @span.SourceText, &Logger, color? : Bool) -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

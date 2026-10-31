@@ -1,3 +1,14 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Run the tests of every workspace member for one or more targets.
 ///
@@ -8,14 +19,10 @@
 /// `moon test <path>` tests only the package at exactly that path, not its
 /// sub-packages, so packages are discovered from `moon.work` recursively.
 /// The tests module uses async and runs on js and native only.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
+///
+/// This script and the tests module stay on async 0.22.5. `mise run test:native-zig` runs them under
+/// `zig-cross exec host`, and zig-cross 0.3.2 hides `O_PATH` from async 0.22.7 on a Linux glibc host
+/// (fixed in moonrockz/moonx-tools#17). Move them to 0.22.7 when a zig-cross release has that fix.
 
 ///|
 let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]

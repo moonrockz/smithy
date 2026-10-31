@@ -1,8 +1,11 @@
-/// Validate JSON with the published library, independently of the Smithy workspace.
+----
 import {
   "moonrockz/smithy@0.8.0",
   "moonrockz/smithy-validation@0.8.0" @validation,
 }
+----
+
+/// Validate JSON with the published library, independently of the Smithy workspace.
 
 ///|
 fn main raise {

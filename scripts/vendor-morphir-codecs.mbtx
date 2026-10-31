@@ -1,3 +1,16 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 /// Vendor the pinned Morphir v3/v4 codec conformance authorities into examples/morphir-codecs, or check them.
 /// Each copied file is checked against the Git blob SHA in the pinned remote tree, so a git checkout and a
 /// snapshot have equal provenance. The bytes are hashed and copied as they are: number lexemes, duplicate
@@ -10,16 +23,6 @@
 ///   moonx scripts/vendor-morphir-codecs.mbtx --check [--remote]
 ///     Check the vendored files against inventory.json without network access, and check cases.json
 ///     against the vendored files. With --remote, also compare the inventory with the pinned trees.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/core/env",
-  "moonbitlang/core/json",
-  "moonbitlang/core/encoding/utf8",
-  "moonbitlang/x@0.5.5/crypto",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 /// One pinned upstream repository and the paths that are vendored from it.

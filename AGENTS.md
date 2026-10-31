@@ -7,10 +7,15 @@ for the layout and the task list.
 
 - `mise` installs and pins every tool (`.config/mise/config.toml`). Run `mise trust` and then `mise install` once.
 - The MoonBit version is pinned there. Change it in the version field and in each URL together.
-- A MoonBit version bump must also re-vendor the regex engine in `pkgs/smithy-validation/internal/regex`
-  from the new core, and update the core version and commit in its README, its NOTICE and
-  `scripts/regex-vendor-check.mbtx`. `mise run regex:vendor:check` (part of `mise run validate`) proves
-  that the copy matches the new core; its README lists the steps.
+- The regex engine in `pkgs/smithy-validation/internal/regex` is a copy of the core regex engine,
+  pinned to core commit `d3c49d103fbe7bcfe86a2299250bdfe52654e70d` (the core of 0.10.15+943464bfa).
+  MoonBit 0.10.18 replaced that engine, so a MoonBit version bump deliberately does not re-vendor the
+  copy until bead `smithy-2qe.60` gives the new engine a work-budget cost model.
+  `mise run regex:vendor:check` (part of `mise run validate`) fetches core at the pinned commit and
+  proves that the copy and its hooks match it; its README lists the steps for a re-vendor.
+- The Windows `mise install` runs `tools/bootstrap-moonbit-windows.ps1`, which checks the core archive
+  against `tools/moonbit-core-pin.json`. Copy both, and the `[tools."http:moonbit"]` block, from
+  finos/morphir-moonbit `main` in a version bump. Do not compute a digest yourself.
 - `moon.work` lists the workspace members. `moon build`, `moon test`, `moon check` and `moon fmt` at the root act
   on all of them.
 
@@ -22,9 +27,16 @@ then works on every platform, and it uses the toolchain that mise already instal
 - Put the script in `scripts/` and run it with `moonx scripts/<name>.mbtx`.
 - Declare its mise task in `.config/mise/config.toml`: `run = "moonx scripts/<name>.mbtx"`.
   `scripts/validate-packages.mbtx` (`mise run validate:packages`) is the reference example.
-- Pin the version of each import: `"moonbitlang/async@0.22.5/process"`. Use `moonbitlang/async` for processes
+- Put the imports in frontmatter, between two `----` lines at the start of the file. MoonBit 0.10.18
+  warns about an import block outside frontmatter (`unfenced_import`).
+- Pin the version of each import: `"moonbitlang/async@0.22.7/process"`. Use `moonbitlang/async` for processes
   (`@process.run`, `@process.collect_output`), files (`@fs`) and `@stdio`; `moonbitlang/core/env` for `@env.args()`
   and environment variables; `moonbitlang/x/sys` for `@sys.exit`.
+- `scripts/test.mbtx`, the `tests` module, `site`, `runtimes/moonbit` and the generated MoonBit peers stay
+  on async 0.22.5. async 0.22.7 fails wasm-gc validation when a module reaches its scheduler
+  (moonrockz/moon-lander#154), and zig-cross 0.3.2 hides `O_PATH` from it on a Linux glibc host
+  (moonrockz/moonx-tools#17). Generated peers are built with the consumer's toolchain, and async 0.22.6
+  and later need the 0.10.18 core.
 - `@env.args()` has the script binary at index 0. Task arguments start at index 1 (`mise run task -- arg`).
 - A `.mbtx` file cannot start with a shebang line, so a mise file task cannot be a `.mbtx` file. Keep the toml
   task declaration.

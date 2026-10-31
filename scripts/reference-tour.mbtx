@@ -1,18 +1,21 @@
-/// Write the Java reference results of the tour lesson cases to site/tour/reference-events.json.
-/// Requires a JDK with javac/java; generated code/classes stay under .dev/.
-/// Usage: moonx scripts/reference-tour.mbtx [CHECKOUT] [--check]
-/// CHECKOUT is a checkout of smithy-lang/smithy at the reference SHA (default .dev/out/reference-smithy).
-/// --check writes to a temporary file and fails when it differs from the committed file.
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/x@0.5.5/crypto",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+/// Write the Java reference results of the tour lesson cases to site/tour/reference-events.json.
+/// Requires a JDK with javac/java; generated code/classes stay under .dev/.
+/// Usage: moonx scripts/reference-tour.mbtx [CHECKOUT] [--check]
+/// CHECKOUT is a checkout of smithy-lang/smithy at the reference SHA (default .dev/out/reference-smithy).
+/// --check writes to a temporary file and fails when it differs from the committed file.
 
 ///|
 /// The commit of pkgs/smithy/PRELUDE_SHA. site/tour/check/reference_test.mbt has the same value and compares it

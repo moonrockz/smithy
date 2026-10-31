@@ -25,17 +25,16 @@ runs:
         mise trust
         mise install
 
-    - name: Complete the MoonBit toolchain
+    - name: Put the MoonBit toolchain on the path
       shell: bash
-      # The binary archive that mise installs omits the core library and moonx. The official
-      # installer adds them into the same directory, for the same pinned version.
+      # The binary archive that mise installs omits the core library and moonx. The postinstall hook
+      # of http:moonbit (.config/mise/config.toml) runs the official installer into the same
+      # directory, for the same pinned version, during `mise install`.
       run: |
         set -euo pipefail
         export PATH="$HOME/.local/bin:$PATH"
         moonbit_dir="$(mise where http:moonbit)"
-        moonbit_version="$(mise current http:moonbit)"
-        curl -fsSL https://cli.moonbitlang.com/install/unix.sh | \
-          MOON_HOME="$moonbit_dir" bash -s -- "$moonbit_version"
+        test -f "$moonbit_dir/lib/core/moon.mod" || { echo "The MoonBit core is missing in $moonbit_dir"; exit 1; }
         chmod +x "$moonbit_dir"/bin/* || true
         echo "$moonbit_dir/bin" >> "$GITHUB_PATH"
         echo "MOON_HOME=$moonbit_dir" >> "$GITHUB_ENV"

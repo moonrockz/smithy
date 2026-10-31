@@ -1,16 +1,19 @@
-///|
-/// Bind payment command manifests to source and executable bytes.
-/// Usage: moonx scripts/jsonrpc-provenance.mbtx seal|check moonbit|python|go.
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/x@0.5.5/crypto",
   "moonbitlang/x@0.5.5/path",
 }
+----
+
+///|
+/// Bind payment command manifests to source and executable bytes.
+/// Usage: moonx scripts/jsonrpc-provenance.mbtx seal|check moonbit|python|go.
 
 ///|
 fn digest(bytes : Bytes) -> String {

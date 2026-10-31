@@ -1,0 +1,51 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/smithy-syntax/parser"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/smithy-syntax/ast",
+  "moonrockz/smithy-syntax/cst",
+  "moonrockz/smithy-syntax/diagnostic",
+  "moonrockz/smithy-syntax/scanner",
+  "moonrockz/smithy-syntax/span",
+}
+
+// Values
+pub let max_nesting : Depth
+
+pub fn parse(@span.SourceText) -> ParseResult
+
+pub fn parse_text(String) -> ParseResult
+
+pub fn parse_tokens(@scanner.TokenStream) -> ParseResult
+
+// Errors
+pub(all) suberror ParseError {
+  ParseError(@diagnostic.Diagnostic)
+} derive(Eq, @debug.Debug)
+pub fn ParseError::diagnostic(Self) -> @diagnostic.Diagnostic
+
+// Types and methods
+pub struct Depth(Int32) derive(Compare, Eq, @debug.Debug)
+pub fn Depth::deeper(Self) -> Self
+pub fn Depth::shallower(Self) -> Self
+pub fn Depth::zero() -> Self
+
+pub(all) struct ParseResult {
+  ast : @ast.IdlFile?
+  cst : @cst.IdlCst
+  version : Version?
+  diagnostics : ArrayView[@diagnostic.Diagnostic]
+} derive(Eq, @debug.Debug)
+pub fn ParseResult::errors(Self) -> Array[@diagnostic.Diagnostic]
+pub fn ParseResult::has_errors(Self) -> Bool
+
+pub(all) enum Version {
+  V1
+  V2
+} derive(Eq, Hash, @debug.Debug)
+pub fn Version::of(String) -> Self?
+
+// Type aliases
+
+// Traits
