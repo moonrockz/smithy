@@ -1,0 +1,171 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/smithy-syntax/traversal"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/smithy-syntax/ast",
+  "moonrockz/smithy-syntax/parser",
+  "moonrockz/smithy-syntax/scanner",
+  "moonrockz/smithy-syntax/span",
+}
+
+// Values
+pub fn[V : Visitor] accept(NodeRef, V) -> Unit
+
+pub fn[A] fold(NodeRef, A, (A, NodeRef) -> (A, Control), leave? : (A, NodeRef) -> A) -> A
+
+pub fn kind_table() -> Array[(String, String, Array[String])]
+
+pub fn[S : EventSource, H : Handler] push_events(S, H) -> Unit
+
+pub fn[R] reduce(NodeRef, (NodeRef, ArrayView[R]) -> R) -> R
+
+pub fn[R] reduce_pruned(NodeRef, (NodeRef) -> Control, (NodeRef, ArrayView[R]) -> R) -> R?
+
+pub fn walk(NodeRef, (NodeRef) -> Control, leave? : (NodeRef) -> Unit) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) enum Control {
+  Continue
+  SkipChildren
+  Stop
+} derive(Eq, @debug.Debug)
+
+pub struct EnterEvent {
+  category : String
+  kind : String
+  field : String?
+  start : @span.Offset
+  depth : Int32
+  path : NodePath
+} derive(Eq, @debug.Debug)
+pub fn EnterEvent::new(category~ : String, kind~ : String, field~ : String?, start~ : @span.Offset, path~ : NodePath) -> Self
+
+pub(all) enum Event {
+  Enter(EnterEvent)
+  Leave(LeaveEvent)
+} derive(Eq, @debug.Debug)
+
+pub struct EventReader {
+  // private fields
+}
+pub fn EventReader::iter(Self) -> Iter[Event]
+pub fn EventReader::new(NodeRef) -> Self
+pub impl EventSource for EventReader
+
+pub struct LeaveEvent {
+  node : NodeRef
+  depth : Int32
+  path : NodePath
+} derive(Eq, @debug.Debug)
+pub fn LeaveEvent::new(node~ : NodeRef, path~ : NodePath) -> Self
+
+pub struct NodePath {
+  // private fields
+} derive(Eq, Hash)
+pub fn NodePath::append(Self, Self) -> Self
+pub fn NodePath::child(Self, String, Int32) -> Self
+pub fn NodePath::depth(Self) -> Int32
+pub fn NodePath::from_steps(ArrayView[PathStep]) -> Self
+pub fn NodePath::last(Self) -> PathStep?
+pub fn NodePath::parent(Self) -> Self?
+pub fn NodePath::resolve(Self, NodeRef) -> NodeRef?
+pub fn NodePath::root() -> Self
+pub fn NodePath::steps(Self) -> Array[PathStep]
+pub impl Show for NodePath
+pub impl @debug.Debug for NodePath
+
+pub(all) enum NodeRef {
+  File(@ast.IdlFile, ArrayView[@scanner.Comment])
+  Control(@ast.ControlStatement)
+  Metadata(@ast.MetadataStatement)
+  Namespace(@ast.NamespaceStatement)
+  Use(@ast.UseStatement)
+  Shape(@ast.ShapeStatement)
+  Apply(@ast.ApplyStatement)
+  Inline(@ast.InlineShape)
+  Mixins(@ast.Mixins)
+  Member(@ast.Member)
+  EnumMember(@ast.EnumMember)
+  Property(@ast.OperationProperty)
+  Trait(@ast.Trait)
+  Value(@ast.NodeValue)
+  Entry(@ast.NodeKvp)
+  ShapeIdRef(@ast.Node[@ast.ShapeId])
+  Name(@ast.Node[String])
+  Doc(@ast.DocComment)
+  Comment(@scanner.Comment)
+} derive(Eq, @debug.Debug)
+pub fn NodeRef::category(Self) -> String
+pub fn NodeRef::children(Self) -> Array[Self]
+pub fn NodeRef::children_with_fields(Self) -> Array[(PathStep, Self)]
+pub fn NodeRef::field(Self, String) -> Array[Self]
+pub fn NodeRef::field_of(Self, Self) -> String?
+pub fn NodeRef::fields(Self) -> Array[String]
+pub fn NodeRef::kind(Self) -> String
+pub fn NodeRef::of_result(@parser.ParseResult) -> Self?
+pub fn NodeRef::span(Self) -> @span.Span
+
+pub(all) struct PathStep {
+  field : String
+  index : Int32
+} derive(Eq, Hash, @debug.Debug)
+
+pub struct Tree {
+  // private fields
+}
+pub fn Tree::ancestors(Self, NodeRef) -> Array[NodeRef]
+pub fn Tree::field_of(Self, NodeRef) -> String?
+pub fn Tree::new(@parser.ParseResult) -> Self?
+pub fn Tree::node_at(Self, @span.Offset) -> NodeRef?
+pub fn Tree::node_path(Self, NodeRef) -> NodePath?
+pub fn Tree::parent(Self, NodeRef) -> NodeRef?
+pub fn Tree::path(Self, NodeRef) -> Array[NodeRef]
+pub fn Tree::root(Self) -> NodeRef
+pub fn Tree::step(Self, NodeRef) -> PathStep?
+pub fn Tree::tokens_in(Self, @span.Span) -> Array[@scanner.Token]
+
+pub struct TreeCursor {
+  // private fields
+}
+pub fn TreeCursor::copy(Self) -> Self
+pub fn TreeCursor::depth(Self) -> Int32
+pub fn TreeCursor::field_name(Self) -> String?
+pub fn TreeCursor::goto_first_child(Self) -> Bool
+pub fn TreeCursor::goto_first_child_for(Self, @span.Offset) -> Bool
+pub fn TreeCursor::goto_last_child(Self) -> Bool
+pub fn TreeCursor::goto_next_sibling(Self) -> Bool
+pub fn TreeCursor::goto_node_at(Self, @span.Offset) -> Bool
+pub fn TreeCursor::goto_parent(Self) -> Bool
+pub fn TreeCursor::goto_previous_sibling(Self) -> Bool
+pub fn TreeCursor::new(NodeRef) -> Self
+pub fn TreeCursor::node(Self) -> NodeRef
+pub fn TreeCursor::path(Self) -> NodePath
+pub fn TreeCursor::reset(Self, NodeRef) -> Unit
+
+// Type aliases
+
+// Traits
+pub(open) trait EventSource {
+  fn next(Self) -> Event?
+  fn skip_children(Self) -> Unit
+}
+
+pub(open) trait Handler {
+  fn on_enter(Self, EnterEvent) -> Control = _
+  fn on_leave(Self, LeaveEvent) -> Unit = _
+}
+
+pub(open) trait Visitor {
+  fn visit_file(Self, NodeRef) -> Control = _
+  fn visit_statement(Self, NodeRef) -> Control = _
+  fn visit_shape(Self, NodeRef) -> Control = _
+  fn visit_member(Self, NodeRef) -> Control = _
+  fn visit_trait(Self, NodeRef) -> Control = _
+  fn visit_value(Self, NodeRef) -> Control = _
+  fn visit_comment(Self, NodeRef) -> Control = _
+  fn visit_other(Self, NodeRef) -> Control = _
+  fn leave(Self, NodeRef) -> Unit = _
+}

@@ -1,0 +1,42 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/smithy-syntax/internal/lawkit"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/core/quickcheck",
+  "moonbitlang/core/quickcheck/shrink",
+  "moonbitlang/core/quickcheck/splitmix",
+  "moonrockz/smithy-syntax/span",
+}
+
+// Values
+pub fn broken_pieces() -> Array[String]
+
+pub fn edge_chars() -> Array[String]
+
+pub fn small_model() -> String
+
+pub fn token_pieces() -> Array[String]
+
+pub fn units(Array[Int32]) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct EditedModel {
+  text : String
+  edit_offset : @span.Offset
+} derive(@debug.Debug)
+pub fn EditedModel::edit_offset(Self) -> @span.Offset
+pub fn EditedModel::text(Self) -> String
+pub impl @quickcheck.Arbitrary for EditedModel
+pub impl @shrink.Shrink for EditedModel
+
+pub(all) struct SmithyText(Array[String]) derive(@debug.Debug)
+pub fn SmithyText::text(Self) -> String
+pub impl @quickcheck.Arbitrary for SmithyText
+pub impl @shrink.Shrink for SmithyText
+
+// Type aliases
+
+// Traits

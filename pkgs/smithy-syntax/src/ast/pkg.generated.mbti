@@ -1,0 +1,244 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/smithy-syntax/ast"
+
+import {
+  "moonbitlang/core/bigint",
+  "moonbitlang/core/debug",
+  "moonbitlang/x/decimal",
+  "moonrockz/smithy-syntax/span",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) enum AggregateType {
+  List
+  Map
+  Union
+  Structure
+  Set
+} derive(Eq, Hash, @debug.Debug)
+pub fn AggregateType::keyword(Self) -> String
+
+pub(all) struct ApplyStatement {
+  target : Node[ShapeId]
+  traits : ArrayView[Trait]
+  block : Bool
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) struct ControlStatement {
+  key : Node[String]
+  value : NodeValue
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) struct DocComment {
+  text : String
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) enum EntityType {
+  Service
+  Resource
+} derive(Eq, Hash, @debug.Debug)
+
+pub(all) struct EnumMember {
+  docs : ArrayView[DocComment]
+  traits : ArrayView[Trait]
+  name : Node[String]
+  value : NodeValue?
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) enum EnumType {
+  Enum
+  IntEnum
+} derive(Eq, Hash, @debug.Debug)
+
+pub(all) struct IdlFile {
+  control : ArrayView[ControlStatement]
+  metadata : ArrayView[MetadataStatement]
+  namespace : NamespaceStatement?
+  uses : ArrayView[UseStatement]
+  statements : ArrayView[Statement]
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+pub fn IdlFile::control_value(Self, String) -> NodeValue?
+pub fn IdlFile::shapes(Self) -> Array[ShapeStatement]
+
+pub(all) struct InlineShape {
+  docs : ArrayView[DocComment]
+  traits : ArrayView[Trait]
+  for_resource : Node[ShapeId]?
+  mixins : Mixins?
+  members : ArrayView[Member]
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Keyword {
+  True
+  False
+  Null
+} derive(Eq, Hash, @debug.Debug)
+
+pub(all) struct Member {
+  docs : ArrayView[DocComment]
+  traits : ArrayView[Trait]
+  name : Node[String]
+  target : MemberTarget
+  default : NodeValue?
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) enum MemberTarget {
+  Explicit(Node[ShapeId])
+  Elided
+} derive(Eq, @debug.Debug)
+
+pub(all) struct MetadataStatement {
+  key : Node[String]
+  value : NodeValue
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Mixins {
+  ids : ArrayView[Node[ShapeId]]
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) struct NamespaceStatement {
+  namespace : Node[String]
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Node[T] {
+  value : T
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+pub fn[T] Node::new(T, @span.Span) -> Self[T]
+
+pub(all) struct NodeKvp {
+  key : Node[String]
+  value : NodeValue
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) enum NodeValue {
+  Array(ArrayView[NodeValue], @span.Span)
+  Object(ArrayView[NodeKvp], @span.Span)
+  Number(NumberLiteral, @span.Span)
+  Keyword(Keyword, @span.Span)
+  String(String, @span.Span)
+  TextBlock(String, @span.Span)
+  ShapeId(ShapeId, @span.Span)
+} derive(Eq, @debug.Debug)
+pub fn NodeValue::as_string(Self) -> String?
+pub fn NodeValue::get(Self, String) -> Self?
+pub fn NodeValue::span(Self) -> @span.Span
+
+pub(all) struct NumberLiteral {
+  text : String
+  value : NumberValue
+} derive(Eq, @debug.Debug)
+pub fn NumberLiteral::as_double(Self) -> Double
+pub fn NumberLiteral::as_int64(Self) -> Int64?
+
+pub(all) enum NumberValue {
+  Integer(@bigint.BigInt)
+  Decimal(@decimal.Decimal)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum OperationProperty {
+  Input(OperationTarget, @span.Span)
+  Output(OperationTarget, @span.Span)
+  Errors(ArrayView[Node[ShapeId]], @span.Span)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum OperationTarget {
+  Reference(Node[ShapeId])
+  Inline(InlineShape)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Shape {
+  Simple(kind~ : SimpleType, name~ : Node[String], mixins~ : Mixins?)
+  Enum(kind~ : EnumType, name~ : Node[String], mixins~ : Mixins?, members~ : ArrayView[EnumMember])
+  Aggregate(kind~ : AggregateType, name~ : Node[String], for_resource~ : Node[ShapeId]?, mixins~ : Mixins?, members~ : ArrayView[Member])
+  Entity(kind~ : EntityType, name~ : Node[String], mixins~ : Mixins?, body~ : NodeValue)
+  Operation(name~ : Node[String], mixins~ : Mixins?, properties~ : ArrayView[OperationProperty])
+} derive(Eq, @debug.Debug)
+pub fn Shape::kind(Self) -> ShapeKind
+pub fn Shape::name(Self) -> Node[String]
+
+pub(all) struct ShapeId {
+  namespace : String?
+  name : String
+  member : String?
+} derive(Eq, Hash, @debug.Debug)
+pub fn ShapeId::is_absolute(Self) -> Bool
+pub fn ShapeId::new(String, namespace? : String, member? : String) -> Self
+pub impl Show for ShapeId
+
+pub(all) enum ShapeKind {
+  Simple(SimpleType)
+  Enum(EnumType)
+  Aggregate(AggregateType)
+  Entity(EntityType)
+  Operation
+} derive(Eq, Hash, @debug.Debug)
+pub fn ShapeKind::keyword(Self) -> String
+pub fn ShapeKind::of(String) -> Self?
+pub impl Show for ShapeKind
+
+pub(all) struct ShapeStatement {
+  docs : ArrayView[DocComment]
+  traits : ArrayView[Trait]
+  shape : Shape
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) enum SimpleType {
+  Blob
+  Boolean
+  Document
+  String
+  Byte
+  Short
+  Integer
+  Long
+  Float
+  Double
+  BigInteger
+  BigDecimal
+  Timestamp
+} derive(Eq, Hash, @debug.Debug)
+pub fn SimpleType::keyword(Self) -> String
+pub fn SimpleType::of(String) -> Self?
+
+pub(all) enum Statement {
+  Shape(ShapeStatement)
+  Apply(ApplyStatement)
+} derive(Eq, @debug.Debug)
+pub fn Statement::span(Self) -> @span.Span
+
+pub(all) struct Trait {
+  id : Node[ShapeId]
+  body : TraitBody?
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) enum TraitBody {
+  Structure(ArrayView[NodeKvp])
+  Node(NodeValue)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct UseStatement {
+  id : Node[ShapeId]
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

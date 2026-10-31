@@ -249,10 +249,9 @@ fn Model::node_validation_events(
         let matches = if shape.id.to_string() == "smithy.api#Identifier" {
           identifier(text)
         } else {
-          let pattern = pattern
-            .replace_all(old="\\d", new="[0-9]")
-            .replace_all(old="\\w", new="[a-zA-Z0-9_]")
-          try (@string.Regex::Regex(pattern).execute(text) is Some(_)) catch {
+          try (
+            @string.Regex::Regex(core_pattern(pattern)).execute(text) is Some(_)
+          ) catch {
             _ => true
           }
         }

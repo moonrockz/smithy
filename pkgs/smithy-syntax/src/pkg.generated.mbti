@@ -1,0 +1,216 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/smithy-syntax"
+
+import {
+  "moonbitlang/core/json",
+  "moonrockz/smithy-syntax/ast",
+  "moonrockz/smithy-syntax/cst",
+  "moonrockz/smithy-syntax/diagnostic",
+  "moonrockz/smithy-syntax/json_ast",
+  "moonrockz/smithy-syntax/parser",
+  "moonrockz/smithy-syntax/scanner",
+  "moonrockz/smithy-syntax/span",
+  "moonrockz/smithy-syntax/traversal",
+}
+
+// Values
+pub fn[V : @traversal.Visitor] accept(@traversal.NodeRef, V) -> Unit
+
+pub fn codes() -> ArrayView[String]
+
+pub fn decode_json_ast(Json) -> @json_ast.JsonAst raise @json.JsonDecodeError
+
+pub fn diagnostic_description(String) -> String?
+
+pub fn encode_json_ast(@json_ast.JsonAst) -> Json
+
+pub fn[A] fold(@traversal.NodeRef, A, (A, @traversal.NodeRef) -> (A, @traversal.Control), leave? : (A, @traversal.NodeRef) -> A) -> A
+
+pub fn kind_table() -> Array[(String, String, Array[String])]
+
+pub fn parse(@span.SourceText) -> @parser.ParseResult
+
+pub fn parse_idl(String, name? : String) -> @parser.ParseResult
+
+pub fn parse_json_ast(String) -> @json_ast.JsonAst raise
+
+pub fn parse_json_value(String) -> Json raise @json.ParseError
+
+pub fn parse_tokens(@scanner.TokenStream) -> @parser.ParseResult
+
+pub fn[S : @traversal.EventSource, H : @traversal.Handler] push_events(S, H) -> Unit
+
+pub fn[R] reduce(@traversal.NodeRef, (@traversal.NodeRef, ArrayView[R]) -> R) -> R
+
+pub fn[R] reduce_pruned(@traversal.NodeRef, (@traversal.NodeRef) -> @traversal.Control, (@traversal.NodeRef, ArrayView[R]) -> R) -> R?
+
+pub fn render_all(ArrayView[@diagnostic.Diagnostic], @span.SourceText, color? : Bool) -> String
+
+pub fn render_all_to(ArrayView[@diagnostic.Diagnostic], @span.SourceText, &Logger, color? : Bool) -> Unit
+
+pub fn render_plain(@diagnostic.Diagnostic, @span.SourceText) -> String
+
+pub fn render_short(@diagnostic.Diagnostic, @span.SourceText) -> String
+
+pub fn render_terminal(@diagnostic.Diagnostic, @span.SourceText, color? : Bool) -> String
+
+pub fn render_terminal_to(@diagnostic.Diagnostic, @span.SourceText, &Logger, color? : Bool) -> Unit
+
+pub fn tokenize(@span.SourceText) -> @scanner.TokenStream
+
+pub fn version() -> String
+
+pub fn walk(@traversal.NodeRef, (@traversal.NodeRef) -> @traversal.Control, leave? : (@traversal.NodeRef) -> Unit) -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+pub using @ast {type AggregateType}
+
+pub using @ast {type ApplyStatement}
+
+pub using @span {type Column}
+
+pub using @scanner {type Comment}
+
+pub using @scanner {type CommentKind}
+
+pub using @traversal {type Control}
+
+pub using @ast {type ControlStatement}
+
+pub using @diagnostic {type Diagnostic}
+
+pub using @ast {type DocComment}
+
+pub using @traversal {type EnterEvent}
+
+pub using @ast {type EntityType}
+
+pub using @ast {type EnumMember}
+
+pub using @ast {type EnumType}
+
+pub using @traversal {type Event}
+
+pub using @traversal {type EventReader}
+
+pub using @cst {type IdlCst}
+
+pub using @ast {type IdlFile}
+
+pub using @ast {type InlineShape}
+
+pub using @json_ast {type JsonAst}
+
+pub using @json_ast {type JsonMember}
+
+pub using @json_ast {type JsonOperation}
+
+pub using @json_ast {type JsonReference}
+
+pub using @json_ast {type JsonResource}
+
+pub using @json_ast {type JsonService}
+
+pub using @json_ast {type JsonShape}
+
+pub using @json_ast {type JsonShapeKind}
+
+pub using @ast {type Keyword}
+
+pub using @diagnostic {type Label}
+
+pub using @traversal {type LeaveEvent}
+
+pub using @span {type Length}
+
+pub using @span {type Line}
+
+pub using @ast {type Member}
+
+pub using @ast {type MemberTarget}
+
+pub using @ast {type MetadataStatement}
+
+pub using @ast {type Mixins}
+
+pub using @ast {type NamespaceStatement}
+
+pub using @ast {type Node}
+
+pub using @ast {type NodeKvp}
+
+pub using @traversal {type NodePath}
+
+pub using @traversal {type NodeRef}
+
+pub using @ast {type NodeValue}
+
+pub using @ast {type NumberLiteral}
+
+pub using @ast {type NumberValue}
+
+pub using @span {type Offset}
+
+pub using @ast {type OperationProperty}
+
+pub using @ast {type OperationTarget}
+
+pub using @parser {type ParseResult}
+
+pub using @traversal {type PathStep}
+
+pub using @span {type Position}
+
+pub using @diagnostic {type Severity}
+
+pub using @ast {type Shape}
+
+pub using @ast {type ShapeId}
+
+pub using @ast {type ShapeKind}
+
+pub using @ast {type ShapeStatement}
+
+pub using @ast {type SimpleType}
+
+pub using @span {type SourceText}
+
+pub using @span {type Span}
+
+pub using @ast {type Statement}
+
+pub using @cst {type StatementCst}
+
+pub using @cst {type StatementKind}
+
+pub using @scanner {type Token}
+
+pub using @scanner {type TokenKind}
+
+pub using @scanner {type TokenStream}
+
+pub using @ast {type Trait}
+
+pub using @ast {type TraitBody}
+
+pub using @traversal {type Tree}
+
+pub using @traversal {type TreeCursor}
+
+pub using @scanner {type Trivia}
+
+pub using @ast {type UseStatement}
+
+pub using @parser {type Version}
+
+pub using @traversal {trait EventSource}
+
+pub using @traversal {trait Handler}
+
+pub using @traversal {trait Visitor}
+
+// Traits

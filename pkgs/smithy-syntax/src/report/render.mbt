@@ -1,6 +1,6 @@
 ///|
-/// The sink of a render: any core `Logger` (a `StringBuilder`, a
-/// `@buffer.Buffer`, or the caller's own), plus the color switch.
+/// The sink of a render: any core `Logger` (a `StringBuilder` or the
+/// caller's own), plus the color switch.
 priv struct Out {
   logger : &Logger
   color : Bool

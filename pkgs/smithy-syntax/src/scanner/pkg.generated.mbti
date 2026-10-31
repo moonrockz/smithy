@@ -1,0 +1,103 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/smithy-syntax/scanner"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/smithy-syntax/diagnostic",
+  "moonrockz/smithy-syntax/span",
+}
+
+// Values
+pub fn attach_trivia(Array[Step]) -> TokenStream
+
+pub fn is_integer_lexeme(String) -> Bool
+
+pub fn scan_at(String, @span.Offset) -> Step?
+
+pub fn scan_pieces(String) -> Array[Step]
+
+pub fn text_block_value(String) -> String
+
+pub fn tokenize(@span.SourceText) -> TokenStream
+
+pub fn tokenize_text(String) -> TokenStream
+
+pub fn unescape(String) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct Comment {
+  kind : CommentKind
+  text : String
+  span : @span.Span
+} derive(Eq, @debug.Debug)
+
+pub(all) enum CommentKind {
+  Line
+  Doc
+} derive(Eq, Hash, @debug.Debug)
+
+pub(all) enum Piece {
+  Tok(TokenKind, String, @span.Span)
+  Triv(Trivia)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Step {
+  piece : Piece
+  end : @span.Offset
+  diagnostics : ArrayView[@diagnostic.Diagnostic]
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Token {
+  kind : TokenKind
+  lexeme : String
+  span : @span.Span
+  trivia_before : ArrayView[Trivia]
+  trivia_after : ArrayView[Trivia]
+} derive(Eq, @debug.Debug)
+pub fn Token::to_source(Self) -> String
+
+pub(all) enum TokenKind {
+  Identifier
+  Number
+  String
+  TextBlock
+  At
+  Colon
+  Walrus
+  Equal
+  Dot
+  Pound
+  Dollar
+  LBrace
+  RBrace
+  LBracket
+  RBracket
+  LParen
+  RParen
+  Error
+} derive(Eq, Hash, @debug.Debug)
+
+pub(all) struct TokenStream {
+  tokens : ArrayView[Token]
+  trivia : ArrayView[Trivia]
+  diagnostics : ArrayView[@diagnostic.Diagnostic]
+} derive(Eq, @debug.Debug)
+pub fn TokenStream::has_errors(Self) -> Bool
+pub fn TokenStream::to_source(Self) -> String
+
+pub(all) enum Trivia {
+  Whitespace(String, @span.Span)
+  Newline(String, @span.Span)
+  Comma(@span.Span)
+  Comment(Comment)
+} derive(Eq, @debug.Debug)
+pub fn Trivia::is_comment(Self) -> Bool
+pub fn Trivia::is_newline(Self) -> Bool
+pub fn Trivia::span(Self) -> @span.Span
+pub fn Trivia::text(Self) -> String
+
+// Type aliases
+
+// Traits

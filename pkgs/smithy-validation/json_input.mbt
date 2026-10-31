@@ -113,7 +113,9 @@ pub fn parse_json_value(text : String) -> Json raise ValueInputError {
       let offset = match error {
         @json.InvalidChar(position, _)
         | @json.InvalidNumber(position, _)
-        | @json.InvalidIdentEscape(position) => {
+        | @json.InvalidIdentEscape(position)
+        // The parse keeps the last value of a duplicate key, so it does not raise this.
+        | @json.DuplicateKey(position, _) => {
           let mut line = 1
           let mut start = 0
           for at = 0; at < text.length(); at = at + 1 {
