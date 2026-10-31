@@ -372,7 +372,8 @@ async test "curl consumes an authentication config supplied through stdin" {
   let config = auth_config("test-token")
   let (code, out, err) = curl_with_config(url, config + "range = \"0-3\"\n")
   assert_eq(code, 0, msg=err.text())
-  assert_eq(out.text(), "///|")
+  // The first four bytes of this file: the frontmatter fence.
+  assert_eq(out.text(), "----")
   let (code, out, err) = curl_with_config(url, config)
   assert_eq(code, 0, msg=err.text())
   assert_eq(out.text(), @fs.read_file("vendor-tck.mbtx").text())

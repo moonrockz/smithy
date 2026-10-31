@@ -88,8 +88,14 @@ fn rewrite_imports(text : String) -> String {
     guard !line.contains("\"moonbitlang/core/builtin\"") else { continue }
     lines.push(
       line
-      .replace_all(old="moonbitlang/core/internal/regex_engine/", new=import_base + "/")
-      .replace_all(old="moonbitlang/core/string/internal/", new=import_base + "/"),
+      .replace_all(
+        old="moonbitlang/core/internal/regex_engine/",
+        new=import_base + "/",
+      )
+      .replace_all(
+        old="moonbitlang/core/string/internal/",
+        new=import_base + "/",
+      ),
     )
   }
   lines.join("\n")
@@ -130,7 +136,10 @@ test "rewrite_imports points core imports at the copy and drops builtin" {
 ///|
 test "strip_note removes the note and keeps the rest" {
   let text = "// limitations under the License.\n//\n// Modified for moonrockz/smithy-validation: a hook\n// on two lines.\n\n///|\nfn f() -> Unit {}"
-  assert_eq(strip_note(text), "// limitations under the License.\n\n///|\nfn f() -> Unit {}")
+  assert_eq(
+    strip_note(text),
+    "// limitations under the License.\n\n///|\nfn f() -> Unit {}",
+  )
   assert_eq(strip_note("// a\n//\n// b\n"), "// a\n//\n// b\n")
 }
 
@@ -159,10 +168,12 @@ async fn package_files(dir : String) -> Array[String] {
 }
 
 ///|
-/// Every file of the copy, relative to it.
+/// Every file of the copy, relative to it. `pkg.generated.mbti` is left out: `moon check` writes it
+/// (MoonBit 0.10.18 and later), and git ignores it.
 async fn vendored_files(dir : String, prefix : String) -> Array[String] {
   let found = []
   for name in @fs.readdir(dir, sort=true) {
+    guard name != "pkg.generated.mbti" else { continue }
     let path = "\{dir}/\{name}"
     let relative = if prefix == "" { name } else { "\{prefix}/\{name}" }
     if @fs.kind(path) is Directory {
@@ -177,7 +188,9 @@ async fn vendored_files(dir : String, prefix : String) -> Array[String] {
 ///|
 /// The commit that the git checkout `dir` is at, or `None` when it is not a checkout.
 async fn checkout_commit(dir : String) -> String? {
-  let (code, out, _) = @process.collect_output("git", ["-C", dir, "rev-parse", "HEAD"])
+  let (code, out, _) = @process.collect_output("git", [
+    "-C", dir, "rev-parse", "HEAD",
+  ])
   if code != 0 {
     return None
   }
@@ -204,7 +217,9 @@ async fn default_core() -> String {
     let args = ["-C", dir]
     args.append(step)
     if @process.run("git", args) != 0 {
-      eprintln("❌ ERROR: git \{step.join(" ")} failed for \{core_repository} at \{core_commit}")
+      eprintln(
+        "❌ ERROR: git \{step.join(" ")} failed for \{core_repository} at \{core_commit}",
+      )
       @sys.exit(1)
     }
   }
@@ -224,7 +239,8 @@ async fn main {
   }
   match checkout_commit(core) {
     Some(commit) if commit == core_commit => ()
-    Some(commit) => error("\{core} is at core commit \{commit}, not \{core_commit}")
+    Some(commit) =>
+      error("\{core} is at core commit \{commit}, not \{core_commit}")
     None => error("\{core} is not a git checkout of core \{core_commit}")
   }
   for doc in ["README.md", "NOTICE"] {
@@ -283,7 +299,11 @@ async fn main {
         write_text("\{scratch}/ours.mbt", ours)
         ignore(
           @process.run("git", [
-            "--no-pager", "diff", "--no-index", "\{upstream}/\{path}", "\{scratch}/ours.mbt",
+            "--no-pager",
+            "diff",
+            "--no-index",
+            "\{upstream}/\{path}",
+            "\{scratch}/ours.mbt",
           ]),
         )
       }
