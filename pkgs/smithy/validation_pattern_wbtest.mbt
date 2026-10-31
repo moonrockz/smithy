@@ -13,6 +13,20 @@ test "core_pattern escapes the literal dashes of a class" {
   inspect(core_pattern("[\\--/]"), content="[\\--/]")
   inspect(core_pattern("a-b[x]-c"), content="a-b[x]-c")
   inspect(core_pattern("[\\]-]"), content="[\\]\\-]")
+  inspect(core_pattern("[--/]"), content="[\\--/]")
+  inspect(core_pattern("[a-z--/]"), content="[a-z\\--/]")
+  inspect(core_pattern("[--]"), content="[\\-\\-]")
+}
+
+///|
+test "a literal dash starts a range as in ECMA 262" {
+  let regex = @string.Regex::Regex(core_pattern("^[--/]$"))
+  inspect(regex.execute(".") is Some(_), content="true")
+  inspect(regex.execute("-") is Some(_), content="true")
+  inspect(regex.execute("a") is Some(_), content="false")
+  let after_range = @string.Regex::Regex(core_pattern("^[a-c--/]$"))
+  inspect(after_range.execute(".") is Some(_), content="true")
+  inspect(after_range.execute("b") is Some(_), content="true")
 }
 
 ///|

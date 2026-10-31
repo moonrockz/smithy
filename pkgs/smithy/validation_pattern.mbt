@@ -5,7 +5,8 @@
 /// - `\d` and `\w` become their ASCII classes.
 /// - A literal dash in a class becomes `\-`. ECMA 262 reads a dash as a
 ///   literal at the start or end of a class, and after a range or a class
-///   escape. Core 0.10.18 rejects these dashes as ambiguous.
+///   escape. Core 0.10.18 rejects these dashes as ambiguous. A literal
+///   dash can start a range: `[--/]` is the range from `-` to `/`.
 fn core_pattern(pattern : String) -> String {
   let pattern = pattern
     .replace_all(old="\\d", new="[0-9]")
@@ -58,7 +59,8 @@ fn core_pattern(pattern : String) -> String {
         range_end = true
       } else {
         out.write_string("\\-")
-        range_start = false
+        // A literal dash is a class atom, so it can start a range (`[--/]`).
+        range_start = true
         range_end = false
       }
     } else {
