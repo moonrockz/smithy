@@ -186,15 +186,69 @@ async fn vendored_files(dir : String, prefix : String) -> Array[String] {
 }
 
 ///|
-/// The commit that the git checkout `dir` is at, or `None` when it is not a checkout.
+/// The environment of a git command on the core checkout `dir` (an absolute path). It drops every
+/// inherited `GIT_` variable and names the repository of `dir` explicitly. A git hook (such as
+/// pre-push, which runs `mise run validate`) exports `GIT_DIR`, and without this, `git init`, `fetch`
+/// and `checkout` would act on the Smithy repository itself.
+fn git_env(
+  inherited : Map[String, String],
+  dir : String,
+) -> Map[String, String] {
+  let env : Map[String, String] = Map([])
+  for key, value in inherited {
+    if !key.has_prefix("GIT_") {
+      env[key] = value
+    }
+  }
+  env["GIT_DIR"] = dir + "/.git"
+  env["GIT_WORK_TREE"] = dir
+  env["GIT_CEILING_DIRECTORIES"] = dir
+  env
+}
+
+///|
+test "git_env drops the inherited git variables and names the core checkout" {
+  let env = git_env(
+    {
+      "PATH": "/bin",
+      "GIT_DIR": "/repo/.git",
+      "GIT_INDEX_FILE": "/repo/.git/index",
+    },
+    "/w/core",
+  )
+  assert_eq(env, {
+    "PATH": "/bin",
+    "GIT_DIR": "/w/core/.git",
+    "GIT_WORK_TREE": "/w/core",
+    "GIT_CEILING_DIRECTORIES": "/w/core",
+  })
+}
+
+///|
+/// Run git on the core checkout `dir` with `git_env`; return the exit code and the standard output.
+async fn core_git(dir : String, args : Array[String]) -> (Int32, String) {
+  let (code, out, err) = @process.collect_output(
+    "git",
+    args,
+    cwd=dir,
+    extra_env=git_env(@env.get_env_vars(), dir),
+    inherit_env=false,
+  )
+  if code != 0 {
+    eprintln(err.text().trim_end(chars="\n"))
+  }
+  (code, out.text())
+}
+
+///|
+/// The commit that the git checkout `dir` is at, or `None` when it is not a checkout of its own.
 async fn checkout_commit(dir : String) -> String? {
-  let (code, out, _) = @process.collect_output("git", [
-    "-C", dir, "rev-parse", "HEAD",
-  ])
+  guard @fs.exists(dir + "/.git") else { return None }
+  let (code, out) = core_git(@fs.realpath(dir), ["rev-parse", "HEAD"])
   if code != 0 {
     return None
   }
-  Some(out.text().trim(chars=" \r\n").to_owned())
+  Some(out.trim(chars=" \r\n").to_owned())
 }
 
 ///|
@@ -208,15 +262,15 @@ async fn default_core() -> String {
     @fs.rmdir(dir, recursive=true)
   }
   @fs.mkdir(dir, recursive=true)
+  let absolute = @fs.realpath(dir)
   let steps = [
     ["init", "--quiet"],
     ["fetch", "--quiet", "--depth", "1", core_repository, core_commit],
     ["-c", "advice.detachedHead=false", "checkout", "--quiet", "FETCH_HEAD"],
   ]
   for step in steps {
-    let args = ["-C", dir]
-    args.append(step)
-    if @process.run("git", args) != 0 {
+    let (code, _) = core_git(absolute, step)
+    if code != 0 {
       eprintln(
         "❌ ERROR: git \{step.join(" ")} failed for \{core_repository} at \{core_commit}",
       )
