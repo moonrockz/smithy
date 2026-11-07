@@ -1,0 +1,15 @@
+import {
+  "moonbitlang/core/hashmap",
+  "moonbitlang/core/debug",
+  "moonrockz/regex/internal/shared_types",
+  "moonrockz/regex/internal/regex_engine/ast",
+  "moonrockz/regex/internal/regex_engine/symbol_map",
+}
+
+import {
+  "moonbitlang/core/test",
+} for "test"
+
+import {
+  "moonbitlang/core/test",
+} for "wbtest"

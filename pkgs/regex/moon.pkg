@@ -1,0 +1,11 @@
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/regex/internal/regex_engine" @re,
+  "moonrockz/regex/internal/regex_parser",
+}
+
+import {
+  "moonrockz/regex",
+  "moonbitlang/core/string",
+  "moonbitlang/core/quickcheck",
+} for "test"

@@ -9,24 +9,23 @@ import {
 ----
 
 ///|
-/// Check the regex engine that smithy-validation copies from MoonBit core
-/// (`pkgs/smithy-validation/internal/regex`) against the core of the pinned toolchain.
+/// Check the regex engine that moonrockz/regex copies from MoonBit core
+/// (`pkgs/regex`) against the core of the pinned toolchain.
 ///
 /// The script copies the core packages into a scratch module under `_build/`, points their imports at
 /// the vendored packages and formats them with `moon fmt`, as the repository's checks format the copy.
-/// It then removes the "Modified for moonrockz/smithy-validation" comment of each vendored file and
+/// It then removes the "Modified for moonrockz/regex" comment of each vendored file and
 /// compares the files:
 ///
 /// - A file with budget hooks (`hooked`) may differ; `--diff` prints how.
 /// - Every other copied file must be equal to the formatted core file.
 /// - Every core file must have a copy, and every other vendored file must be one that the copy adds.
-/// - The core must be a git checkout at `core_commit`, and `internal/regex/README.md` and `NOTICE`
+/// - The core must be a git checkout at `core_commit`, and `README.mbt.md` and `NOTICE`
 ///   must name that commit.
 ///
-/// The copy is pinned to one core commit, not to the core of the pinned toolchain. MoonBit 0.10.18
-/// replaced the core regex engine (a DFA and an NFA in place of the `automata` package), so the
-/// budget hooks cannot be applied to it without a new cost model. Until then the copy stays on the
-/// engine of 0.10.15 and a toolchain bump does not change it (bead smithy-2qe.60).
+/// The copy is pinned independently of toolchain upgrades. Its Boolean executor
+/// shares the core NFA compiler and uses fresh metered state for every search.
+/// The upstream tagged executor and its tests remain an independent reference.
 ///
 /// Usage: `mise run regex:vendor:check [-- --diff] [-- CORE_DIRECTORY]`, or
 /// `moonx scripts/regex-vendor-check.mbtx`. The default core is a shallow fetch of `core_commit` from
@@ -34,15 +33,15 @@ import {
 /// It exits with 0 when the copy matches, else with 1.
 
 ///|
-let vendored : String = "pkgs/smithy-validation/internal/regex"
+let vendored : String = "pkgs/regex"
 
 ///|
-let import_base : String = "moonrockz/smithy-validation/internal/regex"
+let import_base : String = "moonrockz/regex/internal"
 
 ///|
 /// The moonbitlang/core commit that the copy comes from: the core bundled with moonc
-/// 0.10.15+943464bfa. The check fetches the core by this commit, so no other digest is needed.
-let core_commit : String = "d3c49d103fbe7bcfe86a2299250bdfe52654e70d"
+/// 0.10.18+6c83a7f62. The check fetches the core by this commit, so no other digest is needed.
+let core_commit : String = "417988f6e19738a7f683ce19a6cf5aaf52c96965"
 
 ///|
 let core_repository : String = "https://github.com/moonbitlang/core"
@@ -50,13 +49,16 @@ let core_repository : String = "https://github.com/moonbitlang/core"
 ///|
 /// Core package directories and their place in the copy.
 let packages : Array[(String, String)] = [
-  ("internal/regex_engine/automata", "automata"),
-  ("internal/regex_engine/shared_types", "shared_types"),
-  ("internal/regex_engine/shared_types/rechar_set", "shared_types/rechar_set"),
-  ("string/internal/regex_engine", "regex_engine"),
-  ("string/internal/regex_engine/ast", "regex_engine/ast"),
-  ("string/internal/regex_engine/symbol_map", "regex_engine/symbol_map"),
-  ("string/internal/regex_parser", "regex_parser"),
+  ("internal/regex_engine/shared_types", "internal/shared_types"),
+  (
+    "internal/regex_engine/shared_types/rechar_set", "internal/shared_types/rechar_set",
+  ),
+  ("string/internal/regex_engine", "internal/regex_engine"),
+  ("string/internal/regex_engine/ast", "internal/regex_engine/ast"),
+  (
+    "string/internal/regex_engine/symbol_map", "internal/regex_engine/symbol_map",
+  ),
+  ("string/internal/regex_parser", "internal/regex_parser"),
 ]
 
 ///|
@@ -69,15 +71,16 @@ let single_files : Array[(String, String)] = [
 ///|
 /// Copied files that carry budget hooks.
 let hooked : Array[String] = [
-  "automata/context.mbt", "automata/delta.mbt", "automata/slot_book.mbt", "automata/thread_set.mbt",
-  "regex_engine/execute.mbt", "regex_engine/regex.mbt", "regex_engine/states.mbt",
+  "internal/regex_parser/parser.mbt", "internal/regex_parser/parser_context.mbt",
 ]
 
 ///|
 /// Files that the copy adds.
 let added : Array[String] = [
-  "LICENSE", "NOTICE", "README.md", "moon.pkg", "regex.mbt", "regex_law_test.mbt",
-  "automata/meter.mbt", "regex_engine/meter.mbt",
+  "LICENSE", "NOTICE", "README.mbt.md", "moon.mod", "moon.pkg", "limits.mbt", "regex.mbt",
+  "compile_test.mbt", "matches_test.mbt", "internal/regex_engine/program.mbt", "internal/regex_engine/meter.mbt",
+  "internal/regex_engine/state_index.mbt", "internal/regex_engine/bounded.mbt", "internal/regex_engine/bounded_wbtest.mbt",
+  "internal/shared_types/rechar_set/bounded.mbt",
 ]
 
 ///|
@@ -102,7 +105,7 @@ fn rewrite_imports(text : String) -> String {
 }
 
 ///|
-/// Remove the "Modified for moonrockz/smithy-validation" comment: the `//` line before it and the
+/// Remove the "Modified for moonrockz/regex" comment: the `//` line before it and the
 /// comment lines after it, up to the first line that is not a comment.
 fn strip_note(text : String) -> String {
   let lines = text.split("\n").map(line => line.to_owned()).to_array()
@@ -111,7 +114,7 @@ fn strip_note(text : String) -> String {
   while i < lines.length() {
     if lines[i] == "//" &&
       i + 1 < lines.length() &&
-      lines[i + 1].has_prefix("// Modified for moonrockz/smithy-validation:") {
+      lines[i + 1].has_prefix("// Modified for moonrockz/regex:") {
       i += 2
       while i < lines.length() && lines[i].has_prefix("// ") {
         i += 1
@@ -129,13 +132,13 @@ test "rewrite_imports points core imports at the copy and drops builtin" {
   let text = "import {\n  \"moonbitlang/core/builtin\",\n  \"moonbitlang/core/internal/regex_engine/automata\",\n  \"moonbitlang/core/string/internal/regex_parser\" @p,\n  \"moonbitlang/core/list\",\n}"
   assert_eq(
     rewrite_imports(text),
-    "import {\n  \"moonrockz/smithy-validation/internal/regex/automata\",\n  \"moonrockz/smithy-validation/internal/regex/regex_parser\" @p,\n  \"moonbitlang/core/list\",\n}",
+    "import {\n  \"moonrockz/regex/internal/automata\",\n  \"moonrockz/regex/internal/regex_parser\" @p,\n  \"moonbitlang/core/list\",\n}",
   )
 }
 
 ///|
 test "strip_note removes the note and keeps the rest" {
-  let text = "// limitations under the License.\n//\n// Modified for moonrockz/smithy-validation: a hook\n// on two lines.\n\n///|\nfn f() -> Unit {}"
+  let text = "// limitations under the License.\n//\n// Modified for moonrockz/regex: a hook\n// on two lines.\n\n///|\nfn f() -> Unit {}"
   assert_eq(
     strip_note(text),
     "// limitations under the License.\n\n///|\nfn f() -> Unit {}",
@@ -297,7 +300,7 @@ async fn main {
       error("\{core} is at core commit \{commit}, not \{core_commit}")
     None => error("\{core} is not a git checkout of core \{core_commit}")
   }
-  for doc in ["README.md", "NOTICE"] {
+  for doc in ["README.mbt.md", "NOTICE"] {
     if !read_text("\{vendored}/\{doc}").contains(core_commit) {
       error("\{vendored}/\{doc} does not name core commit \{core_commit}")
     }
@@ -307,11 +310,11 @@ async fn main {
   if @fs.exists(scratch) {
     @fs.rmdir(scratch, recursive=true)
   }
-  let upstream = "\{scratch}/internal/regex"
+  let upstream = scratch
   @fs.mkdir(upstream, recursive=true)
   write_text(
     "\{scratch}/moon.mod",
-    "name = \"moonrockz/smithy-validation\"\n\nwarnings = \"-implicit_impl_as_method\"\n",
+    "name = \"moonrockz/regex\"\n\nwarnings = \"-implicit_impl_as_method\"\n",
   )
   write_text("\{upstream}/moon.pkg", read_text("\{vendored}/moon.pkg"))
   let expected = []
@@ -352,13 +355,18 @@ async fn main {
       if show_diff {
         write_text("\{scratch}/ours.mbt", ours)
         ignore(
-          @process.run("git", [
-            "--no-pager",
-            "diff",
-            "--no-index",
-            "\{upstream}/\{path}",
-            "\{scratch}/ours.mbt",
-          ]),
+          @process.run(
+            "git",
+            [
+              "--no-pager",
+              "diff",
+              "--no-index",
+              "\{upstream}/\{path}",
+              "\{scratch}/ours.mbt",
+            ],
+            extra_env=git_env(@env.get_env_vars(), @fs.realpath(core)),
+            inherit_env=false,
+          ),
         )
       }
     } else {

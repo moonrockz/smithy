@@ -2,6 +2,7 @@ members = [
   ".",
   "./pkgs/artifact-resources",
   "./pkgs/jmespath",
+  "./pkgs/regex",
   "./pkgs/smithy",
   "./pkgs/smithy-validation",
   "./pkgs/smithy-codec",

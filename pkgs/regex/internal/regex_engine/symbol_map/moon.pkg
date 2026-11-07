@@ -1,0 +1,8 @@
+import {
+  "moonbitlang/core/sorted_set",
+  "moonrockz/regex/internal/shared_types",
+}
+
+import {
+  "moonrockz/regex/internal/shared_types/rechar_set",
+} for "test"
