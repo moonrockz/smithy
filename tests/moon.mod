@@ -1,6 +1,6 @@
 name = "moonrockz/smithy_tests"
 
-version = "0.9.0"
+version = "0.10.0"
 
 description = "Test module for moonrockz/smithy-syntax: reference corpus parity and moonspec acceptance features; not published"
 
@@ -13,21 +13,21 @@ source = "."
 warnings = "-implicit_impl_as_method"
 
 import {
-  "moonrockz/artifact-resources@0.9.0",
+  "moonrockz/artifact-resources@0.10.0",
   "moonbit-community/zipc@0.2.2",
-  "moonrockz/smithy@0.9.0",
-  "moonrockz/smithy-validation@0.9.0",
-  "moonrockz/smithy-ion-validation@0.9.0",
-  "moonrockz/smithy-codec@0.9.0",
+  "moonrockz/smithy@0.10.0",
+  "moonrockz/smithy-validation@0.10.0",
+  "moonrockz/smithy-ion-validation@0.10.0",
+  "moonrockz/smithy-codec@0.10.0",
   "moonrockz/ion@0.6.0",
-  "moonrockz/smithy-build@0.9.0",
-  "moonrockz/smithy-codegen-jsonrpc@0.9.0",
-  "moonrockz/smithy-codegen-moonbit@0.9.0",
-  "moonrockz/smithy-codegen-python@0.9.0",
-  "moonrockz/smithy-diff@0.9.0",
-  "moonrockz/smithy-openapi@0.9.0",
-  "moonrockz/smithy-openrpc@0.9.0",
-  "moonrockz/smithy-syntax@0.9.0",
+  "moonrockz/smithy-build@0.10.0",
+  "moonrockz/smithy-codegen-jsonrpc@0.10.0",
+  "moonrockz/smithy-codegen-moonbit@0.10.0",
+  "moonrockz/smithy-codegen-python@0.10.0",
+  "moonrockz/smithy-diff@0.10.0",
+  "moonrockz/smithy-openapi@0.10.0",
+  "moonrockz/smithy-openrpc@0.10.0",
+  "moonrockz/smithy-syntax@0.10.0",
   "moonrockz/expect@0.6.1",
   "moonrockz/moonspec@0.12.0",
   "moonbitlang/async@0.22.5",

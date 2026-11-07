@@ -1,6 +1,6 @@
 name = "moonrockz/smithy-codegen-python"
 
-version = "0.9.0"
+version = "0.10.0"
 
 description = "A Smithy code generator for Python JSON-RPC peers"
 
@@ -13,9 +13,9 @@ readme = "README.mbt.md"
 warnings = "-implicit_impl_as_method"
 
 import {
-  "moonrockz/smithy@0.9.0",
-  "moonrockz/smithy-build@0.9.0",
-  "moonrockz/smithy-codegen@0.9.0",
-  "moonrockz/smithy-codegen-jsonrpc@0.9.0",
-  "moonrockz/smithy-validation@0.9.0",
+  "moonrockz/smithy@0.10.0",
+  "moonrockz/smithy-build@0.10.0",
+  "moonrockz/smithy-codegen@0.10.0",
+  "moonrockz/smithy-codegen-jsonrpc@0.10.0",
+  "moonrockz/smithy-validation@0.10.0",
 }

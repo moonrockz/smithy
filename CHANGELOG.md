@@ -6,6 +6,16 @@ is 0.x, a minor release can contain breaking changes.
 
 <!-- git-cliff: end of header -->
 
+## [0.10.0] - 2026-11-07
+
+This release needs MoonBit 0.10.20 (moonc `v0.10.20+65efd5b93`, moon `0.1.20261104`) or later. Older toolchains are not supported. The MoonBit JSON-RPC generator (`moonbit-jsonrpc-codegen`) now writes the `#derive(...)` attribute before each struct and enum, in place of the deprecated trailing `derive(...)` syntax. The generated peers and their embedded runtime also no longer use the deprecated `view(start_offset~, end_offset~)` calls, so they pass `moon check --deny-warn` on MoonBit 0.10.20. To migrate, move your toolchain to MoonBit 0.10.20 and generate your MoonBit peers again.
+
+### 🏗️ Build and CI
+
+- Upgrade MoonBit to 0.10.20 ([#97](https://github.com/moonrockz/smithy/pull/97)) by @DamianReeves
+
+**Full changelog**: https://github.com/moonrockz/smithy/compare/v0.9.0...v0.10.0
+
 ## [0.9.0] - 2026-11-07
 
 Reusable bounded runtime matching is now available in `moonrockz/regex`, with compilation limits and per-call work budgets. Smithy `@pattern` validation uses this shared engine while retaining its portable ECMA translation and default validation allowance. Work counts change with the new engine; exhausted matches still report incomplete validation. This release uses MoonBit 0.10.18 and includes parallel release builds and workspace coverage reporting.
