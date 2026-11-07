@@ -8,7 +8,7 @@ is 0.x, a minor release can contain breaking changes.
 
 ## [0.9.0] - 2026-11-07
 
-<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+Reusable bounded runtime matching is now available in `moonrockz/regex`, with compilation limits and per-call work budgets. Smithy `@pattern` validation uses this shared engine while retaining its portable ECMA translation and default validation allowance. Work counts change with the new engine; exhausted matches still report incomplete validation. This release uses MoonBit 0.10.18 and includes parallel release builds and workspace coverage reporting.
 
 ### 🚀 Features
 
