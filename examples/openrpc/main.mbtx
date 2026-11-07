@@ -1,8 +1,8 @@
 ----
 import {
-  "moonrockz/smithy@0.9.0",
-  "moonrockz/smithy-validation@0.9.0/rpc",
-  "moonrockz/smithy-openrpc@0.9.0" @openrpc,
+  "moonrockz/smithy@0.10.0",
+  "moonrockz/smithy-validation@0.10.0/rpc",
+  "moonrockz/smithy-openrpc@0.10.0" @openrpc,
 }
 ----
 

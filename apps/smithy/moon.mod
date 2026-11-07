@@ -1,6 +1,6 @@
 name = "moonrockz/smithy-cli"
 
-version = "0.9.0"
+version = "0.10.0"
 
 description = "Smithy command-line application"
 
@@ -15,22 +15,22 @@ preferred_target = "wasm"
 keywords = [ "smithy", "command-line", "moonx", "idl", "json" ]
 
 import {
-  "moonrockz/artifact-resources@0.9.0",
-  "moonrockz/smithy@0.9.0",
-  "moonrockz/smithy-validation@0.9.0",
-  "moonrockz/smithy-codec@0.9.0",
-  "moonrockz/smithy-ion-validation@0.9.0",
+  "moonrockz/artifact-resources@0.10.0",
+  "moonrockz/smithy@0.10.0",
+  "moonrockz/smithy-validation@0.10.0",
+  "moonrockz/smithy-codec@0.10.0",
+  "moonrockz/smithy-ion-validation@0.10.0",
   "moonrockz/ion@0.6.0",
-  "moonrockz/smithy-build@0.9.0",
-  "moonrockz/smithy-codegen@0.9.0",
-  "moonrockz/smithy-codegen-moonbit@0.9.0",
-  "moonrockz/smithy-codegen-python@0.9.0",
-  "moonrockz/smithy-codegen-go@0.9.0",
-  "moonrockz/smithy-diff@0.9.0",
-  "moonrockz/smithy-jsonschema@0.9.0",
-  "moonrockz/smithy-openapi@0.9.0",
-  "moonrockz/smithy-openrpc@0.9.0",
-  "moonrockz/smithy-syntax@0.9.0",
+  "moonrockz/smithy-build@0.10.0",
+  "moonrockz/smithy-codegen@0.10.0",
+  "moonrockz/smithy-codegen-moonbit@0.10.0",
+  "moonrockz/smithy-codegen-python@0.10.0",
+  "moonrockz/smithy-codegen-go@0.10.0",
+  "moonrockz/smithy-diff@0.10.0",
+  "moonrockz/smithy-jsonschema@0.10.0",
+  "moonrockz/smithy-openapi@0.10.0",
+  "moonrockz/smithy-openrpc@0.10.0",
+  "moonrockz/smithy-syntax@0.10.0",
   "moonbitlang/x@0.5.5",
   "moonbit-community/zipc@0.2.2",
 }

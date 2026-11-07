@@ -1,6 +1,6 @@
 name = "moonrockz/smithy-codec"
 
-version = "0.9.0"
+version = "0.10.0"
 
 description = "Schema-driven JSON codecs with declared serialization profiles for Smithy shapes"
 
@@ -15,7 +15,7 @@ readme = "README.mbt.md"
 warnings = "-implicit_impl_as_method"
 
 import {
-  "moonrockz/smithy@0.9.0",
-  "moonrockz/smithy-syntax@0.9.0",
-  "moonrockz/smithy-validation@0.9.0",
+  "moonrockz/smithy@0.10.0",
+  "moonrockz/smithy-syntax@0.10.0",
+  "moonrockz/smithy-validation@0.10.0",
 }

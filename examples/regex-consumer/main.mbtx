@@ -1,6 +1,6 @@
 ----
 import {
-  "moonrockz/regex@0.9.0",
+  "moonrockz/regex@0.10.0",
 }
 ----
 

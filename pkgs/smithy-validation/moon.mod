@@ -1,6 +1,6 @@
 name = "moonrockz/smithy-validation"
 
-version = "0.9.0"
+version = "0.10.0"
 
 description = "Direct application value validation against Smithy shapes"
 
@@ -13,7 +13,7 @@ readme = "README.mbt.md"
 warnings = "-implicit_impl_as_method"
 
 import {
-  "moonrockz/regex@0.9.0",
-  "moonrockz/smithy@0.9.0",
-  "moonrockz/smithy-syntax@0.9.0",
+  "moonrockz/regex@0.10.0",
+  "moonrockz/smithy@0.10.0",
+  "moonrockz/smithy-syntax@0.10.0",
 }
