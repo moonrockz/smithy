@@ -27,6 +27,7 @@ import {
 let publish_list : Array[(String, String)] = [
   ("pkgs/artifact-resources", "moonrockz/artifact-resources"),
   ("pkgs/jmespath", "moonrockz/jmespath"),
+  ("pkgs/regex", "moonrockz/regex"),
   ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
   ("pkgs/smithy", "moonrockz/smithy"),
   ("pkgs/smithy-validation", "moonrockz/smithy-validation"),

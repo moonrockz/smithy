@@ -7,12 +7,14 @@ for the layout and the task list.
 
 - `mise` installs and pins every tool (`.config/mise/config.toml`). Run `mise trust` and then `mise install` once.
 - The MoonBit version is pinned there. Change it in the version field and in each URL together.
-- The regex engine in `pkgs/smithy-validation/internal/regex` is a copy of the core regex engine,
-  pinned to core commit `d3c49d103fbe7bcfe86a2299250bdfe52654e70d` (the core of 0.10.15+943464bfa).
-  MoonBit 0.10.18 replaced that engine, so a MoonBit version bump deliberately does not re-vendor the
-  copy until bead `smithy-2qe.60` gives the new engine a work-budget cost model.
-  `mise run regex:vendor:check` (part of `mise run validate`) fetches core at the pinned commit and
-  proves that the copy and its hooks match it; its README lists the steps for a re-vendor.
+- `pkgs/regex` is the reusable `moonrockz/regex` module, based on core commit
+  `417988f6e19738a7f683ce19a6cf5aaf52c96965` (MoonBit 0.10.18+6c83a7f62).
+  It shares the core NFA compiler and adds a metered Boolean DFA with fresh per-call
+  state. Smithy's portable ECMA translation remains in `smithy-validation`.
+  A toolchain bump does not automatically re-vendor the module: review its bounded
+  compiler, execution cost model and all-target laws. `mise run regex:vendor:check`
+  (part of validate) compares the pinned source and the explicit hook/addition inventory.
+  `pkgs/regex/README.mbt.md` documents the cost model and re-vendor steps.
 - The Windows `mise install` runs `tools/bootstrap-moonbit-windows.ps1`, which checks the core archive
   against `tools/moonbit-core-pin.json`. Copy both, and the `[tools."http:moonbit"]` block, from
   finos/morphir-moonbit `main` in a version bump. Do not compute a digest yourself.
@@ -202,7 +204,7 @@ Smithy publishes to **mooncakes.io** and **GitHub Releases**, and records every 
   - `smoke` (`.github/workflows/smoke.yml`, shared with CI) runs `smithy version` from each archive on a runner
     of its own OS. A release always smokes the bytes that it publishes.
   - `publish` (`release:credentials`, `release:publish`) publishes the modules in `scripts/publish.mbtx`:
-    `pkgs/artifact-resources`, `pkgs/jmespath`, `pkgs/smithy-syntax`, `pkgs/smithy`, `pkgs/smithy-validation`, `pkgs/smithy-ion-validation`, `pkgs/smithy-codec`, `pkgs/smithy-build`, `pkgs/smithy-codegen`, `pkgs/smithy-codegen-jsonrpc`, `pkgs/smithy-codegen-moonbit`, `pkgs/smithy-codegen-python`, `pkgs/smithy-codegen-go`, `pkgs/smithy-diff`, `pkgs/smithy-jsonschema`, `pkgs/smithy-openapi`, `pkgs/smithy-openrpc`
+    `pkgs/artifact-resources`, `pkgs/jmespath`, `pkgs/regex`, `pkgs/smithy-syntax`, `pkgs/smithy`, `pkgs/smithy-validation`, `pkgs/smithy-ion-validation`, `pkgs/smithy-codec`, `pkgs/smithy-build`, `pkgs/smithy-codegen`, `pkgs/smithy-codegen-jsonrpc`, `pkgs/smithy-codegen-moonbit`, `pkgs/smithy-codegen-python`, `pkgs/smithy-codegen-go`, `pkgs/smithy-diff`, `pkgs/smithy-jsonschema`, `pkgs/smithy-openapi`, `pkgs/smithy-openrpc`
     and `apps/smithy`. It needs the `MOONCAKES_USER_TOKEN` org secret. It runs after
     `smoke`, because a mooncakes.io version is permanent.
   - `release` (`release:notes`, `release:github`) creates the tag and the GitHub release with the 8 assets.
