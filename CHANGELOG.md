@@ -8,7 +8,7 @@ is 0.x, a minor release can contain breaking changes.
 
 ## [0.10.0] - 2026-11-07
 
-<!-- Highlights: replace this comment with a few sentences on what this release brings. -->
+This release needs MoonBit 0.10.20 (moonc `v0.10.20+65efd5b93`, moon `0.1.20261104`) or later. Older toolchains are not supported. The MoonBit JSON-RPC generator (`moonbit-jsonrpc-codegen`) now writes the `#derive(...)` attribute before each struct and enum, in place of the deprecated trailing `derive(...)` syntax. The generated peers and their embedded runtime also no longer use the deprecated `view(start_offset~, end_offset~)` calls, so they pass `moon check --deny-warn` on MoonBit 0.10.20. To migrate, move your toolchain to MoonBit 0.10.20 and generate your MoonBit peers again.
 
 ### 🏗️ Build and CI
 
