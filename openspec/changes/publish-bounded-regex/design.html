@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>publish-bounded-regex</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line); border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left; overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+svg rect { fill: var(--panel); stroke: var(--line); }
+svg text { fill: var(--fg); font-family: system-ui, sans-serif; }
+svg path { stroke: var(--link); fill: none; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body><main>
+<h1>publish-bounded-regex</h1>
+<p class="meta">OpenSpec design | 2026-10-31 | Implemented and verified | Owning epic smithy-2qe.60</p>
+<p>Create <code>moonrockz/regex</code> as a core-only library for bounded Boolean search. Compile the program once and create fresh, metered execution state per call. Smithy keeps its dialect translation and maps exhaustion into its shared validation budget.</p>
+<nav class="toc" aria-label="Contents"><ul>
+<li><a href="#context">Context</a></li>
+<li><a href="#goals">Goals and non-goals</a></li>
+<li><a href="#decisions">Decisions</a></li>
+<li><a href="#risks">Risks and trade-offs</a></li>
+<li><a href="#migration">Migration plan</a></li>
+<li><a href="#verification">Verification</a></li>
+</ul></nav>
+
+<h2 id="context">Context</h2>
+<p>See <a href="proposal.md">the proposal</a> for motivation and <a href="specs/bounded-regex/spec.md">the capability spec</a> for observable behavior. The investigation is recorded on <code>smithy-2qe.60</code>. The existing engine in <code>pkgs/smithy-validation/internal/regex</code> comes from core <code>d3c49d1</code>; seven modified files and added meter/front files provide interruption, charge replay and cache limits.</p>
+<p>Core 0.10.18, commit <code>417988f6e19738a7f683ce19a6cf5aaf52c96965</code>, represents the program as a tagged NFA and builds DFA transitions lazily. Its internal cache allowance does not limit match work. Public <code>@string.Regex</code> exposes no budget. Compiler-known <code>lexmatch</code> cases cannot accept runtime model patterns.</p>
+<p>The current validation adapter passes remaining work into the matcher in <code>validate.mbt</code>, lines 206 through 217. The Morphir acceptance cases and exact-boundary laws prevent replacing actual work with an overly pessimistic length multiplier. The isolated consumer script explicitly maps local modules, so adding a sibling import also requires updating that dependency closure.</p>
+
+<h2 id="goals">Goals and non-goals</h2>
+<p>The reusable boundary contains no shape IDs, findings, Smithy model loader, async runtime or generated application code. Private upstream packages remain private. Initial support is runtime Boolean search with the core dialect; consumers that require another dialect translate or reject it at their own boundary.</p>
+<p>Capturing-group syntax can serve as grouping because the API returns no captures and the dialect has no backreferences. Extraction, token scanning, replacement, splitting, full ECMA conformance and generated <code>lexmatch</code> are separate extensions. The release tooling will know the module; this work does not publish it.</p>
+
+<h2 id="decisions">Decisions</h2>
+<h3 id="pkg-1">PKG-1. A public module with private vendored packages</h3>
+<p>Use <code>pkgs/regex</code> and module name <code>moonrockz/regex</code>, selected by the user. Put the public API and checked examples at the module root and source copies under <code>internal/</code>. Keep upstream package layout recognizable. Bring over only the parser, engine, AST, symbol mapping, shared types, character-set support, UTF-16/profile code and tests required by this Boolean implementation. Do not copy the old automata package into the final module.</p>
+<p>Keeping this inside <code>smithy-validation</code> would retain the unwanted dependency. Publishing a separate repository would add release and source-management work without improving the API boundary. This monorepo already publishes independent modules such as <code>jmespath</code>.</p>
+<svg viewBox="0 0 900 180" role="img" aria-labelledby="flow-title flow-desc">
+<title id="flow-title">Dependencies point from consumers toward the generic matcher</title>
+<desc id="flow-desc">Smithy validation translates ECMA patterns and other consumers supply core-dialect patterns. Both use moonrockz/regex, which depends only on MoonBit core.</desc>
+<rect x="10" y="10" width="260" height="64" rx="8"/><text x="28" y="36" font-size="18">smithy-validation</text><text x="28" y="59" font-size="14">ECMA translation and diagnostics</text>
+<rect x="10" y="105" width="260" height="64" rx="8"/><text x="28" y="132" font-size="18">Other moonrockz consumers</text><text x="28" y="155" font-size="14">Runtime core-dialect patterns</text>
+<rect x="350" y="57" width="230" height="66" rx="8"/><text x="373" y="85" font-size="19">moonrockz/regex</text><text x="373" y="108" font-size="14">Compile limits and match budget</text>
+<rect x="670" y="57" width="215" height="66" rx="8"/><text x="693" y="96" font-size="19">MoonBit core</text>
+<path d="M270 42 H310 V90 H345 M337 84 L345 90 L337 96 M270 137 H310 V90 M580 90 H664 M656 84 L664 90 L656 96" stroke-width="2"/>
+</svg>
+
+<h3 id="api-1">API-1. Validated inputs and explicit exhaustion</h3>
+<p>The public vocabulary is <code>Regex</code>, <code>CompileLimits</code>, <code>WorkLimit</code>, <code>MatchOutcome</code> and structured compilation/configuration errors. Proposed operations are <code>Regex::compile(pattern, limits~)</code> and <code>Regex::matches(input, work~)</code>. A completed outcome carries <code>matched</code> and <code>used</code>; an exhausted outcome carries <code>used</code>. Hide counters and engine objects behind those types.</p>
+<p>Validate work limits in the range 0 through 10,000,000; zero represents an already-spent caller allowance. Default compilation caps are 4,096 source UTF-16 units, 32 nested groups and 1,024 expanded expression units. Support finite configurable maxima of 1,048,576 source units, 64 group levels and 65,536 expanded units. Higher caps let adapters compile expanded translations without changing their source-language limits. Name errors separately for malformed syntax, unsupported constructs and exceeded compilation limits. Do not use <code>None</code> or a Boolean to conflate exhaustion with a completed non-match.</p>
+<p>The existing internal <code>(Bool, Int)?</code> API is sufficient for its single adapter but is ambiguous for new consumers. A shared mutable public meter would couple the library to request ownership. Returning used units lets callers compose their own budgets and treat exhaustion as terminal for the current operation.</p>
+
+<h3 id="cmp-1">CMP-1. Bound compilation before expansion</h3>
+<p>Check source length first. Pass the configured nesting limit into the parser and check it before descending into a group. After parsing, count the expression's expansion with checked arithmetic before emitting NFA copies or constructing symbol tables. Count class intervals and UTF-16 lowering contributions as part of the documented structural bound. Reject over-limit multiplication before allocating the expanded structure.</p>
+<p>Use the existing Smithy <code>pattern_size</code> accounting as a compatibility reference, not as a second regex parser in the generic API. The generic bounds operate on the supported core syntax and normalized AST. Erase capture annotations before NFA construction so execution retains only the whole-match tags. Compare Boolean behavior with core using the original pattern, including ordinary and named grouping syntax where supported by the parser.</p>
+<p>Core's per-quantifier and group-depth limits alone permit huge nested expansion. Waiting until the first search to build the NFA would place that unmetered expansion inside a supposedly bounded call. Compilation must finish the immutable program under its own finite structural limits.</p>
+
+<h3 id="run-1">RUN-1. Share the program, isolate each execution</h3>
+<p>Split upstream's private compiled-regex state into an immutable program and a per-call runner. The program owns the NFA nodes, symbol map, category data and entry point. The Boolean runner owns visited/targeted stamps, state keys and transition tables. It treats capture tags as epsilon moves, so capture registers and renaming are unnecessary. Every search starts with an empty runner, charges its initialization and discards it on completion or exhaustion. The upstream tagged DFA executor stays unchanged as a private test reference; added bounded.mbt implements the smaller Boolean specialization over the same compiled NFA.</p>
+<p>This removes cross-call cache history from both costs and outcomes without transition-cost replay tables. Cache hits within one call still accelerate repeated transitions. Cross-call caching was considered, but register renaming, cache flushes and state reuse make faithful cold-work replay substantially harder in the new engine. Retaining the old engine would postpone the new-engine maintenance while leaving the original migration unresolved.</p>
+<p>Fresh execution allocates more often on short repeated inputs. Compile once, retain the immutable program, and measure this cost against realistic Morphir patterns. Do not cache mutable runners as an optimization within this change.</p>
+
+<h3 id="met-1">MET-1. Charge every variable-cost execution operation</h3>
+<p>Precharge input UTF-16 length plus the end marker, preserving the current input-size protection. Charge initialization before allocating scratch storage. During transition construction, charge node and alternative visits, tag/key words examined or copied, symbol-set lookup work and register scans. Charge logical array cells allocated or copied before growth and clearing. Charge state reuse, candidate comparisons and flush work if those paths remain reachable.</p>
+<p>Core's general hash maps hide probing, comparisons and resizing from the meter. Use a private meter-aware state index with a specified deterministic integer hash and traversal order, checked growth and charged probes/key comparisons. Apply the same rule to any execution-time shape index, or remove that optimization if its measured value does not justify retaining it. A fixed hash is safe here only because collision work is metered. Do not claim constant-time lookups or rely on process-randomized hash seeds for deterministic units.</p>
+<p>Use checked/subtractive allowance comparisons before counter and capacity arithmetic. A refused charge performs no subsequent work for that operation and unwinds to the public exhausted outcome. Compiled programs survive interruption; partial runners never escape. Internal tests can use a very large finite allowance, but the public path has no unbounded execution bypass.</p>
+<p>Before the engine group is closed, publish a cost table linking charges to loops and allocation sites, the constant converting charged storage into a bound on reachable matcher storage, and measurements on native plus JS or wasm-gc. Units describe logical work in this implementation, not CPU instructions, allocator overhead, process RSS or an exact deadline. Their numeric values are not preserved across engine versions. Same-version outcomes and units must agree on all four targets.</p>
+
+<h3 id="smy-1">SMY-1. Preserve the Smithy adapter contract</h3>
+<p>Keep ECMA escape/class/anchor translation, existing source/nesting/expansion guards and <code>UnsupportedConstraint</code> diagnostics in <code>pkgs/smithy-validation/pattern.mbt</code>. The library is not named or advertised as an ECMA engine. <code>BoundedPattern</code> holds the new public <code>Regex</code>; translate completed outcomes into its current match/count result and exhausted outcomes into the existing stop path. The validation budget still receives only remaining call work and returns incomplete <code>LimitExceeded</code>.</p>
+<p>Do not apply the generic default source-length cap to already-translated Smithy text. For example, repeated whitespace escapes expand into long explicit classes. After Smithy's existing guards pass, use the library's larger finite caps as secondary safeguards, and prove that the translator and lowering of every accepted profile pattern fit them. Add a regression with translated text longer than 4,096 units. This keeps the source-language profile stable while leaving generic defaults useful for direct consumers.</p>
+<p>The 97-unit FQName, 16 references and deal record remain acceptance gates at 100,000 default units. The old optional-chain regression might legitimately become cheap under the new engine. Preserve it as a differential correctness case; if it no longer exhausts, replace its exhaustion expectation with a measured expensive case in the same supported profile. Keep an explicit inner-transition exhaustion regression. Do not force the old engine's numeric costs onto the new algorithm.</p>
+
+<h3 id="rel-1">REL-1. Publish through the existing release process</h3>
+<p>Use the root module's shared version, add the module to <code>moon.work</code>, add the versioned sibling dependency to validation and update both publication lists before <code>smithy-validation</code>. Check version discovery and package inventory mechanically. Extend isolated consumer packaging to stage the new module; add a core-only public consumer alongside the existing validation consumer checks. Prefer the existing script/task over another CI workflow.</p>
+<p>Retarget <code>regex:vendor:check</code> to the new module and pinned commit. Preserve the git-environment isolation regression. List every normalization, hook, new private helper and modified upstream test explicitly, with required upstream license/NOTICE text. Tests upstream of the Boolean wrapper may still require internal capture behavior; retain their unchanged paths where possible and explain any necessary adaptation in the hook inventory. Keep runtime dependencies small without removing licensing or useful source tests.</p>
+<p>Update README layout, public package docs, AGENTS.md and release documentation. Existing tags continue using their original publication inventory. Publication and version bumps remain normal release actions after the change lands.</p>
+
+<h2 id="risks">Risks and trade-offs</h2>
+<table><thead><tr><th>Risk</th><th>Mitigation</th></tr></thead><tbody>
+<tr><td>Fresh runners slow repeated small matches.</td><td>Retain compiled programs, record representative timings and allocation measurements, and compare with the current validator. Treat any material regression as a blocker for integration.</td></tr>
+<tr><td>Dictionary or cache maintenance bypasses metering.</td><td>Meter deterministic private indexing and growth; enumerate every variable-cost loop. Test adversarial collisions, reuse and interruption boundaries.</td></tr>
+<tr><td>A new cost model rejects useful inputs.</td><td>Require Morphir acceptance at unchanged limits. Fix the charge model or implementation; do not raise defaults to satisfy the gate.</td></tr>
+<tr><td>Captures introduce variable tag maps.</td><td>Erase annotations for Boolean execution and test nested, repeated and named group parity against core.</td></tr>
+<tr><td>Users assume ECMA compatibility or a deadline.</td><td>Document the core dialect, limits, exhaustion behavior and storage scope at the public entry points.</td></tr>
+<tr><td>Publication closure works only in the workspace.</td><td>Build and run packaged isolated consumers on every target with no workspace path resolution.</td></tr>
+</tbody></table>
+
+<h2 id="migration">Migration plan</h2>
+<ol>
+<li>Establish the independent module, public types and bounded compiler. Keep validation on its existing engine while the replacement is incomplete.</li>
+<li>Implement fresh-run metering and prove the public matcher laws and bounds before switching validation.</li>
+<li>Switch the private adapter, update consumer dependency closure, verify integration and remove the redundant old engine. Update obsolete algorithm-specific exhaustion fixtures explicitly.</li>
+<li>Wire provenance and publication checks and documentation; run the gates in <a href="tasks.md">tasks.md</a>. Release through the normal process later.</li>
+</ol>
+<p>Before integration, rollback means leaving the existing matcher in use. After integration, revert the adapter/dependency/removal change together; do not leave two active engines or silently fall back after exhaustion. No migration writes external data.</p>
+
+<h2 id="verification">Verification</h2>
+<p>Use compiler checks for API/type correctness and focused tests for semantics and budget boundaries. Differential tests cover supported patterns, Unicode, anchors, nullable repetitions and capture erasure. Budget laws cover exact limits, zero, overflow rejection, collisions, table growth and recovery. Cross-target fixtures compare both outcomes and counts. Benchmarks include the investigation's backtracking, state-explosion and long-input families, plus useful Morphir models.</p>
+<p>Repository gates include the vendor check, isolated consumers, validation/RPC/codec regressions, script publication-inventory checks, strict OpenSpec validation and <code>mise run check</code>. Format changed MoonBit sources before any eventual commit. No commit, push, merge or publication is part of this proposal turn.</p>
+<p>Fresh delivery measurements are available as <a href="benchmarks/2026-11-07-native-js.json">native and JS benchmark evidence</a>, including the source and measurement scope. Publication remains part of the normal release process.</p>
+</main></body></html>
