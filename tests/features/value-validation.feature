@@ -43,6 +43,12 @@ Feature: Direct application value validation
     And I validate the JSON value "\"morphir/SDK:basics#int\""
     Then the value is valid
 
+  Scenario: An optional chain can finish a short non-match within the work limit
+    Given a value model whose input has the pattern "^(a?){150}a{150}$"
+    When I prepare the value validator
+    And I validate the JSON value "\"aaaaaaaaaa\""
+    Then the value finding is "Pattern" at "" on "example#Input"
+
   Scenario: A long FQName validates within the default work limit
     Given a value model whose input has the pattern "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*:([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*#([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$"
     When I prepare the value validator

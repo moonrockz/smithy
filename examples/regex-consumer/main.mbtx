@@ -1,0 +1,29 @@
+----
+import {
+  "moonrockz/regex@0.8.0",
+}
+----
+
+///|
+fn main raise {
+  let pattern = "(a|b)+"
+  let regex = @regex.Regex::compile(pattern)
+  let matched = match
+    regex.matches("!abba!", work=@regex.WorkLimit::new(10000)) {
+    Complete(value, used) => {
+      assert_true(used > 0)
+      value
+    }
+    Exhausted(_) => false
+  }
+  let exhausted = match regex.matches("abba", work=@regex.WorkLimit::new(0)) {
+    Complete(_, _) => false
+    Exhausted(used) => {
+      assert_eq(used, 0)
+      true
+    }
+  }
+  assert_true(matched)
+  assert_true(exhausted)
+  println("regex matched=\{matched} exhausted=\{exhausted}")
+}

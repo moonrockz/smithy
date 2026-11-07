@@ -11,14 +11,17 @@ fn BoundedPattern::matches(
   text : String,
   work~ : Int32,
 ) -> (Bool, Int32)? {
-  self.regex.matches(text, work~)
+  let work = @regex.WorkLimit::new(work) catch { _ => return None }
+  match self.regex.matches(text, work~) {
+    Complete(matched, used) => Some((matched, used))
+    Exhausted(_) => None
+  }
 }
 
 ///|
-/// Bound the expanded expression before the parser and compiler can recurse or
-/// copy quantified subexpressions. Counts include every alternative and class.
-/// `*` counts one copy; `?` and `+` count two, because the automaton follows
-/// chains of optional items in quadratic time.
+/// Preserve the portable preparation bound across matcher implementations.
+/// Counts include every alternative and class. `*` counts one copy; `?` and
+/// `+` count two as a conservative structural estimate, not a match-work cost.
 fn pattern_size(
   pattern : String,
   id : @smithy.ShapeId,
@@ -235,7 +238,20 @@ fn compile_pattern(
 ) -> BoundedPattern raise PreparationError {
   let translated = translate_pattern(pattern, id)
   ignore(pattern_size(translated, id))
-  let regex = @regex.Regex::compile(translated) catch {
+  // The original source is capped at 4096 units above, and pattern_size caps
+  // the translated expansion at 1024. Each source unit writes fewer than 128
+  // translated units; the generic structural count is at most 16 times the
+  // legacy count, including UTF-16 lowering. These secondary bounds therefore
+  // cover every accepted portable pattern without applying the generic default
+  // source cap to already-expanded escape classes.
+  let limits = @regex.CompileLimits::new(
+    source_units=1048576,
+    nesting=64,
+    expanded_units=65536,
+  ) catch {
+    _ => abort("I expected valid portable pattern compiler limits.")
+  }
+  let regex = @regex.Regex::compile(translated, limits~) catch {
     _ => raise unsupported_pattern(id)
   }
   { regex, }

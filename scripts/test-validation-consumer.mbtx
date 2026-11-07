@@ -27,6 +27,7 @@ async fn write(path : String, bytes : &@io.Data) -> Unit {
 ///|
 enum ConsumerProfile {
   JsonConsumer
+  RegexConsumer
   OpenRpcConsumer
   IonConsumer
 } derive(Eq)
@@ -47,6 +48,9 @@ let openrpc_checksum = "8f5c8785377676aefd3e038aed21853e533354f9a378c70306f3efad
 
 ///|
 fn allowed(name : String, profile : ConsumerProfile) -> Bool {
+  if profile == RegexConsumer {
+    return name == "moonrockz/regex"
+  }
   match name {
     "moonrockz/ion" | "moonrockz/smithy-ion-validation" =>
       profile == IonConsumer
@@ -99,6 +103,7 @@ async fn seed(
   }
   seen.add(coordinate)
   let local_module = match name {
+    "moonrockz/regex" => Some("pkgs/regex")
     "moonrockz/smithy-validation" => Some("pkgs/smithy-validation")
     "moonrockz/smithy-ion-validation" => Some("pkgs/smithy-ion-validation")
     "moonrockz/smithy" => Some("pkgs/smithy")
@@ -255,7 +260,9 @@ async fn exercise(
   profile~ : ConsumerProfile = JsonConsumer,
 ) -> Unit {
   let dir = root +
-    (if profile == IonConsumer {
+    (if profile == RegexConsumer {
+      "/.dev/out/regex-consumer"
+    } else if profile == IonConsumer {
       "/.dev/out/ion-validation-consumer"
     } else if profile == OpenRpcConsumer {
       "/.dev/out/openrpc-consumer"
@@ -276,7 +283,9 @@ async fn exercise(
     root,
     registry_home,
     fixture,
-    if profile == IonConsumer {
+    if profile == RegexConsumer {
+      "moonrockz/regex"
+    } else if profile == IonConsumer {
       "moonrockz/smithy-ion-validation"
     } else if profile == OpenRpcConsumer {
       "moonrockz/smithy-openrpc"
@@ -288,7 +297,9 @@ async fn exercise(
     profile,
   )
   for
-    example_name in (if profile == IonConsumer {
+    example_name in (if profile == RegexConsumer {
+      ["regex-consumer"]
+    } else if profile == IonConsumer {
       ["ion-validation-consumer"]
     } else if profile == OpenRpcConsumer {
       ["openrpc"]
@@ -297,33 +308,44 @@ async fn exercise(
     }) {
     let consumer = dir + "/" + example_name
     write(consumer + "/moon.work", "members = [\".\"]\n")
-    write(
-      consumer + "/moon.mod",
-      "name = \"validation-consumer\"\nversion = \"0.0.0\"\nimport {\n  \"moonrockz/smithy@\{version}\",\n  \"moonrockz/smithy-validation@\{version}\",\n" +
-      (if profile == IonConsumer {
-        "  \"moonrockz/smithy-ion-validation@\{version}\",\n  \"moonrockz/ion@0.6.0\",\n"
-      } else if profile == OpenRpcConsumer {
-        "  \"moonrockz/smithy-openrpc@\{version}\",\n"
-      } else {
-        ""
-      }) +
-      "}\n",
-    )
-    let validation_import = if profile == IonConsumer {
-      "\"moonrockz/smithy-ion-validation\" @validation,\n  \"moonrockz/ion/ion\","
-    } else if profile == OpenRpcConsumer {
-      "\"moonrockz/smithy-validation/rpc\",\n  \"moonrockz/smithy-openrpc\" @openrpc,"
-    } else if example_name == "rpc-consumer" {
-      "\"moonrockz/smithy-validation/rpc\","
+    if profile == RegexConsumer {
+      write(
+        consumer + "/moon.mod",
+        "name = \"regex-consumer\"\nversion = \"0.0.0\"\nimport { \"moonrockz/regex@\{version}\" }\n",
+      )
+      write(
+        consumer + "/moon.pkg",
+        "options(\"is-main\": true)\nimport { \"moonrockz/regex\" }\n",
+      )
     } else {
-      "\"moonrockz/smithy-validation\" @validation,"
+      write(
+        consumer + "/moon.mod",
+        "name = \"validation-consumer\"\nversion = \"0.0.0\"\nimport {\n  \"moonrockz/smithy@\{version}\",\n  \"moonrockz/smithy-validation@\{version}\",\n" +
+        (if profile == IonConsumer {
+          "  \"moonrockz/smithy-ion-validation@\{version}\",\n  \"moonrockz/ion@0.6.0\",\n"
+        } else if profile == OpenRpcConsumer {
+          "  \"moonrockz/smithy-openrpc@\{version}\",\n"
+        } else {
+          ""
+        }) +
+        "}\n",
+      )
+      let validation_import = if profile == IonConsumer {
+        "\"moonrockz/smithy-ion-validation\" @validation,\n  \"moonrockz/ion/ion\","
+      } else if profile == OpenRpcConsumer {
+        "\"moonrockz/smithy-validation/rpc\",\n  \"moonrockz/smithy-openrpc\" @openrpc,"
+      } else if example_name == "rpc-consumer" {
+        "\"moonrockz/smithy-validation/rpc\","
+      } else {
+        "\"moonrockz/smithy-validation\" @validation,"
+      }
+      write(
+        consumer + "/moon.pkg",
+        "pkgtype(kind: \"executable\")\nimport {\n  \"moonrockz/smithy\",\n  " +
+        validation_import +
+        "\n}\n",
+      )
     }
-    write(
-      consumer + "/moon.pkg",
-      "pkgtype(kind: \"executable\")\nimport {\n  \"moonrockz/smithy\",\n  " +
-      validation_import +
-      "\n}\n",
-    )
     let example = @fs.read_file(
       root + "/examples/" + example_name + "/main.mbtx",
     ).text()
@@ -355,7 +377,9 @@ async fn exercise(
       } else {
         assert_eq(
           out.text().trim().to_owned(),
-          if profile == IonConsumer {
+          if profile == RegexConsumer {
+            "regex matched=true exhausted=true"
+          } else if profile == IonConsumer {
             "ion valid=true invalid=Range at /count"
           } else if example_name == "rpc-consumer" {
             "rpc valid=true invalid=Range at /params/0"
@@ -369,9 +393,12 @@ async fn exercise(
     let resolved : Set[String] = Set([])
     let audited = audit_manifests(consumer + "/.mooncakes", profile, resolved)
     assert_true(
-      audited >= 4,
+      audited >= (if profile == RegexConsumer { 1 } else { 4 }),
       msg="Expected the full resolved model/validation module graph",
     )
+    if profile == RegexConsumer {
+      assert_eq(resolved.to_array(), ["moonrockz/regex"])
+    }
     if profile == OpenRpcConsumer {
       assert_true(
         resolved.contains("moonrockz/openrpc"),
@@ -403,7 +430,9 @@ async fn exercise(
 ///|
 async fn main {
   let targets = @env.args()[1:].to_owned()
-  let profile = if targets.length() > 0 && targets[0] == "--ion" {
+  let profile = if targets.length() > 0 && targets[0] == "--regex" {
+    RegexConsumer
+  } else if targets.length() > 0 && targets[0] == "--ion" {
     IonConsumer
   } else if targets.length() > 0 && targets[0] == "--openrpc" {
     OpenRpcConsumer
@@ -412,6 +441,17 @@ async fn main {
   }
   if profile != JsonConsumer {
     targets.remove(0) |> ignore
+  }
+  if profile == JsonConsumer {
+    exercise(
+      @fs.realpath("."),
+      if targets.is_empty() {
+        ["native", "wasm", "js", "wasm-gc"]
+      } else {
+        targets
+      },
+      profile=RegexConsumer,
+    )
   }
   exercise(
     @fs.realpath("."),
@@ -458,5 +498,25 @@ async test "isolated Ion consumer resolves Ion and excludes WIT" {
     @fs.realpath(".."),
     ["native", "wasm", "js", "wasm-gc"],
     profile=IonConsumer,
+  )
+}
+
+///|
+test "regex consumer excludes all non-core dependencies" {
+  assert_true(allowed("moonrockz/regex", RegexConsumer))
+  for
+    name in [
+      "moonrockz/smithy", "moonrockz/smithy-validation", "moonbitlang/async", "moonrockz/ion",
+    ] {
+    assert_false(allowed(name, RegexConsumer))
+  }
+}
+
+///|
+async test "isolated regex consumer imports only the public module" {
+  exercise(
+    @fs.realpath(".."),
+    ["native", "wasm", "js", "wasm-gc"],
+    profile=RegexConsumer,
   )
 }

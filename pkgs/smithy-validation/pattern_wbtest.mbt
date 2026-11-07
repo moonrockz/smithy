@@ -1,9 +1,20 @@
 ///|
+test "expanded whitespace translations retain the source-language limits" {
+  let id = @smithy.ShapeId::parse("example#String").unwrap()
+  let pattern = "^" + "\\s".repeat(60) + "$"
+  let translated = translate_pattern(pattern, id)
+  assert_true(translated.length() > 4096)
+  assert_true(pattern_size(translated, id) <= 1024)
+  let compiled = compile_pattern(pattern, id)
+  assert_true(compiled.execute(" ".repeat(60)))
+}
+
+///|
 let fqname_pattern = "^([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*:([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*(/([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*)*#([a-z0-9]+|[A-Z0-9]+)(-([a-z0-9]+|[A-Z0-9]+))*$"
 
 ///|
 fn BoundedPattern::execute(self : BoundedPattern, text : String) -> Bool {
-  self.matches(text, work=0x7fffffff) is Some((true, _))
+  self.matches(text, work=10000000) is Some((true, _))
 }
 
 ///|
@@ -33,7 +44,7 @@ test "pattern size counts the copies the automaton builds" {
     (pattern, size) in [
       ("^[a-z]$", 3),
       ("^[a-z0-9]+$", 8), // a class counts its members
-      ("^a?$", 6), // ? counts two copies: the automaton follows optional chains
+      ("^a?$", 6), // ? counts two copies in the portable preparation profile
       ("^(?:a*)*$", 8),
       ("^(?:a+)+$", 14), // control: + still counts two copies
       ("^[^a]$", 6), // control: a negated class keeps its source length

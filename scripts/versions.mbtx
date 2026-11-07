@@ -32,11 +32,14 @@ let usage : String = "Usage: versions.mbtx check [X.Y.Z] | set X.Y.Z"
 /// The text ends with the opening quote. Only a string with this text before it counts, so another
 /// version-like string in the same file (for example a specification version) is not touched.
 let version_files : Array[(String, String)] = [
+  ("examples/regex-consumer/main.mbtx", "\"moonrockz/regex@"),
   ("examples/resource-consumer/main.mbtx", "\"moonrockz/artifact-resources@"),
   ("examples/validation-consumer/main.mbtx", "\"moonrockz/smithy@"),
   ("examples/validation-consumer/main.mbtx", "\"moonrockz/smithy-validation@"),
   ("examples/ion-validation-consumer/main.mbtx", "\"moonrockz/smithy@"),
-  ("examples/ion-validation-consumer/main.mbtx", "\"moonrockz/smithy-ion-validation@"),
+  (
+    "examples/ion-validation-consumer/main.mbtx", "\"moonrockz/smithy-ion-validation@",
+  ),
   ("examples/rpc-consumer/main.mbtx", "\"moonrockz/smithy@"),
   ("examples/rpc-consumer/main.mbtx", "\"moonrockz/smithy-validation@"),
   ("examples/openrpc/main.mbtx", "\"moonrockz/smithy@"),
@@ -80,14 +83,21 @@ fn is_semver(text : String) -> Bool {
 ///|
 /// Each place in `text` where `head`, a semver and a closing quote follow each other.
 /// A place is `(start, end, version)`: the version lies at `start..<end` of `text`.
-fn versions_after(text : String, head : String) -> Array[(Int, Int, String)] {
+fn versions_after(
+  text : String,
+  head : String,
+) -> Array[(Int32, Int32, String)] {
   let found = []
   let mut from = 0
   while from + head.length() < text.length() {
     guard text[from:].find(head) is Some(at) else { break }
     let start = from + at + head.length()
     guard text[start:].find("\"") is Some(len) else { break }
-    let candidate = text[start:start + len].split("/").next().unwrap().to_owned()
+    let candidate = text[start:start + len]
+      .split("/")
+      .next()
+      .unwrap()
+      .to_owned()
     if is_semver(candidate) {
       found.push((start, start + candidate.length(), candidate))
     }
@@ -100,7 +110,7 @@ fn versions_after(text : String, head : String) -> Array[(Int, Int, String)] {
 /// The text with each version of `places` replaced by `version`.
 fn splice(
   text : String,
-  places : Array[(Int, Int, String)],
+  places : Array[(Int32, Int32, String)],
   version : String,
 ) -> String {
   let buf = StringBuilder()
@@ -165,7 +175,7 @@ fn set_mod_version(moon_mod : String, version : String) -> String? {
 fn sibling_places(
   text : String,
   siblings : Array[String],
-) -> Array[(Int, Int, String)] {
+) -> Array[(Int32, Int32, String)] {
   let places = []
   for name in siblings {
     for place in versions_after(text, "\"\{name}@") {
@@ -194,16 +204,20 @@ fn replace_quoted(text : String, old : String, new : String) -> String {
 
 ///|
 /// All registered version prefixes in this file, in source order.
-fn source_places(path : String, text : String) -> Array[(Int, Int, String)] {
+fn source_places(path : String, text : String) -> Array[(Int32, Int32, String)] {
   let places = []
   let mut registered = false
   for entry in version_files {
     if entry.0 == path {
       registered = true
-      for place in versions_after(text, entry.1) { places.push(place) }
+      for place in versions_after(text, entry.1) {
+        places.push(place)
+      }
     }
   }
-  if !registered { return versions_after(text, "\"") }
+  if !registered {
+    return versions_after(text, "\"")
+  }
   places.sort_by((a, b) => a.0.compare(b.0))
   places
 }
@@ -219,7 +233,10 @@ fn set_source_version(path : String, text : String, version : String) -> String 
 /// A file is `(path, text)`. A `moon.mod` file is checked for its version and its sibling imports.
 /// The sibling modules are the other `moon.mod` files in `files`. Any other file is checked for the
 /// version strings that follow the text of `version_files`.
-fn mismatches(files : Array[(String, String)], expected : String) -> Array[String] {
+fn mismatches(
+  files : Array[(String, String)],
+  expected : String,
+) -> Array[String] {
   let siblings = []
   for file in files {
     if file.0.has_suffix("moon.mod") && mod_name(file.1) is Some(name) {
@@ -389,7 +406,7 @@ struct VersionsWorld {
 
 ///|
 fn VersionsWorld::new() -> VersionsWorld {
-  { text: "", result: "", files: [], found: [] }
+  { text: "", result: "", files: [], found: [], }
 }
 
 ///|
@@ -401,7 +418,7 @@ impl @moonspec.World for VersionsWorld with fn configure(self, setup) {
     @expect.expect(mod_version(self.text).unwrap_or("none")).to_equal(expected)
   })
   setup.then0("there is no module version", fn() raise {
-    @expect.expect((mod_version(self.text) is None)).to_equal(true)
+    @expect.expect(mod_version(self.text) is None).to_equal(true)
   })
   setup.when1("I set the module version to {string}", fn(version : String) {
     self.result = set_mod_version(self.text, version).unwrap_or("none")
@@ -431,7 +448,9 @@ impl @moonspec.World for VersionsWorld with fn configure(self, setup) {
   setup.when1("I look for versions other than {string}", fn(expected : String) {
     self.found = mismatches(self.files, expected)
   })
-  setup.when1("I set the versions of the files to {string}", fn(version : String) {
+  setup.when1("I set the versions of the files to {string}", fn(
+    version : String,
+  ) {
     self.result = self.files
       .map(file => set_source_version(file.0, file.1, version))
       .join("|")

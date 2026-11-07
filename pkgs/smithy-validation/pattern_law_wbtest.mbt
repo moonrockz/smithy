@@ -83,7 +83,7 @@ test "law: prepared patterns match as @string.Regex matches their translation" {
           .join("")
         // A search that runs out of work leaves no partial state behind.
         ignore(compiled.matches(text, work=text.length() + 3))
-        guard compiled.matches(text, work=0x7fffffff) is Some((matched, _)) else {
+        guard compiled.matches(text, work=10000000) is Some((matched, _)) else {
           return false
         }
         if matched != (core.execute(text) is Some(_)) {
