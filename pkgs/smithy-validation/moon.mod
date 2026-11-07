@@ -13,6 +13,7 @@ readme = "README.mbt.md"
 warnings = "-implicit_impl_as_method"
 
 import {
+  "moonrockz/regex@0.8.0",
   "moonrockz/smithy@0.8.0",
   "moonrockz/smithy-syntax@0.8.0",
 }

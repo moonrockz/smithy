@@ -71,10 +71,17 @@ test "the books-and-records deal record validates within the default work limit"
 }
 
 ///|
-test "a chain of optional items stops at the work limit on a short input" {
-  // One automaton step of this pattern visits about 50,000 expression nodes.
+test "an optional chain completes a short non-match under the new cost model" {
   let v = validator("@pattern(\"^(a?){150}a{150}$\")\nstring Value")
   let result = v.validate_json(Json::string("a".repeat(10)))
+  assert_true(result.complete)
+  assert_eq(codes(result), ["Pattern"])
+}
+
+///|
+test "an optional chain stops inside transition work at the default limit" {
+  let v = validator("@pattern(\"^(a?){150}a{150}$\")\nstring Value")
+  let result = v.validate_json(Json::string("a".repeat(150)))
   assert_false(result.complete)
   assert_eq(codes(result), ["LimitExceeded"])
 }

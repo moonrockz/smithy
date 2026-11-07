@@ -32,6 +32,8 @@ draft-07 value schemas. See [OpenRPC usage](pkgs/smithy-openrpc/README.mbt.md).
 `moonrockz/smithy-validation` checks application JSON directly against selected Smithy data shapes,
 with exact numbers and structured findings. The CLI exposes it through `smithy validate value`.
 See [value validation](pkgs/smithy-validation/README.mbt.md).
+Its pattern matcher is the independent [`moonrockz/regex`](pkgs/regex/README.mbt.md)
+module, with bounded compilation and deterministic per-call work limits on all four targets.
 Its [RPC package](pkgs/smithy-validation/rpc/README.mbt.md) checks JSON-RPC 1.0 and 2.0 requests,
 notifications and contextual responses against modeled service methods through `smithy validate rpc`.
 Explicit JSON-RPC 2.0 batch checks preserve element paths and associate unordered replies by exact IDs.
@@ -185,6 +187,7 @@ mise run test                  # all targets; the tests module runs on js and na
 mise run test -- js native     # some targets
 mise run test:coverage         # the JS workspace tests once, with coverage reports in .dev/out/coverage/report
 mise run test:cli              # built CLI behavior on native, wasm, js and wasm-gc
+mise run test:regex-consumer   # isolated core-only regex consumer, all targets
 mise run test:validation-consumer # isolated JSON/RPC consumers without Ion or WIT
 mise run test:ion-consumer     # isolated native Ion consumer without WIT, all targets
 mise run test:http             # controlled public archive transport and CLI fixtures
@@ -274,6 +277,7 @@ smithy/
 ├── pkgs/smithy-openapi/       # OpenAPI service converter and protocols
 ├── pkgs/smithy-openrpc/       # OpenRPC service converter
 ├── pkgs/artifact-resources/   # reusable local artifact/resource library
+├── pkgs/regex/               # Bounded runtime regex for independent consumers
 ├── pkgs/jmespath/             # JMESPath parser and evaluator (moonrockz/jmespath)
 ├── pkgs/smithy-syntax/        # IDL syntax (moonrockz/smithy-syntax)
 ├── docs/cookbook/             # tested cookbook articles (moonrockz/smithy_cookbook)

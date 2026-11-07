@@ -1,0 +1,23 @@
+The internal packages and regex_profile.mbt / regex_utf16.mbt are copied from
+MoonBit core, https://github.com/moonbitlang/core, commit
+417988f6e19738a7f683ce19a6cf5aaf52c96965 (MoonBit 0.10.18+6c83a7f62).
+Licensed under Apache-2.0; see LICENSE.
+
+Upstream NOTICE:
+This product includes software developed at
+International Digital Economy Academy (https://www.idea.edu.cn/).
+
+Statement of changes:
+Package imports point to moonrockz/regex/internal, without the implicit builtin
+import, and moon fmt normalizes syntax. The copied parser.mbt and
+parser_context.mbt have configurable group-depth bounds. No other copied
+implementation or upstream test has a behavior change.
+
+Added public limits.mbt and regex.mbt provide bounded compilation and Boolean
+search. Added engine program.mbt, meter.mbt, state_index.mbt and bounded.mbt
+provide immutable program extraction, metered fixed-capacity buffers, a
+deterministic index and a Boolean DFA over the core NFA. Added rechar_set/
+bounded.mbt exposes an interval-count bound. Added compile_test.mbt,
+matches_test.mbt and bounded_wbtest.mbt test these additions. Module metadata,
+README and license/notice files are also added. See README.mbt.md and
+scripts/regex-vendor-check.mbtx for the full path inventory and cost model.

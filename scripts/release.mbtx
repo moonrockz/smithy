@@ -43,7 +43,7 @@ let changelog_path : String = "CHANGELOG.md"
 
 ///|
 /// Pick the version to print from the git-cliff exit code and stdout.
-fn choose_version(exit_code : Int, stdout : String) -> String {
+fn choose_version(exit_code : Int32, stdout : String) -> String {
   let version = stdout.trim().to_owned()
   if exit_code == 0 && version != "" {
     version
@@ -55,9 +55,9 @@ fn choose_version(exit_code : Int, stdout : String) -> String {
 ///|
 /// A `major.minor.patch` version.
 struct Version {
-  major : Int
-  minor : Int
-  patch : Int
+  major : Int32
+  minor : Int32
+  patch : Int32
 } derive(Eq, Compare, Debug)
 
 ///|
@@ -66,7 +66,7 @@ impl Show for Version with fn output(self, logger) {
 }
 
 ///|
-fn parse_number(text : StringView) -> Int? {
+fn parse_number(text : StringView) -> Int32? {
   guard text.length() > 0 && text.length() <= 9 else { return None }
   let mut n = 0
   for c in text {
@@ -89,7 +89,7 @@ fn parse_version(text : String) -> Result[Version, String] {
   match parts {
     [major, minor, patch] =>
       match (parse_number(major), parse_number(minor), parse_number(patch)) {
-        (Some(major), Some(minor), Some(patch)) => Ok({ major, minor, patch })
+        (Some(major), Some(minor), Some(patch)) => Ok({ major, minor, patch, })
         _ => Err("not a version: \{text}")
       }
     _ => Err("not a version: \{text}")
@@ -260,6 +260,7 @@ fn release_notes(version : Version, section : String) -> String {
 let publish_list : Array[(String, String)] = [
   ("pkgs/artifact-resources", "moonrockz/artifact-resources"),
   ("pkgs/jmespath", "moonrockz/jmespath"),
+  ("pkgs/regex", "moonrockz/regex"),
   ("pkgs/smithy-syntax", "moonrockz/smithy-syntax"),
   ("pkgs/smithy", "moonrockz/smithy"),
   ("pkgs/smithy-validation", "moonrockz/smithy-validation"),
@@ -281,13 +282,8 @@ let publish_list : Array[(String, String)] = [
 ///|
 /// The files that a GitHub release holds. `dist/` has exactly these.
 let release_assets : Array[String] = [
-  "smithy-linux-x64.tar.gz",
-  "smithy-linux-arm64.tar.gz",
-  "smithy-darwin-arm64.tar.gz",
-  "smithy-darwin-x64.tar.gz",
-  "smithy-windows-x64.zip",
-  "smithy.wasm",
-  "smithy-gc.wasm",
+  "smithy-linux-x64.tar.gz", "smithy-linux-arm64.tar.gz", "smithy-darwin-arm64.tar.gz",
+  "smithy-darwin-x64.tar.gz", "smithy-windows-x64.zip", "smithy.wasm", "smithy-gc.wasm",
   "checksums.txt",
 ]
 
@@ -398,13 +394,13 @@ struct Checks {
 /// (`evidence`, see `scripts/smoke.mbtx`). A pull request run is not trusted, so it records nothing.
 fn checks(p : Plan, event : String, evidence : Bool) -> Checks {
   match p {
-    Release(_) => { validate: true, build: true, record: true }
-    Skip(_) => { validate: false, build: false, record: false }
+    Release(_) => { validate: true, build: true, record: true, }
+    Skip(_) => { validate: false, build: false, record: false, }
     DryRun(_) =>
       match event {
-        "pull_request" => { validate: false, build: !evidence, record: false }
-        "schedule" => { validate: false, build: !evidence, record: !evidence }
-        _ => { validate: true, build: true, record: true }
+        "pull_request" => { validate: false, build: !evidence, record: false, }
+        "schedule" => { validate: false, build: !evidence, record: !evidence, }
+        _ => { validate: true, build: true, record: true, }
       }
   }
 }
@@ -467,7 +463,7 @@ fn github_steps(
 ///|
 /// A failed network command is worth a retry only when the failure is probably temporary. A refusal
 /// (401, 403) or a conflict (409) is not, and it wins over the transient words.
-fn is_transient(exit_code : Int, output : String) -> Bool {
+fn is_transient(exit_code : Int32, output : String) -> Bool {
   if exit_code == 0 {
     return false
   }
@@ -487,7 +483,7 @@ fn is_transient(exit_code : Int, output : String) -> Bool {
 /// Read the exit code of `git merge-base --is-ancestor HEAD origin/main`. Only code 1 means "not on
 /// main". Any other code besides 0 (a shallow clone, a missing ref) is an error.
 fn ancestor_answer(
-  exit_code : Int,
+  exit_code : Int32,
   output : String,
   ref_name : String,
 ) -> Result[Bool, String] {
@@ -699,7 +695,7 @@ struct Facts {
   /// The release version when available on mooncakes.io, otherwise the latest version or `None`.
   mooncakes : Array[(String, Version?)]
   /// Commits on origin/main after the latest tag.
-  unreleased : Int
+  unreleased : Int32
   /// Head branches of open release pull requests.
   release_prs : Array[String]
 }
@@ -828,9 +824,9 @@ fn mooncakes_version(text : String, requested~ : Version? = None) -> Version? {
     Some(wanted) => {
       guard json is { "versions": Array(versions), .. } else { return None }
       if versions.any(entry => {
-        entry is { "version": String(version), "yanked": False, .. } &&
-        parse_version(version).to_option() == Some(wanted)
-      }) {
+          entry is { "version": String(version), "yanked": False, .. } &&
+          parse_version(version).to_option() == Some(wanted)
+        }) {
         Some(wanted)
       } else {
         // A missing or yanked release cannot pass just because it is the latest version.
@@ -867,7 +863,7 @@ async fn run_or_fail(
 
 ///|
 /// Run a command and return its exit code and stdout. A command that cannot start gives code 1.
-async fn stdout_of(cmd : String, args : Array[String]) -> (Int, String) {
+async fn stdout_of(cmd : String, args : Array[String]) -> (Int32, String) {
   let (code, out, _) = @process.collect_output(cmd, args) catch {
     _ => (1, b"", b"")
   }
@@ -877,7 +873,7 @@ async fn stdout_of(cmd : String, args : Array[String]) -> (Int, String) {
 ///|
 /// Run a command and return its exit code and its stdout and stderr together. A command that cannot
 /// start gives code 1.
-async fn output_of(cmd : String, args : Array[String]) -> (Int, String) {
+async fn output_of(cmd : String, args : Array[String]) -> (Int32, String) {
   let (code, out, err) = @process.collect_output(cmd, args) catch {
     _ => return (1, "cannot start \{cmd}")
   }
@@ -889,8 +885,8 @@ async fn output_of(cmd : String, args : Array[String]) -> (Int, String) {
 /// It stops early on a failure that a retry does not fix.
 async fn with_retry(
   label : String,
-  action : async () -> (Int, String),
-) -> (Int, String) {
+  action : async () -> (Int32, String),
+) -> (Int32, String) {
   let waits = [5000, 20000, 60000]
   let mut result = action()
   for i, wait in waits {
@@ -1007,9 +1003,7 @@ async fn prepare(requested : String?, local_only : Bool) -> Unit {
       let (code, out) = stdout_of("git", ["cliff", "--bumped-version"])
       if code != 0 || out.trim() == "" {
         stop_prepare(
-          start,
-          start_commit,
-          "git-cliff could not compute the next version; run `mise run release:prepare` so mise provides git-cliff",
+          start, start_commit, "git-cliff could not compute the next version; run `mise run release:prepare` so mise provides git-cliff",
         )
       }
       out
@@ -1025,14 +1019,24 @@ async fn prepare(requested : String?, local_only : Bool) -> Unit {
   let tag = "v\{version}"
   let branch = "release/\{tag}"
   let (tag_code, _) = stdout_of("git", [
-    "rev-parse", "--quiet", "--verify", "refs/tags/\{tag}",
+    "rev-parse",
+    "--quiet",
+    "--verify",
+    "refs/tags/\{tag}",
   ])
   let (local_code, _) = stdout_of("git", [
-    "rev-parse", "--quiet", "--verify", "refs/heads/\{branch}",
+    "rev-parse",
+    "--quiet",
+    "--verify",
+    "refs/heads/\{branch}",
   ])
   // `git ls-remote --exit-code` exits 2 when origin has no such branch.
   let (remote_code, _) = stdout_of("git", [
-    "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/\{branch}",
+    "ls-remote",
+    "--exit-code",
+    "--heads",
+    "origin",
+    "refs/heads/\{branch}",
   ])
   if remote_code != 0 && remote_code != 2 {
     stop_prepare(
@@ -1095,12 +1099,17 @@ async fn prepare(requested : String?, local_only : Bool) -> Unit {
 /// Whether the GitHub release of `tag` exists, the names of its assets, and whether it is a draft. A
 /// release that is not there gives `(false, [], false)`. Any other failure stops the script.
 async fn inspect_release(tag : String) -> (Bool, Array[String], Bool) {
-  let (code, out) = with_retry("gh release view", () => output_of("gh", [
-    "release", "view", tag, "--json", "isDraft,assets", "--jq",
-    ".isDraft, (.assets[].name)",
-  ]))
+  let (code, out) = with_retry("gh release view", () => {
+    output_of("gh", [
+      "release", "view", tag, "--json", "isDraft,assets", "--jq", ".isDraft, (.assets[].name)",
+    ])
+  })
   if code == 0 {
-    let lines = out.split("\n").filter(n => n.trim() != "").map(n => n.trim().to_owned()).collect()
+    let lines = out
+      .split("\n")
+      .filter(n => n.trim() != "")
+      .map(n => n.trim().to_owned())
+      .collect()
     let is_draft = lines.length() > 0 && lines[0] == "true"
     return (true, lines.filter(n => n != "true" && n != "false"), is_draft)
   }
@@ -1212,7 +1221,9 @@ async fn github(version : String) -> Unit {
   let local_assets = @fs.readdir("dist")
   let lacking = missing_names(release_assets, local_assets)
   if !lacking.is_empty() {
-    fail_with("dist/ lacks: \{lacking.join(", ")}; run `mise run build:release`")
+    fail_with(
+      "dist/ lacks: \{lacking.join(", ")}; run `mise run build:release`",
+    )
   }
   let mut last = ""
   for _ in 0..<3 {
@@ -1227,19 +1238,23 @@ async fn github(version : String) -> Unit {
       is_draft=draft,
     )
     if steps.is_empty() {
-      println("The GitHub release \{tag} has all \{release_assets.length()} assets.")
+      println(
+        "The GitHub release \{tag} has all \{release_assets.length()} assets.",
+      )
       return
     }
     for args in steps {
-      let (code, out) = with_retry("gh \{args[0]} \{args[1]}", () => output_of(
-        "gh", args,
-      ))
+      let (code, out) = with_retry("gh \{args[0]} \{args[1]}", () => {
+        output_of("gh", args)
+      })
       if code != 0 {
         if is_refusal(out) {
           fail_with("`gh \{args[0]} \{args[1]}` was refused: \{out.trim()}")
         }
         last = out.trim().to_owned()
-        eprintln("`gh \{args[0]} \{args[1]}` failed: \{last}; I read the release again")
+        eprintln(
+          "`gh \{args[0]} \{args[1]}` failed: \{last}; I read the release again",
+        )
         break
       }
       println("done: gh \{args[0]} \{args[1]} \{tag}")
@@ -1257,12 +1272,18 @@ async fn github(version : String) -> Unit {
     is_draft=draft,
   )
   if steps.is_empty() {
-    println("The GitHub release \{tag} has all \{release_assets.length()} assets.")
+    println(
+      "The GitHub release \{tag} has all \{release_assets.length()} assets.",
+    )
     return
   }
   let detail = if exists {
     let lacks = missing_names(release_assets, remote)
-    if lacks.is_empty() { "it is still a draft" } else { "it lacks " + lacks.join(", ") }
+    if lacks.is_empty() {
+      "it is still a draft"
+    } else {
+      "it lacks " + lacks.join(", ")
+    }
   } else {
     "it does not exist"
   }
@@ -1274,11 +1295,18 @@ async fn github(version : String) -> Unit {
 ///|
 /// Look for the exact release, retaining the latest version only to diagnose a missing publication.
 async fn fetch_mooncakes(name : String, version : Version) -> Version? {
-  let (response, body) = @http.get("https://mooncakes.io/api/v0/modules/\{name}") catch {
+  let (response, body) = @http.get(
+    "https://mooncakes.io/api/v0/modules/\{name}",
+  ) catch {
     _ => return None
   }
   guard response.code == 200 else { return None }
-  mooncakes_version(body.text() catch { _ => return None }, requested=Some(version))
+  mooncakes_version(
+    body.text() catch {
+      _ => return None
+    },
+    requested=Some(version),
+  )
 }
 
 ///|
@@ -1513,7 +1541,7 @@ async fn main {
 ///|
 /// Scenario state for `features/release.feature`.
 struct ReleaseWorld {
-  mut exit_code : Int
+  mut exit_code : Int32
   mut stdout : String
   mut text : String
   mut result : Result[String, String]
@@ -1552,7 +1580,7 @@ fn ReleaseWorld::new(dist_source : String) -> ReleaseWorld {
     local_assets: [],
     remote_assets: [],
     facts: {
-      main_version: { major: 0, minor: 0, patch: 0 },
+      main_version: { major: 0, minor: 0, patch: 0, },
       latest_tag: None,
       tagged: false,
       github_release: false,
@@ -1608,7 +1636,8 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
     requested : String,
     expected : String,
   ) raise {
-    let actual = match mooncakes_version(self.text, requested=Some(version_of(requested))) {
+    let actual = match
+      mooncakes_version(self.text, requested=Some(version_of(requested))) {
       Some(version) => "\{version}"
       None => "none"
     }
@@ -1637,7 +1666,7 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
   })
 
   setup.given2("git-cliff exits with {int} and prints {string}", fn(
-    code : Int,
+    code : Int32,
     stdout : String,
   ) {
     self.exit_code = code
@@ -1745,9 +1774,9 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
   setup.then1("the breaking commits without a footer in the log are {string}", fn(
     expected : String,
   ) raise {
-    @expect.expect(
-      breaking_without_footer(log_messages(self.text)).join(", "),
-    ).to_equal(expected)
+    @expect.expect(breaking_without_footer(log_messages(self.text)).join(", ")).to_equal(
+      expected,
+    )
   })
   setup.then3(
     "the pull request body for {string} with the missing footer {string} mentions {string}",
@@ -1830,7 +1859,12 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
   })
   setup.then4(
     "the jobs for a {string} are validate {string}, build {string} and record {string}",
-    fn(kind : String, validate : String, build : String, record : String) raise {
+    fn(
+      kind : String,
+      validate : String,
+      build : String,
+      record : String,
+    ) raise {
       // A skip comes from a version that is already released.
       let r = plan(
         self.event,
@@ -1855,12 +1889,12 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
   setup.given1("the GitHub release exists: {string}", fn(answer : String) {
     self.released = yes(answer)
   })
-  setup.given2("the GitHub release exists with draft {string} and the assets {string}", fn(
-    draft : String,
-    assets : String,
-  ) {
-    self.released = release_complete(true, yes(draft), words(assets))
-  })
+  setup.given2(
+    "the GitHub release exists with draft {string} and the assets {string}",
+    fn(draft : String, assets : String) {
+      self.released = release_complete(true, yes(draft), words(assets))
+    },
+  )
   setup.given0("the GitHub release has every expected asset", fn() {
     self.released = release_complete(true, false, release_assets)
   })
@@ -1869,7 +1903,8 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
     for name in release_assets {
       // `smithy-<target>.tar.gz` and `.zip` names are built from the target; check the target part.
       let found = if name.has_suffix(".tar.gz") || name.has_suffix(".zip") {
-        let target = name[:name.length() - (if name.has_suffix(".zip") { 4 } else { 7 })][7:].to_owned()
+        let target = name[:name.length() -
+        (if name.has_suffix(".zip") { 4 } else { 7 })][7:].to_owned()
         source.contains("\"\{target}\"")
       } else {
         source.contains("\"\{name}\"")
@@ -1913,29 +1948,29 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
       doc.content + "\n",
     )
   })
-  setup.given2("the local assets are {string} and the GitHub release has {string}", fn(
-    here : String,
-    remote : String,
-  ) {
-    self.local_assets = words(here)
-    self.remote_assets = words(remote)
-  })
-  setup.then2(
-    "the gh steps when the release exists: {string} are {string}",
-    fn(exists : String, expected : String) raise {
-      let steps = github_steps(
-        yes(exists),
-        self.remote_assets,
-        self.local_assets,
-        tag="v0.0.1",
-        target="abc123",
-        notes_file="notes.md",
-      )
-      @expect.expect(steps.map(args => args.join(" ")).join(" | ")).to_equal(
-        expected,
-      )
+  setup.given2(
+    "the local assets are {string} and the GitHub release has {string}",
+    fn(here : String, remote : String) {
+      self.local_assets = words(here)
+      self.remote_assets = words(remote)
     },
   )
+  setup.then2("the gh steps when the release exists: {string} are {string}", fn(
+    exists : String,
+    expected : String,
+  ) raise {
+    let steps = github_steps(
+      yes(exists),
+      self.remote_assets,
+      self.local_assets,
+      tag="v0.0.1",
+      target="abc123",
+      notes_file="notes.md",
+    )
+    @expect.expect(steps.map(args => args.join(" ")).join(" | ")).to_equal(
+      expected,
+    )
+  })
   setup.then1("the gh steps for a draft release are {string}", fn(
     expected : String,
   ) raise {
@@ -1952,26 +1987,24 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
       expected,
     )
   })
-  setup.then3("a command that exits with {int} and prints {string} is transient: {string}", fn(
-    code : Int,
-    output : String,
-    expected : String,
-  ) raise {
-    let actual = if is_transient(code, output) { "yes" } else { "no" }
-    @expect.expect(actual).to_equal(expected)
-  })
-  setup.then3("git merge-base exits with {int} and prints {string} gives {string}", fn(
-    code : Int,
-    output : String,
-    expected : String,
-  ) raise {
-    let actual = match ancestor_answer(code, output, "v0.0.1") {
-      Ok(true) => "on main"
-      Ok(false) => "not on main"
-      Err(message) => "error: \{message}"
-    }
-    @expect.expect(actual).to_equal(expected)
-  })
+  setup.then3(
+    "a command that exits with {int} and prints {string} is transient: {string}",
+    fn(code : Int32, output : String, expected : String) raise {
+      let actual = if is_transient(code, output) { "yes" } else { "no" }
+      @expect.expect(actual).to_equal(expected)
+    },
+  )
+  setup.then3(
+    "git merge-base exits with {int} and prints {string} gives {string}",
+    fn(code : Int32, output : String, expected : String) raise {
+      let actual = match ancestor_answer(code, output, "v0.0.1") {
+        Ok(true) => "on main"
+        Ok(false) => "not on main"
+        Err(message) => "error: \{message}"
+      }
+      @expect.expect(actual).to_equal(expected)
+    },
+  )
   setup.given2("moon.mod on main is {string} and the latest tag is {string}", fn(
     main : String,
     latest : String,
@@ -1996,7 +2029,12 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
   )
   setup.given4(
     "mooncakes.io has {string} for {string} and {string} for {string}",
-    fn(first : String, first_name : String, second : String, second_name : String) raise {
+    fn(
+      first : String,
+      first_name : String,
+      second : String,
+      second_name : String,
+    ) raise {
       self.facts = {
         ..self.facts,
         mooncakes: [
@@ -2006,11 +2044,13 @@ impl @moonspec.World for ReleaseWorld with fn configure(self, setup) {
       }
     },
   )
-  setup.given1("the GitHub release lacks the assets {string}", fn(names : String) {
-    self.facts = { ..self.facts, missing_assets: words(names) }
+  setup.given1("the GitHub release lacks the assets {string}", fn(
+    names : String,
+  ) {
+    self.facts = { ..self.facts, missing_assets: words(names), }
   })
   setup.given2("{int} unreleased commits and release pull requests {string}", fn(
-    n : Int,
+    n : Int32,
     prs : String,
   ) {
     self.facts = {

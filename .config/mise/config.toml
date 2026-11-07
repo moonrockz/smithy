@@ -196,7 +196,7 @@ description = "Vendor and embed the official JMESPath compliance tests (args: gi
 run = "moonx scripts/vendor-jmespath.mbtx"
 
 [tasks."regex:vendor:check"]
-description = "Check the regex engine that smithy-validation copies from core against the core of the pinned toolchain (args: --diff, a core directory)"
+description = "Check moonrockz/regex against its explicitly pinned core source (args: --diff, a core directory)"
 run = "moonx scripts/regex-vendor-check.mbtx"
 
 [tasks."test:scripts"]
@@ -321,6 +321,10 @@ run = "moonx scripts/test-resource-consumer.mbtx"
 [tasks."test:validation-consumer"]
 description = "Compile and run an isolated packaged validation consumer on all targets"
 run = "moonx scripts/test-validation-consumer.mbtx"
+
+[tasks."test:regex-consumer"]
+description = "Compile and run a core-only packaged regex consumer on all targets"
+run = "moonx scripts/test-validation-consumer.mbtx --regex"
 
 [tasks."test:ion-consumer"]
 description = "Compile and run an isolated packaged Ion validation consumer on all targets"
