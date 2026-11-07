@@ -6,6 +6,31 @@ is 0.x, a minor release can contain breaking changes.
 
 <!-- git-cliff: end of header -->
 
+## [0.9.0] - 2026-11-07
+
+Reusable bounded runtime matching is now available in `moonrockz/regex`, with compilation limits and per-call work budgets. Smithy `@pattern` validation uses this shared engine while retaining its portable ECMA translation and default validation allowance. Work counts change with the new engine; exhausted matches still report incomplete validation. This release uses MoonBit 0.10.18 and includes parallel release builds and workspace coverage reporting.
+
+### 🚀 Features
+
+- *(regex)* Add reusable bounded matching ([#95](https://github.com/moonrockz/smithy/pull/95)) by @DamianReeves
+
+### 📚 Documentation
+
+- *(release)* Explain local toolchain conflicts ([#89](https://github.com/moonrockz/smithy/pull/89)) by @DamianReeves
+
+### 🏗️ Build and CI
+
+- *(release)* Allow full validation to finish ([#90](https://github.com/moonrockz/smithy/pull/90)) by @DamianReeves
+- Capture MoonBit workspace coverage ([#91](https://github.com/moonrockz/smithy/pull/91)) by @DamianReeves
+- Share parallel release artifact builds ([#92](https://github.com/moonrockz/smithy/pull/92)) by @DamianReeves
+- Upgrade MoonBit to 0.10.18 ([#94](https://github.com/moonrockz/smithy/pull/94)) by @DamianReeves
+
+### ⚙️ Maintenance
+
+- Adopt shared OpenSpec HTML designs ([#93](https://github.com/moonrockz/smithy/pull/93)) by @DamianReeves
+
+**Full changelog**: https://github.com/moonrockz/smithy/compare/v0.8.0...v0.9.0
+
 ## [0.8.0] - 2026-10-28
 
 This release adds `moonrockz/smithy-codec` for checking, decoding and encoding application JSON with model-declared serialization profiles and versioned document bundles. Use `smithy validate value --profile` or `--bundle` to check these representations, `smithy codec canonicalize` to write canonical JSON, and the `jsonCodec` build plugin to check or canonicalize files during a build. The Morphir examples and tour lessons cover version 3 and version 4 IR representations, while existing validation keeps its behavior when no profile or bundle is selected. Release preparation now checks for an existing release branch before changing the checkout, and the repository includes an OpenSpec workflow with HTML designs and beads tracking.

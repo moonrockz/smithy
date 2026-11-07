@@ -1,6 +1,6 @@
 name = "moonrockz/regex"
 
-version = "0.8.0"
+version = "0.9.0"
 
 description = "Portable runtime regular expressions with deterministic work limits"
 
