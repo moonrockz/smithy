@@ -20,6 +20,7 @@ pub using @samples {
 ///|
 /// A message from the page to the Worker. `seq` comes back unchanged in the
 /// response, so the page can drop a stale response.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum Request {
   Validate(seq~ : Int32, model~ : String)
   Transform(
@@ -108,17 +109,18 @@ pub(all) enum Request {
     old~ : Array[(String, String)],
     new~ : Array[(String, String)]
   )
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 /// An event of a model diff, as the library writes it. `shape` is the shape ID
 /// or `None`, as the CLI prints `-`.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct DiffEvent {
   id : String
   severity : String
   shape : String?
   message : String
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 /// The line that `smithy diff` prints for the event: line breaks of the
@@ -135,6 +137,7 @@ pub fn DiffEvent::cli_line(self : DiffEvent) -> String {
 /// A finding of the model, as the library writes it. `severity` and `code` are
 /// the library's strings (`ERROR`, `WARNING`, ...). A line or column of 0 means
 /// that the library gave no place in the model text.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct Diagnostic {
   severity : String
   code : String
@@ -145,13 +148,14 @@ pub(all) struct Diagnostic {
   end_line : Int32
   end_column : Int32
   shape : String?
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 /// A transcript entry. `line` and `column` are the place of the message in the
 /// transcript text. `receiver` is the receiver that the document names, else
 /// the other peer for a request; it is `None` for a reply with no named
 /// receiver.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct EntryView {
   index : Int32
   sender : String
@@ -159,11 +163,12 @@ pub(all) struct EntryView {
   message : String
   line : Int32?
   column : Int32?
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 /// A transcript finding, with the fields of the CLI JSON report. `severity` is
 /// "error" or "advisory". `path` is a JSON pointer.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct FindingView {
   code : String
   severity : String
@@ -176,27 +181,30 @@ pub(all) struct FindingView {
   path : String?
   shape : String?
   operation : String?
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct ExpectedView {
   code : String
   entry : Int32?
   related : Int32?
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 /// The match of the findings against the `expect` list of the transcript.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct ExpectationView {
   matched : Bool
   missing : Array[ExpectedView]
   /// The unexpected findings with severity "error".
   unexpected : Array[FindingView]
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 /// The result at the end of a transcript. `lines`, `not_json` and `skipped`
 /// are the counts of a JSONL log; they are 0 for other formats.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct SummaryView {
   valid : Bool
   complete : Bool
@@ -208,28 +216,31 @@ pub(all) struct SummaryView {
   not_json : Int32
   skipped : Int32
   expectations : ExpectationView?
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 /// Why a request did not run, for the page to choose its copy.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum BlockKind {
   /// The model has errors, and a transform needs a model without them.
   ModelErrors
   /// Any other reason; the `reason` text of the response says it.
   Other
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 /// A structure of the model with the `smithy.rpc#jsonRpcProtocol` trait: the
 /// versions that it declares and the names of its peers, in trait order.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct ProtocolView {
   id : String
   versions : Array[String]
   peers : Array[String]
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 /// A line of a value or message check, with the fields that the CLI prints.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum DataFinding {
   /// A finding in the checked text. `path` is a JSON pointer; "" is the root.
   /// `offset` is the place in the text when the check gives one (a JSON-RPC
@@ -251,9 +262,10 @@ pub(all) enum DataFinding {
     source~ : String?,
     offset~ : Int32?
   )
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum Response {
   /// The diagnostics of the model, and its JSON-RPC protocols, by shape ID.
   /// A model that does not assemble lists no protocol.
@@ -304,4 +316,4 @@ pub(all) enum Response {
     events~ : Array[DiffEvent]?,
     breaking~ : Bool
   )
-} derive(Eq, Debug, ToJson, FromJson)
+}

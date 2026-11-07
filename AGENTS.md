@@ -30,15 +30,16 @@ then works on every platform, and it uses the toolchain that mise already instal
 - Declare its mise task in `.config/mise/config.toml`: `run = "moonx scripts/<name>.mbtx"`.
   `scripts/validate-packages.mbtx` (`mise run validate:packages`) is the reference example.
 - Put the imports in frontmatter, between two `----` lines at the start of the file. MoonBit 0.10.18
-  warns about an import block outside frontmatter (`unfenced_import`).
+  and later warn about an import block outside frontmatter (`unfenced_import`).
 - Pin the version of each import: `"moonbitlang/async@0.22.7/process"`. Use `moonbitlang/async` for processes
   (`@process.run`, `@process.collect_output`), files (`@fs`) and `@stdio`; `moonbitlang/core/env` for `@env.args()`
   and environment variables; `moonbitlang/x/sys` for `@sys.exit`.
 - `scripts/test.mbtx`, the `tests` module, `site`, `runtimes/moonbit` and the generated MoonBit peers stay
   on async 0.22.5. async 0.22.7 fails wasm-gc validation when a module reaches its scheduler
-  (moonrockz/moon-lander#154), and zig-cross 0.3.2 hides `O_PATH` from it on a Linux glibc host
-  (moonrockz/moonx-tools#17). Generated peers are built with the consumer's toolchain, and async 0.22.6
-  and later need the 0.10.18 core.
+  (moonrockz/moon-lander#154). Generated peers are built with the consumer's toolchain, and async 0.22.6
+  and later need the 0.10.18 core or later. zig-cross 0.4.0 and later no longer hide `O_PATH` from
+  async 0.22.7 on a Linux glibc host (moonrockz/moonx-tools#17), so `scripts/test.mbtx` and the `tests`
+  module can move to 0.22.7 in a separate change.
 - `@env.args()` has the script binary at index 0. Task arguments start at index 1 (`mise run task -- arg`).
 - A `.mbtx` file cannot start with a shebang line, so a mise file task cannot be a `.mbtx` file. Keep the toml
   task declaration.
@@ -264,9 +265,9 @@ when the clone has no Dolt data yet.
 
 Use the shared `html-design` schema for new changes. Read `openspec/README.md`
 and `openspec/config.yaml`; repository-local tracking and approval rules still apply.
-The files under `openspec/schemas/html-design/` and `scripts/openspec-ext.mbtx`
-are managed by Mission Control's openspec-ext bundle. Change the shared source
-and reinstall instead of editing these snapshots. Run `mise run openspec:check`
-and `mise exec -- openspec validate --all --strict` after configuration changes.
+The files under `openspec/schemas/html-design/` are managed by the pinned
+Mission Control tools CLI (`mission-control-tools`, in `.config/mise/config.toml`).
+Change the shared source and reinstall instead of editing these snapshots.
+Run `mise run openspec:verify` after configuration changes.
 OpenSpec artifacts are committed project documentation; existing scratch-document
 rules continue to apply to local notes. Existing changes retain their own schema.

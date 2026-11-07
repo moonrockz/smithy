@@ -5,7 +5,8 @@ fn pick(rs : @splitmix.RandomState, n : Int32) -> Int32 {
 
 ///|
 /// A random non-negative offset, at most 1000.
-pub(all) struct AnyOffset(@span.Offset) derive(Debug)
+#derive(Debug)
+pub(all) struct AnyOffset(@span.Offset)
 
 ///|
 pub impl @quickcheck.Arbitrary for AnyOffset with fn arbitrary(_size, rs) {
@@ -18,7 +19,8 @@ pub impl @quickcheck.Arbitrary for AnyOffset with fn arbitrary(_size, rs) {
 pub impl @quickcheck.Shrink for AnyOffset
 
 ///|
-pub(all) struct AnyLength(@span.Length) derive(Debug)
+#derive(Debug)
+pub(all) struct AnyLength(@span.Length)
 
 ///|
 pub impl @quickcheck.Arbitrary for AnyLength with fn arbitrary(_size, rs) {
@@ -31,7 +33,8 @@ pub impl @quickcheck.Shrink for AnyLength
 ///|
 /// A random text of ASCII letters, spaces, LF, CRLF and lone CR, with an
 /// offset inside it (or at its end).
-pub(all) struct TextAndOffset(String, @span.Offset) derive(Debug)
+#derive(Debug)
+pub(all) struct TextAndOffset(String, @span.Offset)
 
 ///|
 pub impl @quickcheck.Arbitrary for TextAndOffset with fn arbitrary(size, rs) {

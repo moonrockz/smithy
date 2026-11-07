@@ -1,6 +1,7 @@
 ///|
 /// Serialized HTTP messages. Query strings retain wire spelling and duplicates;
 /// headers retain repeated values. The host is the resolved destination host.
+#derive(Eq, Debug)
 pub(all) enum HttpMessage {
   Request(
     verb~ : String,
@@ -11,9 +12,10 @@ pub(all) enum HttpMessage {
     body~ : Bytes
   )
   Response(code~ : Int32, headers~ : Array[(String, String)], body~ : Bytes)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum Field {
   MessageKind
   Method
@@ -28,21 +30,23 @@ pub(all) enum Field {
   RequiredHeader(String)
   Body
   Implementation
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Mismatch {
   field : Field
   expected : String
   actual : String
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum Outcome {
   Matched
   Mismatched(Array[Mismatch])
   Skipped
-} derive(Eq, Debug)
+}
 
 ///|
 /// An adapter supplies the protocol implementation, configuration and model.

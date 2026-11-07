@@ -1,7 +1,8 @@
 ///|
+#derive(Eq, Debug)
 pub struct NpmPackageName {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn NpmPackageName::parse(text : String) -> NpmPackageName? {
@@ -39,9 +40,10 @@ pub fn NpmPackageName::to_string(self : NpmPackageName) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct NpmVersion {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn NpmVersion::parse(text : String) -> NpmVersion? {
@@ -99,10 +101,11 @@ pub fn NpmVersion::to_string(self : NpmVersion) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct NpmPackageRef {
   name : NpmPackageName
   version : NpmVersion
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn NpmPackageRef::to_string(self : NpmPackageRef) -> String {
@@ -131,13 +134,14 @@ pub fn NpmPackageRef::from_key(key : ArtifactKey) -> NpmPackageRef? {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct NpmResolution {
   registry : RepositoryUrl
   reference : NpmPackageRef
   metadata : Acquisition
   tarball : HttpUrl
   integrity : NpmIntegrity
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn NpmResolution::to_string(self : NpmResolution) -> String {
@@ -156,11 +160,12 @@ pub fn NpmResolution::to_string(self : NpmResolution) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct NpmArchive {
   registry : RepositoryUrl
   reference : NpmPackageRef
   expected_digest : ContentDigest?
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Provenance::npm_requested(

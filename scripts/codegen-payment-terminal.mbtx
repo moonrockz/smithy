@@ -102,7 +102,7 @@ async fn main {
         build_config,
       ]
   }
-  let status = @process.run(command[0], command[1:].to_array())
+  let status = @process.run(command[0], command[1:].to_owned())
   if status != 0 {
     println("❌ smithy build failed with exit status \{status}.")
     @sys.exit(1)

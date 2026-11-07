@@ -80,10 +80,12 @@ test "classes with surrogate members or a non-boundary escape are unsupported" {
     }
     assert_true(rejected, msg=pattern)
   }
+  // The lone halves of a pair. `exact_view` and `clamped_view` do not split a
+  // pair, so `unsafe_view` makes them; both bounds are in "😀".
   for
     unit in [
-      "😀".view(end_offset=1).to_owned(),
-      "😀".view(start_offset=1).to_owned(),
+      "😀".unsafe_view(start=0, end=1).to_owned(),
+      "😀".unsafe_view(start=1, end=2).to_owned(),
     ] {
     let mut rejected = false
     ignore(compile_pattern("^[" + unit + "]$", id)) catch {

@@ -1,11 +1,12 @@
 ///|
 /// Numeric components are normalized by NodeNumber. Never expand an exponent or
 /// use a floating-point approximation as a correlation key.
+#derive(Eq, Hash)
 priv enum BatchId {
   NullId
   StringId(String)
   NumberId(BigInt, BigInt)
-} derive(Eq, Hash)
+}
 
 ///|
 fn batch_id(id : RequestId) -> BatchId? {

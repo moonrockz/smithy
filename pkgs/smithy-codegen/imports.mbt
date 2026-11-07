@@ -1,21 +1,23 @@
 ///|
 /// An import that a generated file needs. The `local_name` is the name that the
 /// file uses for the symbol, when it is not the name of the symbol.
+#derive(Eq, Compare, Hash, Debug)
 pub(all) struct ImportEntry {
   ns : Namespace
   name : SymbolName
   local_name : SymbolName?
-} derive(Eq, Compare, Hash, Debug)
+}
 
 ///|
 /// A package that a generated file imports, for a language that imports
 /// packages: Go `import qualifier "path"` or MoonBit `"path" @qualifier` in `moon.pkg`.
 /// `explicit` is true when a symbol reference asked for the qualifier.
+#derive(Eq, Hash, Debug)
 pub(all) struct PackageImport {
   ns : Namespace
   qualifier : SymbolName
   explicit : Bool
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 /// Lexical order of the namespace, then of the qualifier.

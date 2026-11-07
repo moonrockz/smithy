@@ -1,10 +1,11 @@
 ///|
 /// A logical scalar produced or consumed by an adapter.
+#derive(Eq, Debug)
 pub(all) enum ScalarValue {
   Text(String)
   Numeric(@smithy.NodeNumber)
   Flag(Bool)
-} derive(Eq, Debug)
+}
 
 ///|
 fn ScalarValue::kind(self : ScalarValue) -> @contract.JsonKind {
@@ -17,10 +18,11 @@ fn ScalarValue::kind(self : ScalarValue) -> @contract.JsonKind {
 
 ///|
 /// An adapter refusal, at a path relative to the value that the adapter reads.
+#derive(Eq, Debug)
 pub struct AdapterFailure {
   path : @validation.InstancePath
   message : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn AdapterFailure::new(

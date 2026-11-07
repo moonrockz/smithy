@@ -461,10 +461,11 @@ fn BuildRunner::validate_config(self : BuildRunner) -> Unit raise BuildError {
 
 ///|
 /// Artifacts from successful plugins and failures reported by the build.
+#derive(Debug)
 pub(all) struct BuildResult {
   artifacts : Map[String, String]
   errors : Array[String]
-} derive(Debug)
+}
 
 ///|
 /// Produce artifacts, raising if any projection failed.

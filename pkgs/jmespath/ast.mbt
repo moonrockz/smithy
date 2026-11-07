@@ -1,18 +1,20 @@
 ///|
 /// A half-open range of UTF-16 offsets in the original expression.
+#derive(Eq, Debug)
 pub(all) struct Span {
   start : Int32
   end : Int32
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ErrorCode {
   Syntax
   InvalidType
   InvalidValue
   InvalidArity
   UnknownFunction
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ErrorCode::to_string(self : ErrorCode) -> String {
@@ -26,11 +28,12 @@ pub fn ErrorCode::to_string(self : ErrorCode) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Diagnostic {
   code : ErrorCode
   message : String
   span : Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// One-based line and UTF-16 column in the supplied expression source.
@@ -58,11 +61,13 @@ pub fn Diagnostic::line_column(
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) suberror JmespathError {
   JmespathError(Diagnostic)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum Operator {
   Pipe
   Or
@@ -73,18 +78,20 @@ pub(all) enum Operator {
   LessEqual
   Greater
   GreaterEqual
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Node {
   kind : NodeKind
   span : Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// Projections retain their input and per-element expression separately.
 /// ExpressionRef nodes represent late-bound expressions such as &name, including
 /// function arguments in sort_by(items, &name).
+#derive(Eq, Debug)
 pub(all) enum NodeKind {
   Identity
   Field(String)
@@ -102,14 +109,15 @@ pub(all) enum NodeKind {
   ExpressionRef(Node)
   Binary(Operator, Node, Node)
   Not(Node)
-} derive(Eq, Debug)
+}
 
 ///|
 /// A reusable parsed expression. The AST is public for downstream analyzers.
+#derive(Eq, Debug)
 pub(all) struct Expression {
   source : String
   root : Node
-} derive(Eq, Debug)
+}
 
 ///|
 fn node(kind : NodeKind, start : Int32, end : Int32) -> Node {

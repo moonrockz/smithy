@@ -1,7 +1,8 @@
 ///|
+#derive(Debug)
 suberror CliError {
   CliError(String, Int32)
-} derive(Debug)
+}
 
 ///|
 fn version_text() -> String {

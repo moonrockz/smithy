@@ -1,6 +1,7 @@
 ///|
 /// What the page needs to start the playground. The pre-render writes it in
 /// the site data of the playground page.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct PlaygroundData {
   /// The Smithy version that the Worker runs.
   version : String
@@ -13,7 +14,7 @@ pub(all) struct PlaygroundData {
   transcripts : Array[@samples.TranscriptSample]
   /// The index of the transcript to open.
   transcript : Int32
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend PlaygroundData with Eq::{equal, not_equal}
@@ -30,6 +31,7 @@ pub extend PlaygroundData with FromJson::{from_json}
 ///|
 /// A diagnostic of the model, as the library writes it. Lines and columns
 /// start at 1; a line of 0 means that the library gave no place in the text.
+#derive(Eq, Debug)
 pub(all) struct Diagnostic {
   severity : String
   code : String
@@ -40,7 +42,7 @@ pub(all) struct Diagnostic {
   end_line : Int32
   end_column : Int32
   shape : String?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Diagnostic with Eq::{equal, not_equal}
@@ -59,6 +61,7 @@ pub using @samples {type Tab, type Output}
 
 ///|
 /// The result of the newest check that the page shows.
+#derive(Eq, Debug)
 pub(all) enum Check {
   /// No answer yet.
   Unchecked
@@ -69,7 +72,7 @@ pub(all) enum Check {
   Stopped
   /// The Worker stopped with an error, given by the browser, and was replaced.
   Failed(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Check with Eq::{equal, not_equal}
@@ -79,12 +82,13 @@ pub extend Check with @debug.Debug::{to_repr}
 
 ///|
 /// Why the Worker did not run a request.
+#derive(Eq, Debug)
 pub(all) enum BlockedBy {
   /// The model has errors.
   ModelErrors
   /// Any other reason. The text of the answer says it.
   Other
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend BlockedBy with Eq::{equal, not_equal}
@@ -94,11 +98,12 @@ pub extend BlockedBy with @debug.Debug::{to_repr}
 
 ///|
 /// The request that the Worker runs now. One request runs at a time.
+#derive(Eq, Debug)
 pub(all) enum Kind {
   Validating
   Transforming
   Transcribing
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Kind with Eq::{equal, not_equal}
@@ -109,6 +114,7 @@ pub extend Kind with @debug.Debug::{to_repr}
 ///|
 /// The answer of the Worker to a request. The text of the files stays in
 /// the page script; the model holds the names only.
+#derive(Eq, Debug)
 pub(all) enum Answer {
   /// The diagnostics and the JSON-RPC protocols of the model.
   Validated(
@@ -131,7 +137,7 @@ pub(all) enum Answer {
     done~ : Bool,
     summary~ : Summary?
   )
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Answer with Eq::{equal, not_equal}
@@ -141,6 +147,7 @@ pub extend Answer with @debug.Debug::{to_repr}
 
 ///|
 /// The state of the Transform tab.
+#derive(Eq, Debug)
 pub(all) enum Transformation {
   /// No run yet.
   TxIdle
@@ -167,7 +174,7 @@ pub(all) enum Transformation {
   TxStopped
   /// The Worker stopped with an error, given by the browser, and was replaced.
   TxFailed(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Transformation with Eq::{equal, not_equal}
@@ -177,11 +184,12 @@ pub extend Transformation with @debug.Debug::{to_repr}
 
 ///|
 /// The result of the Copy button.
+#derive(Eq, Debug)
 pub(all) enum Copy {
   NotCopied
   Copied
   CopyFailed
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Copy with Eq::{equal, not_equal}
@@ -192,6 +200,7 @@ pub extend Copy with @debug.Debug::{to_repr}
 ///|
 /// What the share button did, or why the page opened without the link that
 /// it was given.
+#derive(Eq, Debug)
 pub(all) enum Share {
   NoShare
   /// The URL of the link, which the clipboard took.
@@ -204,7 +213,7 @@ pub(all) enum Share {
   LinkRefused(String)
   /// The user pasted a link that the page could not read. The page kept its state.
   LinkIgnored(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Share with Eq::{equal, not_equal}
@@ -214,6 +223,7 @@ pub extend Share with @debug.Debug::{to_repr}
 
 ///|
 /// How the page was opened.
+#derive(Eq, Debug)
 pub(all) enum Opened {
   /// With no link in the address.
   Default
@@ -221,7 +231,7 @@ pub(all) enum Opened {
   Shared(@samples.ShareState)
   /// With a link that the page could not read. The text says why.
   Refused(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Opened with Eq::{equal, not_equal}
@@ -230,6 +240,7 @@ pub extend Opened with Eq::{equal, not_equal}
 pub extend Opened with @debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Model {
   data : PlaygroundData
   sample : Int32
@@ -297,7 +308,7 @@ pub(all) struct Model {
   grouped : Bool
   /// The tabs whose controls are folded away.
   folded : Folded
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Model with Eq::{equal, not_equal}
@@ -306,6 +317,7 @@ pub extend Model with Eq::{equal, not_equal}
 pub extend Model with @debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum Msg {
   /// The model text changed.
   Edited
@@ -370,7 +382,7 @@ pub(all) enum Msg {
   GroupToggled
   /// The fold button of the controls of a tab.
   FoldToggled(@samples.Tab)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Msg with Eq::{equal, not_equal}
@@ -381,6 +393,7 @@ pub extend Msg with @debug.Debug::{to_repr}
 ///|
 /// What the page must do after an update. The page reads the model text from
 /// the editor when it sends a request, so the text is not in the model.
+#derive(Eq, Debug)
 pub(all) enum Effect {
   /// Send `then` after `ms` milliseconds.
   Wait(ms~ : Int32, then~ : Msg)
@@ -440,7 +453,7 @@ pub(all) enum Effect {
   StoreGrouped(Bool)
   /// Keep the folds of the tabs in the browser for the next visit.
   StoreFolded(Folded)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Effect with Eq::{equal, not_equal}

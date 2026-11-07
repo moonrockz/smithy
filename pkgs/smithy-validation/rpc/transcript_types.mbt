@@ -1,31 +1,35 @@
 ///|
 /// Declared, never assumed. Complete reports each unanswered call as missing;
 /// Partial reports it as outstanding.
+#derive(Eq, Debug)
 pub(all) enum Completeness {
   Complete
   Partial
-} derive(Eq, Debug)
+}
 
 ///|
 /// One-based line and column of an entry in its source document.
+#derive(Eq, Debug)
 pub(all) struct SourceLocation {
   line : Int32
   column : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 /// One message sent by a named peer. The receiver is the other peer.
+#derive(Eq, Debug)
 pub(all) struct TranscriptEntry {
   sender : PeerName
   /// The receiver the document names, if any; it must be the other peer.
   receiver : PeerName?
   message : String
   location : SourceLocation?
-} derive(Eq, Debug)
+}
 
 ///|
 /// Constructor names differ from FindingCode so that unqualified FindingCode
 /// constructors stay unambiguous; `to_string` gives the stable code names.
+#derive(Eq, Debug)
 pub(all) enum TranscriptCode {
   /// A message-level finding from the request or response validator.
   Message(FindingCode)
@@ -55,7 +59,7 @@ pub(all) enum TranscriptCode {
   CancelInactiveCall
   RefusalExpected
   UnknownCallReference
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn TranscriptCode::to_string(self : TranscriptCode) -> String {
@@ -86,6 +90,7 @@ pub fn TranscriptCode::to_string(self : TranscriptCode) -> String {
 ///|
 /// A finding about one entry. `entry` is zero-based; `related` lists other
 /// entries, such as the call a reply answers or the first reply of a duplicate.
+#derive(Eq, Debug)
 pub(all) struct TranscriptFinding {
   code : TranscriptCode
   severity : @validation.FindingSeverity
@@ -95,7 +100,7 @@ pub(all) struct TranscriptFinding {
   related : Array[Int32]
   finding : Finding?
   message : String
-} derive(Eq, Debug)
+}
 
 ///|
 /// An InvalidTranscript reader finding at a place in the transcript text.
@@ -151,6 +156,7 @@ pub impl @json.ToJson for TranscriptFinding with fn to_json(self) {
 
 ///|
 /// Bounds on the checker's memory and output. Exceeding one gives a finding.
+#derive(Eq, Debug)
 pub struct TranscriptLimits {
   /// Active calls, unreadable entries and pending batches, each per sender.
   active_calls : Int32
@@ -160,7 +166,7 @@ pub struct TranscriptLimits {
   entry_bytes : Int32
   /// Findings for the whole transcript, including the final limit finding.
   findings : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 const DEFAULT_ACTIVE_CALLS : Int32 = 1024
@@ -209,6 +215,7 @@ pub fn TranscriptLimits::new(
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct TranscriptSummary {
   /// Findings known only at the end of input.
   findings : Array[TranscriptFinding]
@@ -218,4 +225,4 @@ pub struct TranscriptSummary {
   correlation : Bool
   /// False when a limit stopped a check.
   complete : Bool
-} derive(Eq, Debug)
+}

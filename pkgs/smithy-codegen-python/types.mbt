@@ -12,6 +12,7 @@ let errors_module : String = ".errors"
 
 ///|
 /// The Python type of a shape value, as a Pydantic field annotation.
+#derive(Eq, Debug)
 priv enum Ty {
   Str
   Boolean
@@ -28,7 +29,7 @@ priv enum Ty {
   MapOf(Ty)
   Opt(Ty)
   UnitT
-} derive(Eq, Debug)
+}
 
 ///|
 /// The wrappers of a type, outer first, and the leaf type inside them. The

@@ -27,12 +27,14 @@ pub fn walk(NodeRef, (NodeRef) -> Control, leave? : (NodeRef) -> Unit) -> Unit
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum Control {
   Continue
   SkipChildren
   Stop
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub struct EnterEvent {
   category : String
   kind : String
@@ -40,13 +42,14 @@ pub struct EnterEvent {
   start : @span.Offset
   depth : Int32
   path : NodePath
-} derive(Eq, @debug.Debug)
+}
 pub fn EnterEvent::new(category~ : String, kind~ : String, field~ : String?, start~ : @span.Offset, path~ : NodePath) -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Event {
   Enter(EnterEvent)
   Leave(LeaveEvent)
-} derive(Eq, @debug.Debug)
+}
 
 pub struct EventReader {
   // private fields
@@ -55,16 +58,18 @@ pub fn EventReader::iter(Self) -> Iter[Event]
 pub fn EventReader::new(NodeRef) -> Self
 pub impl EventSource for EventReader
 
+#derive(Eq, @debug.Debug)
 pub struct LeaveEvent {
   node : NodeRef
   depth : Int32
   path : NodePath
-} derive(Eq, @debug.Debug)
+}
 pub fn LeaveEvent::new(node~ : NodeRef, path~ : NodePath) -> Self
 
+#derive(Eq, Hash)
 pub struct NodePath {
   // private fields
-} derive(Eq, Hash)
+}
 pub fn NodePath::append(Self, Self) -> Self
 pub fn NodePath::child(Self, String, Int32) -> Self
 pub fn NodePath::depth(Self) -> Int32
@@ -77,6 +82,7 @@ pub fn NodePath::steps(Self) -> Array[PathStep]
 pub impl Show for NodePath
 pub impl @debug.Debug for NodePath
 
+#derive(Eq, @debug.Debug)
 pub(all) enum NodeRef {
   File(@ast.IdlFile, ArrayView[@scanner.Comment])
   Control(@ast.ControlStatement)
@@ -97,7 +103,7 @@ pub(all) enum NodeRef {
   Name(@ast.Node[String])
   Doc(@ast.DocComment)
   Comment(@scanner.Comment)
-} derive(Eq, @debug.Debug)
+}
 pub fn NodeRef::category(Self) -> String
 pub fn NodeRef::children(Self) -> Array[Self]
 pub fn NodeRef::children_with_fields(Self) -> Array[(PathStep, Self)]
@@ -108,10 +114,11 @@ pub fn NodeRef::kind(Self) -> String
 pub fn NodeRef::of_result(@parser.ParseResult) -> Self?
 pub fn NodeRef::span(Self) -> @span.Span
 
+#derive(Eq, Hash, @debug.Debug)
 pub(all) struct PathStep {
   field : String
   index : Int32
-} derive(Eq, Hash, @debug.Debug)
+}
 
 pub struct Tree {
   // private fields

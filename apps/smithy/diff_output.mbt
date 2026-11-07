@@ -1,8 +1,9 @@
 ///|
+#derive(Eq, Debug)
 enum DiffFormat {
   Text
   Jsonl
-} derive(Eq, Debug)
+}
 
 ///|
 fn DiffFormat::parse(value : String) -> DiffFormat raise CliError {

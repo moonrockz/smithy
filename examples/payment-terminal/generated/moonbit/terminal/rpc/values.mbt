@@ -36,9 +36,10 @@ fn is_integer_text(text : String) -> Bool {
 ///|
 /// A decimal number with its exact text, such as `20.00`. Two values are
 /// equal when their texts are equal.
+#derive(Eq, Hash, Debug)
 pub struct Decimal {
   priv text : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 /// Gives a Decimal when `text` is a number of the JSON grammar.
@@ -170,9 +171,10 @@ pub fn Decimal::compare_value(self : Decimal, other : Decimal) -> Int32 {
 
 ///|
 /// An integer with its exact text, such as `9007199254740993`.
+#derive(Eq, Hash, Debug)
 pub struct BigInteger {
   priv text : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 /// Gives a BigInteger when `text` is an integer of the JSON grammar.
@@ -213,18 +215,20 @@ pub fn BigInteger::from_json(
 
 ///|
 /// The JSON forms of a timestamp in Smithy.
+#derive(Eq, Debug)
 pub(all) enum TimestampFormat {
   EpochSeconds
   DateTime
   HttpDate
-} derive(Eq, Debug)
+}
 
 ///|
 /// A timestamp. It keeps the JSON value that it was read from, so that it
 /// writes the same text again.
+#derive(Eq, Debug)
 pub struct Timestamp {
   priv value : Json
-} derive(Eq, Debug)
+}
 
 ///|
 pub impl Show for Timestamp with fn output(self, logger) {

@@ -1,10 +1,11 @@
 ///|
 /// A transport that a generated peer supports.
+#derive(Eq, Debug)
 pub(all) enum Transport {
   Stdio
   Http
   WebSocket
-} derive(Eq, Debug)
+}
 
 ///|
 /// The setting text of a transport.

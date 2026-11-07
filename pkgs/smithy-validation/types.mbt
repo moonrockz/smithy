@@ -1,14 +1,16 @@
 ///|
+#derive(Debug)
 pub(all) suberror ConfigurationError {
   ConfigurationError(String)
-} derive(Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub struct Limits {
   depth : Int32
   work : Int32
   findings : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Limits::new(
@@ -30,30 +32,35 @@ pub fn Limits::new(
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum UnknownMembers {
   Reject
   Ignore
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum MemberNames {
   Smithy
   JsonName
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum TimestampFormat {
   EpochSeconds
   DateTime
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ValueProfile {
   JsonProfile
   NativeProfile
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub struct Config {
   profile : ValueProfile
   limits : Limits
@@ -61,7 +68,7 @@ pub struct Config {
   member_names : MemberNames
   timestamp_format : TimestampFormat
   nonnumeric_floats : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Config::new(
@@ -83,12 +90,14 @@ pub fn Config::new(
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum FindingSeverity {
   Error
   Advisory
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum FindingCode {
   TypeMismatch
   RequiredMember
@@ -107,7 +116,7 @@ pub(all) enum FindingCode {
   InvalidTimestamp
   UnsupportedValue
   LimitExceeded
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn FindingCode::to_string(self : FindingCode) -> String {
@@ -133,19 +142,21 @@ pub fn FindingCode::to_string(self : FindingCode) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Finding {
   code : FindingCode
   severity : FindingSeverity
   path : InstancePath
   shape : @smithy.ShapeId
   message : String
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct ValidationResult {
   findings : Array[Finding]
   complete : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ValidationResult::is_valid(self : ValidationResult) -> Bool {

@@ -23,16 +23,18 @@ pub fn units(Array[Int32]) -> String
 // Errors
 
 // Types and methods
+#derive(@debug.Debug)
 pub(all) struct EditedModel {
   text : String
   edit_offset : @span.Offset
-} derive(@debug.Debug)
+}
 pub fn EditedModel::edit_offset(Self) -> @span.Offset
 pub fn EditedModel::text(Self) -> String
 pub impl @quickcheck.Arbitrary for EditedModel
 pub impl @shrink.Shrink for EditedModel
 
-pub(all) struct SmithyText(Array[String]) derive(@debug.Debug)
+#derive(@debug.Debug)
+pub(all) struct SmithyText(Array[String])
 pub fn SmithyText::text(Self) -> String
 pub impl @quickcheck.Arbitrary for SmithyText
 pub impl @shrink.Shrink for SmithyText

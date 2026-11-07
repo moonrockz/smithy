@@ -8,7 +8,7 @@ import {
   "moonbitlang/x@0.5.5/sys",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
-  "moonrockz/moonspec@0.11.0",
+  "moonrockz/moonspec@0.12.0/async" @moonspec,
   "moonrockz/expect@0.6.1",
 }
 ----
@@ -54,11 +54,12 @@ fn choose_version(exit_code : Int32, stdout : String) -> String {
 
 ///|
 /// A `major.minor.patch` version.
+#derive(Eq, Compare, Debug)
 struct Version {
   major : Int32
   minor : Int32
   patch : Int32
-} derive(Eq, Compare, Debug)
+}
 
 ///|
 impl Show for Version with fn output(self, logger) {
@@ -81,7 +82,7 @@ fn parse_number(text : StringView) -> Int32? {
 fn parse_version(text : String) -> Result[Version, String] {
   let trimmed = text.trim()
   let bare = if trimmed.has_prefix("v") {
-    trimmed.view(start_offset=1)
+    trimmed.exact_view(start=1)
   } else {
     trimmed
   }
@@ -111,13 +112,13 @@ fn mod_version(moon_mod : String) -> String? {
 fn version_value(line : StringView) -> String? {
   let line = line.trim()
   guard line.has_prefix("version") else { return None }
-  let rest = line.view(start_offset=7).trim_start()
+  let rest = line.exact_view(start=7).trim_start()
   guard rest.has_prefix("=") else { return None }
-  let value = rest.view(start_offset=1).trim()
+  let value = rest.exact_view(start=1).trim()
   guard value.length() >= 2 && value.has_prefix("\"") && value.has_suffix("\"") else {
     return None
   }
-  Some(value.view(start_offset=1, end_offset=value.length() - 1).to_owned())
+  Some(value.exact_view(start=1, end=value.length() - 1).to_owned())
 }
 
 ///|
@@ -321,11 +322,12 @@ fn has_highlights(section : String) -> Bool {
 
 ///|
 /// What the Release workflow does for one run.
+#derive(Eq, Debug)
 enum Plan {
   Release(Version)
   DryRun(Version)
   Skip(String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// Decide whether a Release run releases. A pull request run, a scheduled run and a run with `dry_run`
@@ -381,11 +383,12 @@ fn checks_only(event : String, dry_run : Bool) -> Bool {
 ///|
 /// The jobs that a Release run needs after plan. `build` covers build-windows, build and smoke.
 /// `record` saves the smoke evidence when every platform passed.
+#derive(Eq, Debug)
 struct Checks {
   validate : Bool
   build : Bool
   record : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 /// Choose the jobs of a run. A release always validates, builds and smokes the bytes that it publishes,
@@ -513,7 +516,7 @@ let commit_end : String = "==smithy-commit-end=="
 fn is_breaking_subject(subject : String) -> Bool {
   match subject.find(":") {
     Some(i) => {
-      let prefix = subject.view(end_offset=i)
+      let prefix = subject.exact_view(end=i)
       prefix.has_suffix("!") && !prefix.contains(" ")
     }
     None => false
@@ -702,11 +705,12 @@ struct Facts {
 
 ///|
 /// One line of the `status` report.
+#derive(Eq, Debug)
 enum Finding {
   Good(String)
   Info(String)
   Problem(String)
-} derive(Eq, Debug)
+}
 
 ///|
 fn finding_line(f : Finding) -> String {

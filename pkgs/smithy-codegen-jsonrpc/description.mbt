@@ -1,28 +1,31 @@
 ///|
 /// A service contract and the shapes that its operations reach.
+#derive(Eq, Debug)
 pub struct ServiceDescription {
   service : @smithy.ShapeId
   methods : Array[@rpc.MethodContract]
   shapes : Array[@smithy.ShapeId]
   values : Array[@validation.StructureContract]
   value_config : @validation.Config
-} derive(Eq, Debug)
+}
 
 ///|
 /// The service that a peer receives. None means that the peer receives no calls.
+#derive(Eq, Debug)
 pub struct PeerDescription {
   name : @rpc.PeerName
   accepts : ServiceDescription?
-} derive(Eq, Debug)
+}
 
 ///|
 /// A language-neutral JSON-RPC contract. Each constructor uses RPC preparation.
+#derive(Eq, Debug)
 pub struct Description {
   protocol : @smithy.ShapeId?
   version : @rpc.ProtocolVersion
   peers : Array[PeerDescription]
   session : @rpc.SessionContract?
-} derive(Eq, Debug)
+}
 
 ///|
 /// Prepare a service with the implicit client and server peers.
@@ -57,11 +60,12 @@ pub fn Description::for_service(
 
 ///|
 /// Both directions for one peer: the service it accepts and the service it calls.
+#derive(Eq, Debug)
 pub struct PeerSelection {
   name : @rpc.PeerName
   accepts : ServiceDescription?
   calls : ServiceDescription?
-} derive(Eq, Debug)
+}
 
 ///|
 /// Prepare an explicit two-peer protocol with its session rules.

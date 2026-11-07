@@ -3,29 +3,33 @@ pub using @smithy {type ValidationEvent}
 
 ///|
 /// A changed applied trait, including additions and removals.
+#derive(Eq, Debug)
 pub struct TraitChange {
   id : @smithy.ShapeId
   old_value : @smithy.NodeValue?
   new_value : @smithy.NodeValue?
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub struct ShapeChange {
   old_shape : @smithy.Shape
   new_shape : @smithy.Shape
   traits : Array[TraitChange]
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub struct MetadataChange {
   key : String
   old_value : @smithy.NodeValue?
   new_value : @smithy.NodeValue?
-} derive(Eq, Debug)
+}
 
 ///|
 /// Semantic changes ignore source locations and assembly provenance. Container
 /// changes include changes to their first-class members.
+#derive(Debug)
 pub struct Differences {
   old_model : @smithy.Model
   new_model : @smithy.Model
@@ -33,7 +37,7 @@ pub struct Differences {
   removed : Array[@smithy.Shape]
   changed : Array[ShapeChange]
   metadata : Array[MetadataChange]
-} derive(Debug)
+}
 
 ///|
 fn members(shape : @smithy.Shape) -> Array[@smithy.ShapeId] {
@@ -188,10 +192,11 @@ pub fn Differences::detect(
 }
 
 ///|
+#derive(Debug)
 pub struct Result {
   differences : Differences
   events : Array[ValidationEvent]
-} derive(Debug)
+}
 
 ///|
 pub fn Result::is_breaking(self : Result) -> Bool {

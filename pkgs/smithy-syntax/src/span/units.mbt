@@ -1,7 +1,8 @@
 ///|
 /// A UTF-16 unit index into a source text. Never negative: `Offset::new`
 /// is the only way in from an `Int`.
-pub struct Offset(Int32) derive(Eq, Compare, Hash, Debug)
+#derive(Eq, Compare, Hash, Debug)
+pub struct Offset(Int32)
 
 ///|
 /// The offset `n`, or `None` when `n` is negative.
@@ -54,7 +55,8 @@ pub fn Offset::to(self : Offset, end : Offset) -> Span {
 
 ///|
 /// A count of UTF-16 units. Never negative.
-pub struct Length(Int32) derive(Eq, Compare, Hash, Debug)
+#derive(Eq, Compare, Hash, Debug)
+pub struct Length(Int32)
 
 ///|
 /// The length `n`, or `None` when `n` is negative.
@@ -92,7 +94,8 @@ pub impl Add for Length with fn add(a, b) {
 
 ///|
 /// A 1-based line number.
-pub struct Line(Int32) derive(Eq, Compare, Hash, Debug)
+#derive(Eq, Compare, Hash, Debug)
+pub struct Line(Int32)
 
 ///|
 /// The line `n`, or `None` when `n` is less than 1.
@@ -118,7 +121,8 @@ pub fn Line::next(self : Line) -> Line {
 
 ///|
 /// A 1-based column, counting UTF-16 units as the Java reference does.
-pub struct Column(Int32) derive(Eq, Compare, Hash, Debug)
+#derive(Eq, Compare, Hash, Debug)
+pub struct Column(Int32)
 
 ///|
 /// The column `n`, or `None` when `n` is less than 1.

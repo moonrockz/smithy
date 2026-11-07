@@ -296,8 +296,9 @@ fn Gen::write_structure(
   let reject = self.reject_unknown(shape)
   self.with_file(path, w => {
     w.write("///|")
+    w.write("#derive(Eq, Debug)")
     if fields.is_empty() {
-      w.write("pub(all) struct $L {} derive(Eq, Debug)", args=[Text(name)])
+      w.write("pub(all) struct $L {}", args=[Text(name)])
     } else {
       w.write("pub(all) struct $L {", args=[Text(name)])
       w.indent()
@@ -310,7 +311,7 @@ fn Gen::write_structure(
         w.write("$L : $L", args=[Text(field.field_name), Text(text)])
       }
       w.dedent()
-      w.write("} derive(Eq, Debug)")
+      w.write("}")
     }
     w.blank_line()
     // to_json
@@ -449,6 +450,7 @@ fn Gen::write_union(
   tags.sort_by((a, b) => a.lexical_compare(b))
   self.with_file(types_path(), w => {
     w.write("///|")
+    w.write("#derive(Eq, Debug)")
     w.write("pub(all) enum $L {", args=[Text(name)])
     w.indent()
     for variant in variants {
@@ -459,7 +461,7 @@ fn Gen::write_union(
       }
     }
     w.dedent()
-    w.write("} derive(Eq, Debug)")
+    w.write("}")
     w.blank_line()
     w.write("///|")
     w.write("pub fn $L::to_json(self : $L) -> Json {", args=[
@@ -566,13 +568,14 @@ fn Gen::write_enum(
   values.sort_by((a, b) => a.lexical_compare(b))
   self.with_file(types_path(), w => {
     w.write("///|")
+    w.write("#derive(Eq, Debug)")
     w.write("pub(all) enum $L {", args=[Text(name)])
     w.indent()
     for variant in variants {
       w.write("$L", args=[Text(variant.0)])
     }
     w.dedent()
-    w.write("} derive(Eq, Debug)")
+    w.write("}")
     w.blank_line()
     w.write("///|")
     w.write("pub fn $L::to_json(self : $L) -> Json {", args=[

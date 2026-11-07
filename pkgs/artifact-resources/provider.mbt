@@ -1,16 +1,18 @@
 ///|
 /// A configured source. Its provider interprets location and artifact keys.
+#derive(Debug, Eq)
 pub(all) struct Repository {
   id : RepositoryId
   provider : ProviderId
   location : RepositoryLocation
-} derive(Debug, Eq)
+}
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct ArtifactRef {
   repository : RepositoryId
   key : ArtifactKey
-} derive(Debug, Eq)
+}
 
 ///|
 /// Provider-specific resolved identity and the common entry tree.

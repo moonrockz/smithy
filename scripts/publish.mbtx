@@ -5,7 +5,7 @@ import {
   "moonbitlang/async@0.22.7/process",
   "moonbitlang/x@0.5.5/sys",
   "moonbitlang/core/env",
-  "moonrockz/moonspec@0.11.0",
+  "moonrockz/moonspec@0.12.0/async" @moonspec,
   "moonrockz/expect@0.6.1",
 }
 ----
@@ -52,12 +52,13 @@ let duplicated : String = "is duplicated with an existing version"
 
 ///|
 /// What a `moon publish` run means.
+#derive(Eq, Debug)
 enum Outcome {
   Published
   AlreadyPublished
   Transient
   Failed
-} derive(Eq, Debug)
+}
 
 ///|
 fn classify(exit_code : Int32, output : String) -> Outcome {

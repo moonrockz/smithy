@@ -5,11 +5,12 @@
 
 ///|
 /// The message kinds that a method accepts.
+#derive(Eq, Debug)
 pub(all) enum MethodKind {
   RequestOnly
   NotificationOnly
   RequestOrNotification
-} derive(Eq, Debug)
+}
 
 ///|
 priv enum Handler {

@@ -1,12 +1,13 @@
 ///|
 /// A source text with its line table. The table is built once; every
 /// lookup is a pure function of it.
+#derive(Eq, Debug)
 pub struct SourceText {
   priv text : String
   priv name : String?
   /// The offset of the first unit of each line; `line_starts[0] == 0`.
   priv line_starts : Array[Int32]
-} derive(Eq, Debug)
+}
 
 ///|
 /// LF and CRLF end a line; a lone CR does not.

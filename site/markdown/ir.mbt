@@ -1,5 +1,6 @@
 ///|
 /// Where a link goes after rewriting.
+#derive(Eq, Debug)
 pub(all) enum Target {
   /// A site page, with an optional anchor.
   Internal(@route.Route, String?)
@@ -9,7 +10,7 @@ pub(all) enum Target {
   External(String)
   /// A destination that is not safe to link. The link text stays, the link goes.
   Blocked
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Target with Eq::{equal, not_equal}
@@ -18,6 +19,7 @@ pub extend Target with Eq::{equal, not_equal}
 pub extend Target with @debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum Inline {
   Text(String)
   Code(String)
@@ -28,7 +30,7 @@ pub(all) enum Inline {
   /// Source URL and alt text.
   Image(String, String)
   LineBreak
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Inline with Eq::{equal, not_equal}
@@ -38,12 +40,13 @@ pub extend Inline with @debug.Debug::{to_repr}
 
 ///|
 /// One code block of a tab.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct Snippet {
   lang : String
   /// A file name shown above the code, or `None`.
   file : String?
   code : String
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Snippet with Eq::{equal, not_equal}
@@ -59,10 +62,11 @@ pub extend Snippet with FromJson::{from_json}
 
 ///|
 /// One tab of a tab group: a label and the code blocks under it.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct Tab {
   label : String
   snippets : Array[Snippet]
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Tab with Eq::{equal, not_equal}
@@ -77,6 +81,7 @@ pub extend Tab with ToJson::{to_json}
 pub extend Tab with FromJson::{from_json}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum Block {
   /// Level, unique id, content.
   Heading(Int32, String, Array[Inline])
@@ -92,7 +97,7 @@ pub(all) enum Block {
   Rule
   /// A tab group: its id (`tabs-N`, N from 1 in document order) and its tabs.
   Tabs(String, Array[Tab])
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Block with Eq::{equal, not_equal}
@@ -101,11 +106,12 @@ pub extend Block with Eq::{equal, not_equal}
 pub extend Block with @debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct TocEntry {
   level : Int32
   id : String
   text : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend TocEntry with Eq::{equal, not_equal}
@@ -114,13 +120,14 @@ pub extend TocEntry with Eq::{equal, not_equal}
 pub extend TocEntry with @debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Document {
   /// Text of the first level-1 heading, or "".
   title : String
   blocks : Array[Block]
   /// Level-2 and level-3 headings.
   toc : Array[TocEntry]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Document with Eq::{equal, not_equal}

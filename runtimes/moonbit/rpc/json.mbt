@@ -5,9 +5,10 @@
 ///|
 /// A value that does not have the expected form. `path` is a JSON Pointer to
 /// the value. The dispatcher answers a DecodeError with the code -32602.
+#derive(Debug)
 pub(all) suberror DecodeError {
   DecodeError(path~ : String, message~ : String)
-} derive(Debug)
+}
 
 ///|
 pub impl Show for DecodeError with fn output(self, logger) {
@@ -96,8 +97,10 @@ fn JsonParser::expect_literal(
   value : Json,
 ) -> Json raise DecodeError {
   let end = self.pos + word.length()
+  // `end` can split a surrogate pair of malformed text, which `exact_view` refuses. The raw code-unit
+  // copy keeps the old result (no match). `end <= self.text.length()` checks the bounds.
   if end <= self.text.length() &&
-    self.text.view(start_offset=self.pos, end_offset=end) == word.view() {
+    self.text.unsafe_substring(start=self.pos, end~) == word {
     self.pos = end
     value
   } else {
@@ -168,7 +171,9 @@ fn JsonParser::parse_number(self : JsonParser) -> Json raise DecodeError {
   guard scan_number(self.text, self.pos) is Some(end) else {
     raise self.fail("a JSON number")
   }
-  let repr = self.text.view(start_offset=self.pos, end_offset=end).to_owned()
+  // The text after the number can start with a lone trailing surrogate, which `exact_view` refuses.
+  // `scan_number` returns an end between `self.pos` and the text length.
+  let repr = self.text.unsafe_substring(start=self.pos, end~)
   self.pos = end
   Json::number(number_double(repr), repr~)
 }
@@ -211,12 +216,14 @@ fn JsonParser::parse_string(self : JsonParser) -> String raise DecodeError {
       raise self.fail("a closing quote of the string")
     }
     let c = self.text[self.pos].to_int()
+    // A run can start with a lone trailing surrogate, which `exact_view` refuses, so the runs are
+    // raw code-unit copies. `run <= self.pos < self.text.length()` here.
     if c == 0x22 {
-      out.write_view(self.text.view(start_offset=run, end_offset=self.pos))
+      out.write_string(self.text.unsafe_substring(start=run, end=self.pos))
       self.pos += 1
       break
     } else if c == 0x5C {
-      out.write_view(self.text.view(start_offset=run, end_offset=self.pos))
+      out.write_string(self.text.unsafe_substring(start=run, end=self.pos))
       self.pos += 1
       let e = self.peek()
       self.pos += 1
@@ -429,14 +436,16 @@ fn write_escaped(out : StringBuilder, s : String) -> Unit {
       c if c >= 0xDC00 && c <= 0xDFFF => Some("\\u" + hex4(c))
       _ => None
     }
+    // `s` can hold lone surrogates, which `exact_view` refuses, so the runs are raw code-unit
+    // copies. `run <= i < n` here, and `run <= n` after the loop.
     if escape is Some(text) {
-      out.write_view(s.view(start_offset=run, end_offset=i))
+      out.write_string(s.unsafe_substring(start=run, end=i))
       out.write_string(text)
       run = i + 1
     }
     i += 1
   }
-  out.write_view(s.view(start_offset=run, end_offset=n))
+  out.write_string(s.unsafe_substring(start=run, end=n))
   out.write_char('"')
 }
 

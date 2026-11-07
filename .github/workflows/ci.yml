@@ -34,6 +34,9 @@ jobs:
       - name: Validate package structure
         run: mise run validate
 
+      - name: Check the shared OpenSpec files
+        run: mission-control-tools openspec check --bundle
+
   build:
     name: Build (${{ matrix.target }})
     runs-on: ubuntu-latest

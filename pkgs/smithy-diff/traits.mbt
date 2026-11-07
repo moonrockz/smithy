@@ -1,14 +1,16 @@
 ///|
+#derive(Eq)
 priv enum ChangeKind {
   Add
   Remove
   Update
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 priv struct TraitPath {
   segments : Array[String]
-} derive(Eq)
+}
 
 ///|
 fn TraitPath::render(self : TraitPath) -> String {

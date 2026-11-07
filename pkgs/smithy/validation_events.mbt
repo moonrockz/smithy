@@ -1,5 +1,6 @@
 ///|
 /// A Smithy validation finding after configured severity and suppression rules.
+#derive(Eq, Debug)
 pub(all) struct ValidationEvent {
   id : String
   severity : String
@@ -7,7 +8,7 @@ pub(all) struct ValidationEvent {
   message : String
   source : SourceLocation?
   suppression_reason : String?
-} derive(Eq, Debug)
+}
 
 ///|
 /// Event IDs form a dot-delimited hierarchy.

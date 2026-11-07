@@ -1,21 +1,23 @@
 ///|
 /// One supported release interval of a bundle, with its semantic root and allowed profiles. The first
 /// profile is the default.
+#derive(Debug)
 pub struct ReleaseBinding {
   interval : ReleaseInterval
   root : @smithy.ShapeId
   profiles : Array[ProfileId]
-} derive(Debug)
+}
 
 ///|
 /// A versioned document bundle declared with the jsonBundle trait.
+#derive(Debug)
 pub struct BundleDeclaration {
   id : BundleId
   declared_on : @smithy.ShapeId
   version_field : WireName
   version_adapter : AdapterId
   releases : Array[ReleaseBinding]
-} derive(Debug)
+}
 
 ///|
 /// The binding that supports `release`, if any.

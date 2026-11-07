@@ -1,6 +1,7 @@
 ///|
 /// The MoonBit type of a shape value, and how the generated code encodes and
 /// decodes it.
+#derive(Eq, Debug)
 priv enum Ty {
   Str
   Boolean
@@ -20,7 +21,7 @@ priv enum Ty {
   MapOf(Ty)
   Opt(Ty)
   UnitT
-} derive(Eq, Debug)
+}
 
 ///|
 /// The wrappers of a type, outer first, and the leaf type inside them. The

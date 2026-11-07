@@ -18,11 +18,11 @@ pub fn[V : @traversal.Visitor] accept(@traversal.NodeRef, V) -> Unit
 
 pub fn codes() -> ArrayView[String]
 
-pub fn decode_json_ast(Json) -> @json_ast.JsonAst raise @json.JsonDecodeError
+pub fn decode_json_ast(@json.Json) -> @json_ast.JsonAst raise @json.JsonDecodeError
 
 pub fn diagnostic_description(String) -> String?
 
-pub fn encode_json_ast(@json_ast.JsonAst) -> Json
+pub fn encode_json_ast(@json_ast.JsonAst) -> @json.Json
 
 pub fn[A] fold(@traversal.NodeRef, A, (A, @traversal.NodeRef) -> (A, @traversal.Control), leave? : (A, @traversal.NodeRef) -> A) -> A
 
@@ -34,7 +34,7 @@ pub fn parse_idl(String, name? : String) -> @parser.ParseResult
 
 pub fn parse_json_ast(String) -> @json_ast.JsonAst raise
 
-pub fn parse_json_value(String) -> Json raise @json.ParseError
+pub fn parse_json_value(String) -> @json.Json raise @json.ParseError
 
 pub fn parse_tokens(@scanner.TokenStream) -> @parser.ParseResult
 

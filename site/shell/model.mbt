@@ -1,9 +1,10 @@
 ///|
+#derive(Eq, Debug)
 pub(all) enum Theme {
   Auto
   Light
   Dark
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Theme with Eq::{equal, not_equal}
@@ -30,13 +31,14 @@ pub fn Theme::to_string(self : Theme) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum PageState {
   /// The landing page and pages that do not exist.
   NoContent
   Loading
   Ready(@markdown.Document)
   PageFailed
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend PageState with Eq::{equal, not_equal}
@@ -45,12 +47,13 @@ pub extend PageState with Eq::{equal, not_equal}
 pub extend PageState with @debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum IndexState {
   NotLoaded
   LoadingIndex
   IndexReady(@search.Index)
   IndexFailed
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend IndexState with Eq::{equal, not_equal}
@@ -59,12 +62,13 @@ pub extend IndexState with Eq::{equal, not_equal}
 pub extend IndexState with @debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum InstallTab {
   Mise
   Moonx
   Library
   Download
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend InstallTab with Eq::{equal, not_equal}
@@ -73,12 +77,13 @@ pub extend InstallTab with Eq::{equal, not_equal}
 pub extend InstallTab with @debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct SearchState {
   open : Bool
   query : String
   selected : Int32
   index : IndexState
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SearchState with Eq::{equal, not_equal}
@@ -89,11 +94,12 @@ pub extend SearchState with @debug.Debug::{to_repr}
 ///|
 /// What a check found at the same route in the other channel. The route
 /// keys the result: a result for any other route is stale.
+#derive(Eq, Debug)
 pub(all) enum Counterpart {
   Unknown
   Present(@route.Route)
   Missing(@route.Route)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Counterpart with Eq::{equal, not_equal}
@@ -103,11 +109,12 @@ pub extend Counterpart with @debug.Debug::{to_repr}
 
 ///|
 /// The outcome of one request for the other channel's page.
+#derive(Eq, Debug)
 pub(all) enum Probe {
   Found
   Gone
   Failed
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Probe with Eq::{equal, not_equal}
@@ -116,6 +123,7 @@ pub extend Probe with Eq::{equal, not_equal}
 pub extend Probe with @debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Model {
   config : @data.SiteConfig
   manifest : @content.Manifest
@@ -133,7 +141,7 @@ pub(all) struct Model {
   playground : @workbench.PlaygroundData?
   /// The data of a tour page; `None` on every other page.
   tour : @model.TourPage?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Model with Eq::{equal, not_equal}

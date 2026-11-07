@@ -74,6 +74,7 @@ fn percent_decode(path : String) -> String? {
 
 ///|
 /// What the server does with one request path.
+#derive(Eq, Debug)
 enum Route {
   /// Answer 403: the path leaves the site directory or cannot be decoded.
   Forbidden
@@ -82,7 +83,7 @@ enum Route {
   Serve(String)
   /// Answer 404: the path is not below the base.
   Outside
-} derive(Eq, Debug)
+}
 
 ///|
 /// The route of the request target below `base` (which starts and ends with `/`). The query and
@@ -164,11 +165,12 @@ fn port_of(value : String) -> Result[Int32, String] {
 ///|
 /// What the server does: the port, the built directory to serve (`None`: build `site/dist` first)
 /// and the path below which it serves the directory.
+#derive(Eq, Debug)
 struct Options {
   port : Int32
   serve : String?
   base : String
-} derive(Eq, Debug)
+}
 
 ///|
 /// The options from the arguments (after the program name), or an error message.

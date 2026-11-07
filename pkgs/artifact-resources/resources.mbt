@@ -1,8 +1,9 @@
 ///|
 /// Stable code, complete origin and detail. Hosts can render these separately.
+#derive(Debug)
 pub(all) suberror ResourceError {
   ResourceError(ResourceCode, Provenance, String)
-} derive(Debug)
+}
 
 ///|
 pub(all) struct Limits {
@@ -184,10 +185,11 @@ pub fn EntryTree::text(
 
 ///|
 /// Logical names are independent of physical paths inside the container.
+#derive(Debug, Eq)
 pub(all) struct Declaration {
   name : ResourceName
   path : EntryPath
-} derive(Debug, Eq)
+}
 
 ///|
 pub struct Resource {

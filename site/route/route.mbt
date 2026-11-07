@@ -1,5 +1,6 @@
 ///|
 /// A page of the site, without the base path.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum Route {
   Landing
   /// `/docs/`. The manifest says which page it opens.
@@ -16,7 +17,7 @@ pub(all) enum Route {
   /// `/tour/<slug>`: one lesson of the tour.
   Lesson(String)
   NotFound(String)
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Route with Eq::{equal, not_equal}

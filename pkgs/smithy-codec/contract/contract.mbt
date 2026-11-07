@@ -1,5 +1,6 @@
 ///|
 /// A preparation refusal. Each case names the shape whose declaration is refused.
+#derive(Debug)
 pub(all) suberror ContractError {
   UnknownProfile(ProfileId)
   UnknownBundle(BundleId)
@@ -9,7 +10,7 @@ pub(all) suberror ContractError {
   ConflictingDeclaration(@smithy.ShapeId, String)
   MissingAdapter(@smithy.ShapeId, AdapterId)
   PreparationLimit(@smithy.ShapeId, String)
-} derive(Debug)
+}
 
 ///|
 pub fn ContractError::message(self : ContractError) -> String {
@@ -47,12 +48,13 @@ pub fn ContractError::code(self : ContractError) -> String {
 ///|
 /// What a host adapter declares: the JSON kinds that it reads, the logical scalar kind that it produces
 /// and whether it orders dictionary keys.
+#derive(Eq, Debug)
 pub struct AdapterSignature {
   id : AdapterId
   inputs : Array[JsonKind]
   output : JsonKind
   orders_keys : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn AdapterSignature::new(
@@ -75,25 +77,29 @@ pub fn AdapterSignature::new(
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum WriterMode {
   Canonical
   Expanded
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum UnknownMemberPolicy {
   RejectUnknown
   IgnoreUnknown
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum OptionalTail {
   OmitTail
   NullTail
-} derive(Eq, Debug)
+}
 
 ///|
 /// One member of a structure, union, list or map, with its effective wire decisions.
+#derive(Debug)
 pub struct MemberContract {
   /// The Smithy member name: the logical identity.
   name : String
@@ -112,9 +118,10 @@ pub struct MemberContract {
   null_when_absent : Bool
   /// The member's external union is read from the fields that no other member claims.
   flatten : Bool
-} derive(Debug)
+}
 
 ///|
+#derive(Debug)
 pub(all) enum UnionLayout {
   External
   Internal(tag~ : WireName)
@@ -122,66 +129,74 @@ pub(all) enum UnionLayout {
   TagArray(tag_only_unit~ : Bool)
   /// The member index selected by each accepted JSON kind.
   Untagged(Array[(JsonKind, Int32)])
-} derive(Debug)
+}
 
 ///|
 /// Fixed member positions and an optional final rest list, as member indexes.
+#derive(Debug)
 pub struct TupleLayout {
   fixed : Array[Int32]
   rest : Int32?
   optional : OptionalTail?
-} derive(Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum KeyOrder {
   LexicalKeys
   AdapterKeys
   PreservedKeys
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Debug)
 pub struct DictionaryLayout {
   entries : Bool
   /// Readers also accept the other layout.
   accept_other : Bool
   key_adapter : AdapterId?
   order : KeyOrder
-} derive(Debug)
+}
 
 ///|
+#derive(Debug)
 pub(all) enum FormBinding {
   /// The whole JSON value is the given member. -1 means the payload itself.
   Whole(Int32)
   Positional(fixed~ : Array[Int32], rest~ : Int32?)
-} derive(Debug)
+}
 
 ///|
+#derive(Debug)
 pub struct ReaderGuard {
   kind : JsonKind
   adapter : AdapterId?
   field : WireName?
   absent : WireName?
-} derive(Debug)
+}
 
 ///|
 /// A writer uses the form when every `empty` member is absent or empty and every `present` member is
 /// present and not empty.
+#derive(Debug)
 pub struct WriterGuard {
   empty : Array[Int32]
   present : Array[Int32]
-} derive(Debug)
+}
 
 ///|
 /// A compact form. A union form selects `member` and binds fields of its payload; a structure form binds
 /// fields of the structure itself.
+#derive(Debug)
 pub struct Form {
   union_member : Int32?
   reader : ReaderGuard
   binding : FormBinding
   writer : WriterGuard?
-} derive(Debug)
+}
 
 ///|
+#derive(Debug)
 pub(all) enum ShapeLayout {
   ObjectStructure
   TupleStructure(TupleLayout)
@@ -189,9 +204,10 @@ pub(all) enum ShapeLayout {
   ListShape
   Dictionary(DictionaryLayout)
   Scalar(AdapterId?)
-} derive(Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ShapeKind {
   StructureKind
   UnionKind
@@ -200,9 +216,10 @@ pub(all) enum ShapeKind {
   SimpleKind(@smithy.SimpleType)
   EnumKind
   IntEnumKind
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Debug)
 pub struct ShapeContract {
   id : @smithy.ShapeId
   kind : ShapeKind
@@ -214,7 +231,7 @@ pub struct ShapeContract {
   /// A sparse list or map: a null element or value is kept as null.
   sparse : Bool
   forms : Array[Form]
-} derive(Debug)
+}
 
 ///|
 pub fn ShapeContract::member_index(
@@ -231,6 +248,7 @@ pub fn ShapeContract::member_index(
 
 ///|
 /// The detached wire contract of one root under one profile. It holds no reference to the source model.
+#derive(Debug)
 pub struct WireContract {
   root : @smithy.ShapeId
   profile : ProfileId?
@@ -239,7 +257,7 @@ pub struct WireContract {
   /// The identity of the logical contract. Profiles of one model and root share it.
   fingerprint : String
   shapes : Map[@smithy.ShapeId, ShapeContract]
-} derive(Debug)
+}
 
 ///|
 pub fn WireContract::shape(

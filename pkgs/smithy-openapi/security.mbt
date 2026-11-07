@@ -1,10 +1,11 @@
 ///|
+#derive(Eq, Hash)
 priv enum AuthScheme {
   Basic
   Bearer
   Digest
   ApiKey
-} derive(Eq, Hash)
+}
 
 ///|
 fn AuthScheme::id(self : AuthScheme) -> @smithy.ShapeId {

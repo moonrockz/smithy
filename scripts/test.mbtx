@@ -21,18 +21,19 @@ import {
 /// The tests module uses async and runs on js and native only.
 ///
 /// This script and the tests module stay on async 0.22.5. `mise run test:native-zig` runs them under
-/// `zig-cross exec host`, and zig-cross 0.3.2 hides `O_PATH` from async 0.22.7 on a Linux glibc host
-/// (fixed in moonrockz/moonx-tools#17). Move them to 0.22.7 when a zig-cross release has that fix.
+/// `zig-cross exec host`. zig-cross 0.4.0 and later no longer hide `O_PATH` from async 0.22.7 on a
+/// Linux glibc host (moonrockz/moonx-tools#17), so they can move to 0.22.7 in a separate change.
 
 ///|
 let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]
 
 ///|
+#derive(Debug, Eq)
 struct TestOptions {
   targets : Array[String]
   coverage : Bool
   target_dir : String?
-} derive(Debug, Eq)
+}
 
 ///|
 fn test_options(args : ArrayView[String]) -> Result[TestOptions, String] {

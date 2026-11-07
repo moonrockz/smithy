@@ -10,7 +10,7 @@ import {
   "moonbitlang/core/json",
   "moonbitlang/x@0.5.5/crypto",
   "moonbitlang/x@0.5.5/sys",
-  "moonrockz/moonspec@0.11.0",
+  "moonrockz/moonspec@0.12.0/async" @moonspec,
   "moonrockz/expect@0.6.1",
 }
 ----
@@ -83,11 +83,12 @@ fn is_input(path : String) -> Bool {
 
 ///|
 /// One entry of `git ls-tree`.
+#derive(Eq, Debug)
 struct Entry {
   mode : String
   object : String
   path : String
-} derive(Eq, Debug)
+}
 
 ///|
 /// The entries of `git ls-tree -r -z` output: `<mode> <type> <object>\t<path>`, NUL-terminated.
@@ -96,12 +97,12 @@ fn tree_entries(listing : String) -> Array[Entry] {
   let entries = []
   for record in listing.split("\u{0}") {
     guard record.find("\t") is Some(tab) else { continue }
-    let meta = record.view(end_offset=tab).split(" ").collect()
+    let meta = record.exact_view(end=tab).split(" ").collect()
     guard meta.length() == 3 else { continue }
     entries.push({
       mode: meta[0].to_owned(),
       object: meta[2].to_owned(),
-      path: record.view(start_offset=tab + 1).to_owned(),
+      path: record.exact_view(start=tab + 1).to_owned(),
     })
   }
   entries
@@ -153,8 +154,8 @@ fn checksum_lines(text : String) -> Array[(String, String)] {
     guard line.find("  ") is Some(gap) else { continue }
     lines.push(
       (
-        line.view(start_offset=gap + 2).trim().to_owned(),
-        line.view(end_offset=gap).trim().to_owned(),
+        line.exact_view(start=gap + 2).trim().to_owned(),
+        line.exact_view(end=gap).trim().to_owned(),
       ),
     )
   }
@@ -233,16 +234,16 @@ fn mod_version(moon_mod : String) -> String? {
   for line in moon_mod.split("\n") {
     let line = line.trim()
     guard line.has_prefix("version") else { continue }
-    let rest = line.view(start_offset=7).trim_start()
+    let rest = line.exact_view(start=7).trim_start()
     guard rest.has_prefix("=") else { continue }
-    let value = rest.view(start_offset=1).trim()
+    let value = rest.exact_view(start=1).trim()
     guard value.length() >= 2 &&
       value.has_prefix("\"") &&
       value.has_suffix("\"") else {
       continue
     }
     return Some(
-      value.view(start_offset=1, end_offset=value.length() - 1).to_owned(),
+      value.exact_view(start=1, end=value.length() - 1).to_owned(),
     )
   }
   None

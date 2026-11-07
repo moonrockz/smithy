@@ -27,10 +27,11 @@ fn preview_path(path : String) -> Bool {
 }
 
 ///|
+#derive(Eq, Debug)
 struct SmokePlan {
   run : Bool
   record : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 fn smoke_plan(

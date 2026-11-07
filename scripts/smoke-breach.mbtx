@@ -8,7 +8,7 @@ import {
   "moonbitlang/core/json",
   "moonbitlang/x@0.5.5/crypto",
   "moonbitlang/x@0.5.5/sys",
-  "moonrockz/moonspec@0.11.0",
+  "moonrockz/moonspec@0.12.0/async" @moonspec,
   "moonrockz/expect@0.6.1",
 }
 ----
@@ -60,13 +60,14 @@ fn fail_with(message : String) -> Unit {
 ///|
 /// One smoke leg that did not pass: its platform, the job conclusion, the job page and the check run
 /// path in the REST API (for the annotations).
+#derive(Debug)
 struct Leg {
   platform : String
   conclusion : String
   job_url : String
   check_run : String
   mut messages : Array[String]
-} derive(Debug)
+}
 
 ///|
 /// A failed smoke of one run.
@@ -89,12 +90,13 @@ struct BreachIssue {
 }
 
 ///|
+#derive(Eq, Debug)
 enum Action {
   Create
   Nothing(Int)
   Update(Int)
   Reopen(Int)
-} derive(Eq, Debug)
+}
 
 ///|
 fn compare_lexical(a : String, b : String) -> Int {
@@ -120,9 +122,9 @@ fn sorted_legs(legs : Array[Leg]) -> Array[Leg] {
 /// The platform of a smoke job name, such as `Smoke / Smoke (linux-x64)`, or `None` for another job.
 fn platform_of(name : String) -> String? {
   guard name.find("Smoke (") is Some(start) else { return None }
-  let rest = name.view(start_offset=start + 7)
+  let rest = name.exact_view(start=start + 7)
   guard rest.find(")") is Some(end) else { return None }
-  Some(rest.view(end_offset=end).to_owned())
+  Some(rest.exact_view(end=end).to_owned())
 }
 
 ///|
@@ -154,7 +156,7 @@ fn failed_legs(jobs : Json) -> Array[Leg] {
       conclusion,
       job_url: text_field(fields, "html_url").unwrap_or(""),
       check_run: if check_run.has_prefix(api_prefix) {
-        check_run.view(start_offset=api_prefix.length()).to_owned()
+        check_run.exact_view(start=api_prefix.length()).to_owned()
       } else {
         check_run
       },
@@ -258,9 +260,9 @@ fn Breach::comment(self : Breach, reopened : Bool) -> String {
 /// The signature in the marker of an issue body.
 fn signature_in(body : String) -> String? {
   guard body.find(marker_prefix) is Some(start) else { return None }
-  let rest = body.view(start_offset=start + marker_prefix.length())
+  let rest = body.exact_view(start=start + marker_prefix.length())
   guard rest.find(marker_suffix) is Some(end) else { return None }
-  Some(rest.view(end_offset=end).trim().to_owned())
+  Some(rest.exact_view(end=end).trim().to_owned())
 }
 
 ///|

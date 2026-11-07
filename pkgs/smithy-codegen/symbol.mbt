@@ -6,7 +6,8 @@ fn has_blank(text : String) -> Bool {
 
 ///|
 /// The name of a symbol. It is not empty and has no whitespace.
-pub struct SymbolName(String) derive(Eq, Hash, Debug)
+#derive(Eq, Hash, Debug)
+pub struct SymbolName(String)
 
 ///|
 /// Lexical order of the text.
@@ -31,10 +32,11 @@ pub fn SymbolName::to_string(self : SymbolName) -> String {
 ///|
 /// A namespace of a symbol, with the separator that joins it to the name.
 /// The root namespace has empty text and an empty separator.
+#derive(Eq, Hash, Debug)
 pub struct Namespace {
   text : String
   separator : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 /// Lexical order of the text, then of the separator.
@@ -67,7 +69,8 @@ pub fn Namespace::is_root(self : Namespace) -> Bool {
 
 ///|
 /// A relative output path with `/` as the only separator.
-pub struct OutputPath(String) derive(Eq, Hash, Debug)
+#derive(Eq, Hash, Debug)
+pub struct OutputPath(String)
 
 ///|
 /// Lexical order of the text.
@@ -101,7 +104,8 @@ pub fn OutputPath::to_string(self : OutputPath) -> String {
 
 ///|
 /// The name of a package that a generated file depends on.
-pub struct PackageName(String) derive(Eq, Hash, Debug)
+#derive(Eq, Hash, Debug)
+pub struct PackageName(String)
 
 ///|
 /// Lexical order of the text.
@@ -124,18 +128,20 @@ pub fn PackageName::to_string(self : PackageName) -> String {
 }
 
 ///|
+#derive(Eq, Compare, Hash, Debug)
 pub(all) enum DependencyKind {
   Runtime
   Test
   Build
-} derive(Eq, Compare, Hash, Debug)
+}
 
 ///|
+#derive(Eq, Hash, Debug)
 pub(all) struct SymbolDependency {
   package_name : PackageName
   version : String
   kind : DependencyKind
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 /// Order by package, then version in lexical order, then kind in declaration order.
@@ -152,6 +158,7 @@ pub impl Compare for SymbolDependency with fn compare(self, other) {
 
 ///|
 /// A symbol: the target-language name of a shape, where it is defined and what it needs.
+#derive(Eq, Debug)
 pub struct Symbol {
   name : SymbolName
   ns : Namespace
@@ -159,14 +166,15 @@ pub struct Symbol {
   references : Array[SymbolReference]
   dependencies : Array[SymbolDependency]
   properties : Map[String, Json]
-} derive(Eq, Debug)
+}
 
 ///|
 /// A reference from one symbol to another, with an optional local name.
+#derive(Eq, Debug)
 pub struct SymbolReference {
   symbol : Symbol
   local_name : SymbolName?
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Symbol::new(

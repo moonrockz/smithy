@@ -1,6 +1,7 @@
 ///|
 /// Random path steps: a field ("a" or "b") and an index below 4.
-struct Steps(Array[(Bool, UInt32)]) derive(Debug)
+#derive(Debug)
+struct Steps(Array[(Bool, UInt32)])
 
 ///|
 impl @quickcheck.Arbitrary for Steps with fn arbitrary(size, rs) {

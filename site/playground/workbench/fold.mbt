@@ -2,10 +2,11 @@
 /// The tabs whose controls are folded away, so that their code view starts on
 /// the same line as the model editor. The Validate tab has no code view, so it
 /// has no fold.
+#derive(Eq, Debug)
 pub(all) struct Folded {
   transform : Bool
   transcript : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Folded with Eq::{equal, not_equal}

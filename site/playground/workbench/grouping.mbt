@@ -1,6 +1,7 @@
 ///|
 /// What makes two diagnostics repeats of each other: the same severity and
 /// code at the same place in the same file.
+#derive(Eq, Hash)
 priv struct RepeatKey {
   severity : String
   code : String
@@ -9,7 +10,7 @@ priv struct RepeatKey {
   start_column : Int32
   end_line : Int32
   end_column : Int32
-} derive(Eq, Hash)
+}
 
 ///|
 fn Diagnostic::repeat_key(self : Diagnostic) -> RepeatKey {
@@ -27,10 +28,11 @@ fn Diagnostic::repeat_key(self : Diagnostic) -> RepeatKey {
 ///|
 /// One row of the Validate list: a diagnostic and its repeats. `first` is the
 /// earliest of them in the list; `repeats` keep the order of the list.
+#derive(Eq, Debug)
 pub(all) struct DiagnosticGroup {
   first : Diagnostic
   repeats : Array[Diagnostic]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend DiagnosticGroup with Eq::{equal, not_equal}
@@ -74,10 +76,11 @@ pub fn group_diagnostics(
 /// A part of a diagnostic message. Smithy puts the names of shapes, traits and
 /// members between backticks, and many messages name shapes by their shape ID
 /// without them; the list shows both as code.
+#derive(Eq, Debug)
 pub(all) enum MessagePart {
   Text(String)
   Name(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend MessagePart with Eq::{equal, not_equal}

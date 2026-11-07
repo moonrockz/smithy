@@ -1,8 +1,9 @@
 ///|
+#derive(Debug)
 pub(all) suberror JsonSchemaError {
   ConflictingShapeName(String)
   InvalidConfiguration(String)
-} derive(Debug)
+}
 
 ///|
 fn member_target(entry : Json) -> String? {

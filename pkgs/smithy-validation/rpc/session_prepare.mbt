@@ -1,8 +1,9 @@
 ///|
 /// A session state named by `jsonRpcSession`. It follows the PeerName rule.
+#derive(Eq, Hash, Debug)
 pub struct StateName {
   priv text : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub fn StateName::parse(text : String) -> StateName? {

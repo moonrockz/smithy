@@ -2,6 +2,7 @@
 /// A model-aware value, independent of its JSON spelling. Structures hold their present members by Smithy
 /// member name, a union names its selected member, and maps hold logical keys. `Object` is a document
 /// object, which has no modeled members.
+#derive(Debug)
 pub(all) enum LogicalValue {
   Null
   Boolean(Bool)
@@ -12,7 +13,7 @@ pub(all) enum LogicalValue {
   Union(String, LogicalValue)
   Map(Array[(String, LogicalValue)])
   Object(Array[(String, LogicalValue)])
-} derive(Debug)
+}
 
 ///|
 /// A number from its exact JSON text, such as `12345678901234567890.25`.
@@ -111,10 +112,11 @@ pub impl Eq for LogicalValue with fn equal(self, other) {
 ///|
 /// The identity of a logical contract: a root shape and the fingerprint of the contract reachable from it.
 /// Profiles of one model and root share it; another root or another modeled version does not.
+#derive(Eq, Debug)
 pub struct SemanticRoot {
   shape : @smithy.ShapeId
   fingerprint : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub impl Show for SemanticRoot with fn output(self, logger) {
@@ -124,10 +126,11 @@ pub impl Show for SemanticRoot with fn output(self, logger) {
 ///|
 /// A logical value that a codec has checked against its semantic root. Only decoding and
 /// `PreparedCodec::value` create one.
+#derive(Debug)
 pub struct CodecValue {
   priv root : SemanticRoot
   priv value : LogicalValue
-} derive(Debug)
+}
 
 ///|
 pub fn CodecValue::root(self : CodecValue) -> SemanticRoot {

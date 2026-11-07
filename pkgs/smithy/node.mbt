@@ -1,12 +1,13 @@
 ///|
 /// An exact JSON number. Equality compares numeric values, not Double
 /// approximations or token spellings. No exponent is expanded into zeros.
+#derive(Debug)
 pub struct NodeNumber {
   text : String
   coefficient : BigInt
   exponent : BigInt
   approximate : Double
-} derive(Debug)
+}
 
 ///|
 pub impl Eq for NodeNumber with fn equal(self, other) {
@@ -112,12 +113,14 @@ pub impl @json.ToJson for NodeNumber with fn to_json(self) {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) suberror NodeError {
   InvalidNode(String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// Source-independent values used for metadata and applied traits.
+#derive(Eq, Debug)
 pub(all) enum NodeValue {
   Null
   Boolean(Bool)
@@ -125,7 +128,7 @@ pub(all) enum NodeValue {
   String(String)
   Array(Array[NodeValue])
   Object(Map[String, NodeValue])
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn NodeValue::from_json(value : Json) -> NodeValue raise NodeError {

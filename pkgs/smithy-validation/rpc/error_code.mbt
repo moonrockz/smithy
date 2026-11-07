@@ -1,8 +1,9 @@
 ///|
 /// An exact integer JSON-RPC error code, without a machine-integer bound.
+#derive(Eq, Debug)
 pub struct ErrorCode {
   priv number : @smithy.NodeNumber
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ErrorCode::from_number(number : @smithy.NodeNumber) -> ErrorCode? {

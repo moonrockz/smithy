@@ -2,11 +2,12 @@
 /// A directory under `examples/`, as found in the content tree: its name, the
 /// first `#` heading of its README (empty without one) and every file in it,
 /// as paths relative to the directory.
+#derive(Eq, Debug)
 pub(all) struct ExampleDir {
   dir : String
   title : String
   files : Array[String]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ExampleDir with Eq::{equal, not_equal}
@@ -16,6 +17,7 @@ pub extend ExampleDir with @debug.Debug::{to_repr}
 
 ///|
 /// A published example: a directory of `examples/` that has a README.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct Example {
   /// The directory name, which is also the route slug.
   dir : String
@@ -26,7 +28,7 @@ pub(all) struct Example {
   /// The share fragment of the playground state of this example, or `None`
   /// when the playground has no model of it.
   playground : String?
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Example with Eq::{equal, not_equal}

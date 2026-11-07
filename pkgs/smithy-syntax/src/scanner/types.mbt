@@ -2,6 +2,7 @@
 /// The token kinds, the reference's `IdlToken` without its whitespace
 /// kinds (those are `Trivia`) and without `EOF`. Keywords are identifiers:
 /// Smithy keywords are contextual and the parser recognizes them.
+#derive(Eq, Debug, Hash)
 pub(all) enum TokenKind {
   Identifier
   Number
@@ -22,33 +23,36 @@ pub(all) enum TokenKind {
   RParen
   /// Text a lexical error covers; the diagnostic is in the stream.
   Error
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// `//` or `///`.
+#derive(Eq, Debug, Hash)
 pub(all) enum CommentKind {
   Line
   Doc
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// A comment. `span` covers the slashes and the text up to the line break
 /// (not included); `text` is what follows the slashes.
+#derive(Eq, Debug)
 pub(all) struct Comment {
   kind : CommentKind
   text : String
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// Text between tokens. The specification treats a comma as whitespace, so
 /// it is trivia here.
+#derive(Eq, Debug)
 pub(all) enum Trivia {
   Whitespace(String, @span.Span)
   Newline(String, @span.Span)
   Comma(@span.Span)
   Comment(Comment)
-} derive(Eq, Debug)
+}
 
 ///|
 /// The source text of the trivia.
@@ -85,13 +89,14 @@ pub fn Trivia::is_comment(self : Trivia) -> Bool {
 /// A token with the trivia around it. Trivia after a token up to and
 /// including the first line break is its `trivia_after`; everything else
 /// is the next token's `trivia_before`.
+#derive(Eq, Debug)
 pub(all) struct Token {
   kind : TokenKind
   lexeme : String
   span : @span.Span
   trivia_before : ArrayView[Trivia]
   trivia_after : ArrayView[Trivia]
-} derive(Eq, Debug)
+}
 
 ///|
 /// `trivia_before`, the lexeme and `trivia_after`, as in the source.
@@ -110,11 +115,12 @@ pub fn Token::to_source(self : Token) -> String {
 ///|
 /// The result of a scan. `trivia` is the trivia of a text with no tokens,
 /// and empty otherwise. `diagnostics` are the lexical problems in order.
+#derive(Eq, Debug)
 pub(all) struct TokenStream {
   tokens : ArrayView[Token]
   trivia : ArrayView[Trivia]
   diagnostics : ArrayView[@diagnostic.Diagnostic]
-} derive(Eq, Debug)
+}
 
 ///|
 /// The scanned text, byte for byte.
@@ -137,17 +143,19 @@ pub fn TokenStream::has_errors(self : TokenStream) -> Bool {
 
 ///|
 /// What one scanning step produces, in source order.
+#derive(Eq, Debug)
 pub(all) enum Piece {
   Tok(TokenKind, String, @span.Span)
   Triv(Trivia)
-} derive(Eq, Debug)
+}
 
 ///|
 /// One step of the scan: the piece read at an offset, where the next step
 /// starts, and the lexical problems found in the piece (several for a
 /// string with several bad escapes).
+#derive(Eq, Debug)
 pub(all) struct Step {
   piece : Piece
   end : @span.Offset
   diagnostics : ArrayView[@diagnostic.Diagnostic]
-} derive(Eq, Debug)
+}

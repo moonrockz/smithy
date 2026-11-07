@@ -1,24 +1,28 @@
 ///|
+#derive(Eq, Debug)
 pub(all) suberror BuildError {
   InvalidBuildConfig(String)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct TransformConfig {
   name : String
   args : Json
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct ProjectionConfig {
   name : String
   is_abstract : Bool
   imports : Array[BuildInput]
   transforms : Array[TransformConfig]
   plugins : Map[String, Json]
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct BuildConfig {
   version : String
   sources : Array[BuildInput]
@@ -30,7 +34,7 @@ pub(all) struct BuildConfig {
   projections : Array[ProjectionConfig]
   plugins : Map[String, Json]
   ignore_missing_plugins : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 fn config_field(value : Json, key : String) -> Json? {

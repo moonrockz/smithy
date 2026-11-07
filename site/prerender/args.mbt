@@ -1,4 +1,5 @@
 ///|
+#derive(Eq, Debug)
 pub(all) struct Args {
   content : String
   channel : @data.Channel
@@ -10,7 +11,7 @@ pub(all) struct Args {
   has_release : Bool
   git_ref : String
   out : String
-} derive(Eq, Debug)
+}
 
 ///|
 fn with_slashes(path : String) -> String {

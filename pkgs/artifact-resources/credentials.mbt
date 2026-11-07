@@ -1,8 +1,9 @@
 ///|
 /// A normalized scheme/host/port identity. Paths and queries are not origins.
+#derive(Eq, Debug)
 pub struct HttpOrigin {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn HttpUrl::origin(self : HttpUrl) -> HttpOrigin {
@@ -78,9 +79,10 @@ pub fn HttpOrigin::permits_credentials(self : HttpOrigin) -> Bool {
 
 ///|
 /// Secret authorization material. Debug and Show never render the value.
+#derive(Eq)
 pub struct Authorization {
   priv header : String
-} derive(Eq)
+}
 
 ///|
 pub fn Authorization::bearer(token : String) -> Authorization? {
@@ -140,9 +142,10 @@ pub impl Show for Authorization with fn output(_, logger) {
 
 ///|
 /// One explicit authorization per origin. No ambient credentials are discovered.
+#derive(Eq, Debug)
 pub struct Credentials {
   priv entries : Array[(HttpOrigin, Authorization)]
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Credentials::new(
@@ -174,19 +177,21 @@ pub fn Credentials::for_url(
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum HttpAccept {
   AnyContent
   OctetStream
-} derive(Eq, Debug)
+}
 
 ///|
 /// Authorization is never part of a URL or provenance. Redirects must strip it
 /// when the destination's origin differs, even if another credential is configured.
+#derive(Eq, Debug)
 pub(all) struct HttpRequest {
   url : HttpUrl
   authorization : Authorization?
   accept : HttpAccept
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn HttpRequest::anonymous(url : HttpUrl) -> HttpRequest {

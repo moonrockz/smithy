@@ -11,7 +11,7 @@ import {
   "moonrockz/smithy_tests/tck",
   "moonbitlang/x/fs" @xfs,
   "moonbitlang/x/crypto",
-  "moonrockz/moonspec",
+  "moonrockz/moonspec/async" @moonspec,
   "moonrockz/expect",
   "moonbitlang/async",
   "moonbitlang/core/json",
@@ -26,3 +26,8 @@ import {
   "moonrockz/ion/binary" @ion_binary,
   "moonrockz/smithy-validation/rpc",
 } for "wbtest"
+
+// The features run through moonspec's async facade (`moonrockz/moonspec/async`, moonspec 0.12.0),
+// and that package has no wasm-gc build.
+
+supported_targets = "wasm+js+native"

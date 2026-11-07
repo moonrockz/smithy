@@ -82,7 +82,10 @@ async fn stdio_fixture(mode : String) -> Array[String] {
 async test "spawn_stdio talks to a child process" {
   @async.with_task_group(owner => {
     let conn = @rpc.spawn_stdio(owner, stdio_fixture("echo"))
-    conn.send("{\"jsonrpc\":\"2.0\",\"method\":\"terminal.ping\"}", related=None)
+    conn.send(
+      "{\"jsonrpc\":\"2.0\",\"method\":\"terminal.ping\"}",
+      related=None,
+    )
     inspect(
       conn.receive().unwrap(),
       content="{\"jsonrpc\":\"2.0\",\"method\":\"terminal.ping\"}",

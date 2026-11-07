@@ -1,9 +1,10 @@
 ///|
 /// A leaf value with its span.
+#derive(Eq, Debug)
 pub(all) struct Node[T] {
   value : T
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// Pairs a value with the span it was parsed from.
@@ -15,11 +16,12 @@ pub fn[T] Node::new(value : T, span : @span.Span) -> Node[T] {
 /// A syntactic, unresolved shape ID: `namespace#name$member`. A relative
 /// ID has no namespace; resolution against `use` statements and the
 /// prelude is the loader's job.
+#derive(Eq, Debug, Hash)
 pub(all) struct ShapeId {
   namespace : String?
   name : String
   member : String?
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// Builds a `ShapeId` from its parts.
@@ -59,7 +61,8 @@ pub impl Show for ShapeId with fn output(self, logger) {
 
 ///|
 /// One `///` line, the slashes stripped, the line break not included.
+#derive(Eq, Debug)
 pub(all) struct DocComment {
   text : String
   span : @span.Span
-} derive(Eq, Debug)
+}

@@ -1,18 +1,20 @@
 ///|
 /// How serious a diagnostic is. A file with an `Error` is rejected; a
 /// `Warning` does not stop parsing.
+#derive(Eq, Debug, Hash)
 pub(all) enum Severity {
   Error
   Warning
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// A secondary span with the text shown under it ("the structure started
 /// here").
+#derive(Eq, Debug)
 pub(all) struct Label {
   span : @span.Span
   text : String
-} derive(Eq, Debug)
+}
 
 ///|
 /// A problem found while scanning or parsing, with everything a rich
@@ -20,6 +22,7 @@ pub(all) struct Label {
 /// `message` under the primary `span`, secondary `labels`, `notes` in the
 /// first person, an optional `hint` and an optional correct `example`.
 /// Immutable: `with_context` returns a new value.
+#derive(Eq, Debug)
 pub(all) struct Diagnostic {
   code : String
   severity : Severity
@@ -30,7 +33,7 @@ pub(all) struct Diagnostic {
   notes : ArrayView[String]
   hint : String?
   example : String?
-} derive(Eq, Debug)
+}
 
 ///|
 /// Build a diagnostic; the optional parts default to empty lists and `None`.

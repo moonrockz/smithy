@@ -24,9 +24,10 @@ let uv_build_version : String = "0.13.5"
 
 ///|
 /// An integration that adds an optional module to the output.
+#derive(Eq)
 priv enum PyIntegration {
   FastApi
-} derive(Eq)
+}
 
 ///|
 fn read_integrations(

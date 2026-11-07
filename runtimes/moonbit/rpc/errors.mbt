@@ -2,9 +2,10 @@
 /// A JSON-RPC error. A handler raises it to answer with this code, message
 /// and data. `Peer::request` raises it for an error response and for a call
 /// that the session refuses before it is sent.
+#derive(Debug)
 pub(all) suberror RpcError {
   RpcError(code~ : Int32, message~ : String, data~ : Json?)
-} derive(Debug)
+}
 
 ///|
 pub impl Show for RpcError with fn output(self, logger) {
@@ -15,9 +16,10 @@ pub impl Show for RpcError with fn output(self, logger) {
 ///|
 /// A failure of the connection: the remote peer closed it, or a frame on the
 /// wire is not valid.
+#derive(Debug)
 pub(all) suberror TransportError {
   TransportError(String)
-} derive(Debug)
+}
 
 ///|
 pub impl Show for TransportError with fn output(self, logger) {
@@ -52,10 +54,11 @@ pub let request_cancelled_code : Int32 = -32800
 ///|
 /// The ID of a JSON-RPC request: an integer or a string. An integer keeps its
 /// exact text, so that an ID beyond the Int64 range is echoed unchanged.
+#derive(Eq, Hash, Debug)
 pub(all) enum RequestId {
   Number(String)
   Text(String)
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub impl Show for RequestId with fn output(self, logger) {

@@ -1,9 +1,10 @@
 ///|
 /// An absolute, ASCII HTTP(S) URL without credentials or fragments.
 /// Non-ASCII path/query characters must be percent-encoded by the caller.
+#derive(Eq, Debug)
 pub struct HttpUrl {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn HttpUrl::parse(text : String) -> HttpUrl? {
@@ -99,18 +100,20 @@ pub fn HttpUrl::location(self : HttpUrl) -> Location {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ArchiveFormat {
   Zip
   Tar
   Tgz
-} derive(Eq, Debug)
+}
 
 ///|
 /// Transport implementations must enforce these bounds while receiving bytes.
+#derive(Eq, Debug)
 pub struct AcquisitionLimits {
   max_bytes : Int32
   timeout_seconds : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn AcquisitionLimits::new(
@@ -142,18 +145,20 @@ pub(all) struct HttpResponse {
 pub type HttpTransport = (HttpRequest, AcquisitionLimits) -> HttpResponse raise ResourceError
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct PublicArchive {
   url : HttpUrl
   format : ArchiveFormat
   expected_digest : ContentDigest?
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Acquisition {
   requested : HttpUrl
   resolved : HttpUrl
   digest : ContentDigest
-} derive(Eq, Debug)
+}
 
 ///|
 /// Acquire and verify before parsing any archive bytes. The transport owns I/O;

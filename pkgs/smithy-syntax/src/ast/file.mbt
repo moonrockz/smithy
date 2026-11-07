@@ -1,57 +1,64 @@
 ///|
 /// `$key: value`.
+#derive(Eq, Debug)
 pub(all) struct ControlStatement {
   key : Node[String]
   value : NodeValue
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// `metadata key = value`.
+#derive(Eq, Debug)
 pub(all) struct MetadataStatement {
   key : Node[String]
   value : NodeValue
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// `namespace a.b.c`.
+#derive(Eq, Debug)
 pub(all) struct NamespaceStatement {
   namespace : Node[String]
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// `use a.b#Name`.
+#derive(Eq, Debug)
 pub(all) struct UseStatement {
   id : Node[ShapeId]
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// Doc comments and traits, then the shape.
+#derive(Eq, Debug)
 pub(all) struct ShapeStatement {
   docs : ArrayView[DocComment]
   traits : ArrayView[Trait]
   shape : Shape
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// `apply Target @trait` or `apply Target { @a @b }`.
+#derive(Eq, Debug)
 pub(all) struct ApplyStatement {
   target : Node[ShapeId]
   traits : ArrayView[Trait]
   block : Bool
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// A shape or apply statement in the shape section.
+#derive(Eq, Debug)
 pub(all) enum Statement {
   Shape(ShapeStatement)
   Apply(ApplyStatement)
-} derive(Eq, Debug)
+}
 
 ///|
 /// The statement's span.
@@ -65,6 +72,7 @@ pub fn Statement::span(self : Statement) -> @span.Span {
 ///|
 /// One IDL file: control section, metadata section, then the shape section
 /// (`namespace`, `use` statements, shape and apply statements).
+#derive(Eq, Debug)
 pub(all) struct IdlFile {
   control : ArrayView[ControlStatement]
   metadata : ArrayView[MetadataStatement]
@@ -72,7 +80,7 @@ pub(all) struct IdlFile {
   uses : ArrayView[UseStatement]
   statements : ArrayView[Statement]
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// The shape statements, without the apply statements.

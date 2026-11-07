@@ -1,6 +1,7 @@
 ///|
 /// A root shape ID naming the service selected for conversion.
-pub struct ServiceId(@smithy.ShapeId) derive(Eq, Debug, Hash)
+#derive(Eq, Debug, Hash)
+pub struct ServiceId(@smithy.ShapeId)
 
 ///|
 pub fn ServiceId::parse(text : String) -> ServiceId? {
@@ -22,7 +23,8 @@ pub fn ServiceId::to_string(self : ServiceId) -> String {
 
 ///|
 /// The trait ID of the selected serialization protocol.
-pub struct ProtocolId(@smithy.ShapeId) derive(Eq, Debug, Hash)
+#derive(Eq, Debug, Hash)
+pub struct ProtocolId(@smithy.ShapeId)
 
 ///|
 pub fn ProtocolId::parse(text : String) -> ProtocolId? {
@@ -43,10 +45,11 @@ pub fn ProtocolId::to_string(self : ProtocolId) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum OpenApiVersion {
   V3_0_2
   V3_1_0
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn OpenApiVersion::parse(text : String) -> OpenApiVersion? {
@@ -66,33 +69,37 @@ pub fn OpenApiVersion::to_string(self : OpenApiVersion) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum PrefixHeadersPolicy {
   Fail
   Warn
-} derive(Eq, Debug)
+}
 
 ///|
 /// Stable conversion warning classifications. Warnings retain the affected
 /// semantic shape instead of parsing a rendered diagnostic later.
+#derive(Eq, Debug)
 pub(all) enum WarningCode {
   OmittedPrefixHeaders
   OmittedUnsupportedTrait
   OmittedHttpMethod
   OmittedAuthScheme
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct ConversionWarning {
   code : WarningCode
   shape : @smithy.ShapeId
   message : String
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Debug)
 pub(all) struct Conversion {
   document : Json
   warnings : Array[ConversionWarning]
-} derive(Debug)
+}
 
 ///|
 pub fn OpenApiError::message(self : OpenApiError) -> String {
@@ -119,6 +126,7 @@ pub fn OpenApiError::message(self : OpenApiError) -> String {
 }
 
 ///|
+#derive(Debug)
 pub(all) suberror OpenApiError {
   InvalidConfiguration(String)
   MissingService(ServiceId)
@@ -129,4 +137,4 @@ pub(all) suberror OpenApiError {
   PrefixHeaders(@smithy.ShapeId)
   GreedyLabel(@smithy.ShapeId)
   SchemaConversion(String)
-} derive(Debug)
+}

@@ -1,25 +1,28 @@
 ///|
 /// OriginalBatch declares the response to one complete supplied request batch.
 /// BatchMethod and BatchOperation check payloads without establishing correlation.
+#derive(Eq, Debug)
 pub(all) enum BatchResponseContext {
   BatchEnvelopeOnly
   BatchMethod(MethodName)
   BatchOperation(@smithy.ShapeId)
   OriginalBatch(String)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct RequestBatchEntry {
   index : Int32
   result : RequestResult
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct RequestBatchResult {
   findings : Array[Finding]
   complete : Bool
   entries : Array[RequestBatchEntry]
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn RequestBatchResult::is_valid(self : RequestBatchResult) -> Bool {
@@ -28,20 +31,22 @@ pub fn RequestBatchResult::is_valid(self : RequestBatchResult) -> Bool {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct ResponseBatchEntry {
   /// None for the single error object returned for an invalid whole batch.
   index : Int32?
   request_index : Int32?
   result : ResponseResult
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct ResponseBatchResult {
   findings : Array[Finding]
   complete : Bool
   scope : ResponseScope
   entries : Array[ResponseBatchEntry]
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ResponseBatchResult::is_valid(self : ResponseBatchResult) -> Bool {

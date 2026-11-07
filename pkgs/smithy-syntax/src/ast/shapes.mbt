@@ -1,5 +1,6 @@
 ///|
 /// A simple (unparameterized) shape type.
+#derive(Eq, Debug, Hash)
 pub(all) enum SimpleType {
   Blob
   Boolean
@@ -14,7 +15,7 @@ pub(all) enum SimpleType {
   BigInteger
   BigDecimal
   Timestamp
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// The simple type named by a keyword, or `None`.
@@ -59,37 +60,41 @@ pub fn SimpleType::keyword(self : SimpleType) -> String {
 
 ///|
 /// `enum` or `intEnum`.
+#derive(Eq, Debug, Hash)
 pub(all) enum EnumType {
   Enum
   IntEnum
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// `Set` is Smithy 1.0 syntax. The parser reports it in a 2.0 file.
+#derive(Eq, Debug, Hash)
 pub(all) enum AggregateType {
   List
   Map
   Union
   Structure
   Set
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// `service` or `resource`.
+#derive(Eq, Debug, Hash)
 pub(all) enum EntityType {
   Service
   Resource
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// Every shape keyword, for recovery and for `ShapeKind` in the CST.
+#derive(Eq, Debug, Hash)
 pub(all) enum ShapeKind {
   Simple(SimpleType)
   Enum(EnumType)
   Aggregate(AggregateType)
   Entity(EntityType)
   Operation
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// The IDL keyword, for messages and CST names.
@@ -129,36 +134,41 @@ pub fn ShapeKind::of(word : String) -> ShapeKind? {
 
 ///|
 /// `with [A, B]`.
+#derive(Eq, Debug)
 pub(all) struct Mixins {
   ids : ArrayView[Node[ShapeId]]
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// `@id`, `@id(value)` or `@id(key: value, ...)`. `@id()` is
 /// `Structure([])`.
+#derive(Eq, Debug)
 pub(all) enum TraitBody {
   Structure(ArrayView[NodeKvp])
   Node(NodeValue)
-} derive(Eq, Debug)
+}
 
 ///|
 /// A single applied trait: `@id` with an optional body.
+#derive(Eq, Debug)
 pub(all) struct Trait {
   id : Node[ShapeId]
   body : TraitBody?
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// `name: Target` or the elided `$name`.
+#derive(Eq, Debug)
 pub(all) enum MemberTarget {
   Explicit(Node[ShapeId])
   Elided
-} derive(Eq, Debug)
+}
 
 ///|
 /// A member of a structure, union, list or map.
+#derive(Eq, Debug)
 pub(all) struct Member {
   docs : ArrayView[DocComment]
   traits : ArrayView[Trait]
@@ -166,20 +176,22 @@ pub(all) struct Member {
   target : MemberTarget
   default : NodeValue?
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// A member of an `enum` or `intEnum`.
+#derive(Eq, Debug)
 pub(all) struct EnumMember {
   docs : ArrayView[DocComment]
   traits : ArrayView[Trait]
   name : Node[String]
   value : NodeValue?
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// `:= { ... }` with its own traits, `for` and mixins.
+#derive(Eq, Debug)
 pub(all) struct InlineShape {
   docs : ArrayView[DocComment]
   traits : ArrayView[Trait]
@@ -187,28 +199,31 @@ pub(all) struct InlineShape {
   mixins : Mixins?
   members : ArrayView[Member]
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// The target of an operation's `input` or `output`: a reference to a
 /// shape, or an inline shape defined on the spot.
+#derive(Eq, Debug)
 pub(all) enum OperationTarget {
   Reference(Node[ShapeId])
   Inline(InlineShape)
-} derive(Eq, Debug)
+}
 
 ///|
 /// One property of an `operation` shape: `input`, `output` or `errors`.
+#derive(Eq, Debug)
 pub(all) enum OperationProperty {
   Input(OperationTarget, @span.Span)
   Output(OperationTarget, @span.Span)
   Errors(ArrayView[Node[ShapeId]], @span.Span)
-} derive(Eq, Debug)
+}
 
 ///|
 /// `Shape`, one case per grammar production. `name` is the identifier
 /// after the keyword. Member names are unique only when the parse result
 /// has no errors; duplicate members survive in a partial AST.
+#derive(Eq, Debug)
 pub(all) enum Shape {
   Simple(kind~ : SimpleType, name~ : Node[String], mixins~ : Mixins?)
   Enum(
@@ -235,7 +250,7 @@ pub(all) enum Shape {
     mixins~ : Mixins?,
     properties~ : ArrayView[OperationProperty]
   )
-} derive(Eq, Debug)
+}
 
 ///|
 /// The shape's name.

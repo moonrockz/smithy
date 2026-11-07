@@ -1,6 +1,7 @@
 ///|
 /// What a statement's tokens parsed as. `Skipped` is a run the parser
 /// reported and skipped (recovery per statement).
+#derive(Eq, Debug)
 pub(all) enum StatementKind {
   Control
   Metadata
@@ -9,7 +10,7 @@ pub(all) enum StatementKind {
   Shape(@ast.ShapeKind)
   Apply
   Skipped
-} derive(Eq, Debug)
+}
 
 ///|
 /// `Control`, `Shape(structure)`, ... for tests and tools.
@@ -30,12 +31,13 @@ pub impl Show for StatementKind with fn output(self, logger) {
 /// key, metadata key, namespace, used shape ID, shape name or apply
 /// target; `None` for a skipped run. `span` runs from the first token's
 /// start to the last token's end, trivia excluded; empty at 0 with no token.
+#derive(Eq, Debug)
 pub(all) struct StatementCst {
   kind : StatementKind
   name : String?
   tokens : ArrayView[@scanner.Token]
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// Group `tokens` as one statement; the span runs from the first token's start to the last token's end.
@@ -66,11 +68,12 @@ pub fn StatementCst::to_source(self : StatementCst) -> String {
 /// Every token of a file, grouped per statement. `statements` tile
 /// `tokens` in order; `trivia` is the stream's trivia for a text with no
 /// token.
+#derive(Eq, Debug)
 pub(all) struct IdlCst {
   tokens : ArrayView[@scanner.Token]
   trivia : ArrayView[@scanner.Trivia]
   statements : ArrayView[StatementCst]
-} derive(Eq, Debug)
+}
 
 ///|
 /// The CST of a scanned stream with its statements.

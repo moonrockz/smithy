@@ -1,4 +1,5 @@
 ///|
+#derive(Debug)
 priv struct Constraints {
   min : @smithy.NodeNumber?
   max : @smithy.NodeNumber?
@@ -7,7 +8,7 @@ priv struct Constraints {
   pattern : BoundedPattern?
   unique : Bool
   timestamp : TimestampFormat
-} derive(Debug)
+}
 
 ///|
 fn effective_trait(

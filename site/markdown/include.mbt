@@ -1,19 +1,21 @@
 ///|
 /// One line of an include block: `LABEL: PATH#NAME`.
+#derive(Eq, Debug)
 pub(all) struct Include {
   label : String
   path : String
   name : String
-} derive(Eq, Debug)
+}
 
 ///|
 /// A fenced code block of a source region; `lang` and `rest` split the info string
 /// as `@cmark.CodeBlock::language_of_info_string` does ("mbt check" gives "mbt" and "check").
+#derive(Eq, Debug)
 pub(all) struct Fence {
   lang : String
   rest : String
   code : String
-} derive(Eq, Debug)
+}
 
 ///|
 fn lines_of(text : String) -> Array[String] {

@@ -24,8 +24,10 @@ let portable_letters : Array[String] = [
   "-",
   " ",
   "😀",
-  "😀".view(end_offset=1).to_owned(),
-  "😀".view(start_offset=1).to_owned(),
+  // `exact_view` and `clamped_view` do not split a pair, so `unsafe_view` makes
+  // the lone halves; both bounds are in "😀".
+  "😀".unsafe_view(start=0, end=1).to_owned(),
+  "😀".unsafe_view(start=1, end=2).to_owned(),
   "é",
   "\n",
   "A",

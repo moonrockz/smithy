@@ -1,8 +1,9 @@
 ///|
+#derive(Eq, Hash, Debug)
 pub(all) enum ProtocolVersion {
   V1_0
   V2_0
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub fn ProtocolVersion::parse(text : String) -> ProtocolVersion? {
@@ -22,9 +23,10 @@ pub fn ProtocolVersion::to_string(self : ProtocolVersion) -> String {
 }
 
 ///|
+#derive(Eq, Hash, Debug)
 pub struct MethodName {
   priv text : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub fn MethodName::parse(text : String) -> MethodName? {
@@ -41,44 +43,51 @@ pub fn MethodName::to_string(self : MethodName) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum RequestId {
   Absent
   Present(@smithy.NodeValue)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum MessageKind {
   Call
   Notification
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum MethodKind {
   RequestOnly
   NotificationOnly
   RequestOrNotification
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ParameterMode {
   Named
   Positional
   Either
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ResultSelection {
   OutputStructure(@smithy.ShapeId)
   OutputMember(@smithy.ShapeId)
   NullResult
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Debug)
 pub(all) suberror PreparationError {
   InvalidContract(@smithy.ShapeId, String)
-} derive(Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum FindingCode {
   InvalidJson
   DuplicateJsonKey
@@ -103,7 +112,7 @@ pub(all) enum FindingCode {
   DuplicateResponse
   MissingResponse
   Value(@validation.FindingCode)
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn FindingCode::to_string(self : FindingCode) -> String {
@@ -135,6 +144,7 @@ pub fn FindingCode::to_string(self : FindingCode) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Finding {
   code : FindingCode
   severity : @validation.FindingSeverity
@@ -143,16 +153,17 @@ pub(all) struct Finding {
   operation : @smithy.ShapeId?
   offset : Int32?
   message : String
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct RequestResult {
   findings : Array[Finding]
   complete : Bool
   kind : MessageKind?
   id : RequestId
   operation : @smithy.ShapeId?
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn RequestResult::is_valid(self : RequestResult) -> Bool {

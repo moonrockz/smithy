@@ -1,19 +1,22 @@
 ///|
+#derive(Debug)
 pub(all) suberror PreparationError {
   InvalidTarget(@smithy.ShapeId, String)
   InvalidConfiguration(String)
   InvalidModel(@smithy.ShapeId, String)
   UnsupportedConstraint(@smithy.ShapeId, String)
-} derive(Debug)
+}
 
 ///|
+#derive(Debug)
 priv struct PreparedMember {
   name : String
   id : @smithy.ShapeId
   required : Bool
-} derive(Debug)
+}
 
 ///|
+#derive(Debug)
 priv struct PreparedShape {
   id : @smithy.ShapeId
   value_shape : @smithy.ShapeId
@@ -25,15 +28,16 @@ priv struct PreparedShape {
   sparse : Bool
   unknown_members : UnknownMembers
   critical_separator : String?
-} derive(Debug)
+}
 
 ///|
 /// A private snapshot of the reachable semantic contract, reusable across values.
+#derive(Debug)
 pub struct PreparedValidator {
   priv target : @smithy.ShapeId
   priv shapes : Map[@smithy.ShapeId, PreparedShape]
   priv config : Config
-} derive(Debug)
+}
 
 ///|
 fn data_shape(shape : @smithy.Shape) -> Bool {
