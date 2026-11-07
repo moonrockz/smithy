@@ -36,6 +36,7 @@ on:
       - .github/actions/setup/**
       - pkgs/artifact-resources/**
       - pkgs/jmespath/**
+      - pkgs/regex/**
       - pkgs/smithy-syntax/**
       - pkgs/smithy/**
       - pkgs/smithy-validation/**
@@ -56,6 +57,7 @@ on:
       - .github/actions/setup/**
       - pkgs/artifact-resources/**
       - pkgs/jmespath/**
+      - pkgs/regex/**
       - pkgs/smithy-syntax/**
       - pkgs/smithy/**
       - pkgs/smithy-validation/**
