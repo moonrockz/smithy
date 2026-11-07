@@ -38,7 +38,7 @@ zig = "0.17.0"
 # tools/moonbit-core-pin.json. A version bump updates that file from finos/morphir-moonbit.
 
 [tools."http:moonbit"]
-version = "0.10.18+6c83a7f62"
+version = "0.10.20+65efd5b93"
 bin_path = "bin"
 # The "-" markers remove the newlines around each command. Windows runs the hook
 # with `cmd /s /c`, which stops at the first newline: a leading newline runs nothing.
@@ -51,12 +51,27 @@ pwsh -NoProfile -File "{{config_root}}/tools/bootstrap-moonbit-windows.ps1"
 """
 
 [tools."http:moonbit".platforms]
-linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-linux-x86_64.tar.gz" }
-linux-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-linux-aarch64.tar.gz" }
-macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-darwin-aarch64.tar.gz" }
-windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-windows-x86_64.zip", format = "zip" }
+linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.20%2B65efd5b93/moonbit-linux-x86_64.tar.gz" }
+linux-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.20%2B65efd5b93/moonbit-linux-aarch64.tar.gz" }
+macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.20%2B65efd5b93/moonbit-darwin-aarch64.tar.gz" }
+windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.20%2B65efd5b93/moonbit-windows-x86_64.zip", format = "zip" }
 # No Windows arm64 build is published; Windows on Arm runs the x64 build under emulation.
-windows-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-windows-x86_64.zip", format = "zip" }
+windows-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.20%2B65efd5b93/moonbit-windows-x86_64.zip", format = "zip" }
+
+# Mission Control tools CLI: checks and installs the shared html-design OpenSpec schema and generates the
+# agent skills (openspec:check, openspec:setup). A pinned binary, so a MoonBit toolchain change cannot break it.
+[tools."github:moonrockz/mission-control"]
+version = "0.1.1"
+version_prefix = "tools-v"
+
+[tools."github:moonrockz/mission-control".platforms]
+linux-x64 = { asset_pattern = "mission-control-tools-linux-x64.tar.gz" }
+linux-arm64 = { asset_pattern = "mission-control-tools-linux-arm64.tar.gz" }
+macos-arm64 = { asset_pattern = "mission-control-tools-darwin-arm64.tar.gz" }
+macos-x64 = { asset_pattern = "mission-control-tools-darwin-x64.tar.gz" }
+windows-x64 = { asset_pattern = "mission-control-tools-windows-x64.zip" }
+# No Windows arm64 build; Windows on Arm runs the x64 build under emulation.
+windows-arm64 = { asset_pattern = "mission-control-tools-windows-x64.zip" }
 
 [env]
 _.path = ["./node_modules/.bin"]
@@ -435,9 +450,17 @@ description = "Check the embedded Go runtime against its tested source files"
 run = "moonx scripts/jsonrpc-go-runtime.mbtx --check"
 
 [tasks."openspec:check"]
-description = "Shared OpenSpec check"
-run = "moon run --target wasm scripts/openspec-ext.mbtx -- check"
+description = "Check the shared OpenSpec workflow"
+run = "mission-control-tools openspec check --bundle"
 
 [tasks."openspec:setup"]
-description = "Shared OpenSpec setup"
-run = "moon run --target wasm scripts/openspec-ext.mbtx -- setup"
+description = "Set up the shared OpenSpec workflow"
+run = "mission-control-tools openspec setup"
+
+[tasks."openspec:validate"]
+description = "Validate the shared OpenSpec workflow"
+run = ["openspec schema validate html-design", "openspec validate --all --strict"]
+
+[tasks."openspec:verify"]
+description = "Verify the shared OpenSpec workflow"
+run = ["mise run openspec:check", "mise run openspec:validate"]

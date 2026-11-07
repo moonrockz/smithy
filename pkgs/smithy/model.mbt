@@ -5,22 +5,24 @@ pub using @syntax {type SimpleType}
 /// A shape's source in the assembled input. JSON paths use JSON Pointer;
 /// IDL locations retain the parser's UTF-16 span.
 /// The kind tells whether the source holds built-in definitions.
+#derive(Eq, Debug)
 pub(all) struct SourceLocation {
   file : String
   path : String
   span : @syntax.Span?
   kind : SourceKind
-} derive(Eq, Debug)
+}
 
 ///|
 /// Where the definitions of a source come from.
+#derive(Eq, Debug)
 pub(all) enum SourceKind {
   /// A model input that the caller supplies, or a provider default.
   User
   /// Definitions that the loader bundles: the prelude, the contracts, the
   /// protocol test traits and the sources added with Loader::add_builtin_idl.
   BuiltIn
-} derive(Eq, Debug)
+}
 
 ///|
 /// Create a source location. The kind is User unless the caller gives it.
@@ -42,6 +44,7 @@ pub fn SourceLocation::is_builtin(self : SourceLocation) -> Bool {
 
 ///|
 /// How the validation events report a diagnostic.
+#derive(Eq, Debug)
 pub(all) enum DiagnosticReport {
   /// An event with the severity of the diagnostic.
   Event
@@ -51,7 +54,7 @@ pub(all) enum DiagnosticReport {
   CoveredBySelector
   /// No event: a hint for tools, for which Smithy reports no event.
   HintOnly
-} derive(Eq, Debug)
+}
 
 ///|
 /// Whether the validation events report the diagnostic.
@@ -61,6 +64,7 @@ pub fn DiagnosticReport::has_event(self : DiagnosticReport) -> Bool {
 
 ///|
 /// An assembly error. Syntax diagnostics retain their original code and span.
+#derive(Eq, Debug)
 pub(all) struct ModelDiagnostic {
   code : String
   event_id : String
@@ -69,22 +73,24 @@ pub(all) struct ModelDiagnostic {
   message : String
   source : SourceLocation
   shape : ShapeId?
-} derive(Eq, Debug)
+}
 
 ///|
 /// Source declarations and the inherited baseline of an assembled shape.
 /// Effective traits and members stay on Shape; provenance distinguishes local
 /// overrides, including overrides equal to the inherited value.
+#derive(Eq, Debug)
 pub(all) struct ShapeProvenance {
   introduced_traits : Map[ShapeId, NodeValue]
   inherited_traits : Map[ShapeId, NodeValue]
   introduced_fields : Map[String, NodeValue]
   inherited_fields : Map[String, NodeValue]
   legacy_set : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 /// A shape, including first-class member shapes.
+#derive(Eq, Debug)
 pub(all) struct Shape {
   id : ShapeId
   body : ShapeBody
@@ -92,7 +98,7 @@ pub(all) struct Shape {
   mixins : Array[ShapeId]
   provenance : ShapeProvenance?
   source : SourceLocation
-} derive(Eq, Debug)
+}
 
 ///|
 /// Traits introduced by this shape, including changes made after assembly.
@@ -117,6 +123,7 @@ pub fn Shape::is_legacy_set(self : Shape) -> Bool {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ShapeBody {
   Simple(SimpleType)
   List(ShapeId)
@@ -147,7 +154,7 @@ pub(all) enum ShapeBody {
     collectionOperations~ : Array[ShapeId],
     resources~ : Array[ShapeId]
   )
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ShapeBody::keyword(self : ShapeBody) -> String {
@@ -169,10 +176,11 @@ pub fn ShapeBody::keyword(self : ShapeBody) -> String {
 ///|
 /// A graph of semantic shapes and metadata. Assembly includes built-in prelude
 /// and contract definitions; serialization omits them unless explicitly requested.
+#derive(Eq, Debug)
 pub(all) struct Model {
   shapes : Map[ShapeId, Shape]
   metadata : Map[String, NodeValue]
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Model::get(self : Model, id : String) -> Shape? {
@@ -186,11 +194,12 @@ pub fn Shape::trait_value(self : Shape, id : String) -> NodeValue? {
 
 ///|
 /// Failed assembly never returns a partially validated model.
+#derive(Debug)
 pub(all) struct LoadResult {
   model : Model?
   diagnostics : Array[ModelDiagnostic]
   validation_findings : Array[ValidationEvent]
-} derive(Debug)
+}
 
 ///|
 pub fn LoadResult::has_errors(self : LoadResult) -> Bool {

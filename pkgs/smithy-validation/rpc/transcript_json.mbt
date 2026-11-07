@@ -2,12 +2,13 @@
 /// A transcript read from a JSON document. `version` and `completeness` are
 /// None when the document does not say; `expect` is None without an `expect`
 /// key.
+#derive(Eq, Debug)
 pub(all) struct TranscriptDocument {
   version : ProtocolVersion?
   completeness : Completeness?
   entries : Array[TranscriptEntry]
   expect : Array[ExpectedFinding]?
-} derive(Eq, Debug)
+}
 
 ///|
 /// The most nesting levels that a transcript reader parses in one JSON value,

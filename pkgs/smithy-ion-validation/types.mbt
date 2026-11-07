@@ -1,4 +1,5 @@
 ///|
+#derive(Eq, Debug)
 pub(all) struct Finding {
   code : @validation.FindingCode
   severity : @validation.FindingSeverity
@@ -6,13 +7,14 @@ pub(all) struct Finding {
   shape : @smithy.ShapeId
   message : String
   native_kind : @ion.IonType?
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct ValidationResult {
   findings : Array[Finding]
   complete : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ValidationResult::is_valid(self : ValidationResult) -> Bool {

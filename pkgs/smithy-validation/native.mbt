@@ -1,11 +1,13 @@
 ///|
+#derive(Eq, Debug)
 pub(all) enum NativeOffset {
   KnownOffsetMinutes(Int32)
   UnknownOffset
-} derive(Eq, Debug)
+}
 
 ///|
 /// A native timestamp's precision and offset, independent of any format library.
+#derive(Debug)
 pub struct NativeTimestamp {
   year : Int32
   month : Int32?
@@ -15,7 +17,7 @@ pub struct NativeTimestamp {
   second : Int32?
   fraction : @smithy.NodeNumber?
   offset : NativeOffset
-} derive(Debug)
+}
 
 ///|
 pub impl Eq for NativeTimestamp with fn equal(self, other) {

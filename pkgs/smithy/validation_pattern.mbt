@@ -23,7 +23,10 @@ fn core_pattern(pattern : String) -> String {
     let c = pattern.code_unit_at(i)
     if c == '\\' && i + 1 < length {
       let next = pattern.code_unit_at(i + 1)
-      out.write_view(pattern.view(start_offset=i, end_offset=i + 2))
+      // The escape and the code unit after it. That code unit can be the leading
+      // surrogate of a pair (`\😀`), which `exact_view` refuses, so this keeps the
+      // old raw code-unit view. `i + 1 < length` above checks the bounds.
+      out.write_view(pattern.unsafe_view(start=i, end=i + 2))
       if in_class {
         let class_escape = next == 'd' ||
           next == 'D' ||

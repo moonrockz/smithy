@@ -13,24 +13,27 @@ import {
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) struct IdlCst {
   tokens : ArrayView[@scanner.Token]
   trivia : ArrayView[@scanner.Trivia]
   statements : ArrayView[StatementCst]
-} derive(Eq, @debug.Debug)
+}
 pub fn IdlCst::new(@scanner.TokenStream, Array[StatementCst]) -> Self
 pub fn IdlCst::skipped(Self) -> Array[StatementCst]
 pub fn IdlCst::to_source(Self) -> String
 
+#derive(Eq, @debug.Debug)
 pub(all) struct StatementCst {
   kind : StatementKind
   name : String?
   tokens : ArrayView[@scanner.Token]
   span : @span.Span
-} derive(Eq, @debug.Debug)
+}
 pub fn StatementCst::new(kind~ : StatementKind, name~ : String?, tokens~ : ArrayView[@scanner.Token]) -> Self
 pub fn StatementCst::to_source(Self) -> String
 
+#derive(Eq, @debug.Debug)
 pub(all) enum StatementKind {
   Control
   Metadata
@@ -39,7 +42,7 @@ pub(all) enum StatementKind {
   Shape(@ast.ShapeKind)
   Apply
   Skipped
-} derive(Eq, @debug.Debug)
+}
 pub impl Show for StatementKind
 
 // Type aliases

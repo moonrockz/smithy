@@ -31,11 +31,12 @@ let default_content : String = "."
 
 ///|
 /// The arguments split into the `--content` value, the `--out` value and the other arguments in order.
+#derive(Eq, Debug)
 struct Split {
   content : String
   out : String
   rest : Array[String]
-} derive(Eq, Debug)
+}
 
 ///|
 fn split_args(args : ArrayView[String]) -> Split {

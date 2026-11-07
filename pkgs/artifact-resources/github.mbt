@@ -1,8 +1,9 @@
 ///|
 /// A GitHub repository coordinate, independent of its API host.
+#derive(Eq, Debug)
 pub struct GitHubRepository {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn GitHubRepository::parse(text : String) -> GitHubRepository? {
@@ -32,9 +33,10 @@ pub fn GitHubRepository::to_string(self : GitHubRepository) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct GitHubTag {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn GitHubTag::parse(text : String) -> GitHubTag? {
@@ -51,9 +53,10 @@ pub fn GitHubTag::to_string(self : GitHubTag) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct GitHubAssetName {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn GitHubAssetName::parse(text : String) -> GitHubAssetName? {
@@ -75,14 +78,16 @@ pub fn GitHubAssetName::to_string(self : GitHubAssetName) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct GitHubReleaseId {
   priv value : Int64
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub struct GitHubAssetId {
   priv value : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn GitHubReleaseId::to_string(self : GitHubReleaseId) -> String {
@@ -97,10 +102,11 @@ pub fn GitHubAssetId::to_string(self : GitHubAssetId) -> String {
 ///|
 /// An exact name within an explicitly named release. Keys serialize both fields
 /// as JSON, so tags and names containing punctuation cannot collide.
+#derive(Eq, Debug)
 pub(all) struct GitHubAssetRef {
   tag : GitHubTag
   asset : GitHubAssetName
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn GitHubAssetRef::key(self : GitHubAssetRef) -> ArtifactKey {
@@ -121,13 +127,14 @@ pub fn GitHubAssetRef::from_key(key : ArtifactKey) -> GitHubAssetRef? {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct GitHubResolution {
   repository : GitHubRepository
   requested : GitHubAssetRef
   release_id : GitHubReleaseId
   asset_id : GitHubAssetId
   download : HttpUrl
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn GitHubResolution::to_string(self : GitHubResolution) -> String {
@@ -154,12 +161,13 @@ pub fn Provenance::github(
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct GitHubArchive {
   repository : GitHubRepository
   reference : GitHubAssetRef
   format : ArchiveFormat
   expected_digest : ContentDigest?
-} derive(Eq, Debug)
+}
 
 ///|
 fn github_segment(text : String) -> String {

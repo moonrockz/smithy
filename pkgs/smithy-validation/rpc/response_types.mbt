@@ -1,36 +1,41 @@
 ///|
 /// Context is supplied by the caller, never inferred from response fields.
+#derive(Eq, Debug)
 pub(all) enum ResponseContext {
   EnvelopeOnly
   Method(MethodName)
   Operation(@smithy.ShapeId)
   OriginalRequest(String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// JSON-RPC 1.0 defines no code/message/data schema. Opt in explicitly to reuse
 /// that application mapping; otherwise legacy errors remain opaque JSON values.
+#derive(Eq, Debug)
 pub(all) enum LegacyErrorMode {
   Opaque
   CodeMessageData
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ResponseKind {
   Success
   ProtocolError
   ApplicationError
   LegacyError
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ResponseScope {
   Envelope
   MethodPayload
   RequestContext
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct ResponseResult {
   findings : Array[Finding]
   complete : Bool
@@ -38,7 +43,7 @@ pub(all) struct ResponseResult {
   kind : ResponseKind?
   id : RequestId
   operation : @smithy.ShapeId?
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ResponseResult::is_valid(self : ResponseResult) -> Bool {

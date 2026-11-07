@@ -8,50 +8,55 @@ import {
 }
 
 // Values
-pub fn decode(Json) -> JsonAst raise @json.JsonDecodeError
+pub fn decode(@json.Json) -> JsonAst raise @json.JsonDecodeError
 
-pub fn encode(JsonAst) -> Json
+pub fn encode(JsonAst) -> @json.Json
 
 pub fn parse(String) -> JsonAst raise
 
-pub fn parse_exact(String) -> Json raise @json.ParseError
+pub fn parse_exact(String) -> @json.Json raise @json.ParseError
 
 pub fn stringify(JsonAst, indent? : Int32) -> String
 
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) struct JsonAst {
   smithy : String
-  metadata : Map[String, Json]?
+  metadata : Map[String, @json.Json]?
   shapes : Map[String, JsonShape]?
-} derive(Eq, @debug.Debug)
-pub fn JsonAst::new(smithy? : String, metadata? : Map[String, Json], shapes? : Map[String, JsonShape]) -> Self
-pub impl ToJson for JsonAst
+}
+pub fn JsonAst::new(smithy? : String, metadata? : Map[String, @json.Json], shapes? : Map[String, JsonShape]) -> Self
 pub impl @json.FromJson for JsonAst
+pub impl @json.ToJson for JsonAst
 
+#derive(Eq, @debug.Debug)
 pub(all) struct JsonMember {
   target : String
-  traits : Map[String, Json]?
-} derive(Eq, @debug.Debug)
-pub fn JsonMember::new(String, traits? : Map[String, Json]) -> Self
-pub impl ToJson for JsonMember
+  traits : Map[String, @json.Json]?
+}
+pub fn JsonMember::new(String, traits? : Map[String, @json.Json]) -> Self
 pub impl @json.FromJson for JsonMember
+pub impl @json.ToJson for JsonMember
 
+#derive(Eq, @debug.Debug)
 pub(all) struct JsonOperation {
   input : JsonReference?
   output : JsonReference?
   errors : Array[JsonReference]?
-} derive(Eq, @debug.Debug)
+}
 pub fn JsonOperation::new(input? : JsonReference, output? : JsonReference, errors? : Array[JsonReference]) -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) struct JsonReference {
   target : String
-} derive(Eq, @debug.Debug)
+}
 pub fn JsonReference::new(String) -> Self
-pub impl ToJson for JsonReference
 pub impl @json.FromJson for JsonReference
+pub impl @json.ToJson for JsonReference
 
+#derive(Eq, @debug.Debug)
 pub(all) struct JsonResource {
   identifiers : Map[String, JsonReference]?
   properties : Map[String, JsonReference]?
@@ -64,27 +69,30 @@ pub(all) struct JsonResource {
   operations : Array[JsonReference]?
   collectionOperations : Array[JsonReference]?
   resources : Array[JsonReference]?
-} derive(Eq, @debug.Debug)
+}
 pub fn JsonResource::new(identifiers? : Map[String, JsonReference], properties? : Map[String, JsonReference], create? : JsonReference, put? : JsonReference, read? : JsonReference, update? : JsonReference, delete? : JsonReference, list? : JsonReference, operations? : Array[JsonReference], collectionOperations? : Array[JsonReference], resources? : Array[JsonReference]) -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) struct JsonService {
   version : String?
   operations : Array[JsonReference]?
   resources : Array[JsonReference]?
   errors : Array[JsonReference]?
   rename : Map[String, String]?
-} derive(Eq, @debug.Debug)
+}
 pub fn JsonService::new(version? : String, operations? : Array[JsonReference], resources? : Array[JsonReference], errors? : Array[JsonReference], rename? : Map[String, String]) -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) struct JsonShape {
   kind : JsonShapeKind
-  traits : Map[String, Json]?
+  traits : Map[String, @json.Json]?
   mixins : Array[JsonReference]?
-} derive(Eq, @debug.Debug)
-pub fn JsonShape::new(JsonShapeKind, traits? : Map[String, Json], mixins? : Array[JsonReference]) -> Self
-pub impl ToJson for JsonShape
+}
+pub fn JsonShape::new(JsonShapeKind, traits? : Map[String, @json.Json], mixins? : Array[JsonReference]) -> Self
 pub impl @json.FromJson for JsonShape
+pub impl @json.ToJson for JsonShape
 
+#derive(Eq, @debug.Debug)
 pub(all) enum JsonShapeKind {
   Simple(@ast.SimpleType)
   List(JsonMember?)
@@ -98,7 +106,7 @@ pub(all) enum JsonShapeKind {
   Service(JsonService)
   Resource(JsonResource)
   Apply
-} derive(Eq, @debug.Debug)
+}
 pub fn JsonShapeKind::keyword(Self) -> String
 
 // Type aliases

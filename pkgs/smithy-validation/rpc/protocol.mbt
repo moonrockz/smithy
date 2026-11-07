@@ -1,7 +1,8 @@
 ///|
+#derive(Eq, Hash, Debug)
 pub struct PeerName {
   priv text : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 /// Accepts `^[A-Za-z][A-Za-z0-9_-]{0,63}$`.

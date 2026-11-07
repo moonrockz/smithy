@@ -1,13 +1,14 @@
 ///|
 /// Limits of one request: check, decode, encode or canonicalize. Work is one allowance shared by parsing,
 /// form selection, adapters, constraint checks and output.
+#derive(Eq, Debug)
 pub struct CodecLimits {
   input_bytes : Int32
   output_bytes : Int32
   depth : Int32
   work : Int32
   findings : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn CodecLimits::new(

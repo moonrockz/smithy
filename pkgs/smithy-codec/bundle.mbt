@@ -1,10 +1,11 @@
 ///|
 /// A decoded document of a versioned bundle. It keeps the exact release that selected its root.
+#derive(Eq, Debug)
 pub struct VersionedValue {
   priv release : @contract.Release
   priv profile : @contract.ProfileId
   priv value : CodecValue
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn VersionedValue::release(self : VersionedValue) -> @contract.Release {

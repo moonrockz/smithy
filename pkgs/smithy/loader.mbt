@@ -1,9 +1,10 @@
 ///|
+#derive(Debug)
 pub(all) enum ModelInput {
   Idl(name~ : String, text~ : String)
   Json(name~ : String, text~ : String)
   Ast(name~ : String, document~ : @syntax.JsonAst)
-} derive(Debug)
+}
 
 ///|
 /// An in-memory multi-file loader. It never reads files or the network.

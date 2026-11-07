@@ -115,8 +115,10 @@ test "law: runtime Boolean matches and budget boundaries agree with core" {
         " ",
         "\n",
         "😀",
-        "😀".view(end_offset=1).to_owned(),
-        "😀".view(start_offset=1).to_owned(),
+        // The two lone surrogates of 😀. `exact_view` and `clamped_view` do not
+        // split a pair, so `unsafe_view` makes them; both bounds are in "😀".
+        "😀".unsafe_view(start=0, end=1).to_owned(),
+        "😀".unsafe_view(start=1, end=2).to_owned(),
       ]
       let text = input.1[:Int32::min(30, input.1.length())]
         .map(x => letters[(x & 0x7fffffff) % letters.length()])

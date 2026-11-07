@@ -1,5 +1,6 @@
 ///|
 /// What a traversal does after it enters a node.
+#derive(Eq, Debug)
 pub(all) enum Control {
   /// Visit the node's children next.
   Continue
@@ -7,7 +8,7 @@ pub(all) enum Control {
   SkipChildren
   /// End the traversal now; no node is left after this.
   Stop
-} derive(Eq, Debug)
+}
 
 ///|
 /// One open node on the walk stack.

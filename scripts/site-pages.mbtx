@@ -30,6 +30,7 @@ let no_tag_version : String = "v0.0.0"
 
 ///|
 /// One build: where the `site/` comes from, which channel and which bases.
+#derive(Eq, Debug)
 struct Build {
   /// The checkout to build. `None` is the working tree.
   checkout : String?
@@ -42,7 +43,7 @@ struct Build {
   git_ref : String
   /// The output directory below the Pages root: "" for the root.
   sub : String
-} derive(Eq, Debug)
+}
 
 ///|
 /// The builds for a Pages deploy. `tag` is the newest stable tag, if any; `tag_has_site` tells whether
@@ -154,11 +155,12 @@ fn linkcheck_args(build : Build, out : String) -> Array[String] {
 
 ///|
 /// A command and its working directory (`None`: the working directory of this script).
+#derive(Eq, Debug)
 struct Command {
   command : String
   args : Array[String]
   cwd : String?
-} derive(Eq, Debug)
+}
 
 ///|
 /// The commands that prepare the worktree of a release tag for its build. mise refuses the config files
@@ -179,12 +181,13 @@ fn trust_commands(release_dir : String, has_site_mise : Bool) -> Array[Command] 
 /// The MoonBit toolchain of a release tag. The release channel is built with the toolchain that its tag
 /// pins, not with the toolchain of this checkout: a newer compiler can reject the sources of an older
 /// tag (MoonBit 0.10.18 rejects a match of v0.8.0 that misses a new `@json.ParseError` case).
+#derive(Eq, Debug)
 struct Toolchain {
   /// The mise install directory of `http:moonbit` for the tag.
   home : String
   /// The pinned MoonBit version.
   version : String
-} derive(Eq, Debug)
+}
 
 ///|
 /// The command that installs the MoonBit toolchain of the worktree `release_dir`, as its mise config pins it.

@@ -38,6 +38,7 @@ let cli : String = "_build/native/release/build/moonrockz/smithy-cli/smithy-cli.
 let out_dir : String = ".dev/out/bench"
 
 ///|
+#derive(Debug, Eq)
 struct Options {
   sizes : Array[Int32]
   max_seconds : Double
@@ -45,7 +46,7 @@ struct Options {
   runs : Int32
   cutoff : Int32
   build : Bool
-} derive(Debug, Eq)
+}
 
 ///|
 /// Parse the options. `args` has the script binary at index 0.

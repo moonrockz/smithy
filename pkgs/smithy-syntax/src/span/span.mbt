@@ -1,10 +1,11 @@
 ///|
 /// A half-open range of a source text: `start` included, `length` units.
 /// Built from a length, so the end never precedes the start.
+#derive(Eq, Debug, Hash)
 pub(all) struct Span {
   start : Offset
   length : Length
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// The span of `length` units starting at `start`.
@@ -40,10 +41,11 @@ pub fn Span::join(self : Span, other : Span) -> Span {
 
 ///|
 /// A 1-based line and column.
+#derive(Eq, Debug, Hash)
 pub(all) struct Position {
   line : Line
   column : Column
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// The position at `line` and `column`.

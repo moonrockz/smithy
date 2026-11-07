@@ -1,5 +1,6 @@
 ///|
 /// The shapes of the lesson model that an example is checked against.
+#derive(Eq, Debug)
 pub(all) enum Kind {
   Name
   Path
@@ -7,7 +8,7 @@ pub(all) enum Kind {
   Type
   TypeAttributes
   SourceLocation
-} derive(Eq, Debug)
+}
 
 ///|
 /// The shape id of the lesson model for this kind.
@@ -24,22 +25,24 @@ pub fn Kind::shape(self : Kind) -> String {
 
 ///|
 /// What Morphir says about an example in its own source.
+#derive(Eq, Debug)
 pub(all) enum Verdict {
   Accepted
   Legacy(String)
   Rejected(String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// A Morphir spelling that is not the expanded spelling. `Compact` is a bare
 /// string for a node. `Wrapper` is a node wrapper with a string or an array
 /// payload, which the schema lists as an accepted format. `Legacy` is an array
 /// for a name, a path, an FQName or a node.
+#derive(Eq, Debug)
 pub(all) enum Spelling {
   Compact
   Wrapper
   Legacy
-} derive(Eq, Debug)
+}
 
 ///|
 /// The label of the spelling in the review snapshot.
@@ -54,22 +57,24 @@ pub fn Spelling::label(self : Spelling) -> String {
 ///|
 /// One finding that the value check must report for an example in another
 /// spelling.
+#derive(Eq, Debug)
 pub(all) struct Expected {
   code : String
   pointer : String
   message : String
   spelling : Spelling
-} derive(Eq, Debug)
+}
 
 ///|
 /// How an example is spelled. `Other` holds the findings of the spellings that
 /// are not expanded. `Unknown` holds the JSON pointer of a spelling that the
 /// sort does not know.
+#derive(Eq, Debug)
 pub(all) enum Form {
   Expanded
   Other(Array[Expected])
   Unknown(String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// These are the messages of the value check of the core. The check of the

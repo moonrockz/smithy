@@ -6,10 +6,11 @@ pub let github_repo : String = "https://github.com/moonrockz/smithy"
 pub let api_docs_url : String = "https://mooncakes.io/docs/moonrockz/smithy"
 
 ///|
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum Channel {
   Release
   Next
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Channel with Eq::{equal, not_equal}
@@ -40,6 +41,7 @@ pub fn Channel::parse(name : String) -> Channel? {
 
 ///|
 /// One built version of the site.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct SiteConfig {
   /// Base path of this version, for example "/smithy/next/".
   base : String
@@ -54,7 +56,7 @@ pub(all) struct SiteConfig {
   release_version : String
   /// False while no release has a site: the release entry is then left out.
   has_release : Bool
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend SiteConfig with Eq::{equal, not_equal}
@@ -71,6 +73,7 @@ pub extend SiteConfig with FromJson::{from_json}
 ///|
 /// Everything the component needs for its first render. The pre-render puts
 /// it in `<meta name="smithy-data">`; the browser reads it back for hydration.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct SiteData {
   config : SiteConfig
   pages : Array[@content.Page]
@@ -83,7 +86,7 @@ pub(all) struct SiteData {
   playground : @workbench.PlaygroundData?
   /// The contents or the lesson of a tour page; `None` on every other page.
   tour : @model.TourPage?
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend SiteData with Eq::{equal, not_equal}

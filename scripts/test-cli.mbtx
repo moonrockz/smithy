@@ -1529,17 +1529,19 @@ async fn exercise_jsonrpc_codegen(runner : Runner, root : String) -> Unit {
 let readme_files : Array[String] = ["apps/smithy/README.md"]
 
 ///|
+#derive(Eq, Debug)
 priv struct DocCommand {
   args : Array[String]
   output : String
   status : Int32
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 priv enum DocStep {
   Fixture(name~ : String, text~ : String)
   Session(Array[DocCommand])
-} derive(Eq, Debug)
+}
 
 ///|
 /// Words of a command line; a single-quoted word keeps its spaces.

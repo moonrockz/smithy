@@ -1,12 +1,13 @@
 ///|
 /// The outcome of checking a transcript document.
+#derive(Eq, Debug)
 pub struct TranscriptRun {
   /// Reader findings first, then checker findings, then the end-of-input ones.
   findings : Array[TranscriptFinding]
   summary : TranscriptSummary
   /// The match against the document's expect list; None without one.
   expectations : ExpectationResult?
-} derive(Eq, Debug)
+}
 
 ///|
 /// Checks the entries of a document that a reader produced and matches its

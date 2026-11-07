@@ -25,12 +25,13 @@ async fn write(path : String, bytes : &@io.Data) -> Unit {
 }
 
 ///|
+#derive(Eq)
 enum ConsumerProfile {
   JsonConsumer
   RegexConsumer
   OpenRpcConsumer
   IonConsumer
-} derive(Eq)
+}
 
 ///|
 let integration_modules : Array[String] = [

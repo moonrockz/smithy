@@ -1,11 +1,12 @@
 ///|
 /// A finding that a transcript is expected to produce. The code is the stable
 /// name of a TranscriptCode, an rpc FindingCode or a validation FindingCode.
+#derive(Eq, Debug)
 pub struct ExpectedFinding {
   priv code : String
   priv entry : Int32?
   priv related : Int32?
-} derive(Eq, Debug)
+}
 
 ///|
 /// The successor of each rpc FindingCode in a walk of all variants. The match
@@ -159,12 +160,13 @@ pub fn ExpectedFinding::related(self : ExpectedFinding) -> Int32? {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct ExpectationResult {
   /// Expected findings that no actual finding matched.
   missing : Array[ExpectedFinding]
   /// Actual findings that no expectation matched, with any severity.
   unexpected : Array[TranscriptFinding]
-} derive(Eq, Debug)
+}
 
 ///|
 /// True when nothing is missing and no unexpected finding is an error.

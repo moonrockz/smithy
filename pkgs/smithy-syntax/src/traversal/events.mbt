@@ -3,6 +3,7 @@
 /// the node's category and kind, its field in the parent (`None` for the
 /// start node), its start, and its depth and path from the start node.
 /// Build one with `EnterEvent::new`, which sets `depth` from the path.
+#derive(Eq, Debug)
 pub struct EnterEvent {
   category : String
   kind : String
@@ -10,16 +11,17 @@ pub struct EnterEvent {
   start : @span.Offset
   depth : Int32
   path : NodePath
-} derive(Eq, Debug)
+}
 
 ///|
 /// A node ends: the finished node, with the depth and path of its `Enter`.
 /// Build one with `LeaveEvent::new`.
+#derive(Eq, Debug)
 pub struct LeaveEvent {
   node : NodeRef
   depth : Int32
   path : NodePath
-} derive(Eq, Debug)
+}
 
 ///|
 /// An `EnterEvent` whose `depth` is the path's depth.
@@ -41,10 +43,11 @@ pub fn LeaveEvent::new(node~ : NodeRef, path~ : NodePath) -> LeaveEvent {
 
 ///|
 /// One event of a traversal: a node starts or ends.
+#derive(Eq, Debug)
 pub(all) enum Event {
   Enter(EnterEvent)
   Leave(LeaveEvent)
-} derive(Eq, Debug)
+}
 
 ///|
 /// A source of events in `walk`'s order. `skip_children` right after an

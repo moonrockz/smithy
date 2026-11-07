@@ -1,8 +1,9 @@
 ///|
 /// An environment variable name, never its secret value.
+#derive(Eq, Debug)
 pub struct CredentialVariable {
   priv name : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn CredentialVariable::parse(text : String) -> CredentialVariable? {
@@ -26,16 +27,18 @@ pub fn CredentialVariable::to_string(self : CredentialVariable) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum CredentialSource {
   BearerEnvironment(CredentialVariable)
   BasicEnvironment(CredentialVariable, CredentialVariable)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct CredentialBinding {
   origin : @resources.HttpOrigin
   source : CredentialSource
-} derive(Eq, Debug)
+}
 
 ///|
 fn config_credentials(

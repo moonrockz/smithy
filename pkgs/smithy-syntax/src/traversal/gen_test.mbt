@@ -51,7 +51,8 @@ fn pick(rs : @splitmix.RandomState, n : Int32) -> Int32 {
 ///|
 /// Repeated Continue/SkipChildren decisions and a separate Stop draw.
 /// `policy_for` binds the stop to the actual tree's node count.
-struct Policy(Array[@traversal.Control], Int32?) derive(Debug)
+#derive(Debug)
+struct Policy(Array[@traversal.Control], Int32?)
 
 ///|
 impl @quickcheck.Arbitrary for Policy with fn arbitrary(_, rs) {

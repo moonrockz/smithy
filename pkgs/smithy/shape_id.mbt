@@ -1,11 +1,12 @@
 ///|
 /// A validated absolute semantic shape ID. Relative IDs belong to the IDL
 /// representation and are resolved before they enter the model.
+#derive(Eq, Debug, Hash)
 pub struct ShapeId {
   namespace : String
   name : String
   member : String?
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 fn identifier(text : String) -> Bool {

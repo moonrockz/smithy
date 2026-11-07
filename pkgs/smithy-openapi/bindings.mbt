@@ -1,4 +1,5 @@
 ///|
+#derive(Eq)
 priv enum BindingLocation {
   Label
   Query(String)
@@ -8,7 +9,7 @@ priv enum BindingLocation {
   PrefixHeaders
   ResponseCode
   Document
-} derive(Eq)
+}
 
 ///|
 priv struct Binding {

@@ -1,10 +1,11 @@
 ///|
 /// Input offsets use UTF-16 code units, matching MoonBit string locations.
+#derive(Debug)
 pub(all) suberror ValueInputError {
   InvalidJson(Int32, String)
   DuplicateJsonKey(Int32)
   JsonInputLimit(Int32, String)
-} derive(Debug)
+}
 
 ///|
 /// The UTF-8 length of `text`. A surrogate pair counts 4 bytes, and a lone

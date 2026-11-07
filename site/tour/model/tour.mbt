@@ -1,9 +1,10 @@
 ///|
 /// One file of a lesson: the editor tab name and the text.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct LessonFile {
   name : String
   text : String
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend LessonFile with Eq::{equal, not_equal}
@@ -42,10 +43,11 @@ pub(all) struct Expectation {
 ///|
 /// The transcript finding keys (`transcript_key`) that a check shows after
 /// `count` entries from the start, in any order.
+#derive(Eq, Debug)
 pub(all) struct StepExpectation {
   count : Int32
   findings : Array[String]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend StepExpectation with Eq::{equal, not_equal}
@@ -55,6 +57,7 @@ pub extend StepExpectation with @debug.Debug::{to_repr}
 
 ///|
 /// What a lesson runs on its files. A lesson has one engine.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum Engine {
   /// Validate the model files; `Lesson.output` names the transform, if any.
   Model
@@ -69,7 +72,7 @@ pub(all) enum Engine {
   /// No editor, no files and no cases: the blocks of the text come from
   /// include blocks.
   Static
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Engine with Eq::{equal, not_equal}
@@ -86,11 +89,12 @@ pub extend Engine with FromJson::{from_json}
 ///|
 /// The setup of a value lesson: the starting file with the value, the absolute
 /// ID of the target shape and the options of `smithy validate value`.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct ValueSetup {
   file : String
   shape : String
   options : @samples.ValueOptions
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend ValueSetup with Eq::{equal, not_equal}
@@ -108,13 +112,14 @@ pub extend ValueSetup with FromJson::{from_json}
 /// The setup of a message lesson: the starting file with the message, the
 /// absolute ID of the service, the JSON-RPC version, what the message is and
 /// the options of `smithy validate rpc`.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct MessageSetup {
   file : String
   service : String
   version : @samples.RpcVersion
   role : MessageRole
   options : @samples.ValueOptions
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend MessageSetup with Eq::{equal, not_equal}
@@ -132,10 +137,11 @@ pub extend MessageSetup with FromJson::{from_json}
 /// What the message of a message lesson is: a request, or a response with the
 /// options `--method`, `--operation`, `--request`, `--envelope-only` and
 /// `--legacy-errors`.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum MessageRole {
   Request
   Response(context~ : LessonContext?, legacy_errors~ : @samples.LegacyErrors)
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend MessageRole with Eq::{equal, not_equal}
@@ -152,12 +158,13 @@ pub extend MessageRole with FromJson::{from_json}
 ///|
 /// What a response lesson knows of the call: `RequestFile` names a starting
 /// file that holds the request. The check gets the text of that file.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum LessonContext {
   Method(String)
   Operation(String)
   RequestFile(String)
   EnvelopeOnly
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend LessonContext with Eq::{equal, not_equal}
@@ -211,10 +218,11 @@ pub fn MessageSetup::message_kind(
 ///|
 /// The setup of a transcript lesson: the starting file with the transcript
 /// (a `.json` document) and the absolute ID of the protocol shape.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct TranscriptSetup {
   file : String
   protocol : String
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend TranscriptSetup with Eq::{equal, not_equal}
@@ -531,11 +539,12 @@ pub fn output_text(files : Array[(String, String)]) -> String {
 ///|
 /// The severity of a finding that the tour compares. The tour does not
 /// compare NOTE and SUPPRESSED findings.
+#derive(Eq, Debug)
 pub(all) enum Severity {
   Warning
   Danger
   Error
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Severity with Eq::{equal, not_equal}
@@ -574,11 +583,12 @@ pub fn Severity::blocks_output(self : Severity) -> Bool {
 
 ///|
 /// A compared finding: its id, its severity and its shape.
+#derive(Eq, Debug)
 pub(all) struct EventKey {
   id : String
   severity : Severity
   shape : String?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend EventKey with Eq::{equal, not_equal}
@@ -627,10 +637,11 @@ pub fn compare_events(a : EventKey, b : EventKey) -> Int32 {
 
 ///|
 /// The id of a case: the folder of its lesson and the name of the case.
+#derive(Eq, Hash, Debug)
 pub(all) struct CaseId {
   dir : String
   name : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub extend CaseId with Eq::{equal, not_equal}
@@ -716,10 +727,11 @@ pub fn slug_of_source(path : String) -> String? {
 
 ///|
 /// A link to a lesson.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct LessonLink {
   slug : String
   title : String
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend LessonLink with Eq::{equal, not_equal}
@@ -736,6 +748,7 @@ pub extend LessonLink with FromJson::{from_json}
 ///|
 /// What the page of one lesson needs: the pre-render writes it in the site
 /// data, and the lesson component starts from it.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct LessonPage {
   slug : String
   title : String
@@ -763,7 +776,7 @@ pub(all) struct LessonPage {
   /// The href of the playground page; `None` when the lesson has more than
   /// one file, because the playground holds one model.
   playground : String?
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 /// Whether the page is a static lesson: it has no editor and no output.
@@ -785,9 +798,10 @@ pub extend LessonPage with FromJson::{from_json}
 
 ///|
 /// The contents: the sections in order, each with its lessons in order.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct TourContents {
   sections : Array[(String, Array[LessonLink])]
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend TourContents with Eq::{equal, not_equal}
@@ -803,10 +817,11 @@ pub extend TourContents with FromJson::{from_json}
 
 ///|
 /// The data of a tour page: the contents, or one lesson.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum TourPage {
   Contents(TourContents)
   Page(LessonPage)
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend TourPage with Eq::{equal, not_equal}

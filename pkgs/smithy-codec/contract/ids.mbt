@@ -1,8 +1,9 @@
 ///|
 /// A refused boundary value: the constructor name and the reason.
+#derive(Debug)
 pub(all) suberror IdentityError {
   InvalidIdentity(String, String)
-} derive(Debug)
+}
 
 ///|
 fn identifier_text(text : String) -> Bool {
@@ -33,9 +34,10 @@ fn identifier_text(text : String) -> Bool {
 ///|
 /// The identifier of a declared serialization profile, such as `morphir-v4`.
 /// Lower-case letters and digits, separated by single `.` or `-`, at most 64 characters.
+#derive(Eq, Hash, Compare, Debug)
 pub struct ProfileId {
   priv text : String
-} derive(Eq, Hash, Compare, Debug)
+}
 
 ///|
 pub fn ProfileId::parse(text : String) -> ProfileId raise IdentityError {
@@ -60,9 +62,10 @@ pub fn ProfileId::to_string(self : ProfileId) -> String {
 
 ///|
 /// The identifier of a host-registered scalar adapter, such as `morphir.v4.name`.
+#derive(Eq, Hash, Compare, Debug)
 pub struct AdapterId {
   priv text : String
-} derive(Eq, Hash, Compare, Debug)
+}
 
 ///|
 pub fn AdapterId::parse(text : String) -> AdapterId raise IdentityError {
@@ -87,9 +90,10 @@ pub fn AdapterId::to_string(self : AdapterId) -> String {
 
 ///|
 /// The identifier of a versioned document bundle, such as `morphir`.
+#derive(Eq, Hash, Compare, Debug)
 pub struct BundleId {
   priv text : String
-} derive(Eq, Hash, Compare, Debug)
+}
 
 ///|
 pub fn BundleId::parse(text : String) -> BundleId raise IdentityError {
@@ -114,9 +118,10 @@ pub fn BundleId::to_string(self : BundleId) -> String {
 
 ///|
 /// A JSON object member name or union tag on the wire. It is not empty and has no unpaired surrogate.
+#derive(Eq, Hash, Compare, Debug)
 pub struct WireName {
   priv text : String
-} derive(Eq, Hash, Compare, Debug)
+}
 
 ///|
 pub fn WireName::parse(text : String) -> WireName raise IdentityError {
@@ -160,11 +165,12 @@ pub fn WireName::to_string(self : WireName) -> String {
 
 ///|
 /// An exact release `major.minor.patch`. Comparison is numeric, component by component.
+#derive(Eq, Hash, Compare, Debug)
 pub struct Release {
   major : Int32
   minor : Int32
   patch : Int32
-} derive(Eq, Hash, Compare, Debug)
+}
 
 ///|
 pub fn Release::new(
@@ -237,10 +243,11 @@ pub fn Release::to_string(self : Release) -> String {
 
 ///|
 /// A half-open release interval `[since, until)`.
+#derive(Eq, Debug)
 pub struct ReleaseInterval {
   since : Release
   until : Release
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ReleaseInterval::new(
@@ -289,6 +296,7 @@ pub impl Show for ReleaseInterval with fn output(self, logger) {
 
 ///|
 /// The kind of one JSON value.
+#derive(Eq, Hash, Compare, Debug)
 pub(all) enum JsonKind {
   NullKind
   BooleanKind
@@ -296,7 +304,7 @@ pub(all) enum JsonKind {
   StringKind
   ArrayKind
   ObjectKind
-} derive(Eq, Hash, Compare, Debug)
+}
 
 ///|
 pub fn JsonKind::parse(text : String) -> JsonKind? {

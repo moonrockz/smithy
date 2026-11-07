@@ -1,10 +1,11 @@
 ///|
 /// One example of the playground picker: its title and the repository path
 /// of its model.
+#derive(Eq, Debug)
 pub(all) struct SampleSource {
   title : String
   path : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SampleSource with Eq::{equal, not_equal}
@@ -32,11 +33,12 @@ pub let default_index : Int32 = 1
 
 ///|
 /// An example of the picker with the text of its model.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct Sample {
   title : String
   path : String
   model : String
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Sample with Eq::{equal, not_equal}
@@ -52,11 +54,12 @@ pub extend Sample with FromJson::{from_json}
 
 ///|
 /// The encoding of a transcript text.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum TranscriptFormat {
   Markdown
   Json
   Jsonl
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend TranscriptFormat with Eq::{equal, not_equal}
@@ -73,10 +76,11 @@ pub extend TranscriptFormat with FromJson::{from_json}
 ///|
 /// The sender of the message of a log record whose `dir` member has this
 /// value: the CLI option `--direction value=peer`.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct Direction {
   value : String
   peer : String
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Direction with Eq::{equal, not_equal}
@@ -93,13 +97,14 @@ pub extend Direction with FromJson::{from_json}
 ///|
 /// How the lines of a JSONL log become transcript entries: the CLI option
 /// `--log-preset`.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum LogPreset {
   /// `{"dir", "message"}` records. Each direction names the sender for one
   /// `dir` value.
   DirMessage(Array[Direction])
   /// Each line is a JSON-RPC message from `sender`.
   Raw(sender~ : String)
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend LogPreset with Eq::{equal, not_equal}
@@ -118,6 +123,7 @@ pub extend LogPreset with FromJson::{from_json}
 /// of its text, and how to check it. The model of every transcript is
 /// `examples/json-rpc/peers.smithy`. A log has a version and a preset; a
 /// document gives its own version and has neither.
+#derive(Eq, Debug)
 pub(all) struct TranscriptSource {
   title : String
   path : String
@@ -125,7 +131,7 @@ pub(all) struct TranscriptSource {
   format : TranscriptFormat
   version : String?
   preset : LogPreset?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend TranscriptSource with Eq::{equal, not_equal}
@@ -191,6 +197,7 @@ pub let default_transcript : Int32 = 0
 
 ///|
 /// A transcript of the picker with its text.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct TranscriptSample {
   title : String
   path : String
@@ -199,7 +206,7 @@ pub(all) struct TranscriptSample {
   version : String?
   preset : LogPreset?
   text : String
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend TranscriptSample with Eq::{equal, not_equal}
@@ -215,11 +222,12 @@ pub extend TranscriptSample with FromJson::{from_json}
 
 ///|
 /// The tab of the playground.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum Tab {
   ValidateTab
   TransformTab
   TranscriptTab
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Tab with Eq::{equal, not_equal}
@@ -235,6 +243,7 @@ pub extend Tab with FromJson::{from_json}
 
 ///|
 /// The transform that the Transform tab runs.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum Output {
   JsonAst
   Idl
@@ -243,7 +252,7 @@ pub(all) enum Output {
   OpenApi30
   OpenApi31
   OpenRpc
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Output with Eq::{equal, not_equal}
@@ -260,6 +269,7 @@ pub extend Output with FromJson::{from_json}
 ///|
 /// What a share link holds: the settings of the page and the texts of the two
 /// editors. The page and the core both use it, so a link needs no conversion.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct ShareState {
   model : String
   transcript : String
@@ -272,7 +282,7 @@ pub(all) struct ShareState {
   log_preset : LogPreset?
   /// The JSON-RPC version of a log.
   version : String?
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend ShareState with Eq::{equal, not_equal}

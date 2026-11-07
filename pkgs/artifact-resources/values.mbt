@@ -6,9 +6,10 @@ fn valid_value(text : String) -> Bool {
 }
 
 ///|
+#derive(Eq, Hash, Compare, Debug)
 pub struct RepositoryId {
   priv value : String
-} derive(Eq, Hash, Compare, Debug)
+}
 
 ///|
 pub fn RepositoryId::parse(text : String) -> RepositoryId? {
@@ -30,9 +31,10 @@ pub impl Show for RepositoryId with fn output(self, logger) {
 }
 
 ///|
+#derive(Eq, Hash, Compare, Debug)
 pub struct ProviderId {
   priv value : String
-} derive(Eq, Hash, Compare, Debug)
+}
 
 ///|
 pub fn ProviderId::parse(text : String) -> ProviderId? {
@@ -54,9 +56,10 @@ pub impl Show for ProviderId with fn output(self, logger) {
 }
 
 ///|
+#derive(Eq, Hash, Compare, Debug)
 pub struct ArtifactKey {
   priv value : String
-} derive(Eq, Hash, Compare, Debug)
+}
 
 ///|
 pub fn ArtifactKey::parse(text : String) -> ArtifactKey? {
@@ -78,9 +81,10 @@ pub impl Show for ArtifactKey with fn output(self, logger) {
 }
 
 ///|
+#derive(Eq, Hash, Compare, Debug)
 pub struct ArtifactIdentity {
   priv value : String
-} derive(Eq, Hash, Compare, Debug)
+}
 
 ///|
 pub fn ArtifactIdentity::parse(text : String) -> ArtifactIdentity? {
@@ -102,9 +106,10 @@ pub impl Show for ArtifactIdentity with fn output(self, logger) {
 }
 
 ///|
+#derive(Eq, Hash, Compare, Debug)
 pub struct RepositoryLocation {
   priv value : String
-} derive(Eq, Hash, Compare, Debug)
+}
 
 ///|
 pub fn RepositoryLocation::parse(text : String) -> RepositoryLocation? {
@@ -126,9 +131,10 @@ pub impl Show for RepositoryLocation with fn output(self, logger) {
 }
 
 ///|
+#derive(Eq, Hash, Debug)
 pub struct EntryPath {
   priv value : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub impl Compare for EntryPath with fn compare(self, other) {
@@ -155,9 +161,10 @@ pub impl Show for EntryPath with fn output(self, logger) {
 }
 
 ///|
+#derive(Eq, Hash, Debug)
 pub struct ResourceName {
   priv value : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub impl Compare for ResourceName with fn compare(self, other) {
@@ -205,19 +212,21 @@ pub fn EntryPath::resource_name(self : EntryPath) -> ResourceName {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum PathStyle {
   Slash
   Backslash
-} derive(Eq, Debug)
+}
 
 ///|
 /// Physical location relationships remain data until a presentation boundary.
+#derive(Eq, Debug)
 pub(all) enum Location {
   Source(RepositoryLocation)
   FilesystemDirectory(CacheDirectory)
   DirectoryEntry(Location, EntryPath, PathStyle)
   ArchiveEntry(Location, EntryPath)
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Location::parse(text : String) -> Location? {
@@ -305,12 +314,14 @@ pub impl Show for Location with fn output(self, logger) {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Resolution {
   reference : ArtifactRef
   identity : ArtifactIdentity?
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ProvenanceStep {
   NpmRequestStep(RepositoryUrl, NpmPackageRef)
   NpmStep(NpmResolution)
@@ -323,20 +334,22 @@ pub(all) enum ProvenanceStep {
   ContainerStep(Location)
   ProviderRegistrationStep(ProviderId)
   RepositoryReferenceStep(RepositoryId)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ProvenanceOrigin {
   Physical(Location)
   ProviderRegistration(ProviderId)
   RepositoryReference(RepositoryId)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub struct Provenance {
   origin : ProvenanceOrigin
   priv history : Array[ProvenanceStep]
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Provenance::new(location : Location) -> Provenance {
@@ -475,9 +488,10 @@ pub impl Show for Provenance with fn output(self, logger) {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct ContentDigest {
   priv bytes : FixedArray[Byte]
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ContentDigest::sha256(data : Bytes) -> ContentDigest {
@@ -525,9 +539,10 @@ pub impl Show for ContentDigest with fn output(self, logger) {
 ///|
 /// A physical cache directory in the portable filesystem-path subset. This
 /// validates syntax, not existence, permissions or filesystem-specific limits.
+#derive(Eq, Debug)
 pub struct CacheDirectory {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn CacheDirectory::parse(text : String) -> CacheDirectory? {

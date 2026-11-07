@@ -1,15 +1,17 @@
 ///|
+#derive(Eq)
 priv enum ValueDiagnostics {
   TextFindings
   JsonFindings
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 priv enum ValueInputFormat {
   JsonInput
   IonTextInput
   IonBinaryInput
-} derive(Eq)
+}
 
 ///|
 priv struct ValueOptions {

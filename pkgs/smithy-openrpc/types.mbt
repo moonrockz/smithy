@@ -1,5 +1,6 @@
 ///|
-pub struct ServiceId(@smithy.ShapeId) derive(Eq, Debug, Hash)
+#derive(Eq, Debug, Hash)
+pub struct ServiceId(@smithy.ShapeId)
 
 ///|
 pub fn ServiceId::parse(text : String) -> ServiceId? {
@@ -18,9 +19,10 @@ pub fn ServiceId::shape_id(self : ServiceId) -> @smithy.ShapeId {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum OpenRpcVersion {
   V1_3_2
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn OpenRpcVersion::parse(text : String) -> OpenRpcVersion? {
@@ -39,40 +41,45 @@ pub fn OpenRpcVersion::to_string(self : OpenRpcVersion) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ExtensionPolicy {
   Preserve
   Omit
   Fail
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum WarningCode {
   OmittedProtocolSemantics
   OmittedErrorData
   OmittedExample
   SchemaLimitation
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct ConversionWarning {
   code : WarningCode
   shape : @smithy.ShapeId
   message : String
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Debug)
 pub(all) struct Conversion {
   document : Json
   warnings : Array[ConversionWarning]
-} derive(Debug)
+}
 
 ///|
+#derive(Debug)
 pub(all) suberror OpenRpcError {
   InvalidConfiguration(@smithy.ShapeId, String)
   InvalidContract(@smithy.ShapeId, String)
   SchemaConversion(@smithy.ShapeId, String)
   UnsupportedMapping(@smithy.ShapeId, String)
-} derive(Debug)
+}
 
 ///|
 pub fn OpenRpcError::shape(self : OpenRpcError) -> @smithy.ShapeId {

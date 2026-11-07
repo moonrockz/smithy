@@ -99,9 +99,10 @@ let runtime_files : Array[(String, String)] = [
       #|/// A JSON-RPC error. A handler raises it to answer with this code, message
       #|/// and data. `Peer::request` raises it for an error response and for a call
       #|/// that the session refuses before it is sent.
+      #|#derive(Debug)
       #|pub(all) suberror RpcError {
       #|  RpcError(code~ : Int32, message~ : String, data~ : Json?)
-      #|} derive(Debug)
+      #|}
       #|
       #|///|
       #|pub impl Show for RpcError with fn output(self, logger) {
@@ -112,9 +113,10 @@ let runtime_files : Array[(String, String)] = [
       #|///|
       #|/// A failure of the connection: the remote peer closed it, or a frame on the
       #|/// wire is not valid.
+      #|#derive(Debug)
       #|pub(all) suberror TransportError {
       #|  TransportError(String)
-      #|} derive(Debug)
+      #|}
       #|
       #|///|
       #|pub impl Show for TransportError with fn output(self, logger) {
@@ -149,10 +151,11 @@ let runtime_files : Array[(String, String)] = [
       #|///|
       #|/// The ID of a JSON-RPC request: an integer or a string. An integer keeps its
       #|/// exact text, so that an ID beyond the Int64 range is echoed unchanged.
+      #|#derive(Eq, Hash, Debug)
       #|pub(all) enum RequestId {
       #|  Number(String)
       #|  Text(String)
-      #|} derive(Eq, Hash, Debug)
+      #|}
       #|
       #|///|
       #|pub impl Show for RequestId with fn output(self, logger) {
@@ -708,9 +711,10 @@ let runtime_files : Array[(String, String)] = [
       #|///|
       #|/// A value that does not have the expected form. `path` is a JSON Pointer to
       #|/// the value. The dispatcher answers a DecodeError with the code -32602.
+      #|#derive(Debug)
       #|pub(all) suberror DecodeError {
       #|  DecodeError(path~ : String, message~ : String)
-      #|} derive(Debug)
+      #|}
       #|
       #|///|
       #|pub impl Show for DecodeError with fn output(self, logger) {
@@ -799,8 +803,10 @@ let runtime_files : Array[(String, String)] = [
       #|  value : Json,
       #|) -> Json raise DecodeError {
       #|  let end = self.pos + word.length()
+      #|  // `end` can split a surrogate pair of malformed text, which `exact_view` refuses. The raw code-unit
+      #|  // copy keeps the old result (no match). `end <= self.text.length()` checks the bounds.
       #|  if end <= self.text.length() &&
-      #|    self.text.view(start_offset=self.pos, end_offset=end) == word.view() {
+      #|    self.text.unsafe_substring(start=self.pos, end~) == word {
       #|    self.pos = end
       #|    value
       #|  } else {
@@ -871,7 +877,9 @@ let runtime_files : Array[(String, String)] = [
       #|  guard scan_number(self.text, self.pos) is Some(end) else {
       #|    raise self.fail("a JSON number")
       #|  }
-      #|  let repr = self.text.view(start_offset=self.pos, end_offset=end).to_owned()
+      #|  // The text after the number can start with a lone trailing surrogate, which `exact_view` refuses.
+      #|  // `scan_number` returns an end between `self.pos` and the text length.
+      #|  let repr = self.text.unsafe_substring(start=self.pos, end~)
       #|  self.pos = end
       #|  Json::number(number_double(repr), repr~)
       #|}
@@ -914,12 +922,14 @@ let runtime_files : Array[(String, String)] = [
       #|      raise self.fail("a closing quote of the string")
       #|    }
       #|    let c = self.text[self.pos].to_int()
+      #|    // A run can start with a lone trailing surrogate, which `exact_view` refuses, so the runs are
+      #|    // raw code-unit copies. `run <= self.pos < self.text.length()` here.
       #|    if c == 0x22 {
-      #|      out.write_view(self.text.view(start_offset=run, end_offset=self.pos))
+      #|      out.write_string(self.text.unsafe_substring(start=run, end=self.pos))
       #|      self.pos += 1
       #|      break
       #|    } else if c == 0x5C {
-      #|      out.write_view(self.text.view(start_offset=run, end_offset=self.pos))
+      #|      out.write_string(self.text.unsafe_substring(start=run, end=self.pos))
       #|      self.pos += 1
       #|      let e = self.peek()
       #|      self.pos += 1
@@ -1132,14 +1142,16 @@ let runtime_files : Array[(String, String)] = [
       #|      c if c >= 0xDC00 && c <= 0xDFFF => Some("\\u" + hex4(c))
       #|      _ => None
       #|    }
+      #|    // `s` can hold lone surrogates, which `exact_view` refuses, so the runs are raw code-unit
+      #|    // copies. `run <= i < n` here, and `run <= n` after the loop.
       #|    if escape is Some(text) {
-      #|      out.write_view(s.view(start_offset=run, end_offset=i))
+      #|      out.write_string(s.unsafe_substring(start=run, end=i))
       #|      out.write_string(text)
       #|      run = i + 1
       #|    }
       #|    i += 1
       #|  }
-      #|  out.write_view(s.view(start_offset=run, end_offset=n))
+      #|  out.write_string(s.unsafe_substring(start=run, end=n))
       #|  out.write_char('"')
       #|}
       #|
@@ -1418,11 +1430,12 @@ let runtime_files : Array[(String, String)] = [
       #|
       #|///|
       #|/// The message kinds that a method accepts.
+      #|#derive(Eq, Debug)
       #|pub(all) enum MethodKind {
       #|  RequestOnly
       #|  NotificationOnly
       #|  RequestOrNotification
-      #|} derive(Eq, Debug)
+      #|}
       #|
       #|///|
       #|priv enum Handler {
@@ -2468,12 +2481,13 @@ let runtime_files : Array[(String, String)] = [
       #|
       #|///|
       #|/// A capability that the successful result of a method advertises.
+      #|#derive(Eq, Debug)
       #|pub struct CapabilitySource {
       #|  name : String
       #|  method_name : String
       #|  /// A JSON Pointer into the result.
       #|  pointer : String
-      #|} derive(Eq, Debug)
+      #|}
       #|
       #|///|
       #|pub fn CapabilitySource::new(
@@ -2487,11 +2501,12 @@ let runtime_files : Array[(String, String)] = [
       #|///|
       #|/// How a method cancels a call: the params member (or the position) that
       #|/// holds the ID of the call, and the error code of the cancelled call.
+      #|#derive(Eq, Debug)
       #|pub struct CancelRule {
       #|  id_member : String
       #|  position : Int32?
       #|  code : Int32?
-      #|} derive(Eq, Debug)
+      #|}
       #|
       #|///|
       #|pub fn CancelRule::new(
@@ -2504,6 +2519,7 @@ let runtime_files : Array[(String, String)] = [
       #|
       #|///|
       #|/// The order rules of one method that one peer receives.
+      #|#derive(Eq, Debug)
       #|pub struct MethodRule {
       #|  receiver : String
       #|  method_name : String
@@ -2515,7 +2531,7 @@ let runtime_files : Array[(String, String)] = [
       #|  /// The capability names that must be advertised.
       #|  requires : Array[String]
       #|  cancels : CancelRule?
-      #|} derive(Eq, Debug)
+      #|}
       #|
       #|///|
       #|pub fn MethodRule::new(
@@ -2966,9 +2982,10 @@ let runtime_files : Array[(String, String)] = [
       #|///|
       #|/// A decimal number with its exact text, such as `20.00`. Two values are
       #|/// equal when their texts are equal.
+      #|#derive(Eq, Hash, Debug)
       #|pub struct Decimal {
       #|  priv text : String
-      #|} derive(Eq, Hash, Debug)
+      #|}
       #|
       #|///|
       #|/// Gives a Decimal when `text` is a number of the JSON grammar.
@@ -3100,9 +3117,10 @@ let runtime_files : Array[(String, String)] = [
       #|
       #|///|
       #|/// An integer with its exact text, such as `9007199254740993`.
+      #|#derive(Eq, Hash, Debug)
       #|pub struct BigInteger {
       #|  priv text : String
-      #|} derive(Eq, Hash, Debug)
+      #|}
       #|
       #|///|
       #|/// Gives a BigInteger when `text` is an integer of the JSON grammar.
@@ -3143,18 +3161,20 @@ let runtime_files : Array[(String, String)] = [
       #|
       #|///|
       #|/// The JSON forms of a timestamp in Smithy.
+      #|#derive(Eq, Debug)
       #|pub(all) enum TimestampFormat {
       #|  EpochSeconds
       #|  DateTime
       #|  HttpDate
-      #|} derive(Eq, Debug)
+      #|}
       #|
       #|///|
       #|/// A timestamp. It keeps the JSON value that it was read from, so that it
       #|/// writes the same text again.
+      #|#derive(Eq, Debug)
       #|pub struct Timestamp {
       #|  priv value : Json
-      #|} derive(Eq, Debug)
+      #|}
       #|
       #|///|
       #|pub impl Show for Timestamp with fn output(self, logger) {
@@ -3593,11 +3613,12 @@ let runtime_files : Array[(String, String)] = [
       #|// directions.
       #|
       #|///|
+      #|#derive(Eq)
       #|priv enum WsCloseState {
       #|  Open
       #|  Graceful
       #|  Forced
-      #|} derive(Eq)
+      #|}
       #|
       #|///|
       #|priv enum WsReaderState {

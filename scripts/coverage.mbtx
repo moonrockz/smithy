@@ -25,10 +25,11 @@ struct CoverageInputs {
 }
 
 ///|
+#derive(Debug, Eq)
 struct CoverageTotals {
   covered : Int32
   total : Int32
-} derive(Debug, Eq)
+}
 
 ///|
 fn CoverageTotals::percentage(self : CoverageTotals) -> String {

@@ -16,18 +16,20 @@ import {
 /// .dev/out/payment-terminal/commands/<language>.json.
 
 ///|
+#derive(Eq, Debug)
 enum Language {
   MoonBit
   Python
   Go
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 enum Transport {
   Stdio
   Http
   WebSocket
-} derive(Eq, Debug)
+}
 
 ///|
 enum HostOs {
@@ -36,11 +38,12 @@ enum HostOs {
 }
 
 ///|
+#derive(Eq, Debug)
 struct MatrixCase {
   caller : Language
   receiver : Language
   transport : Transport
-} derive(Eq, Debug)
+}
 
 ///|
 fn language_name(language : Language) -> String {

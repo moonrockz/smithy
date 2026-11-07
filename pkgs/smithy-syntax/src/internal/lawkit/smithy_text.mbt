@@ -158,7 +158,8 @@ fn piece(rs : @splitmix.RandomState) -> String {
 /// text: no crash, lossless scan, spans in bounds. It is a list of pieces;
 /// `text()` joins them. It shrinks by dropping a piece or halving the
 /// longest one.
-pub(all) struct SmithyText(Array[String]) derive(Debug)
+#derive(Debug)
+pub(all) struct SmithyText(Array[String])
 
 ///|
 /// The pieces joined into one text.

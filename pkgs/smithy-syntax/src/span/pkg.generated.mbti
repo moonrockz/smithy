@@ -10,24 +10,28 @@ import {
 // Errors
 
 // Types and methods
-pub struct Column(Int32) derive(Compare, Eq, Hash, @debug.Debug)
+#derive(Compare, Eq, Hash, @debug.Debug)
+pub struct Column(Int32)
 pub fn Column::first() -> Self
 pub fn Column::new(Int32) -> Self?
 pub fn Column::next(Self) -> Self
 
-pub struct Length(Int32) derive(Compare, Eq, Hash, @debug.Debug)
+#derive(Compare, Eq, Hash, @debug.Debug)
+pub struct Length(Int32)
 pub fn Length::new(Int32) -> Self?
 pub fn Length::of_string(String) -> Self
 pub fn Length::one() -> Self
 pub fn Length::zero() -> Self
 pub impl Add for Length
 
-pub struct Line(Int32) derive(Compare, Eq, Hash, @debug.Debug)
+#derive(Compare, Eq, Hash, @debug.Debug)
+pub struct Line(Int32)
 pub fn Line::first() -> Self
 pub fn Line::new(Int32) -> Self?
 pub fn Line::next(Self) -> Self
 
-pub struct Offset(Int32) derive(Compare, Eq, Hash, @debug.Debug)
+#derive(Compare, Eq, Hash, @debug.Debug)
+pub struct Offset(Int32)
 pub fn Offset::advance(Self, Length) -> Self
 pub fn Offset::distance(Self, Self) -> Length
 pub fn Offset::new(Int32) -> Self?
@@ -35,15 +39,17 @@ pub fn Offset::next(Self) -> Self
 pub fn Offset::to(Self, Self) -> Span
 pub fn Offset::zero() -> Self
 
+#derive(Eq, Hash, @debug.Debug)
 pub(all) struct Position {
   line : Line
   column : Column
-} derive(Eq, Hash, @debug.Debug)
+}
 pub fn Position::new(Line, Column) -> Self
 
+#derive(Eq, @debug.Debug)
 pub struct SourceText {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn SourceText::end(Self) -> Offset
 pub fn SourceText::line_count(Self) -> Int32
 pub fn SourceText::line_span(Self, Line) -> Span?
@@ -54,10 +60,11 @@ pub fn SourceText::position(Self, Offset) -> Position
 pub fn SourceText::slice(Self, Span) -> String
 pub fn SourceText::text(Self) -> String
 
+#derive(Eq, Hash, @debug.Debug)
 pub(all) struct Span {
   start : Offset
   length : Length
-} derive(Eq, Hash, @debug.Debug)
+}
 pub fn Span::contains(Self, Offset) -> Bool
 pub fn Span::end(Self) -> Offset
 pub fn Span::is_empty(Self) -> Bool

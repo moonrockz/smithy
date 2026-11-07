@@ -1,16 +1,18 @@
 ///|
 /// The exact value of a number literal.
+#derive(Eq, Debug)
 pub(all) enum NumberValue {
   Integer(BigInt)
   Decimal(@decimal.Decimal)
-} derive(Eq, Debug)
+}
 
 ///|
 /// A number literal: the lexeme as written and its exact value.
+#derive(Eq, Debug)
 pub(all) struct NumberLiteral {
   text : String
   value : NumberValue
-} derive(Eq, Debug)
+}
 
 ///|
 /// The value as an `Int64` when it is an integer that fits.
@@ -43,23 +45,26 @@ pub fn NumberLiteral::as_double(self : NumberLiteral) -> Double {
 
 ///|
 /// The Smithy node keywords: `true`, `false` and `null`.
+#derive(Eq, Debug, Hash)
 pub(all) enum Keyword {
   True
   False
   Null
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// `NodeObjectKvp`: a key (an identifier or a quoted string) and a value.
+#derive(Eq, Debug)
 pub(all) struct NodeKvp {
   key : Node[String]
   value : NodeValue
   span : @span.Span
-} derive(Eq, Debug)
+}
 
 ///|
 /// `NodeValue`. Strings hold their decoded value; `ShapeId` is a bare
 /// identifier or shape ID in value position (`@foo(bar)`).
+#derive(Eq, Debug)
 pub(all) enum NodeValue {
   Array(ArrayView[NodeValue], @span.Span)
   Object(ArrayView[NodeKvp], @span.Span)
@@ -68,7 +73,7 @@ pub(all) enum NodeValue {
   String(String, @span.Span)
   TextBlock(String, @span.Span)
   ShapeId(ShapeId, @span.Span)
-} derive(Eq, Debug)
+}
 
 ///|
 /// The span of the value, whatever its shape.

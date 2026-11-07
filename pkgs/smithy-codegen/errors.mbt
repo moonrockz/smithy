@@ -1,5 +1,6 @@
 ///|
 /// An error that the code generation core raises.
+#derive(Debug)
 pub(all) suberror CodegenError {
   InvalidSettings(String)
   MissingService(@smithy.ShapeId)
@@ -10,7 +11,7 @@ pub(all) suberror CodegenError {
   DuplicateIntegration(String)
   IntegrationCycle(Array[String])
   StateError(String)
-} derive(Debug)
+}
 
 ///|
 /// The first-person message of an error. It names the construct.

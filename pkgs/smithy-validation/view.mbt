@@ -21,6 +21,7 @@ impl ValueView with fn source(_self) {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum NativeKind {
   NullKind
   BoolKind
@@ -35,9 +36,10 @@ pub(all) enum NativeKind {
   StructKind
   ListKind
   SexpKind
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Debug)
 pub(all) enum NativeScalar {
   TypedNull(NativeKind)
   Float(Double)
@@ -47,7 +49,7 @@ pub(all) enum NativeScalar {
   Symbol(String?)
   Blob(Bytes)
   Clob(Bytes)
-} derive(Debug)
+}
 
 ///|
 pub struct LocatedField[V] {

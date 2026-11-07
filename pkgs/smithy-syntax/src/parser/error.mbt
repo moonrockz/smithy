@@ -1,9 +1,10 @@
 ///|
 /// A syntax error, carrying its finished diagnostic. Raised inside a
 /// statement; `parse` catches it, records it and recovers.
+#derive(Eq, Debug)
 pub(all) suberror ParseError {
   ParseError(@diagnostic.Diagnostic)
-} derive(Eq, Debug)
+}
 
 ///|
 /// The diagnostic the error carries.
@@ -14,10 +15,11 @@ pub fn ParseError::diagnostic(self : ParseError) -> @diagnostic.Diagnostic {
 
 ///|
 /// The IDL version a file declares with `$version`.
+#derive(Eq, Debug, Hash)
 pub(all) enum Version {
   V1
   V2
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 /// `1`, `1.0`, `2`, `2.0`, else `None`.
@@ -35,12 +37,13 @@ pub fn Version::of(text : String) -> Version? {
 /// for a file with no tokens (empty or only comments); it is `None` only
 /// when the file has tokens and every statement failed. `cst` has every
 /// token. `version` is the declared `$version`, `None` when absent.
+#derive(Eq, Debug)
 pub(all) struct ParseResult {
   ast : @ast.IdlFile?
   cst : @cst.IdlCst
   version : Version?
   diagnostics : ArrayView[@diagnostic.Diagnostic]
-} derive(Eq, Debug)
+}
 
 ///|
 /// Whether any diagnostic is an error (not just a warning).
@@ -56,7 +59,8 @@ pub fn ParseResult::errors(self : ParseResult) -> Array[@diagnostic.Diagnostic] 
 
 ///|
 /// A nesting count of node values, member blocks and trait bodies.
-pub struct Depth(Int32) derive(Eq, Compare, Debug)
+#derive(Eq, Compare, Debug)
+pub struct Depth(Int32)
 
 ///|
 /// The shallowest depth: not nested at all.

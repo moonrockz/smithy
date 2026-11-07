@@ -1,9 +1,10 @@
 ///|
 /// One step of a path: the field that holds a child and its index there.
+#derive(Eq, Hash, Debug)
 pub(all) struct PathStep {
   field : String
   index : Int32
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 /// The steps from a start node down to a node: the field and index of each
@@ -35,11 +36,12 @@ pub(all) struct PathStep {
 ///   )
 /// }
 /// ```
+#derive(Eq, Hash)
 pub struct NodePath {
   /// The steps, innermost first.
   priv reversed : @list.List[PathStep]
   priv length : Int32
-} derive(Eq, Hash)
+}
 
 ///|
 /// The path of the start node itself: no steps.

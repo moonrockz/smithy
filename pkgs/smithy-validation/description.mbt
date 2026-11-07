@@ -1,19 +1,21 @@
 ///|
 /// A member name and its constraints after value preparation.
+#derive(Eq, Debug)
 pub struct ValueMemberContract {
   shape : @smithy.ShapeId
   wire_name : String
   required : Bool
   critical_separator : String?
-} derive(Eq, Debug)
+}
 
 ///|
 /// The effective policy and member names of a prepared structure.
+#derive(Eq, Debug)
 pub struct StructureContract {
   shape : @smithy.ShapeId
   unknown_members : UnknownMembers
   members : Array[ValueMemberContract]
-} derive(Eq, Debug)
+}
 
 ///|
 /// Return detached structure contracts in lexical shape order.

@@ -16,12 +16,13 @@
 
 ///|
 /// A capability that the successful result of a method advertises.
+#derive(Eq, Debug)
 pub struct CapabilitySource {
   name : String
   method_name : String
   /// A JSON Pointer into the result.
   pointer : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn CapabilitySource::new(
@@ -35,11 +36,12 @@ pub fn CapabilitySource::new(
 ///|
 /// How a method cancels a call: the params member (or the position) that
 /// holds the ID of the call, and the error code of the cancelled call.
+#derive(Eq, Debug)
 pub struct CancelRule {
   id_member : String
   position : Int32?
   code : Int32?
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn CancelRule::new(
@@ -52,6 +54,7 @@ pub fn CancelRule::new(
 
 ///|
 /// The order rules of one method that one peer receives.
+#derive(Eq, Debug)
 pub struct MethodRule {
   receiver : String
   method_name : String
@@ -63,7 +66,7 @@ pub struct MethodRule {
   /// The capability names that must be advertised.
   requires : Array[String]
   cancels : CancelRule?
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn MethodRule::new(

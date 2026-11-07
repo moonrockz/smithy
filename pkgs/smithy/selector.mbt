@@ -824,10 +824,11 @@ pub fn Selector::select_ids_from(
 }
 
 ///|
+#derive(Debug)
 pub(all) struct SelectorMatch {
   id : String
   variables : Map[String, Array[String]]
-} derive(Debug)
+}
 
 ///|
 /// Retain variable captures for each selector match.

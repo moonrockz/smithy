@@ -88,7 +88,7 @@ async fn check_log(log : String, writer : String, scenario : String) -> Bool {
 ///|
 async fn main {
   let args = @env.args()
-  let selected = if args.length() > 1 { args[1:].to_array() } else { scenarios }
+  let selected = if args.length() > 1 { args[1:].to_owned() } else { scenarios }
   for name in selected {
     guard scenarios.contains(name) else {
       println("❌ I expected a scenario of \{scenarios.join(", ")}, found `\{name}`.")
@@ -111,7 +111,7 @@ async fn main {
         @fs.remove(log)
       }
     }
-    let argv = [..pos[1:].to_array()]
+    let argv = [..pos[1:].to_owned()]
     argv.append([
       "--scenario", scenario, "--connect", "stdio", "--log", pos_log, "--",
     ])

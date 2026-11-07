@@ -1,5 +1,6 @@
 ///|
 /// The kind of a codec finding. Constraint findings come from Smithy value validation.
+#derive(Eq, Debug)
 pub(all) enum CodecCode {
   Constraint(@validation.FindingCode)
   InvalidJson
@@ -20,7 +21,7 @@ pub(all) enum CodecCode {
   UnsupportedVersion
   VersionConflict
   LimitExceeded
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn CodecCode::to_string(self : CodecCode) -> String {
@@ -55,19 +56,21 @@ pub impl Show for CodecCode with fn output(self, logger) {
 ///|
 /// One finding. The path is the original input location when reading, and the logical location when
 /// encoding a value.
+#derive(Eq, Debug)
 pub(all) struct CodecFinding {
   code : CodecCode
   path : @validation.InstancePath
   shape : @smithy.ShapeId
   message : String
-} derive(Eq, Debug)
+}
 
 ///|
 /// The result of a check. A value is valid only when the check is complete and has no findings.
+#derive(Eq, Debug)
 pub(all) struct CodecResult {
   findings : Array[CodecFinding]
   complete : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn CodecResult::is_valid(self : CodecResult) -> Bool {
@@ -97,9 +100,10 @@ pub impl ToJson for CodecResult with fn to_json(self) {
 
 ///|
 /// A refused check, decode or encode. The result holds the findings; no value or output exists.
+#derive(Debug)
 pub(all) suberror CodecFailure {
   CodecFailure(CodecResult)
-} derive(Debug)
+}
 
 ///|
 /// Findings and the shared work meter of one request.

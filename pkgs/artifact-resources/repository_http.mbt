@@ -1,8 +1,9 @@
 ///|
 /// A credential-free HTTP repository base without query or fragment.
+#derive(Eq, Debug)
 pub struct RepositoryUrl {
   priv url : HttpUrl
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn RepositoryUrl::parse(text : String) -> RepositoryUrl? {

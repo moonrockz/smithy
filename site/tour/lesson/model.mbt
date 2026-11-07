@@ -31,12 +31,13 @@ pub let too_large_text : String = "The model is too large for a link to the play
 
 ///|
 /// A tab of the output pane.
+#derive(Eq, Debug)
 pub(all) enum Pane {
   FindingsPane
   OutputPane
   /// The steps of a transcript lesson.
   TranscriptPane
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Pane with Eq::{equal, not_equal}
@@ -46,6 +47,7 @@ pub extend Pane with @debug.Debug::{to_repr}
 
 ///|
 /// Which right-hand pane fills the column.
+#derive(Eq, Debug)
 pub(all) enum Layout {
   /// The editor above the output.
   Split
@@ -53,7 +55,7 @@ pub(all) enum Layout {
   EditorOnly
   /// The output fills the column; the editor is hidden.
   OutputOnly
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Layout with Eq::{equal, not_equal}
@@ -63,10 +65,11 @@ pub extend Layout with @debug.Debug::{to_repr}
 
 ///|
 /// A right-hand pane that has an expand button.
+#derive(Eq, Debug)
 pub(all) enum Expandable {
   EditorSide
   OutputSide
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Expandable with Eq::{equal, not_equal}
@@ -87,6 +90,7 @@ fn Layout::toggled(self : Layout, side : Expandable) -> Layout {
 
 ///|
 /// The answer of the Worker to a request.
+#derive(Eq, Debug)
 pub(all) enum Answer {
   /// The findings of the files.
   Checked(Array[@core.Diagnostic])
@@ -113,7 +117,7 @@ pub(all) enum Answer {
     new~ : Array[@core.Diagnostic],
     events~ : Array[@core.DiffEvent]?
   )
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Answer with Eq::{equal, not_equal}
@@ -122,6 +126,7 @@ pub extend Answer with Eq::{equal, not_equal}
 pub extend Answer with @debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum Msg {
   /// The full text of the file that the editor shows. The editor also sends
   /// it after `LoadEditor`; the same text changes nothing.
@@ -141,7 +146,7 @@ pub(all) enum Msg {
   StepClicked
   /// The reader pressed Run all: check the rest of the entries.
   RunAllClicked
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Msg with Eq::{equal, not_equal}
@@ -151,6 +156,7 @@ pub extend Msg with @debug.Debug::{to_repr}
 
 ///|
 /// What the page must do after an update.
+#derive(Eq, Debug)
 pub(all) enum Effect {
   /// Send the files, as (name, text), to the Worker for a check.
   SendValidate(seq~ : Int32, files~ : Array[(String, String)])
@@ -219,7 +225,7 @@ pub(all) enum Effect {
   RestartWorker
   /// Make the editors measure their elements again, after a change of layout.
   Remeasure
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Effect with Eq::{equal, not_equal}
@@ -229,6 +235,7 @@ pub extend Effect with @debug.Debug::{to_repr}
 
 ///|
 /// The request that the Worker runs now. One request runs at a time.
+#derive(Eq, Debug)
 pub(all) enum Kind {
   Validating
   Transforming
@@ -236,7 +243,7 @@ pub(all) enum Kind {
   CheckingValue
   CheckingMessage
   Diffing
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Kind with Eq::{equal, not_equal}
@@ -246,13 +253,14 @@ pub extend Kind with @debug.Debug::{to_repr}
 
 ///|
 /// The state of the Findings tab.
+#derive(Eq, Debug)
 pub(all) enum Findings {
   /// No answer yet.
   Unchecked
   Found(Array[@core.Diagnostic])
   /// The check did not run; the text says why.
   NotChecked(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Findings with Eq::{equal, not_equal}
@@ -262,6 +270,7 @@ pub extend Findings with @debug.Debug::{to_repr}
 
 ///|
 /// The state of the output tab.
+#derive(Eq, Debug)
 pub(all) enum Output {
   /// No output yet.
   NoOutput
@@ -269,7 +278,7 @@ pub(all) enum Output {
   Shown(text~ : String, highlight~ : Array[Int32])
   /// The output did not run; the text says why.
   NotShown(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Output with Eq::{equal, not_equal}
@@ -284,6 +293,7 @@ pub const MESSAGE_CHARS : Int32 = 120
 ///|
 /// The state of the Transcript tab: the entries of the transcript, the
 /// findings so far and the position of the check.
+#derive(Eq, Debug)
 pub(all) struct Transcript {
   entries : Array[@core.EntryView]
   findings : Array[@core.FindingView]
@@ -295,7 +305,7 @@ pub(all) struct Transcript {
   /// The CLI lines before the last edit; a line that is not in them is
   /// highlighted. `None`: no highlight.
   before : Array[String]?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Transcript with Eq::{equal, not_equal}
@@ -340,6 +350,7 @@ pub fn Transcript::changed_lines(
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Model {
   page : @model.LessonPage
   /// The files as the reader edited them, in the order of the starting files.
@@ -377,7 +388,7 @@ pub(all) struct Model {
   stepping : Bool
   /// Why Open in playground did not open the model, until the next edit.
   link_problem : String?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Model with Eq::{equal, not_equal}
@@ -388,10 +399,11 @@ pub extend Model with @debug.Debug::{to_repr}
 ///|
 /// The edits of a lesson in localStorage, with the digest of the starting
 /// files that they come from.
+#derive(ToJson, FromJson)
 priv struct Stored {
   digest : String
   files : Array[(String, String)]
-} derive(ToJson, FromJson)
+}
 
 ///|
 fn pairs(files : Array[@model.LessonFile]) -> Array[(String, String)] {

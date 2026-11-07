@@ -4,16 +4,18 @@ const DEFAULT_LINE_BYTES : Int32 = 1048576
 ///|
 /// Leading text that a log line has before its JSON record. It is a fixed
 /// rule, not a pattern language.
+#derive(Eq, Debug)
 pub(all) enum LogPrefix {
   NoPrefix
   /// Skip to the first `{` of the line.
   ToFirstBrace
   /// Skip this many fields, each one ended by the delimiter.
   Fields(Int32, Char)
-} derive(Eq, Debug)
+}
 
 ///|
 /// Decides whether a JSON record is a protocol entry. Paths are JSON Pointers.
+#derive(Eq, Debug)
 pub(all) enum LogSelector {
   HasField(String)
   /// The field is a string with this value.
@@ -21,33 +23,36 @@ pub(all) enum LogSelector {
   /// The record, or an element of a record array, has `jsonrpc`, `method`,
   /// `result` or `error`.
   AnyJsonRpc
-} derive(Eq, Debug)
+}
 
 ///|
 /// Where the message of a record is. Paths are JSON Pointers.
+#derive(Eq, Debug)
 pub(all) enum MessageSource {
   WholeRecord
   /// The exact source text of this field's value.
   Field(String)
   /// The decoded value of this string field.
   EscapedField(String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// Who sent the message of a record. Paths are JSON Pointers.
+#derive(Eq, Debug)
 pub(all) enum SenderSource {
   /// Every entry has this sender; the log has one direction.
   Fixed(PeerName)
   /// The string value of this field, mapped to a peer.
   Field(String, Map[String, PeerName])
-} derive(Eq, Debug)
+}
 
 ///|
 /// A parsed JSON Pointer (RFC 6901).
+#derive(Eq, Debug)
 pub struct JsonPointer {
   priv text : String
   priv tokens : Array[String]
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn JsonPointer::parse(
@@ -166,35 +171,39 @@ fn JsonPointer::locate(
 }
 
 ///|
+#derive(Eq, Debug)
 priv enum Selector {
   JsonRpcRecord
   Has(JsonPointer)
   Equals(JsonPointer, String)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 priv enum MessagePlace {
   Record
   Exact(JsonPointer)
   Escaped(JsonPointer)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 priv enum SenderPlace {
   Constant(PeerName)
   Lookup(JsonPointer, Map[String, PeerName])
-} derive(Eq, Debug)
+}
 
 ///|
 /// How a log line becomes a transcript entry: the prefix to remove, the
 /// records to keep, and where the message and the sender are. Built with
 /// validated constructors; it never changes.
+#derive(Eq, Debug)
 pub struct LogMapping {
   priv prefix : LogPrefix
   priv selector : Selector
   priv message : MessagePlace
   priv sender : SenderPlace
-} derive(Eq, Debug)
+}
 
 ///|
 /// Raises when a path is not a JSON Pointer, when a `Fields` count is
@@ -396,12 +405,13 @@ pub fn LogMapping::from_json(
 /// `lines`; a line that is blank or not JSON after its prefix is `not_json`,
 /// a JSON record that the selector rejects is `skipped`, and a line that
 /// gives an entry is in `entries`. Lines with a finding are only in `lines`.
+#derive(Eq, Debug)
 pub struct LogCounts {
   lines : Int32
   not_json : Int32
   skipped : Int32
   entries : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 /// Turns log text, given in chunks of any size, into transcript entries. It

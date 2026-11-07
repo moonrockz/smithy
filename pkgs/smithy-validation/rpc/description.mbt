@@ -1,21 +1,24 @@
 ///|
 /// A capability source checked by protocol preparation.
+#derive(Eq, Debug)
 pub struct CapabilityContract {
   name : String
   method_name : MethodName
   pointer : JsonPointer
-} derive(Eq, Debug)
+}
 
 ///|
 /// A prepared reference to an active call in named or positional parameters.
+#derive(Eq, Debug)
 pub struct CallReferenceContract {
   wire_name : String
   position : Int32?
   code : ErrorCode?
-} derive(Eq, Debug)
+}
 
 ///|
 /// The prepared lifecycle rules of a method, with its receiving peer.
+#derive(Eq, Debug)
 pub struct MethodRuleContract {
   receiver : PeerName
   method_name : MethodName
@@ -25,24 +28,26 @@ pub struct MethodRuleContract {
   on_error : StateName?
   requires : Array[String]
   cancels : CallReferenceContract?
-} derive(Eq, Debug)
+}
 
 ///|
 /// A detached session contract. State order keeps the initial state first.
+#derive(Eq, Debug)
 pub struct SessionContract {
   states : Array[StateName]
   capabilities : Array[CapabilityContract]
   methods : Array[MethodRuleContract]
   refusals : Array[StateRefusalContract]
   capability_refusal : ErrorCode?
-} derive(Eq, Debug)
+}
 
 ///|
 /// The error code of a request refused in one state.
+#derive(Eq, Debug)
 pub struct StateRefusalContract {
   state : StateName
   code : ErrorCode
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn PreparedService::service_id(self : PreparedService) -> @smithy.ShapeId {

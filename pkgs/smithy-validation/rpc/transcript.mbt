@@ -2,10 +2,11 @@
 /// A correlation key. Scalar IDs use the batch normalization (no exponent
 /// expansion, no floating point). Structured 1.0 IDs compare by NodeValue
 /// structural equality.
+#derive(Eq)
 priv enum CallKey {
   Scalar(BatchId)
   Structured(@smithy.NodeValue)
-} derive(Eq)
+}
 
 ///|
 impl Hash for CallKey with fn hash_combine(self, hasher) {

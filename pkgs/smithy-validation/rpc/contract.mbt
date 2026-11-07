@@ -1,15 +1,17 @@
 ///|
 /// A detached description of one validated application-error mapping.
+#derive(Eq, Debug)
 pub(all) struct ErrorContract {
   shape : @smithy.ShapeId
   code : ErrorCode
   data : @smithy.ShapeId?
   data_required : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 /// A detached method mapping shared by validators and description exporters.
 /// Positional entries are semantic member IDs, independent of wire naming.
+#derive(Eq, Debug)
 pub(all) struct MethodContract {
   name : MethodName
   operation : @smithy.ShapeId
@@ -20,7 +22,7 @@ pub(all) struct MethodContract {
   positional : Array[@smithy.ShapeId]
   result : ResultSelection
   errors : Array[ErrorContract]
-} derive(Eq, Debug)
+}
 
 ///|
 /// Return contracts sorted by wire method name. Arrays are detached from the

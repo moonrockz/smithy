@@ -1,9 +1,11 @@
 ///|
+#derive(Eq, Debug)
 pub(all) suberror SelectorError {
   InvalidSelector(String)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum SelectorStep {
   ShapeType(String)
   AnyShape
@@ -13,27 +15,30 @@ pub(all) enum SelectorStep {
   Function(String, Array[Array[SelectorStep]])
   VariableStore(String, Array[SelectorStep])
   VariableGet(String)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ScopedValue {
   Literal(String)
   Path(Array[String])
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct ScopedAssertion {
   left : ScopedValue
   operator : String
   right : Array[ScopedValue]
   insensitive : Bool
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Selector {
   source : String
   steps : Array[SelectorStep]
-} derive(Eq, Debug)
+}
 
 ///|
 priv struct SelectorParser {

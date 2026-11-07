@@ -1,8 +1,9 @@
 ///|
+#derive(Eq, Debug)
 pub(all) enum ResourceRoot {
   ContainerRoot
   Subtree(EntryPath)
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ResourceRoot::parse(text : String) -> ResourceRoot? {
@@ -22,23 +23,26 @@ pub fn ResourceRoot::to_string(self : ResourceRoot) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 priv enum GlobToken {
   Literal(Char)
   Star
   Any
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 priv enum GlobPart {
   Recursive
   Component(Array[GlobToken])
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub struct GlobPattern {
   priv text : String
   priv parts : Array[GlobPart]
-} derive(Eq, Debug)
+}
 
 ///|
 /// *, ? and whole-component **. No escaping, classes or brace expansion.
@@ -131,17 +135,19 @@ pub fn GlobPattern::matches(self : GlobPattern, path : EntryPath) -> Bool {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ResourceSelector {
   Exact(EntryPath)
   Named(EntryPath, ResourceName)
   Matching(GlobPattern)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub struct Selection {
   root : ResourceRoot
   priv terms : Array[ResourceSelector]
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Selection::new(

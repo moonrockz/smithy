@@ -1,7 +1,8 @@
 ///|
+#derive(Debug)
 priv struct BoundedPattern {
   regex : @regex.Regex
-} derive(Debug)
+}
 
 ///|
 /// Search `text`, spending at most `work` units. Returns whether it matched and

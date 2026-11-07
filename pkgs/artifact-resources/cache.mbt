@@ -1,15 +1,17 @@
 ///|
+#derive(Eq, Debug)
 pub(all) enum AcquisitionMode {
   Online
   Offline
-} derive(Eq, Debug)
+}
 
 ///|
 /// Versioned keys scoped by provider. Providers may add pinned-reference mappings
 /// without using repository text or content digests as physical paths.
+#derive(Eq, Hash, Debug)
 pub struct CacheKey {
   priv value : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub fn CacheKey::reference(

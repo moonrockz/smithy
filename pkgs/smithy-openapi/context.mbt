@@ -1,8 +1,9 @@
 ///|
+#derive(Eq)
 priv enum Protocol {
   RestJson1
   RpcV2Json
-} derive(Eq)
+}
 
 ///|
 fn Protocol::id(self : Protocol) -> ProtocolId {

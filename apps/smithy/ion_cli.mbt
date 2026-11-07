@@ -1,7 +1,8 @@
 ///|
+#derive(Debug)
 priv suberror IonInputError {
   IonInputError(String, String, Int32?)
-} derive(Debug)
+}
 
 ///|
 fn parse_ion_input(

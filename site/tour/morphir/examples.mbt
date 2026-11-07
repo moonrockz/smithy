@@ -1,13 +1,14 @@
 ///|
 /// One example of the Morphir sources. `source` is the path in finos/morphir
 /// and `at` is a JSON pointer, or "line N" for a row of the compatibility kit.
+#derive(Eq, Debug)
 pub(all) struct Example {
   source : String
   at : String
   kind : Kind
   verdict : Verdict
   value : Json
-} derive(Eq, Debug)
+}
 
 ///|
 /// A value of a lesson that quotes an example of the Morphir sources.

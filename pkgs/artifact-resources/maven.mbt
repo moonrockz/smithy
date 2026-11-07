@@ -41,9 +41,10 @@ fn maven_timestamp_snapshot(text : String) -> Bool {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct MavenGroupId {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn MavenGroupId::parse(text : String) -> MavenGroupId? {
@@ -61,9 +62,10 @@ pub fn MavenGroupId::to_string(self : MavenGroupId) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct MavenArtifactId {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn MavenArtifactId::parse(text : String) -> MavenArtifactId? {
@@ -80,9 +82,10 @@ pub fn MavenArtifactId::to_string(self : MavenArtifactId) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct MavenVersion {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn MavenVersion::parse(text : String) -> MavenVersion? {
@@ -102,9 +105,10 @@ pub fn MavenVersion::to_string(self : MavenVersion) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct MavenClassifier {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn MavenClassifier::parse(text : String) -> MavenClassifier? {
@@ -122,12 +126,13 @@ pub fn MavenClassifier::to_string(self : MavenClassifier) -> String {
 
 ///|
 /// Direct JAR coordinates only. No mutable snapshots, ranges or POM traversal.
+#derive(Eq, Debug)
 pub(all) struct MavenCoordinates {
   group : MavenGroupId
   artifact : MavenArtifactId
   version : MavenVersion
   classifier : MavenClassifier?
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn MavenCoordinates::to_string(self : MavenCoordinates) -> String {
@@ -145,9 +150,10 @@ pub fn MavenCoordinates::to_string(self : MavenCoordinates) -> String {
 
 ///|
 /// A repository-relative artifact location, distinct from paths inside its JAR.
+#derive(Eq, Debug)
 pub struct MavenArtifactPath {
   priv value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn MavenArtifactPath::to_string(self : MavenArtifactPath) -> String {
@@ -211,10 +217,11 @@ pub fn MavenCoordinates::from_key(key : ArtifactKey) -> MavenCoordinates? {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum MavenChecksum {
   Sha1Sidecar
   Sha256Sidecar
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn MavenChecksum::algorithm(self : MavenChecksum) -> ChecksumAlgorithm {
@@ -225,18 +232,20 @@ pub fn MavenChecksum::algorithm(self : MavenChecksum) -> ChecksumAlgorithm {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum MavenVerification {
   PinnedDigest(ContentDigest)
   RepositoryChecksum(Acquisition, Checksum)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct MavenResolution {
   repository : RepositoryUrl
   coordinates : MavenCoordinates
   artifact : HttpUrl
   verification : MavenVerification
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn MavenResolution::to_string(self : MavenResolution) -> String {
@@ -253,12 +262,13 @@ pub fn MavenResolution::to_string(self : MavenResolution) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct MavenArchive {
   repository : RepositoryUrl
   coordinates : MavenCoordinates
   checksum : MavenChecksum
   expected_digest : ContentDigest?
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Provenance::maven_requested(

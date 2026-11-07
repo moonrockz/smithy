@@ -29,7 +29,7 @@ import {
   "moonrockz/smithy-openrpc@0.9.0",
   "moonrockz/smithy-syntax@0.9.0",
   "moonrockz/expect@0.6.1",
-  "moonrockz/moonspec@0.11.0",
+  "moonrockz/moonspec@0.12.0",
   "moonbitlang/async@0.22.5",
   "moonbitlang/x@0.5.5",
 }

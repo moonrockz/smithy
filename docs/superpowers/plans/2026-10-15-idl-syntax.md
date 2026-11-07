@@ -17,7 +17,7 @@
 - Functional style: public functions are pure (a value in, a value out, no hidden state). Mutation is allowed only for local accumulators and the parser's private cursor inside one `parse` call. Diagnostics are returned as values, never pushed into shared state across functions. Linear multi-stage flows are written as `|>` pipelines.
 - Text output goes through core's `Logger` trait (`&Logger`), the sink that `StringBuilder`, `@buffer.Buffer` and `Show::output` share; a renderer never holds a concrete `StringBuilder` in its API. The async `@io.Writer` of `moonbitlang/async` is byte-oriented and belongs to the CLI boundary (sub-project 5), which writes rendered strings to it.
 - Every value type with an invariant (`Offset`, `Length`, `Line`, `Column`, `Span`, `Depth`) has quickcheck laws beside its unit tests, in a `*_law_test.mbt` file.
-- Three test layers: unit and law tests inside `pkgs/smithy-syntax` (every target), the compatibility kit (TCK) parity tests in `tests/tck`, and acceptance features in Gherkin (`tests/features/*.feature`) run by `moonrockz/moonspec@0.11.0` from `tests/bdd`. The tests module depends on `moonbitlang/async`, which supports js and native, so `mise run test` runs the tests module on those two targets only; the library runs on all four.
+- Three test layers: unit and law tests inside `pkgs/smithy-syntax` (every target), the compatibility kit (TCK) parity tests in `tests/tck`, and acceptance features in Gherkin (`tests/features/*.feature`) run by `moonrockz/moonspec@0.12.0` from `tests/bdd`. The tests module depends on `moonbitlang/async`, which supports js and native, so `mise run test` runs the tests module on those two targets only; the library runs on all four.
 - LF and CRLF are line breaks; a lone CR is not.
 - Every AST node has `span`; every list field is `ArrayView[T]`; every public type derives `Eq, Debug`. `derive(Show)` is deprecated on this toolchain: write `impl Show` by hand where a type needs it.
 - Diagnostic codes are `SM-SCAN-001`..`SM-SCAN-007` and `SM-PARSE-001`..`SM-PARSE-011`, exactly as listed in Task 3; a test checks the table against what is emitted.
@@ -7975,7 +7975,7 @@ warnings = "-implicit_impl_as_method"
 import {
   "moonrockz/smithy-syntax@0.1.0",
   "moonrockz/expect@0.6.1",
-  "moonrockz/moonspec@0.11.0",
+  "moonrockz/moonspec@0.12.0",
   "moonbitlang/async@0.22.5",
   "moonbitlang/x@0.5.5",
 }

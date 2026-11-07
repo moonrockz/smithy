@@ -222,10 +222,11 @@ let harness : String =
   #|}
 
 ///|
+#derive(Eq, Debug)
 struct Options {
   checkout : String
   check : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 /// The options of `args`, without the script binary at index 0.
@@ -352,13 +353,14 @@ async fn read_sides(path : String) -> Array[(String, String)] {
 
 ///|
 /// What the harness writes for a case, from the lesson output name.
+#derive(Eq, Debug)
 struct Flags {
   json_schema : Bool
   json_ast : Bool
   openapi : String?
   http_protocols : Bool
   selector : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 fn flags_of(output : String?) -> Flags {

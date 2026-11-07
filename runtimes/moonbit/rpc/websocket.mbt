@@ -2,11 +2,12 @@
 // directions.
 
 ///|
+#derive(Eq)
 priv enum WsCloseState {
   Open
   Graceful
   Forced
-} derive(Eq)
+}
 
 ///|
 priv enum WsReaderState {

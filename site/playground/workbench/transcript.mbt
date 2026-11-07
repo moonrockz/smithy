@@ -1,11 +1,12 @@
 ///|
 /// A structure of the model with the `@jsonRpcProtocol` trait: the versions
 /// that it declares and its peer names, in trait order.
+#derive(Eq, Debug)
 pub(all) struct Protocol {
   id : String
   versions : Array[String]
   peers : Array[String]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Protocol with Eq::{equal, not_equal}
@@ -15,6 +16,7 @@ pub extend Protocol with @debug.Debug::{to_repr}
 
 ///|
 /// A transcript entry. `receiver` is `None` for a reply.
+#derive(Eq, Debug)
 pub(all) struct Entry {
   index : Int32
   sender : String
@@ -22,7 +24,7 @@ pub(all) struct Entry {
   message : String
   line : Int32?
   column : Int32?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Entry with Eq::{equal, not_equal}
@@ -33,6 +35,7 @@ pub extend Entry with @debug.Debug::{to_repr}
 ///|
 /// A transcript finding, as the library writes it. `severity` is "error" or
 /// "advisory"; `path` is a JSON pointer.
+#derive(Eq, Debug)
 pub(all) struct Finding {
   code : String
   severity : String
@@ -45,7 +48,7 @@ pub(all) struct Finding {
   path : String?
   shape : String?
   operation : String?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Finding with Eq::{equal, not_equal}
@@ -55,11 +58,12 @@ pub extend Finding with @debug.Debug::{to_repr}
 
 ///|
 /// An expected finding of the `expect` list of a transcript.
+#derive(Eq, Debug)
 pub(all) struct Expected {
   code : String
   entry : Int32?
   related : Int32?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Expected with Eq::{equal, not_equal}
@@ -69,12 +73,13 @@ pub extend Expected with @debug.Debug::{to_repr}
 
 ///|
 /// The match of the findings against the `expect` list.
+#derive(Eq, Debug)
 pub(all) struct Expectations {
   matched : Bool
   missing : Array[Expected]
   /// The unexpected error findings.
   unexpected : Array[Finding]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Expectations with Eq::{equal, not_equal}
@@ -85,6 +90,7 @@ pub extend Expectations with @debug.Debug::{to_repr}
 ///|
 /// The result at the end of a transcript. `lines`, `not_json` and `skipped`
 /// are the counts of a JSONL log.
+#derive(Eq, Debug)
 pub(all) struct Summary {
   valid : Bool
   complete : Bool
@@ -96,7 +102,7 @@ pub(all) struct Summary {
   not_json : Int32
   skipped : Int32
   expectations : Expectations?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Summary with Eq::{equal, not_equal}
@@ -106,10 +112,11 @@ pub extend Summary with @debug.Debug::{to_repr}
 
 ///|
 /// The kind of a log preset, for the picker.
+#derive(Eq, Debug)
 pub(all) enum LogKind {
   DirMessageLog
   RawLog
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend LogKind with Eq::{equal, not_equal}
@@ -120,6 +127,7 @@ pub extend LogKind with @debug.Debug::{to_repr}
 ///|
 /// How the Transcript tab checks the transcript text. `version` and `preset`
 /// apply to a JSONL log only; a document gives its own version.
+#derive(Eq, Debug)
 pub(all) struct Settings {
   protocol : String
   format : @samples.TranscriptFormat
@@ -127,7 +135,7 @@ pub(all) struct Settings {
   complete : Bool
   version : String
   preset : @samples.LogPreset
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Settings with Eq::{equal, not_equal}
@@ -234,6 +242,7 @@ fn Settings::fit(self : Settings, protocols : Array[Protocol]) -> Settings {
 /// and the page compares models after each message, so equality compares
 /// `revision` only. Each change has a new revision: the number of the answer
 /// that made it.
+#derive(Debug)
 pub(all) struct Log {
   revision : Int32
   entries : Array[Entry]
@@ -242,7 +251,7 @@ pub(all) struct Log {
   checked : Int32
   done : Bool
   summary : Summary?
-} derive(Debug)
+}
 
 ///|
 pub impl Eq for Log with fn equal(self, other) {
@@ -290,6 +299,7 @@ pub fn Log::add(
 
 ///|
 /// The state of the Transcript tab.
+#derive(Eq, Debug)
 pub(all) enum Checking {
   /// No check.
   TrIdle
@@ -301,7 +311,7 @@ pub(all) enum Checking {
   TrStopped
   /// The Worker stopped with an error, given by the browser, and was replaced.
   TrFailed(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Checking with Eq::{equal, not_equal}
@@ -311,11 +321,12 @@ pub extend Checking with @debug.Debug::{to_repr}
 
 ///|
 /// A button of the Transcript tab that waits for the Worker.
+#derive(Eq, Debug)
 pub(all) enum Action {
   StepAction
   RunAllAction
   ResetAction
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Action with Eq::{equal, not_equal}
@@ -325,13 +336,14 @@ pub extend Action with @debug.Debug::{to_repr}
 
 ///|
 /// What the check still needs after the request that runs.
+#derive(Eq, Debug)
 pub(all) enum Goal {
   NoGoal
   /// One entry: Step.
   OneStep
   /// Every entry, in groups: Run all.
   ToEnd
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Goal with Eq::{equal, not_equal}
@@ -341,11 +353,12 @@ pub extend Goal with @debug.Debug::{to_repr}
 
 ///|
 /// A transcript request.
+#derive(Eq, Debug)
 pub(all) enum TrRequest {
   Starting
   Stepping
   Resetting
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend TrRequest with Eq::{equal, not_equal}
@@ -356,11 +369,12 @@ pub extend TrRequest with @debug.Debug::{to_repr}
 ///|
 /// What the session of the Worker checks: the settings and the numbers of
 /// changes to the model and the transcript when it started.
+#derive(Eq, Debug)
 pub(all) struct Started {
   model_edits : Int32
   text_edits : Int32
   settings : Settings
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Started with Eq::{equal, not_equal}
@@ -706,10 +720,11 @@ fn transcript_update(m : Model, msg : Msg) -> (Model, Array[Effect]) {
 ///|
 /// A row of the entry list: an entry, or a number of entries that the list
 /// does not show.
+#derive(Eq, Debug)
 pub(all) enum Row {
   Shown(Int32)
   Hidden(Int32)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Row with Eq::{equal, not_equal}

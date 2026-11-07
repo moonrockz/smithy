@@ -27,6 +27,7 @@
 ///   inspect(file.statements.length(), content="1")
 /// }
 /// ```
+#derive(Eq, Debug)
 pub(all) enum NodeRef {
   File(@ast.IdlFile, ArrayView[@scanner.Comment])
   Control(@ast.ControlStatement)
@@ -47,7 +48,7 @@ pub(all) enum NodeRef {
   Name(@ast.Node[String])
   Doc(@ast.DocComment)
   Comment(@scanner.Comment)
-} derive(Eq, Debug)
+}
 
 ///|
 /// The file node of `result`, or `None` when the parser read no AST. The

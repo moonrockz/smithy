@@ -1,29 +1,33 @@
 ///|
+#derive(Debug)
 pub(all) suberror ConfigurationError {
   ConfigurationError(String)
-} derive(Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum CompileLimit {
   SourceLength
   Nesting
   Expansion
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Debug)
 pub(all) suberror CompileError {
   InvalidPattern(String)
   UnsupportedPattern(String)
   CompilationLimit(CompileLimit)
-} derive(Debug)
+}
 
 ///|
 /// Finite compilation bounds. Construct with `CompileLimits::new`.
+#derive(Eq, Debug)
 pub struct CompileLimits {
   priv source_units : Int32
   priv nesting : Int32
   priv expanded_units : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn CompileLimits::new(
@@ -46,9 +50,10 @@ pub fn CompileLimits::new(
 
 ///|
 /// A finite search allowance. Zero represents an already-spent allowance.
+#derive(Eq, Debug)
 pub struct WorkLimit {
   priv units : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn WorkLimit::new(units : Int32) -> WorkLimit raise ConfigurationError {
@@ -65,10 +70,11 @@ pub fn WorkLimit::units(self : WorkLimit) -> Int32 {
 
 ///|
 /// Complete carries the Boolean result and used units. Exhausted carries used units.
+#derive(Eq, Debug)
 pub(all) enum MatchOutcome {
   Complete(Bool, Int32)
   Exhausted(Int32)
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn MatchOutcome::used(self : MatchOutcome) -> Int32 {

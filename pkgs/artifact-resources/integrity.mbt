@@ -1,9 +1,10 @@
 ///|
+#derive(Eq, Debug)
 pub(all) enum ChecksumAlgorithm {
   Sha1
   Sha256
   Sha512
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ChecksumAlgorithm::to_string(self : ChecksumAlgorithm) -> String {
@@ -34,10 +35,11 @@ fn ChecksumAlgorithm::rank(self : ChecksumAlgorithm) -> Int32 {
 
 ///|
 /// An algorithm and digest validated together at the boundary.
+#derive(Eq, Debug)
 pub struct Checksum {
   algorithm : ChecksumAlgorithm
   priv digest : Bytes
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Checksum::parse_hex(
@@ -90,17 +92,19 @@ fn ChecksumAlgorithm::digest(self : ChecksumAlgorithm, body : Bytes) -> Bytes {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum NpmIntegritySource {
   Sri
   Shasum
-} derive(Eq, Debug)
+}
 
 ///|
 /// Only the strongest supported SRI algorithm participates in verification.
+#derive(Eq, Debug)
 pub struct NpmIntegrity {
   source : NpmIntegritySource
   priv checksums : Array[Checksum]
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn NpmIntegrity::parse_sri(text : String) -> NpmIntegrity? {

@@ -1,17 +1,19 @@
 ///|
 /// A source position. Occurrences distinguish repeated native object fields.
+#derive(Eq, Debug, Hash)
 pub(all) enum InstanceStep {
   Field(String, Int32)
   Index(Int32)
   FieldPosition(Int32)
   FieldNamePosition(Int32)
   MapKey(String, Int32)
-} derive(Eq, Debug, Hash)
+}
 
 ///|
+#derive(Eq, Debug, Hash)
 pub struct InstancePath {
   priv parts : Array[InstanceStep]
-} derive(Eq, Debug, Hash)
+}
 
 ///|
 pub fn InstancePath::root() -> InstancePath {

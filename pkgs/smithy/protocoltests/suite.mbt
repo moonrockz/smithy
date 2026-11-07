@@ -1,10 +1,12 @@
 ///|
+#derive(Debug)
 pub(all) suberror SuiteError {
   InvalidSuite(String)
-} derive(Debug)
+}
 
 ///|
-pub struct CaseId(String) derive(Eq, Debug)
+#derive(Eq, Debug)
+pub struct CaseId(String)
 
 ///|
 /// Validate the pinned test trait's case-ID constraint independently of shape IDs.
@@ -26,17 +28,19 @@ pub fn CaseId::to_string(self : CaseId) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum Side {
   Client
   Server
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum Subject {
   Request(operation~ : @smithy.ShapeId, input~ : @smithy.ShapeId)
   Response(operation~ : @smithy.ShapeId, output~ : @smithy.ShapeId)
   ErrorResponse(error~ : @smithy.ShapeId)
-} derive(Eq, Debug)
+}
 
 ///|
 pub struct Case {

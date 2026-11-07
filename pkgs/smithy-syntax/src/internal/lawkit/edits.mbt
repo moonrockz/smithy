@@ -3,10 +3,11 @@
 /// inserted (from the token pieces) or one replaced. For laws about
 /// recovery: the parser must not crash, the CST stays lossless, and at
 /// most a few diagnostics come out of a single edit.
+#derive(Debug)
 pub(all) struct EditedModel {
   text : String
   edit_offset : @span.Offset
-} derive(Debug)
+}
 
 ///|
 /// The edited text.

@@ -1,5 +1,6 @@
 ///|
 /// Legacy local discovery or explicitly selected resources in a local container.
+#derive(Eq, Debug)
 pub(all) enum BuildInput {
   Npm(@resources.NpmArchive, @resources.Selection)
   Maven(@resources.MavenArchive, @resources.Selection?)
@@ -7,7 +8,7 @@ pub(all) enum BuildInput {
   Remote(@resources.PublicArchive, @resources.Selection)
   Local(@resources.RepositoryLocation)
   Selected(@resources.RepositoryLocation, @resources.Selection)
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn BuildInput::from_path(path : String) -> BuildInput raise BuildError {

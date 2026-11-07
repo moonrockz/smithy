@@ -1,4 +1,5 @@
 ///|
+#derive(Eq, Debug)
 pub(all) enum ResourceCode {
   MissingPackageVersion
   MissingArtifact
@@ -33,7 +34,7 @@ pub(all) enum ResourceCode {
   MissingSelection
   MissingRoot
   ProviderFailure
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ResourceCode::to_string(self : ResourceCode) -> String {
